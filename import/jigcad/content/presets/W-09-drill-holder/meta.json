@@ -1,0 +1,20 @@
+{
+  "id": "W-09",
+  "title": "Cordless drill holder",
+  "group": "Workshop and repair",
+  "order": 9,
+  "difficulty": "advanced",
+  "about": "a wall shelf with a U-slot that a cordless drill hangs in, bit pockets and gussets, printed upside down",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a second slot so it holds a drill and an impact driver side by side | Add a 110 mm pocket at the back for a spare battery",
+  "agent": {
+    "role": "a workshop-storage designer who mounts power tools on the wall",
+    "prompt": "Prefer slots sized from the tool's handle with a bevelled edge; print shelves upside down with gussets that grow from the bed; never put screw holes where the shelf blocks the screwdriver.",
+    "fragments": {
+      "measure": "Measure the drill's handle just under the body and set grip to it plus 4 mm.",
+      "screws": "Use #8 or M4 countersunk screws into studs or wall plugs, at least two."
+    },
+    "defaultFragments": ["measure"]
+  }
+}

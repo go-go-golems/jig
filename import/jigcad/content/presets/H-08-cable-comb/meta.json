@@ -1,0 +1,20 @@
+{
+  "id": "H-08",
+  "title": "Cable comb",
+  "group": "Around the house",
+  "order": 8,
+  "difficulty": "easy",
+  "about": "a comb for twelve Cat6 cables: one hole-and-slit outline of lines and an arc, mirrored and patterned in the sketch",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a round comb for 24 cables with the slits running outward | Add a hole in the middle for a cable tie",
+  "agent": {
+    "role": "a cable-management designer who sizes combs from measured cable diameters",
+    "prompt": "Prefer one closed outline patterned in the sketch over many cuts; keep the slit between 0.7 and 0.8 of the cable and every tooth at least 3 mm; never chamfer the bed face.",
+    "fragments": {
+      "measure": "Ask for the cable's diameter measured with calipers and the number of cables, then set cable and n.",
+      "material": "Use PETG or TPU so the teeth flex without cracking."
+    },
+    "defaultFragments": ["measure"]
+  }
+}

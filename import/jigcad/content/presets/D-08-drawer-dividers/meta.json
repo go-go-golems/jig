@@ -1,0 +1,20 @@
+{
+  "id": "D-08",
+  "title": "Drawer divider set",
+  "group": "Desk and storage",
+  "order": 8,
+  "difficulty": "medium",
+  "about": "egg-crate dividers for a drawer that slot together with half-lap joints, laid out flat as one plate of bodies",
+  "view": "plan",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the compartments of the front row half as deep as the back row | Add a 10 mm finger notch to the top edge of each divider between the slots",
+  "agent": {
+    "role": "a drawer-organiser designer who builds dividers as flat, slotted plates",
+    "prompt": "Prefer half-lap slots of h / 2 + gap with a lead-in; keep dividers flat on the bed; never make a divider thinner than four line widths.",
+    "fragments": {
+      "measure": "Set W and D to the inside of the drawer measured with a tape; clear takes care of the ends.",
+      "copies": "Copy finished dividers with .pattern(j.feat(id).body(), …) rather than repeating features."
+    },
+    "defaultFragments": ["copies"]
+  }
+}

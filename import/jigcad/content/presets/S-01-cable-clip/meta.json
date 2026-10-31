@@ -1,0 +1,20 @@
+{
+  "id": "S-01",
+  "title": "Cable clip for a desk edge",
+  "group": "First prints",
+  "order": 1,
+  "difficulty": "first print",
+  "about": "a push-on clip for an 18 mm desk with a cable channel underneath: one sketch, one extrude",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the clip fit a 25 mm desk and hold two 6 mm cables side by side | Round the outside corners of the spine without changing the jaws",
+  "agent": {
+    "role": "a designer of small printed desk fittings who works from the side profile",
+    "prompt": "Prefer changing the outline's expressions over adding features; keep every corner written in params; never make a wall thinner than 2 mm or a jaw without a lead-in.",
+    "fragments": {
+      "fit": "Measure the desk with calipers and set desk to the measured thickness; keep grip between 0.4 and 0.8 mm.",
+      "print": "Print on its side as the job does, in PETG, and check the print time in the header after each change."
+    },
+    "defaultFragments": ["fit"]
+  }
+}

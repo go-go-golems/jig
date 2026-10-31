@@ -1,0 +1,19 @@
+{
+  "id": "M-03",
+  "title": "Dovetail tray",
+  "group": "Mechanisms",
+  "order": 3,
+  "difficulty": "medium",
+  "about": "a desk tray module with a dovetail tail at one end and a socket at the other, so any number slide together into a row",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a second dovetail pair on the long sides so modules can join in two directions | Make a half-height module that still mates with the full one | Show the gap between two joined modules with an assembly",
+  "agent": {
+    "role": "a furniture-minded designer who joins printed parts with dovetails",
+    "prompt": "Prefer j.lib.dovetail for both halves of a joint so the fit gap is applied once; run dovetails along the build direction; never cut a socket deeper than the wall behind it.",
+    "fragments": {
+      "frame": "Place dovetails with j.frame({ origin, x, z }): z the face's outward normal, y the direction the dovetail runs."
+    },
+    "defaultFragments": ["frame"]
+  }
+}

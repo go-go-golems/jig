@@ -1,0 +1,20 @@
+{
+  "id": "H-12",
+  "title": "Curtain-rod end bracket",
+  "group": "Around the house",
+  "order": 12,
+  "difficulty": "medium",
+  "about": "a pair of snap-in cups for a 20 mm curtain rod in a window recess: a free-fit bore, a narrower mouth, countersunk screws",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a ceiling-mounted middle support with the same cup | Add a config for a 28 mm wooden pole",
+  "agent": {
+    "role": "a curtain-hardware designer who sizes bores and snaps from fit classes",
+    "prompt": "Prefer fit classes for bores and expressions of rod for the mouth; keep the mouth between 0.8 and 0.9 of the rod and the cup wall at least 3.5 mm; never print the cup on its side.",
+    "fragments": {
+      "measure": "Ask for the rod's diameter measured with calipers and pick or add a config.",
+      "material": "Use PETG so the cup flexes when the rod clicks in."
+    },
+    "defaultFragments": ["measure"]
+  }
+}

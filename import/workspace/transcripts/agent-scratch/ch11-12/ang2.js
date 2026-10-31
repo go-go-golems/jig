@@ -1,0 +1,5 @@
+return j.sketch('tri', { on: j.plane.XY })
+  .polyline('t', [[0, 0], [40, 0], [40, 23]], { closed: true })
+  .dim(['t.1', 't.2'], deg(90))
+  .dim(['t.2', 't.3'], deg(60))
+  .dim(['t.3', 't.1'], deg(31))

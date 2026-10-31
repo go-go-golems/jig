@@ -1,0 +1,4 @@
+return j.part('p')
+  .extrude(j.region.circle(20), mm(8), { id: 'disc' })
+  .extrude(j.region.circle(8).on(j.plane.offset(j.plane.XY, 8)), mm(5), { id: 'hub' })
+  .extrude(j.region.circle(3, { at: [12, 0] }).on(j.plane.offset(j.plane.XY, 8)), mm(14), { id: 'crank' })

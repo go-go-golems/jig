@@ -1,0 +1,8 @@
+{
+  "id": "E-01",
+  "title": "Search a wall hook",
+  "group": "Design process",
+  "about": "A J-shaped hook searched over arm thickness and width: mass against a bending proxy.",
+  "view": "side",
+  "overlays": "shadows,grid,dims"
+}

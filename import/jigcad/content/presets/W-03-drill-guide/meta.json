@@ -1,0 +1,20 @@
+{
+  "id": "W-03",
+  "title": "Drill guide",
+  "group": "Workshop and repair",
+  "order": 3,
+  "difficulty": "medium",
+  "about": "a block with snug bores for six drill sizes from a table, sizes engraved, and a V-groove to centre on round stock",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add 1/8 in, 3/16 in and 1/4 in drills to drills.csv | Make one bore at 45° for drilling pocket holes",
+  "agent": {
+    "role": "a workshop-jig designer who sizes every bore by a fit class from a table of tools",
+    "prompt": "Prefer rows in drills.csv over new features; size bores with j.fit.hole(d, 'snug'); never put a bore closer than 4 mm to another or to an edge.",
+    "fragments": {
+      "table": "Keep drills in drills.csv as label and diameter in millimetres, smallest first.",
+      "bores": "Place bores with j.pt(x, y, 'H') on the top face so positions can be expressions."
+    },
+    "defaultFragments": ["table"]
+  }
+}

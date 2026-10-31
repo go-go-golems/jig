@@ -1,0 +1,416 @@
+// 14 · Printable joints and hardware: where plastic meets metal, and plastic meets itself
+//
+// Model
+//   A lib item is a parametric part or feature with ports (frames you can mate to) and a fit-aware size.
+//   Every hole size is resolved in context: modelled Ø = nominal + 2·c(class) + holeComp(printer).
+//   Cantilever snap hook (rectangular section, constant thickness), from beam theory:
+//     strain at the root ε = 1.5·t·y / L²   ⇔   permissible deflection y = 0.67·ε·L² / t
+//   A living hinge is a thin flexure (t ≈ 2 layers) whose life depends on the extrusion direction, not just the material.
+//   Embedded parts (magnets, nuts) need a pause at the layer where the pocket is bridged over: z_top / layer.
+//
+// Grounding
+//   Cantilever beam theory as used in snap-fit design guides (y = 0.67·ε·L²/t); insert and fastener sizes
+//   from vendor tables and ISO standards.
+//
+// Notice
+//   - Hardware sizes come from standards tables, and clearances come from the fit profile, so one design adapts per printer.
+//   - j.inspect.snap uses the beam formula the design check uses; the suite tests it as snap.deflection.
+//   - Orientation matters as much as geometry: hooks and hinges must bend within layers, not across them.
+//   - Ports turn "put the screw here" into a frame that survives edits (used in 15).
+//
+// Results in `// →` comments show the illustrative shape of a result.
+
+import { j, mm, deg, lw, layer } from 'jig'
+
+// ── Fixture: the bottom shell of a small sensor case ─────────────────────────
+const shell = j.part('sensor-case')
+  .material(j.material('PETG'))
+  .extrude(j.sketch('b', { on: j.plane.XY }).rect('r', 60, 40, { center: true, r: 4 }).profiles(), mm(20), { id: 'body' })
+  .shell(j.feat('body').endFace(), lw(4), { id: 'walls' })                      // 1.8 mm walls, 1.8 mm floor
+const floor = j.feat('walls').faces().and(j.sel.faces('+Z')).expect(1)
+
+// ── 1. Heat-set insert bosses ───────────────────────────────────────────────
+const insert = j.lib.insert('M3x5.7')
+const withBosses = shell
+  .add(insert.boss({ wall: lw(3) }), { at: j.frame.on(floor).moved(j.tx.move(-24, -14, 0)), id: 'boss' })
+  .pattern(j.feat('boss'), j.pattern.mirror(j.plane.YZ).times(j.pattern.mirror(j.plane.XZ)), { id: 'bosses' })
+  .port('lid', j.frame.on(j.feat('body').endFace()))
+
+j.compile(withBosses).feature('boss')
+// → { hole: Ø4.0 × 6.7 mm (insert 5.7 + 1.0 melt room), boss: Ø6.7 mm (4.0 + 2·lw(3)), height: 8 mm,
+//     suggests: { modifier: 'walls 4 within 2 mm of the hole' } }   (picked up by the print job, see 19)
+
+// ── 2. Screws: clearance, self-tap, and a side-loaded nut trap ──────────────
+const ear = j.sketch('ear', { on: j.feat('body').sideFace('r.right') }).rect('e', 12, 8, { at: [0, 4], center: true })
+const mounted = withBosses
+  .extrude(ear.profiles(), mm(8), { id: 'ear' })
+  .hole([j.point.center(j.feat('ear').endFace())], j.hole.clearance('M3', { fit: 'slide', depth: mm(8) }), { id: 'through' })
+  .hole([j.pt(0, -14, 1.8)], j.hole.tapped('M3', { depth: mm(8), method: 'self-tap' }), { id: 'pcbScrew' })
+  .hole([j.pt(-20, 0, 10)], j.hole.nutTrap('M3', { kind: 'hex', from: 'side' }), { id: 'trap' })
+
+const M = j.compile(mounted)
+M.feature('through').modelled              // → Ø3.5 mm   = 3 + 2 × 0.20 (slide) + 0.1 (holeComp)
+M.feature('pcbScrew').modelled             // → Ø2.9 mm   prints ≈ 2.75 mm, so the screw cuts its own thread
+M.feature('trap').modelled
+// → { slot: 5.9 × 2.8 mm (AF 5.5 + 2 × 0.2; nut 2.4 + 0.4), roof: 'bridge 5.9 mm', bolt: Ø3.5 mm }
+j.check(M, j.rules.fdm).filter(d => d.at === 'trap')    // → []   bridge 5.9 mm ≤ 10 mm
+
+// ── 3. A cantilever snap-fit, and its law ───────────────────────────────────
+const hook = j.lib.snap.cantilever({
+  length: mm(12), thickness: mm(1.6), deflection: mm(1.0),
+  material: j.material('PETG'), angle: deg(30), retention: deg(90),
+})
+j.inspect.snap(hook)
+// → { strain: 0.0167 (1.5·1.6·1.0/12²), allowable: 0.025 (PETG), permissibleDeflection: 1.51 mm (0.67·0.025·144/1.6), ratio: 0.67 }
+j.compile(mounted.add(hook, { at: j.frame.on(j.feat('walls').faces().and(j.sel.faces('-X')).expect(1)) })).metric('snapStrain')
+// → 0.67   (peak strain / allowable)
+
+const stubby = j.lib.snap.cantilever({ length: mm(8), thickness: mm(1.6), deflection: mm(1.0), material: j.material('PETG') })
+j.compile(shell.add(stubby, { at: j.frame.on(floor) })).diagnostics
+// → [{ level: 'error', kind: 'print.snapStrain', message: 'ε = 3.75 % > 2.5 % allowable (PETG)',
+//      fix: 'length ≥ 9.8 mm at t = 1.6 mm, or thickness ≤ 1.07 mm at L = 8 mm' }]
+
+// Orientation: the hook must bend in the XY plane of the print, or it splits along a layer line.
+j.compile(j.print('case', { parts: [mounted.add(hook, { at: j.frame.on(floor) })] }).use(j.preset.functional)).summary().orientation
+// → { 'sensor-case': '+Z', reason: 'functional: snap hooks bend within layers (layerStrengthRisk 0.00)' }
+
+// ── 4. A living hinge: thickness in layers, life in line direction ──────────
+const cap = j.part('flip-cap')
+  .material(j.material('PP'))
+  .extrude(j.sketch('c', { on: j.plane.XY }).rect('base', 30, 20, { at: [0, 0] }).rect('lid', 30, 20, { at: [31, 0] }).profiles(), mm(2), { id: 'leaves' })
+  .add(j.lib.hinge.living({ length: mm(30), thickness: layer(2), material: 'PP' }),
+    { at: j.frame({ origin: j.pt(30.5, 10, 0), x: j.dir('+Y'), z: j.dir('+Z') }), id: 'hinge' })
+j.compile(cap).feature('hinge')
+// → { thickness: 0.4 mm (2 layers), gap: 1 mm, bendRadius: 0.5 mm, mustPrint: 'flat, first layers, lines across the hinge' }
+const capJob = j.print('cap', { material: j.material('PP'), parts: [cap] })
+  .modifier(j.feat('hinge').faces(), { lineAngle: 'across' })           // lines along the hinge break within a few flexes
+
+// ── 5. A dovetail with a fit class ──────────────────────────────────────────
+const tail = j.lib.dovetail({ width: mm(20), depth: mm(6), angle: deg(15), fit: 'slide' })
+const left = j.part('left').extrude(j.region.rect(80, 40), mm(10), { id: 'b' })
+  .add(tail, { at: j.frame.on(j.sel.faces('>X').of('left').expect(1)), op: 'join', id: 'dovetail' })
+const right = j.part('right').extrude(j.region.rect(80, 40), mm(10), { id: 'b' })
+  .add(tail, { at: j.frame.on(j.sel.faces('<X').of('right').expect(1)), op: 'cut', id: 'dovetail' })
+j.compile(right).feature('dovetail').modelled
+// → { socket: 20.4 × 6.2 mm at 15°, gap: 0.2 mm per flank (slide) }   (op 'cut' gets the gap; op 'join' stays nominal)
+
+// ── 6. A magnet pocket, closed over with a pause ────────────────────────────
+const magnet = j.lib.magnet({ d: mm(6), h: mm(3) })
+const tile = left.add(magnet, { at: j.frame.on(j.sel.faces('<Z').of('left')).moved(j.tx.move(0, 0, 1.0)), op: 'cut', fit: 'press', id: 'magnet' })
+j.compile(tile).feature('magnet').modelled                       // → { pocket: Ø6.2 × 3.2 mm, z: 1.0–4.2 mm, closed: true (10 mm tile) }
+const tileJob = j.print('tile', { parts: [tile] })
+  .modifier(j.feat('magnet').faces(), { pause: 'before-cover', message: 'insert 6×3 magnet, north up' })
+j.compile(tileJob).layers.pauses
+// → [{ afterLayer: 21, z: 4.2 mm, message: 'insert 6×3 magnet, north up' }]   (4.2 / 0.2 = 21; layer 22 bridges the pocket)
+
+// ── 7. Pins and ports ───────────────────────────────────────────────────────
+const dowel = j.lib.dowel({ d: mm(3), l: mm(10), fit: 'press' })   // a steel dowel aligning the two dovetailed halves
+const pinned = left.add(dowel, { at: j.frame.on(j.sel.faces('>X').of('left')).moved(j.tx.move(0, 12, 0)), op: 'cut', id: 'pin' })
+j.compile(pinned).feature('pin').modelled                        // → { hole: Ø3.2 × 5.5 mm }  = 3 + 2 × 0.05 (press) + 0.1 (holeComp)
+const screw = j.lib.screw('ISO 7380', 'M3x8')
+screw.port('head')                                               // → Frame at the bearing face, z along the axis
+screw.port('tip')
+j.compile(withBosses).node('port:lid')
+// → { kind: 'port', frame: { origin: [0, 0, 20], z: '+Z' }, from: 'body/end' }   mate 'sensor-case:lid' in an assembly (15)
+// 18 · Orientation, overhangs and supports: optimisation on the sphere
+//
+// Model
+//   An orientation is a build direction u ∈ S² (plus a free rotation about u that only matters for packing).
+//   Overhang is a predicate on face normals: face f overhangs under u when −n_f · u > sin θ_max (θ from vertical).
+//   Support volume ≈ ∫ over overhanging area of the height down to the part or the bed (columns, or trees).
+//   Choosing u is minimisation over S²: evaluate 26 candidates (cube faces, edges, corners), then refine by descent
+//   along geodesics. Objectives are orders on the candidates: lexicographic and weighted orders can disagree.
+//   Orientation and geometry are coupled: horizontal holes (axis ⟂ u) become teardrops, which changes overhangs.
+//
+// Grounding
+//   The 45° overhang rule is an empirical heuristic, calibrated per printer. Choosing an orientation is
+//   optimisation over directions on the sphere.
+//
+// Notice
+//   - The default is lexicographic: support volume, then bed contact, then height. Every candidate is kept as an alternative.
+//   - When two sensible objectives disagree, the disagreement is the trade-off; jig shows the break-even weight.
+//   - preset.functional puts layer strength first, which needs a load: the preset takes it as a parameter.
+//   - The teardrop ↔ orientation cycle is a fixpoint; the trace shows it converge.
+//
+// Results in `// →` comments show the illustrative shape of a result.
+
+import { j, mm, deg } from 'jig'
+
+// ── Fixture: an L-bracket with two screw holes and a cable hole ───────────────
+const baseHoles = j.sketch('hb', { on: j.plane.offset(j.plane.XY, mm(5)) }).point('p1', [15, 18]).point('p2', [45, 18])
+const cableHole = j.sketch('hc', { on: j.plane.XZ }).point('p', [30, 30])
+const bracket = j.part('bracket').material(j.material('PETG'))
+  .add(j.box(60, 30, 5), { id: 'base' })                                     // 60 × 30 × 5, on the XY plane
+  .add(j.box(60, 5, 40), { at: j.tx.move(0, 0, 5), id: 'upright' })          // 60 × 5 × 40, total height 45
+  .hole(baseHoles, j.hole.clearance('M4', { fit: 'free' }), { id: 'screws' })
+  .hole(cableHole, j.hole.simple(mm(8), mm(5)), { id: 'cable' })
+const job = j.print('bracket', { printer: j.printer('mk4'), material: j.material('PETG'), parts: [bracket] })
+
+// ── 1. Overhang is a predicate on normals ────────────────────────────────────
+const up = j.dir('+Z')
+const overhanging = j.sel.faces().of('bracket').where(f => -f.normal.dot(up) > j.q.sin(deg(45)))
+j.compile(bracket).faces(overhanging)                          // → ['cable/bore (upper 90°)']   the top of a round horizontal hole
+j.inspect.overhang(bracket, { dir: '+Z', max: deg(45) }).area   // → 31 mm²: the same face (6.3 mm of arc × 5 mm deep)
+
+// ── 2. The default: 'auto', lexicographic ────────────────────────────────────
+const P = j.compile(job)
+P.decisions.find(d => d.kind === 'orient')
+// → { at: 'bracket', kind: 'orient', chose: '+Y',
+//     reason: 'lexicographic: support 0 mm³ → bed contact 2650 mm² → height 30 mm',
+//     alternatives: [                                  // scored on the current geometry: holes shaped for +Y
+//       { dir: '+Y', supportVolume: 0,       bedContact: 2650 mm², height: 30 mm, printTime: 52 min },
+//       { dir: '+Z', supportVolume: 206 mm³, bedContact: 1765 mm², height: 45 mm, printTime: 58 min },   // inside the round cable hole
+//       { dir: '+X', supportVolume: 348 mm³, bedContact:  350 mm², height: 60 mm, printTime: 71 min },   // inside all three holes
+//       …, { dir: '-Z', supportVolume: 8900 mm³ (tree; grid would be 60'000), bedContact: 300 mm², height: 45 mm, printTime: 96 min } ] }
+
+// ── 3. Orientation as a design variable on S² ────────────────────────────────
+const space = j.design({ up: j.param.dir({ samples: 26 }) }, p => job.orient(p.up))
+const coarse = await j.search.grid(space, { objective: j.objective.minimize('supportVolume') })
+const fine = await j.search.descent(space, { from: coarse.best.point, steps: 20 })
+fine.best.point                       // → { up: '+Y' }   moved 0°: a flat face down is a local minimum for prismatic parts
+// Each grid point compiles with its orientation fixed, so its holes get their own teardrops: no fixpoint needed there.
+
+// ── 4. Two reasonable objectives disagree ────────────────────────────────────
+// A shelf load pushes down on the base; the upright is screwed to a wall.
+const loaded = bracket.use(j.preset.functional({
+  load: { at: j.sel.faces('>Z').of('base'), dir: '-Z' },
+  fixed: j.sel.faces('<Y').of('upright'),
+}))
+const loadedJob = j.print('bracket-loaded', { printer: j.printer('mk4'), material: j.material('PETG'), parts: [loaded] })
+const loadedSpace = j.design({ up: j.param.dir({ samples: 26 }) }, p => loadedJob.orient(p.up))
+
+const lex = j.objective.lexicographic(['supportVolume', j.objective.maximize('bedContact'), 'height'])
+const weighted = j.objective.weighted({ time: ['printTime', 1], risk: ['layerStrengthRisk', 40] })   // 40 min per unit of risk
+
+const rLex = await j.search.grid(loadedSpace, { objective: lex })
+const rW = await j.search.grid(loadedSpace, { objective: weighted })
+rLex.best.point                       // → { up: '+Y' }
+rW.best.point                         // → { up: '+X' }
+rW.table()
+// → up   printTime  layerStrengthRisk  score
+//   +X   71 min     0.05               73.0     the L lies flat: bending stays inside each layer
+//   +Y   52 min     0.60               76.0     the base bends across its layers
+//   +Z   58 min     0.80               90.0     the upright bends across its layers at the corner
+// Break-even: +X costs 19 min for 0.55 less risk, so it wins whenever risk is worth more than 19 / 0.55 = 34.5 min.
+
+// ── 5. preset.functional: strength first ─────────────────────────────────────
+const F = j.compile(loadedJob)
+F.summary().orientation               // → { bracket: '+X', reason: 'functional: layerStrengthRisk 0.05 (next: +Y 0.60)' }
+F.metrics()                           // → { supportVolume: 0, bedContact: 350 mm², height: 60 mm, printTime: 71 min, layerStrengthRisk: 0.05 }
+
+// ── 6. Supports, when you cannot avoid them ──────────────────────────────────
+const flipped = job.orient('-Z')
+j.compile(flipped.supports({ kind: 'tree', angle: deg(45) })).metric('supportVolume')   // → 8'900 mm³
+j.compile(flipped.supports({ kind: 'grid' })).metric('supportVolume')                   // → 60'000 mm³  (1500 mm² × 40 mm)
+j.compile(flipped.supports({ kind: 'tree', angle: deg(55) })).metric('supportVolume')   // → 8'900 mm³   (the base is flat: 90°)
+
+// ── 7. The teardrop ↔ orientation fixpoint ───────────────────────────────────
+P.trace.filter(t => ['orient', 'teardrops', 'fixpoint'].includes(t.pass))
+// → [{ pass: 'orient',    level: 'L5', iter: 1, note: '+Y: support 142 mm³ (2 round screw holes) beats +Z 206 mm³, +X 348 mm³' },
+//    { pass: 'teardrops', level: 'L4', iter: 1, note: 'screws.p1, screws.p2 → teardrop (axis ⟂ +Y), cable stays round' },
+//    { pass: 'orient',    level: 'L5', iter: 2, note: '+Y: support 0 mm³' },
+//    { pass: 'teardrops', level: 'L4', iter: 2, cached: true, note: 'unchanged' },
+//    { pass: 'fixpoint',  note: 'converged in 2' }]
+P.why(j.feat('screws').bores())
+// → { chain: ['clearance M4 free → Ø 4.7 mm', 'axis Z ⟂ build direction +Y → 45° teardrop, tip toward +Y'], decidedIn: 'iteration 1' }
+// 19 · Split to fit, plates, colours: when the object is bigger than the printer
+//
+// Model
+//   A part fits a bed B when some orientation and placement puts its footprint inside B and its height under B_z.
+//   Splitting cuts a solid S by planes into pieces Sᵢ with ∪ Sᵢ = S (volumes add exactly: Σ vol Sᵢ = vol S).
+//   The seam cost of a cut plane is the area of S ∩ plane that ends up on visible faces; jig minimises it subject to fit.
+//   Joints restore alignment: each dowel needs material d + 2·lw(2) around it, so thin walls get local bosses.
+//   Plates are 2D bin packing of footprints (NP-hard; skyline heuristic by default).
+//   Packing bound: Σ footprint areas ≤ plates × bed area, so plates ≥ ⌈Σ A / A_bed⌉.
+//
+// Grounding
+//   Plane partitions of solids; 2D bin packing with no-fit polygons, reported against the area lower bound.
+//
+// Notice
+//   - Splitting is a print-job decision, not a modelling one: the part stays whole and parametric.
+//   - The cut position is a decision with a reason, and the rejected positions stay listed as alternatives.
+//   - Hardware the split needs (dowels) joins the job automatically, so the BOM and plates stay honest.
+//   - Colour and material are assigned by selector, so they survive edits like everything else.
+//
+// Results in `// →` comments show the illustrative shape of a result.
+
+import { j, mm } from 'jig'
+
+// ── Fixture: a desk tray longer than the bed ─────────────────────────────────
+const tray = j.part('tray')
+  .params({ L: mm(320), W: mm(140), H: mm(40), wall: mm(3) })
+  .extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 'L', 'W', { r: 6 }).profiles(), 'H', { id: 'body' })
+  .shell(j.feat('body').endFace(), 'wall', { id: 'shell' })
+  .emboss(j.region.text('DESK', { size: mm(12), font: 'Inter Black', at: [160, 70] }), mm(0.6),
+    { on: j.feat('shell').faces().and(j.sel.faces('+Z')).expect(1), op: 'join', id: 'label' })   // on the floor, x ≈ 140–180
+  .add(j.box(10, 10, 1.5), { at: j.tx.move(10, 10, -1.5), id: 'foot' })
+  .pattern(j.feat('foot').body(), j.pattern.mirror(j.plane.offset(j.plane.YZ, mm(160))).times(j.pattern.mirror(j.plane.offset(j.plane.XZ, mm(70)))))
+
+const mk4 = j.printer('mk4')            // bed 250 × 210 × 220 mm
+const job = j.print('desk', { printer: mk4, material: j.material('PLA') })
+  .add('tray', tray)
+
+// ── 1. Too big: the diagnostic says why, and what would work ─────────────────
+j.compile(job).diagnostics
+// → [{ level: 'error', kind: 'print.bedFit', at: 'tray',
+//      message: '320 × 140 × 41.5 mm does not fit 250 × 210 × 220 mm in any orientation (even diagonally: the bed diagonal is 326 mm)',
+//      fix: "job.split('tray', { fit: 'bed' })" }]
+
+// ── 2. Split: the default chooses the cut and the joints ─────────────────────
+const split = job.split('tray', { fit: 'bed', by: 'auto', joint: j.lib.dowel({ d: mm(4), l: mm(12), fit: 'press' }) })
+const S = j.compile(split)
+
+S.decisions.find(d => d.kind === 'split')
+// → { at: 'tray', kind: 'split', chose: 'plane x = 130 mm',
+//     reason: 'seam 642 mm² (same for every x-cut), avoids label (x 140–180), both pieces fit (130 and 190 ≤ 250)',
+//     alternatives: [{ plane: 'x = 160', rejected: 'cuts through label' }, { plane: 'y = 70', rejected: '2 cuts needed (320 > 250)' }] }
+// seam = floor 140 × 3 + two walls 2 × 3 × 37 = 420 + 222 = 642 mm²
+S.metric('seamArea')                    // → 642 mm²
+
+S.decisions.filter(d => d.kind === 'joint')
+// → [{ kind: 'joint', chose: '3 × dowel Ø4 × 12 (press)', reason: 'two walls + floor centre' },
+//    { kind: 'boss', chose: '3 × Ø 8 mm boss, 12 mm long each side', reason: 'dowel needs 4 + 2 × 0.9 = 5.8 mm of material; wall is 3 mm' }]
+S.bom()
+// → [{ part: 'tray.a', qty: 1 }, { part: 'tray.b', qty: 1 }, { part: 'dowel Ø4×12', qty: 3, source: 'printed' }]
+
+S.body('tray.a').volume().add(S.body('tray.b').volume()).sub(S.feature('bosses').volume)
+  .eq(j.compile(tray).metric('volume'))   // → true   (the halves partition the tray; the suite checks split.partition)
+
+// ── 3. Choosing the cut yourself: wrap the default ───────────────────────────
+// Keep the default's choice unless the cut lands within 20 mm of a foot.
+const careful = job.split('tray', {
+  fit: 'bed',
+  by: (part, ctx) => {
+    const cut = ctx.default(part)
+    return j.inspect.distance(cut, j.feat('foot').faces()).lt(mm(20)) ? j.plane.offset(j.plane.YZ, mm(120)) : cut
+  },
+})
+j.compile(careful).decisions.find(d => d.kind === 'split').chose   // → 'plane x = 130 mm'   (feet are at x 10–20 and 300–310)
+
+// ── 4. Plates: packing the job ───────────────────────────────────────────────
+const bin = j.part('bin').extrude(j.sketch('b', { on: j.plane.XY }).rect('r', 40, 40, { r: 4 }).profiles(), mm(30), { id: 'body' })
+  .shell(j.feat('body').endFace(), mm(1.6), { id: 'shell' })
+
+const batch = split
+  .add('bin', bin, { qty: 6 })
+  .plates({ pack: 'skyline', spacing: mm(5) })
+
+const B = j.compile(batch)
+B.plates
+// → [{ plate: 1, items: ['tray.b (190 × 140)', 'bin × 1', 'dowel × 3'], utilisation: 0.54 },
+//    { plate: 2, items: ['tray.a (130 × 140)', 'bin × 5'], utilisation: 0.50 }]
+// The halves cannot share a plate: side by side needs 130 + 5 + 190 = 325 mm > 250 (or 140 + 5 + 140 = 285 > 210 stacked).
+
+B.plates.lowerBound
+// → { footprints: 54'544 mm², bedArea: 52'500 mm², plates: 2 }   and the packer used 2
+// Σ A = 26'600 + 18'200 + 6 × 1'600 + 3 × 48 = 54'544 mm² → ⌈54'544 / 52'500⌉ = 2: the skyline packing is optimal here.
+
+// ── 5. Colour and material by selector ───────────────────────────────────────
+const styled = batch
+  .color(j.on('tray', j.feat('label').faces()), 'white')                        // a filament swap for the label layers
+  .color(j.on('tray', j.sel.bodies().minus(j.feat('label').body())), 'black')
+  .material(j.on('tray', j.feat('foot').body()), j.material('TPU-95A'))         // soft feet, a second material
+
+j.compile(styled).summary()
+// → { plates: 2, colors: { black: 'tray, bins, dowels', white: 'label' }, materials: { PLA: 'tray, bins, dowels', 'TPU-95A': '4 feet' },
+//     swaps: 6 (label on tray.b: 3 layers × 2 swaps, plate 1 only), purge: 4.1 g, printTime: 9 h 40 min }
+j.compile(styled).diagnostics
+// → [{ level: 'warning', kind: 'print.firstLayer', at: 'tray.a/foot', message: 'TPU feet start on the first layer; PLA–TPU adhesion is weak on the bed side',
+//      fix: 'print feet separately or move them 0.2 mm up into the floor' }]
+// 20 · Slicing, cusp height, adaptive layers, 3MF and G-code
+//
+// Model
+//   Slicing is a family of level sets: layer k is S_k = M ∩ { z = (k + ½)·t }, a planar region printed t thick.
+//   Σ area(S_k)·t is the midpoint rule for ∫ area(z) dz, so it converges to the volume as t → 0 with error O(t²)
+//   (Cavalieri again; see 06).
+//   Cusp height (the stair-step error) on a face whose normal makes angle θ with the build direction: c = t·|cos θ|.
+//   Adaptive layers invert it: t(z) = clamp(c_max / max |cos θ| over faces at height z, t_min, t_max).
+//   Print time ≈ Σ toolpath length / speed + per-layer overheads, so it grows with layer count, weighted by area.
+//
+// Grounding
+//   Planar sectioning for layered manufacturing; cusp height (Dolenc & Mäkelä 1994); the layer sum is
+//   Cavalieri again.
+//
+// Notice
+//   - The slice law and the cusp law are checks on the slicer, the same way Cavalieri checks the kernel.
+//   - Horizontal faces are snapped to layer boundaries, so their cusp is 0 and features keep their heights.
+//   - G-code flavour is a four-way slot: a lambda can wrap the default, here to pause for an insert.
+//   - Every export says what it kept, approximated and dropped.
+//
+// Results in `// →` comments show the illustrative shape of a result.
+
+import { j, mm, turn } from 'jig'
+
+// ── Fixture: a dome paperweight with a cavity for steel shot and three inserts underneath ─
+const weight = j.part('weight').material(j.material('PLA'))
+  .revolve(j.sketch('q', { on: j.plane.XZ }).arc('a', { center: [0, 0], start: [40, 0], end: [0, 40] })
+    .line('l1', 'a.end', [0, 0]).line('l2', [0, 0], 'a.start').profiles(), j.axis.Z, turn(1), { id: 'dome' })
+  .revolve(j.sketch('cav', { on: j.plane.XZ }).polyline('p', [[0, 3], [15, 3], [15, 13], [0, 28]], { closed: true }).profiles(),
+    j.axis.Z, turn(1), { op: 'cut', id: 'cavity' })              // a 45° conical roof prints without support
+  .hole(j.sketch('ins', { on: j.plane.XY }).point('c', [25, 0]).pattern(['c'], j.pattern.circular(j.axis.Z, { count: 3 })),
+    j.hole.insert('M3x5.7', { kind: 'heat-set' }), { id: 'inserts' })
+
+// volume = ⅔π·40³ − (π·15²·10 + ⅓π·15²·15) − 3·π·2²·6.7 = 134'041 − 10'603 − 253 = 123'186 mm³   (dome − cavity − insert holes)
+
+const job = j.print('weight', { printer: j.printer('mk4'), material: j.material('PLA'), parts: [weight] })
+const P = j.compile(job)
+
+// ── 1. Layers are level sets ─────────────────────────────────────────────────
+P.layers.length                        // → 200   (40 mm / 0.2 mm)
+P.layers[0]                            // → { k: 0, z: [0, 0.2] mm, area: 4'989 mm², regions: 1, holes: 3 }   π·40² − 3 insert holes
+P.layers[15]                           // → { k: 15, z: [3.0, 3.2] mm, area: 4'252 mm², regions: 1, holes: 4 }   the cavity appears at z = 3
+
+P.layers.reduce((v, L) => v.add(L.area.mul(mm(0.2))), j.q('0 mm^3'))
+// → 123'190.2 mm³   against the exact 123'185.8 mm³: Σ area · t is Cavalieri again, with error O(t²).
+//   The slicer gets an as-printed volume for free, and the suite uses the comparison as slice.volume.
+
+// ── 2. Cusp height ───────────────────────────────────────────────────────────
+// On the dome, cos θ = z / R: vertical at the equator (no stairs), flat at the pole (a full layer).
+// Cusp height = t · |cos θ| (Dolenc & Mäkelä 1994). It costs nothing to evaluate, so adaptive slicing uses it
+// to pick each layer's height (section 3), and the suite compares it with the measured stair steps (slice.cusp).
+P.metrics()
+// → { layers: 200, cuspMax: 0.20 mm, cuspMean: 0.10 mm, printTime: 190 min, filament: 52 g, supportVolume: 0 }
+// cuspMean = 0.2 · mean(z / R) = 0.1 mm: on a sphere, area is uniform in z (Archimedes), so mean(z / R) = ½.
+
+// ── 3. Adaptive layers: spend layers where the surface is flat ───────────────
+const smooth = job.slice({ adaptive: { maxCusp: mm(0.05), min: mm(0.05), max: mm(0.3) } })
+const A = j.compile(smooth)
+A.metrics()
+// → { layers: 411, cuspMax: 0.05 mm, printTime: 300 min }
+// t(z) = min(0.3, 0.05 · 40 / z) = min(0.3, 2 / z): 0.3 mm up to z = 6.7 mm, then thinner towards the pole.
+// layers = 6.7 / 0.3 + ∫ z/2 dz from 6.7 to 40 = 22 + 389 = 411
+j.compile(job.slice({ layer: mm(0.05) })).metrics()
+// → { layers: 800, cuspMax: 0.05 mm, printTime: 760 min }   the same surface quality, 2.5× the time
+A.layers.filter(l => l.snapped).map(l => l.z[1])
+// → [3.0 mm, 13.0 mm]   cavity floor and roof start: horizontal faces stay layer boundaries
+
+// ── 4. Per-region settings: modifiers ────────────────────────────────────────
+const strong = smooth.modifier(j.on('weight', j.feat('inserts').bores()),
+  { grow: mm(3), walls: 6, infill: { density: 0.6 } })     // solid material for heat-set inserts to melt into
+j.compile(strong).summary().modifiers
+// → [{ region: 'inserts.bores ⊕ 3 mm', bodies: 3, walls: 6, infill: 0.6, addedTime: 4 min, addedFilament: 1.1 g }]
+
+// ── 5. G-code: flavours, and a lambda that wraps one ─────────────────────────
+const G = j.compile(strong)
+G.gcode({ flavor: 'marlin' }).report
+// → { kept: ['toolpaths', 'temperatures', 'fan', 'progress M73'], approximated: ['arcs as segments'], dropped: ['part names'] }
+G.gcode({ flavor: 'klipper' }).report.kept
+// → ['toolpaths', 'temperatures', 'fan', 'EXCLUDE_OBJECT labels per part']
+
+// Pause before the cavity roof closes, to pour in the steel shot.
+const withPause = G.gcode({
+  flavor: (lyr, ctx) => lyr.z[0].eq(mm(13)) ? ['M0 Pour steel shot into the cavity', ...ctx.default(lyr)] : ctx.default(lyr),
+})
+withPause.report.notes                 // → ['custom flavor: wraps marlin; 1 layer modified (k = 53, z = 13.0 mm)']
+// k = 53: 22 layers of 0.3 mm up to z = 6.7, then ∫ z/2 dz from 6.7 to 13 = 31 adaptive layers
+
+// ── 6. 3MF and STL: what survives the trip ───────────────────────────────────
+const tmf = j.export.tmf(G, { plates: true, settings: true, colors: true })
+tmf.report
+// → { kept: ['units (mm)', 'plates', 'part names', 'slicer settings incl. adaptive layers', 'modifiers', 'colors'],
+//     approximated: ['B-rep → mesh: 21'340 triangles, max deviation 0.008 mm'],
+//     dropped: ['parametric history', 'persistent names', 'fit provenance'] }
+const stl = j.export.stl(G, { chord: mm(0.01), binary: true })
+stl.report
+// → { kept: ['geometry'], approximated: ['B-rep → mesh: 21'340 triangles, max deviation 0.008 mm'],
+//     dropped: ['units (STL has none; assumed mm)', 'settings', 'modifiers', 'plates', 'part names', 'pause'] }

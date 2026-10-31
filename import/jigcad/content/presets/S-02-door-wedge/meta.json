@@ -1,0 +1,20 @@
+{
+  "id": "S-02",
+  "title": "Door wedge with grip ribs",
+  "group": "First prints",
+  "order": 2,
+  "difficulty": "first print",
+  "about": "a 120 mm door wedge with fifteen grip grooves on the underside, written by a loop",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Turn the V-grooves into a sawtooth that resists sliding away from the door | Add a second hanging hole and keep both inside the outline when H changes",
+  "agent": {
+    "role": "a designer of simple household prints who thinks in side profiles and loops",
+    "prompt": "Prefer editing the loop and the outline's expressions; keep the wedge one sketch and one extrude; never let a groove or the hang hole cut through the slope.",
+    "fragments": {
+      "gap": "Ask for the gap under the door and set H to about 1.5 times it.",
+      "grip": "For tiles keep rib small and grooves dense; for carpet make rib deeper."
+    },
+    "defaultFragments": ["gap"]
+  }
+}

@@ -1,0 +1,50 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Overlays</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="a" style="height:260px"></canvas><figcaption><b>Forces · Contacts · Rig</b> amber, 1 m per 2,500 N · st-rec, 1 m per 1,200 N · violet</figcaption></figure>
+  <figure><canvas id="b" style="height:260px"></canvas><figcaption><b>Sites</b> a 12 mm green ring and the site's name at 8 px</figcaption></figure>
+  <figure><canvas id="c" style="height:260px"></canvas><figcaption><b>Course</b> blue dashed legs, 0.12 m rings, a 3 px dot on the current target</figcaption></figure>
+</div>
+<p class="cap">Example loads: 68 kg on the leg spring (667 N), the weight shared by four wheels.</p>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var pose = S.figurePose(), deck = S.deckPose(), d = S.board.DECK;
+  var wheels = [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(function (k) { return [k[0] * d.wheelbase / 2, 0, k[1] * d.track / 2]; });
+  boot(function () {
+    S.sheet(document.getElementById('a'), { scale: 112, target: [0, 0.8, 0], overlays: ['forces', 'contacts', 'rig'] }).draw(function (g) {
+      S.drawBoard(g, deck); S.drawFigure(g, pose);
+      g.layer = 'overlay';
+      wheels.forEach(function (p) { g.dot(p, 2.6, { tone: 'accent' }); g.arrow(p, [0, 172 / 1200, 0], { tone: 'accent' }); });
+      var lf = 667, h = pose.hip; g.arrow(h, [0, lf / 2500, 0], { tone: 'amber' }); g.label(lf + ' N', V.add(h, [0, lf / 2500, 0]), { tone: 'amber', dx: 6, size: 8 });
+    });
+    S.sheet(document.getElementById('b'), { scale: 330, target: [0, 0.09, 0], overlays: ['sites'] }).draw(function (g) { S.drawBoard(g, deck); S.drawSites(g, deck); });
+    S.sheet(document.getElementById('c'), { scale: 34, target: [0.6, 0, 0.8], overlays: ['course', 'grid'] }).draw(function (g) {
+      var C = [[-1.5, 0, -1], [2.5, 0, -1.2], [3, 0, 2.2], [-1, 0, 2.6]];
+      g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 5 });
+      for (var i = 0; i < C.length; i++) { var a = C[i], b = C[(i + 1) % C.length]; g.line(a, b, { tone: 'blue', dash: [2, 4], alpha: 0.7 }); g.ring(a, 0.12, { tone: 'blue' }); }
+      g.line([0, 0, 0], C[1], { tone: 'blue', dash: [1, 3] }); g.dot(C[1], 3, { tone: 'blue' });
+      g.layer = 'figure'; S.drawBoard(g, deck);
+    });
+  });
+</script>
+</body>
+</html>

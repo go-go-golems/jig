@@ -1,0 +1,20 @@
+{
+  "id": "C-04",
+  "title": "Print-in-place clearance",
+  "group": "Calibration",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "ten captive rotors with gaps of 0.15 to 0.60 mm: the first one that turns freely is the clearance for hinges and other parts printed assembled",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the gaps run from 0.10 to 0.40 mm in 0.03 mm steps | Turn the rotors into horizontal pins so the gap is tested sideways too | Show the calibrate row for my results: fused, fused, stiff, stiff, free",
+  "agent": {
+    "role": "a calibration engineer who designs print-in-place test pieces",
+    "prompt": "Prefer changing lo, hi and steps over new geometry; keep every gap measured square to the faces; never let a rotor touch the plate.",
+    "fragments": {
+      "gap": "Offset the rotor from the hole by the gap normal to each face: g on vertical faces, g·√2 sideways on 45° faces.",
+      "calibrate": "Feed results to j.fit.calibrate as a print-in-place row: coupon (kind, range, steps) and outcomes."
+    },
+    "defaultFragments": ["gap"]
+  }
+}

@@ -1,0 +1,1541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Skate Workbench</title>
+<script>(function(){var m='system';try{m=localStorage.getItem('ds-theme')||'system';}catch(e){}var t=m==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;document.documentElement.setAttribute('data-theme',t);window.__dsMode=m;})();</script>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  :root { --x-ui: var(--font-ui, var(--font-display, Arial, "Helvetica Neue", Helvetica, sans-serif)); --x-code: var(--font-code, var(--font-plex, ui-monospace, Menlo, Consolas, monospace)); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 400 14px/1.55 var(--x-ui); }
+  .x-wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  .x-nav { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; border-right: 1px solid var(--hair); padding: 20px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .x-nav b { font: 700 15px/1.2 var(--x-ui); margin-bottom: 12px; }
+  .x-nav a { color: var(--ink-2); text-decoration: none; padding: 3px 0; font-size: 13px; }
+  .x-nav a:hover { color: var(--ink); }
+  .x-nav .x-sub { padding-left: 10px; font-size: 12px; }
+  .x-nav button { margin-top: 16px; background: none; color: var(--ink); border: 1px solid var(--hair); padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+  .x-nav button:hover { border-color: var(--ink); }
+  main { min-width: 0; padding: 24px max(16px, 3vw) 80px; }
+  section { border-top: 1px solid var(--ink); padding-top: 12px; margin-top: 48px; }
+  section:first-child { border-top: 0; margin-top: 0; }
+  h1, h2, h3, h4 { text-wrap: balance; line-height: 1.2; }
+  h2.x-h { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin: 0 0 8px; }
+  .x-md { max-width: 74ch; }
+  .x-md h1 { font-size: 26px; margin: 8px 0 12px; }
+  .x-md h2 { font-size: 18px; margin: 28px 0 8px; }
+  .x-md h3 { font-size: 15px; margin: 20px 0 6px; }
+  .x-md code, .x-tab code, .x-meta code, .x-files code { font: 400 0.9em var(--x-code); background: var(--fill); padding: 0 3px; }
+  .x-md pre { background: var(--fill); padding: 10px 12px; overflow: auto; border: 1px solid var(--hair); }
+  .x-md pre code { background: none; padding: 0; font-size: 12px; }
+  .x-md table, .x-tab { border-collapse: collapse; font-size: 13px; }
+  .x-md th, .x-md td, .x-tab th, .x-tab td { border-bottom: 1px solid var(--hair); padding: 5px 10px 5px 0; text-align: left; vertical-align: top; }
+  .x-md a { color: var(--ink); }
+  .x-md blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--hair); color: var(--ink-2); }
+  .x-scroll { overflow-x: auto; max-width: 100%; }
+  .x-sw span { display: inline-block; width: 18px; height: 18px; border: 1px solid var(--hair); vertical-align: middle; margin-right: 6px; }
+  .x-sw code { white-space: nowrap; }
+  .x-note { color: var(--ink-2); font-size: 13px; max-width: 74ch; }
+  .x-styles { display: flex; flex-direction: column; gap: 10px; }
+  .x-style { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; border-bottom: 1px solid var(--hair); padding-bottom: 8px; }
+  .x-sample { overflow-wrap: anywhere; }
+  .x-meta { color: var(--ink-2); font-size: 12px; }
+  .x-comp { margin: 20px 0 36px; }
+  .x-comp h4 { font-size: 16px; margin: 0 0 8px; }
+  .x-frame iframe { display: block; border: 1px solid var(--hair); background: var(--bg); max-width: none; }
+  .x-cover iframe { width: 960px; border: 1px solid var(--hair); display: block; }
+  .x-cover { overflow-x: auto; margin-bottom: 24px; }
+  .x-files { color: var(--ink-2); font-size: 12px; }
+  .x-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .x-shots figure { margin: 0; }
+  .x-shots img { width: 100%; border: 1px solid var(--hair); display: block; }
+  .x-shots figcaption { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  @media (max-width: 760px) { .x-wrap { grid-template-columns: 1fr; } .x-nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--hair); } .x-style { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="x-wrap">
+<nav class="x-nav"><b>Form Skate Workbench</b>
+<a href="#overview">Overview</a>
+<a href="#sec-docs-and-notes">Writing docs and preset notes</a>
+<a href="#sec-layouts-and-dock">Layouts and the dock</a>
+<a href="#sec-reading-markdown">The Markdown the reading views render</a>
+<a href="#sec-states-and-feedback">States, errors and feedback</a>
+<a href="#sec-ui-copy">Writing interface copy</a>
+<a href="#sec-writing-a-book-section">Writing a book section</a>
+<a href="#tokens">Tokens</a>
+<a href="#components">Components</a><a class="x-sub" href="#comp-BigNumber">Containers</a><a class="x-sub" href="#comp-BookChapter">Reading</a><a class="x-sub" href="#comp-Button">Actions</a><a class="x-sub" href="#comp-CodeBlock">Code</a><a class="x-sub" href="#comp-DockTile">Navigation</a><a class="x-sub" href="#comp-EventList">Panels</a><a class="x-sub" href="#comp-Field">Inputs</a>
+<a href="#assets">Assets</a>
+<a href="#export">About this export</a>
+<button id="x-theme" type="button">Theme: system</button>
+</nav>
+<main>
+<section id="overview"><h2 class="x-h">Overview</h2>
+<div class="x-cover"><iframe data-src="components/Cover/standalone.html" src="components/Cover/standalone.html" title="Cover" style="height:288px"></iframe></div>
+<div class="x-md"><p>Form Skate Workbench is an IDE for one program, a skateboard game built on <code>@form/core</code>: code, notes, docs, a textbook, a coding agent and a drafting-sheet stage share one window of tiled views, and every view is there to read or change the running program. This system is the workbench&#39;s look and its writing: the Kiln style of the shell, panels and reading views (Swiss: white ground, one ink, Arial in two weights, 1 px rules, red only for trouble and selection), and how to write its interface copy, notes, docs and book chapters.</p>
+<p>Two neighbouring systems cover the rest. <strong>Form Skate Agent</strong> (<a href="https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM">https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM</a>) is the agent panel: how the agent works, its chat, steps and threads. <strong>Form Skate Stage</strong> (<a href="https://claude.ai/artifact/J3P5XmY4B7uyZJZzgLaZYy">https://claude.ai/artifact/J3P5XmY4B7uyZJZzgLaZYy</a>) is the stage: the 2.5D drafting look, the camera, line weights and the overlays drawn on the canvas (chips, trick toast, fail banner). A new panel uses this system; anything drawn on the stage uses the Stage system.</p>
+<h2>Using this system</h2>
+<ul>
+<li><strong>Tokens</strong>: colours by their Kiln names (<code>--bg</code>, <code>--ink</code>, <code>--ink-2</code>, <code>--hair</code>, <code>--rule</code>, <code>--fill</code>, <code>--code-bg</code>, <code>--accent</code>, <code>--sel</code>, <code>--tok-*</code>), font sizes <code>--fs-xs</code> to <code>--fs-xl</code>, families <code>--font-ui</code>, <code>--font-display</code>, <code>--font-code</code>. In the app&#39;s own stylesheet the families are <code>--mono</code> (which is Arial), <code>--display</code> and <code>--code</code>.</li>
+<li><strong>Components</strong> are CSS classes on plain markup, in <code>components/bundle.css</code> (the rules copied from <code>app/kiln.css</code> and <code>app/skate.css</code>). There is no script bundle: the app renders the same markup from React (<code>app/ui/*.jsx</code>), and any markup with these classes looks the same. Each component&#39;s README gives the markup to write.</li>
+<li><strong>Fonts</strong>: nothing to load. The interface is Arial (&quot;Helvetica Neue&quot;, Helvetica, sans-serif); code is the system monospace (ui-monospace, Menlo, Consolas). IBM Plex Mono belongs to the stage only.</li>
+<li><strong>Themes</strong>: light is the default and dark mirrors it; the viewer&#39;s choice cycles system → light → dark from the header and sets <code>data-theme</code> on the root. Style through tokens only; no rule names a colour.</li>
+<li><strong>Where it lives in the code</strong>: <code>app/kiln.css</code> and <code>app/skate.css</code> (styles), <code>app/ui/app.jsx</code> (header, layouts), <code>dock.jsx</code> (tiles), <code>common.jsx</code> (Seg, Tog, Menu), <code>code.jsx</code>, <code>panels.jsx</code>, <code>notes.jsx</code>, <code>book.jsx</code>, <code>app/markdown.js</code> (reading views), <code>app/highlight.js</code> (code colours), <code>app/bookexport.js</code> (HTML, EPUB, Markdown export).</li>
+</ul>
+<h2>Content fundamentals</h2>
+<p>The workbench talks like a lab notebook: plain, exact, measured. The full guide is the section <em>Writing interface copy</em>; the rules most often needed:</p>
+<ul>
+<li><strong>Name things by what they are in the program</strong>: &quot;systems&quot;, &quot;signals&quot;, &quot;states&quot;, &quot;params&quot;, &quot;pin trace&quot;, &quot;hot edit&quot;, &quot;fresh world&quot;. Use the program&#39;s ids as written (<code>pop/snap</code>, <code>skater/stance</code>) in the code face.</li>
+<li><strong>Sentence case</strong> for buttons and menu titles (&quot;Export project&quot;, &quot;Square up&quot;); <strong>lowercase</strong> for small descriptions, placeholders and abouts (&quot;the drafting sheet you skate on&quot;, &quot;search the shelf&quot;). View names are one capitalised word: Notes, Docs, Book, Code, Agent, Reference, Stage, Graph, IR, Traces, Events, Params, Experiments.</li>
+<li><strong>Numbers with units</strong>, a space between: &quot;4.29 m/s&quot;, &quot;0.08 m&quot;, &quot;15 rad/s&quot;, &quot;160 N&quot;, &quot;1/120 s&quot;. Times in seconds with two decimals on the clock and three in logs. Join related facts with &quot; · &quot; (&quot;16 systems · 15 signals · 42 states&quot;), multiply with × (&quot;combo ×2&quot;, &quot;1×&quot;).</li>
+<li><strong>Say what happens and what to do next</strong>: &quot;No traces pinned. Type above to add one, or click <em>pin trace</em> in the inspector.&quot; Errors name the thing that failed, the place and the fix: &quot;pop/pop stopped at 2.53 s: … Fix it and press Run (the world resumes), or Reset.&quot;</li>
+<li><strong>British spelling</strong> (centre, behaviour, colour). No exclamation marks, no emoji, no &quot;please&quot;, no jokes.</li>
+<li>The book has stricter rules (no em dashes, a banned-word list, numbers only from measurement): see <em>Writing a book section</em>.</li>
+</ul>
+<h2>Visual foundations</h2>
+<ul>
+<li><strong>Ground and ink.</strong> Every surface is <code>bg</code>; text and marks are <code>ink</code>; secondary text is <code>ink-2</code>. There are no tinted panels and no cards: a region is separated by a 1 px <code>hair</code> rule, rows by a <code>rule</code> line. <code>fill</code> appears only on hover, on inline code chips and in a plain callout. Code sits on <code>code-bg</code>.</li>
+<li><strong>Lines are the structure.</strong> 1 px everywhere (<code>hair</code> for borders and tile edges, <code>rule</code> between rows, <code>ink</code> for emphasis: a menu&#39;s border, the rule above a doc section, the params panel&#39;s top). 2 px only for marks of state (a selected row&#39;s inset bar, a callout&#39;s rule, focus). 3 px once: above a part title in the Book.</li>
+<li><strong>Two weights.</strong> 400 and 700, nothing else. Bold marks the active tab, a value, a title, a defined term.</li>
+<li><strong>One red.</strong> <code>accent</code> means trouble or selection: errors, bails, the stopped clock, the selected row&#39;s bar, the selected graph node, a Try it callout, the ▸ after a lab: link, the chapter label, the caret. Never decoration, never a category colour. <code>sel</code> is its wash. Success is not coloured.</li>
+<li><strong>Square.</strong> <code>border-radius: 0</code> on every control, menu, tile, toast and callout. The only round things are the radio mark in menus and the signals group in the graph.</li>
+<li><strong>Dense and quiet.</strong> Base text 12px at line height 1.45, controls 30px high, toolbars 46px, the header 52px. Paddings are small fixed values (see Spacing: 4, 6, 8, 10, 12, 14, 16px). No shadows anywhere in the UI (one exception: the Book&#39;s contents drawer in a narrow tile).</li>
+<li><strong>Numbers line up.</strong> Use <code>font-variant-numeric: tabular-nums</code> wherever digits change or stack: clocks, pills, values, tables, readouts.</li>
+<li><strong>Data without hue.</strong> Charts and plots are ink on the ground with ink-2 axes in 9.5px and rule grid lines. Tell series apart by dash (solid, 4 3, 1 2) and mark shape (circle, square, diamond, cross, triangle), never by colour; accent marks only the selected series or a failure.</li>
+<li><strong>Focus.</strong> <code>:focus-visible</code> draws a 2px ink outline offset 1px; inputs show focus by turning their border ink.</li>
+<li><strong>Motion.</strong> Almost none: a busy indicator blinks (0.8 s, two steps), the drop hint slides 0.08 s between targets, the Book&#39;s contents drawer slides 0.18 s (off under <code>prefers-reduced-motion</code>). Nothing fades in.</li>
+<li><strong>Dark theme.</strong> The same design with bg <code>#1a1a1a</code>, ink <code>#f2f2f2</code>, ink-2 <code>#9a9a9a</code> and a lighter red <code>#ff3b4a</code>; washes are stronger (sel 16%). Comments and punctuation in code get darker, not lighter, so they still recede.</li>
+</ul>
+<h2>Layout</h2>
+<ul>
+<li><strong>Header bar</strong> (HeaderBar) across the top; under it the <strong>dock</strong>: tiles of tabbed views split by 1 px gutters (DockTile). Seven layouts ship (&quot;Code beside the stage&quot;, &quot;Stage first&quot;, &quot;The program: code, graph, IR&quot;, &quot;Reading the notes&quot;, &quot;Experiments and traces&quot;, &quot;Reading the book&quot;, &quot;Everything in one tile&quot;); people drag tabs to make their own, kept per browser. See <em>Layouts and the dock</em>.</li>
+<li><strong>A view</strong> is <code>.tabbody</code>: a Toolbar at the top, the body (a <code>.scroll</code> list, a document, a canvas, a diagram), optionally a 288px side column of Blocks on the right (<code>aside.side</code>), optionally a 30px hint bar at the bottom.</li>
+<li><strong>Responsive by tile, not window.</strong> A tile body is a size container: under 640px of tile width a view stacks its side column under its body; the Book and Docs fold their left column away under 700 and 620px. Under 640px of window the dock becomes one tile and the header drops pills and labels.</li>
+<li><strong>Reading width.</strong> Documents keep a 76ch measure (74ch in the Book) at 18px 22px padding, however wide the tile.</li>
+</ul>
+<h2>Iconography</h2>
+<p>There is no icon set. The workbench uses text glyphs in the UI font: ▶ ❚❚ ⏭ ⏮ ↺ (run controls), ‹ › (previous, next), × (close, unpin), + (open a view), ▾ (opens a menu), ▸ (after a lab: link), • (unsaved file), ● (recording), ▦ (layouts), and the declaration glyphs of the code gutter: ■ system, λ signal, ○ state, ◇ param, ◎ watch, ▢ view, △ thing. The theme switch is the one drawing: a 16px inline SVG (sun, moon, half disc) stroked in <code>currentColor</code> at 1.4, because those glyphs are missing from many fonts. Check marks are 9px squares (<code>.tog::before</code>, <code>.box</code>), filled ink when on. No emoji, no icon fonts, no logo: the name set in bold type is the mark. The Screens group holds screenshots of the real workbench for reference.</p>
+<h2>States</h2>
+<table>
+<thead>
+<tr>
+<th>state</th>
+<th>how it looks</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>hover</td>
+<td>a control&#39;s hair border turns ink; a row gets <code>fill</code></td>
+</tr>
+<tr>
+<td>selected choice</td>
+<td>ink fill with bg text (segment, on button, event chip)</td>
+</tr>
+<tr>
+<td>selected row</td>
+<td>a 2px accent inset bar on the left (shelf entry, chapter, event, parameter, experiment), bold title</td>
+</tr>
+<tr>
+<td>unsaved</td>
+<td>&quot; •&quot; after a file, &quot;edited&quot; after the preset, Run turns primary</td>
+</tr>
+<tr>
+<td>busy</td>
+<td>a blinking 6px square after the pill&#39;s value; a Meter with Stop</td>
+</tr>
+<tr>
+<td>error</td>
+<td>accent text and border; the line washed <code>sel</code>; the diagnostics list under an accent rule; a red toast</td>
+</tr>
+<tr>
+<td>disabled</td>
+<td>40% opacity (45% in menus), no hover</td>
+</tr>
+<tr>
+<td>empty</td>
+<td>an ink-2 sentence that says what to do</td>
+</tr>
+</tbody></table>
+<p>See <em>States, errors and feedback</em> for the wording.</p>
+<h2>Building a new panel</h2>
+<ol>
+<li>Register the view with a one-word title and a lowercase about (<code>app/ui/app.jsx</code> <code>views</code>), and render <code>&lt;div class=&quot;tabbody col&quot;&gt;</code>.</li>
+<li>Open with <code>&lt;div class=&quot;toolbar&quot;&gt;</code>: a <code>.filter</code> if the view lists things, Segmented and Toggle controls for its modes, <code>.btn.sm</code> commands, and a <code>.lbl</code> sentence that says what the view shows.</li>
+<li>Put the content in <code>&lt;div class=&quot;scroll&quot;&gt;</code>: rows with <code>rule</code> lines between them (<code>.rt</code> tables, <code>.ev</code>-style grids in the code face for logs), or a <code>.doc</code> for prose.</li>
+<li>For details of a selection add <code>&lt;aside class=&quot;side&quot;&gt;</code> with Blocks: an h2 noun, a <code>.sub</code>, a <code>.note</code>, a <code>dl.kv</code>, <code>.actions</code> links. Use <code>.nid</code> for program ids so they select in the graph.</li>
+<li>Use <code>.empty.padded</code> for the empty state, <code>.fail</code> for a failure inside the view, <code>host.toast</code> for a passing confirmation.</li>
+<li>Colours only from tokens; the red only for errors and the selection; numbers tabular with units.</li>
+<li>If it draws (a canvas plot), read <code>--ink</code>, <code>--ink-2</code>, <code>--rule</code> and <code>--accent</code> from <code>getComputedStyle</code> at draw time, as Traces does, so it follows the theme.</li>
+</ol>
+</div></section>
+<section id="sec-docs-and-notes"><h2 class="x-h">docs-and-notes.md</h2><div class="x-md"><h1>Writing docs and preset notes</h1>
+<p>Besides the book, the workbench carries two shorter kinds of writing: <strong>preset notes</strong>, the guide to one preset shown in the Notes tab, and <strong>shelf docs</strong>, one topic each in the Docs tab. Both are Markdown with frontmatter, rendered like the book (see <em>The Markdown the reading views render</em>).</p>
+<h2>Preset notes</h2>
+<p>A preset is <code>content/presets/&lt;id&gt;.md</code> plus an optional folder <code>content/presets/&lt;id&gt;/</code> holding files that replace the base library&#39;s (<code>main.js</code>, <code>lab/chrono.js</code>) or patch it (<code>main.js.patch</code>: blocks of <code>//@@ find</code>, <code>//@@ replace</code>, <code>//@@ end</code>, each of which must match once).</p>
+<pre><code class="language-markdown">---
+id: B-01
+title: Flatground
+group: Basics
+about: The whole game, as the library ships it: a lot, a funbox, a board, a rider, fifteen tricks.
+tries: Explain how a kickflip happens, from the key press to the trick event | Add a new trick to the recognizer and test it
+pins: recognizer/height, recognizer/flipTurns, recognizer/shoveTurns
+docs: workbench-tour, rigid-bodies, quaternions
+overlays: shadows, trail, annotations, grid
+view: axo
+---
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>group letter and number: B Basics, P Physics, T Tricks, M Mechanisms, G Game feel, R Recognition, E Experiments, D Drafting (U for a viewer&#39;s own)</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>the preset&#39;s name in the menu and the notes toolbar</td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>Basics, Physics, Tricks, Mechanisms, Game feel, Recognition, Experiments, Drafting</td>
+</tr>
+<tr>
+<td><code>about</code></td>
+<td>one sentence, shown under the title in the preset menu and in related lists</td>
+</tr>
+<tr>
+<td><code>tries</code></td>
+<td>questions for the agent, separated by <code>|</code>, offered as buttons in an empty thread</td>
+</tr>
+<tr>
+<td><code>pins</code></td>
+<td>traces pinned when the preset loads</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td>shelf docs listed under &quot;Further reading on the shelf&quot;</td>
+</tr>
+<tr>
+<td><code>overlays</code>, <code>view</code>, <code>track</code>, <code>zoom</code>, <code>speed</code>, <code>chains</code>, <code>order</code></td>
+<td>the stage&#39;s starting settings</td>
+</tr>
+</tbody></table>
+<p>The body follows one pattern. A <code>#</code> title, then a lede that says what is on the screen and what the preset is for, then a <strong>Try it</strong> as early as possible so the reader acts before reading on, then <code>##</code> sections that each explain one mechanism with a short code excerpt or formula, a Try it where it can be seen, and an <strong>Exercise</strong> at the end. Notes are shorter than chapters (500 to 1,000 words) and assume the reader has the workbench open: link generously with lab: links.</p>
+<h2>Shelf docs</h2>
+<p><code>content/docs/&lt;nn&gt;-&lt;slug&gt;.md</code>, ordered by <code>order</code>:</p>
+<pre><code class="language-markdown">---
+id: springs
+title: Springs, damping and critical damping
+group: Control
+about: The damped oscillator, ζ and ωₙ, overshoot, and the exact half-life springs used for smooth animation.
+order: 24
+---
+</code></pre>
+<p>Groups on the shelf: Start here, Maths, Mechanics, Control, Contact, The board, Computation, Drawing, Method. A doc covers one topic: it opens by saying what it covers and where the library uses it (&quot;Springs are everywhere in the library: contact forces, the rider&#39;s legs, the foot guides, the camera…&quot;), develops it in five to eight <code>##</code> sections with the library&#39;s own numbers, and often ends with its limits (&quot;When a spring is the wrong tool&quot;). Point to the book chapter that goes deeper with <code>[Chapter 9](lab:book?ch=9)</code>.</p>
+<h2>Voice</h2>
+<p>The same as the book&#39;s (see <em>Writing a book section</em>): plain, exact, the program&#39;s own names, real numbers, British spelling, no analogies. Notes and docs were written before the book&#39;s checker and use em dashes; new writing should follow the book&#39;s rule (a colon, a comma, parentheses or a new sentence) so text can move between notes, docs and chapters. The book checker does not run on notes and docs, but <code>test/links.js</code> checks their lab: links.</p>
+</div></section>
+<section id="sec-layouts-and-dock"><h2 class="x-h">layouts-and-dock.md</h2><div class="x-md"><h1>Layouts and the dock</h1>
+<p>The workbench is one window: the header bar, then a dock of tiles. A tile shows one view at a time behind a strip of tabs; tiles sit side by side or stacked in nested splits. Everything about the arrangement belongs to the person using it and is kept in their browser (<code>localStorage</code>, key <code>formskate.v1.layout</code>).</p>
+<h2>The layout tree</h2>
+<p>A layout is a small tree (<code>app/ui/dock.jsx</code>): a <strong>tile</strong> <code>{ t: &#39;tile&#39;, views: [...], active }</code> or a <strong>split</strong> <code>{ t: &#39;split&#39;, dir: &#39;row&#39; | &#39;col&#39;, kids: [...], sizes: [...] }</code> whose sizes are fractions that sum to 1. Unknown or duplicate views, empty tiles and one-child splits are removed when a layout loads; splits in the same direction merge.</p>
+<h2>The seven layouts</h2>
+<table>
+<thead>
+<tr>
+<th>layout</th>
+<th>arrangement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Code beside the stage (default)</td>
+<td>left 36%: Notes, Code, Agent, Docs, Book, Reference; right: Stage over Traces, Events, Params, Graph, IR, Experiments (68 / 32)</td>
+</tr>
+<tr>
+<td>Stage first</td>
+<td>left 64%: Stage over Traces, Events, Params; right: everything else</td>
+</tr>
+<tr>
+<td>The program: code, graph, IR</td>
+<td>three columns: Code and the reading views; Graph and IR; Stage over the panels</td>
+</tr>
+<tr>
+<td>Reading the notes</td>
+<td>left 46%: Notes, Docs, Book, Reference; right: Stage over the rest</td>
+</tr>
+<tr>
+<td>Experiments and traces</td>
+<td>left: Code and reading; right: Experiments and Params over Traces, Events, Stage, Graph, IR</td>
+</tr>
+<tr>
+<td>Reading the book</td>
+<td>half and half: Book, Notes, Docs, Reference; Stage over the rest</td>
+</tr>
+<tr>
+<td>Everything in one tile</td>
+<td>all thirteen views as tabs, Stage in front</td>
+</tr>
+</tbody></table>
+<p>On a phone (under 640px) the dock is always one tile with Stage first.</p>
+<h2>Moving things</h2>
+<ul>
+<li><strong>Click a tab</strong> to show it; <strong>drag it</strong> onto another tile&#39;s tabs to move it there, onto the edge of a tile (the outer 22%) to split that tile on that side, or into its middle to add it as a tab. The drag shows where it will land (see DragFeedback).</li>
+<li><strong>Drag a gutter</strong> to resize; each side keeps at least 6%.</li>
+<li><strong>×</strong> closes a view (it goes to the + menu and the empty-tile picker); <strong>+</strong> opens a closed view in this tile.</li>
+<li><strong>Links bring views forward.</strong> A lab: link or an action that needs a view (<code>host.focus({ view })</code>) activates it in its tile, or adds it next to related views (Code near Notes and Agent, Traces near Events and Params…) if it was closed.</li>
+</ul>
+<h2>Designing a view for the dock</h2>
+<ul>
+<li>A view must work from about 320px to the full window in either direction. Use the <code>tile</code> container query (<code>@container tile (max-width: 640px)</code>) rather than media queries: the tile is what changes size.</li>
+<li>At narrow widths stack the side column under the body (the shared rules do this for <code>.tabbody</code> and <code>.page</code>) and fold left-hand columns away behind a button (the Book&#39;s Contents).</li>
+<li>Never assume a view is visible: it may be behind another tab. Do expensive drawing only while mounted.</li>
+<li>Keep a view&#39;s own state (open file, chapter, scroll position) in the view or in <code>store</code> (<code>formskate.v1.*</code>), so closing and reopening a tab brings it back.</li>
+</ul>
+</div></section>
+<section id="sec-reading-markdown"><h2 class="x-h">reading-markdown.md</h2><div class="x-md"><h1>The Markdown the reading views render</h1>
+<p>Notes, Docs, Reference, the Book and the agent&#39;s replies are Markdown rendered by <code>app/markdown.js</code>. It is small on purpose; use only what is below. Raw HTML is escaped, and images, footnotes and <code>&lt;details&gt;</code> do not exist.</p>
+<h2>Elements</h2>
+<table>
+<thead>
+<tr>
+<th>element</th>
+<th>write</th>
+<th>renders as</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>title</td>
+<td><code># Title</code> (once, first line)</td>
+<td><code>h1</code>; the next paragraph is the lede</td>
+</tr>
+<tr>
+<td>section</td>
+<td><code>## 12.1 Section</code></td>
+<td><code>h2</code> with an ink rule above; three or more make the contents line</td>
+</tr>
+<tr>
+<td>subsection</td>
+<td><code>### …</code>, <code>#### …</code></td>
+<td><code>h3</code>; <code>h4</code> small caps in ink-2</td>
+</tr>
+<tr>
+<td>emphasis</td>
+<td><code>**bold**</code>, <code>*italic*</code> or <code>_italic_</code></td>
+<td>bold defines a term</td>
+</tr>
+<tr>
+<td>inline code</td>
+<td><code>`rt.step()`</code></td>
+<td>code face on a fill chip</td>
+</tr>
+<tr>
+<td>lists</td>
+<td><code>- item</code>, <code>1. item</code>, nested by two spaces</td>
+<td></td>
+</tr>
+<tr>
+<td>tables</td>
+<td>GitHub pipe tables; <code>:--:</code> and <code>--:</code> align</td>
+<td><code>table.rt.doc-t</code> in a sideways-scrolling wrapper; write a <code>|</code> inside a cell as <code>|</code></td>
+</tr>
+<tr>
+<td>rule</td>
+<td><code>---</code></td>
+<td>a hair line</td>
+</tr>
+<tr>
+<td>inline maths</td>
+<td><code>$\omega = \dot\theta$</code></td>
+<td>KaTeX as MathML</td>
+</tr>
+<tr>
+<td>display maths</td>
+<td><code>$$</code> lines around it, <code>```math</code> (or <code>tex</code>, <code>latex</code>)</td>
+<td><code>.mathblock</code></td>
+</tr>
+<tr>
+<td>code</td>
+<td><code>```js</code> or an unlabelled fence</td>
+<td>highlighted with the editor&#39;s colours; other languages (<code>text</code>, <code>json</code>) plain</td>
+</tr>
+<tr>
+<td>figure</td>
+<td><code>```svg</code> then a paragraph starting <code>Figure N.k</code> (bold allowed)</td>
+<td><code>figure.fig</code> with a <code>figcaption</code></td>
+</tr>
+<tr>
+<td>callout</td>
+<td><code>&gt; **Try it.** …</code>, <code>&gt; **Exercise.** …</code>, <code>&gt; **Careful.** …</code>, <code>&gt; **Note.** …</code></td>
+<td>see Callout</td>
+</tr>
+<tr>
+<td>links</td>
+<td><code>[text](lab:…)</code>, <code>[text](#anchor)</code>, <code>[text](https://…)</code></td>
+<td>lab: links drive the workbench; anchors scroll; web links open a new tab; any other target drops to its text</td>
+</tr>
+</tbody></table>
+<p>Headings get ids from their text (lowercase, non-alphanumerics to hyphens) with a prefix per view: <code>n-</code> notes, <code>d-</code> docs, <code>r-</code> reference, <code>b-</code> book. <code>lab:doc?id=…&amp;at=&lt;slug&gt;</code> and <code>lab:book?ch=…&amp;at=&lt;slug&gt;</code> scroll to a heading by that slug.</p>
+<p>A dollar sign that is not maths is written <code>\$</code>. A <code>lab:</code> link may contain spaces and one level of parentheses: <code>[open](lab:open?file=a.js&amp;find=.phase(&#39;x&#39;))</code>.</p>
+<h2>lab: links</h2>
+<table>
+<thead>
+<tr>
+<th>link</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>lab:preset?id=T-02</code></td>
+<td>load a preset (its code, notes and stage settings)</td>
+</tr>
+<tr>
+<td><code>lab:book?ch=12&amp;at=slug</code></td>
+<td>open a chapter (<code>ch=A</code> for an appendix), at a heading</td>
+</tr>
+<tr>
+<td><code>lab:doc?id=springs&amp;at=slug</code></td>
+<td>open a shelf doc (ids in <code>content/docs/*.md</code> frontmatter)</td>
+</tr>
+<tr>
+<td><code>lab:open?file=skate/motors.js&amp;find=exports.flick</code></td>
+<td>open a file at the first line containing the text (or <code>&amp;line=20</code>)</td>
+</tr>
+<tr>
+<td><code>lab:trace?id=recognizer/flipTurns</code></td>
+<td>pin signals or states in Traces (comma-separate several); <code>lab:pin</code> is the same</td>
+</tr>
+<tr>
+<td><code>lab:node?id=pop/pop&amp;in=ir</code></td>
+<td>select a system, signal or state in the Graph (or the IR)</td>
+</tr>
+<tr>
+<td><code>lab:trick?name=kickflip</code></td>
+<td>play a trick&#39;s key gesture</td>
+</tr>
+<tr>
+<td><code>lab:param?id=pop/snap&amp;value=20</code></td>
+<td>set a parameter; without a value, open it in Params</td>
+</tr>
+<tr>
+<td><code>lab:view?name=side&amp;track=1</code></td>
+<td>stage camera: <code>axo</code>, <code>front</code>, <code>side</code>, <code>plan</code></td>
+</tr>
+<tr>
+<td><code>lab:overlay?name=forces&amp;on=1</code></td>
+<td>toggle a stage overlay: shadows, trail, annotations, grid, forces, contacts, rig, sites, course, changes, truth</td>
+</tr>
+<tr>
+<td><code>lab:speed?x=0.25</code></td>
+<td>time scale</td>
+</tr>
+<tr>
+<td><code>lab:exp?name=…</code></td>
+<td>open and run an experiment of the loaded preset</td>
+</tr>
+<tr>
+<td><code>lab:show?view=traces</code></td>
+<td>bring a view forward</td>
+</tr>
+<tr>
+<td><code>lab:order?name=deck plane</code></td>
+<td>pick a depth-order strategy</td>
+</tr>
+<tr>
+<td><code>lab:record?trick=kickflip</code></td>
+<td>record a clip (<code>seconds=</code>, <code>replay=0</code>) and replay it</td>
+</tr>
+<tr>
+<td><code>lab:ask?q=…</code></td>
+<td>open the agent with a question</td>
+</tr>
+<tr>
+<td><code>lab:reset</code>, <code>lab:autopilot?on=1</code>, <code>lab:build</code>, <code>lab:replay</code>, <code>lab:score</code></td>
+<td>as named</td>
+</tr>
+</tbody></table>
+<p>A link to a parameter, signal or file works only when the loaded preset has it, which is why a Try it loads its preset first. An unknown link shows a red toast (&quot;unknown lab link …&quot;).</p>
+</div></section>
+<section id="sec-states-and-feedback"><h2 class="x-h">states-and-feedback.md</h2><div class="x-md"><h1>States, errors and feedback</h1>
+<p>The workbench runs a live program, so it is often in a state worth showing: edited and not yet run, compiling, stopped by an exception, recording, waiting for a long job. Each state has one place and one look.</p>
+<h2>Where each kind of feedback goes</h2>
+<table>
+<thead>
+<tr>
+<th>situation</th>
+<th>where</th>
+<th>look</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>the program compiled</td>
+<td>the build pill (&quot;ok&quot;, counts), the editor footer (&quot;compiled in 7.6 ms · hot: kept …&quot;)</td>
+<td>ink</td>
+</tr>
+<tr>
+<td>the program does not compile</td>
+<td>the pill (&quot;2 errors&quot;, accent), the Code tab&#39;s badge (accent count), the error line (accent number, sel wash), the diagnostics list, the footer (&quot;does not compile: …&quot;)</td>
+<td>accent</td>
+</tr>
+<tr>
+<td>a warning from the compiler</td>
+<td>the gutter number bold ink, a &quot;!&quot; row in the diagnostics, a plain toast</td>
+<td>ink (errors get the red toast)</td>
+</tr>
+<tr>
+<td>the running program threw</td>
+<td>the clock (&quot; stopped&quot; in accent), the pill (&quot;stopped&quot;), a banner on the stage (Form Skate Stage) with the system, time, message and source</td>
+<td>accent</td>
+</tr>
+<tr>
+<td>unsaved edits</td>
+<td>&quot; •&quot; after the file, &quot;edited&quot; after the preset title, Run turns primary</td>
+<td>ink fill</td>
+</tr>
+<tr>
+<td>something finished</td>
+<td>a toast (&quot;Copied&quot;, &quot;Saved as U-01&quot;)</td>
+<td>ink</td>
+</tr>
+<tr>
+<td>something failed</td>
+<td>a red toast for 5.2 s, or a <code>.fail</code> row inside the view when the failure belongs to it (&quot;experiments.js does not load: …&quot;)</td>
+<td>accent</td>
+</tr>
+<tr>
+<td>a long job</td>
+<td>a Meter with Stop in its row; &quot;Exporting…&quot; in the button&#39;s label; a blinking square in a busy pill</td>
+<td>ink</td>
+</tr>
+<tr>
+<td>a selection</td>
+<td>a 2px accent inset bar on the row; the node&#39;s accent outline in the graph</td>
+<td>accent</td>
+</tr>
+<tr>
+<td>nothing to show</td>
+<td>an ink-2 sentence saying what to do</td>
+<td>ink-2</td>
+</tr>
+</tbody></table>
+<h2>Rules</h2>
+<ul>
+<li><strong>Red is earned.</strong> Accent marks an error, a bail or the current selection. If two different things are red at once, one of them should not be.</li>
+<li><strong>Errors carry their place.</strong> A diagnostic shows <code>file:line</code> and opens it on click; the runtime banner names the system and the time (&quot;pop/pop stopped at 2.53 s: …&quot;) and opens the source.</li>
+<li><strong>Recover in place.</strong> After an exception the world stops at that step; fixing the code and pressing Run resumes from the same moment. Say so in the message (&quot;Fix it and press Run (the world resumes), or Reset.&quot;).</li>
+<li><strong>Do not block.</strong> No modal dialogs and no confirmations: destructive actions are undoable (Revert all edits brings the preset back) or say what they remove in their description (&quot;removes your saved preset&quot;).</li>
+<li><strong>Busy without spinners.</strong> Progress is a Meter fed by the job, or a 6px square blinking in steps (0.8 s), never a spinner.</li>
+<li><strong>Disabled, not hidden,</strong> when the reason is temporary (Run on other experiments while one runs, Replay before anything is recorded), at 40% opacity; hidden when the control can never apply here (Delete on a built-in preset).</li>
+<li><strong>Offline features degrade with a sentence.</strong> When saving files or Claude is unavailable, say so and offer what still works (&quot;…was copied to the clipboard instead&quot;).</li>
+</ul>
+</div></section>
+<section id="sec-ui-copy"><h2 class="x-h">ui-copy.md</h2><div class="x-md"><h1>Writing interface copy</h1>
+<p>The workbench&#39;s words are short, exact and in the program&#39;s own vocabulary. They tell a person what a thing is, what a control does, and what just happened, in that order of priority. Every example below is copy from the app.</p>
+<h2>Names</h2>
+<ul>
+<li><strong>Views</strong> are one capitalised word: Notes, Docs, Book, Code, Agent, Reference, Stage, Graph, IR, Traces, Events, Params, Experiments. Each has an about, a lowercase phrase with no full stop: &quot;what this preset is about&quot;, &quot;physics and maths, one topic each&quot;, &quot;the textbook: Kickflips from First Principles&quot;, &quot;the library, editable&quot;, &quot;a coding agent with an eval tool&quot;, &quot;the API, one page&quot;, &quot;the drafting sheet you skate on&quot;, &quot;dataflow between systems by phase&quot;, &quot;the compiled program as text&quot;, &quot;signals and states over time&quot;, &quot;tricks, pops, bails, errors&quot;, &quot;every parameter, live&quot;, &quot;parameter sweeps, headless&quot;.</li>
+<li><strong>Program objects</strong> keep their ids and kinds exactly: <code>pop/pop</code> is a system, <code>recognizer/height</code> a signal, <code>pop/snap</code> a param. Write ids in the code face; never translate them into prose names in a control.</li>
+<li><strong>Parameters</strong> show the label written in the code (lowercase, says what it does: &quot;tail snap (nose-up spin the slam starts)&quot;, &quot;rider take-off speed&quot;) followed by the id&#39;s last segment.</li>
+<li><strong>Presets</strong> are code plus title: &quot;B-01 Flatground&quot;, &quot;D-03 Onion skins and chronophotographs&quot;.</li>
+</ul>
+<h2>Controls</h2>
+<ul>
+<li>Buttons and menu titles are sentence case, a verb or the thing they make: &quot;Run&quot;, &quot;Square up&quot;, &quot;Clear&quot;, &quot;Reset all&quot;, &quot;Save&quot;, &quot;Stop&quot;, &quot;Export project&quot;, &quot;Revert all edits&quot;, &quot;Record 20 s of autopilot&quot;, &quot;Replay the recording&quot;, &quot;Score depth-order strategies…&quot;.</li>
+<li>A label that opens a menu ends with ▾ (&quot;Files ▾&quot;, &quot;Export ▾&quot;, &quot;Show 4 ▾&quot;); one that opens a file picker or a second step ends with … (&quot;Import project…&quot;, &quot;Load clip…&quot;).</li>
+<li>Toggles name the mode: &quot;Track&quot;, &quot;Follow&quot;, &quot;Freeze&quot;, &quot;Edit&quot;, &quot;Changed (3)&quot;.</li>
+<li>Every icon button and most buttons have a <code>title</code> that says what happens in a full phrase, with its shortcut: &quot;Recompile the library; the world keeps its state (Ctrl+Enter)&quot;, &quot;Step 1/120 s (Shift: 12 steps)&quot;, &quot;Reset the world (keeps the code)&quot;, &quot;Turn the sheet with the rider&#39;s heading&quot;, &quot;Stop scrolling (the simulation keeps running)&quot;.</li>
+<li>Menu items carry a lowercase description of the result: &quot;files, notes and settings as .json&quot;, &quot;back to B-01 as published&quot;, &quot;.epub for Apple Books, Kobo, Calibre and other readers&quot;, &quot;a fresh world from this preset&#39;s code, run headlessly: the same clip every time&quot;.</li>
+<li>Placeholders say what to type, lowercase: &quot;search the shelf&quot;, &quot;search the book&quot;, &quot;filter lines&quot;, &quot;add a trace: filter signals and states&quot;, &quot;new file, e.g. skate/grind.js&quot;, &quot;save as my preset: title&quot;.</li>
+</ul>
+<h2>Explanations</h2>
+<p>A view explains itself in one <code>.lbl</code> sentence in its toolbar, and a menu in a closing note:</p>
+<ul>
+<li>&quot;Live: a change takes effect on the next step. Edit the code to change a default.&quot;</li>
+<li>&quot;Dataflow: systems by phase, edges carry the states and signals one writes and another reads. Dashed edges: the reader runs before the writer in the step, so it sees last step&#39;s value.&quot;</li>
+<li>&quot;Experiments are exported from experiments.js: many headless runs, each a fresh world.&quot;</li>
+<li>&quot;Drag a tab to move it; drop it on a tile&#39;s edge to split. The layout is kept in this browser.&quot;</li>
+<li>&quot;Links that drive the workbench become plain text outside it.&quot;</li>
+</ul>
+<p>Say the mechanism, not a reassurance. &quot;the world keeps its state&quot; tells a person what Run will not destroy.</p>
+<h2>Numbers</h2>
+<ul>
+<li>A unit after every quantity, separated by a space: &quot;4.29 m/s&quot;, &quot;0.08 m&quot;, &quot;160 N&quot;, &quot;15 rad/s&quot;, &quot;0.49 s&quot;, &quot;20 s&quot;. Angles in the code&#39;s own unit.</li>
+<li>Clocks two decimals (&quot;5.66&quot;), event times three (&quot;2.525&quot;), inspector values three, parameter values as many as they need up to four.</li>
+<li>Thousands separators on scores (&quot;1,059&quot;). A missing value is &quot;—&quot;.</li>
+<li>Several related numbers in one line are joined by &quot; · &quot; (&quot;flip · shove · wrap&quot; with &quot;-0.01 · 0.01 · 0.00&quot;; &quot;16 systems · 15 signals · 42 states&quot;). A multiplier uses × (&quot;combo ×2&quot;, &quot;1×&quot;, &quot;0.25×&quot;).</li>
+<li>Status in numbers: &quot;compiled in 7.6 ms · hot: kept 37 states, 4 bodies, 12 system locals, 7 expression states&quot;.</li>
+</ul>
+<h2>Messages</h2>
+<ul>
+<li><strong>Confirmations</strong> in the past tense, a few words: &quot;Copied&quot;, &quot;Saved as U-01&quot;, &quot;Back to the preset as published&quot;, &quot;Imported B-01-flatground.json&quot;.</li>
+<li><strong>Errors</strong> name the thing, then what went wrong, then what to do: &quot;pop/pop stopped at 2.53 s: … Fix it and press Run (the world resumes), or Reset.&quot;; &quot;Saving files is not available here: kickflips-from-first-principles.md was copied to the clipboard instead&quot;; &quot;Nothing recorded yet: turn Record on and let the stage run&quot;.</li>
+<li><strong>Lookups that fail</strong> say exactly what was asked for, lowercase: &quot;no chapter 99&quot;, &quot;no trace recognizer/hight&quot;, &quot;no file skate/grid.js&quot;, &quot;unknown lab link …&quot;.</li>
+<li><strong>Empty states</strong> say what will be here and how to get it: &quot;No traces pinned. Type above to add one, or click <em>pin trace</em> in the inspector. Every signal and every numeric state is recorded for the last 20 s, pinned or not.&quot;; &quot;This preset has no experiments. Add <code>experiments.js</code> exporting <code>Experiment.from(…)</code> values.&quot;; &quot;Nothing on the shelf matches.&quot;; &quot;No chapter mentions that.&quot;; &quot;An empty tile. Open a view:&quot;.</li>
+<li><strong>Unavailable features</strong> say so and keep the rest working: &quot;Claude is not available here, so the agent is off. Everything else in the workbench works.&quot;</li>
+</ul>
+<h2>Never</h2>
+<p>Exclamation marks, emoji, &quot;please&quot;, &quot;oops&quot;, &quot;simply&quot;, &quot;just&quot;, jokes, marketing words, title case in sentences, or a message that blames the person.</p>
+</div></section>
+<section id="sec-writing-a-book-section"><h2 class="x-h">writing-a-book-section.md</h2><div class="x-md"><h1>Writing a book section</h1>
+<p><em>Kickflips from First Principles</em> is the workbench&#39;s textbook: 69 chapters in a front matter, nine parts (I The board and the bench, II Mathematics of moving things, III Physics, IV Tricks, V The program and its runtime, VI Algorithms of the game, VII Drawing, VIII The API and the tools, IX Gameplay and design) and six appendices (A to F). Each chapter is one Markdown file in <code>content/book/</code>, rendered by the Book tab with the same renderer as the notes and exported from there as one HTML page, an EPUB and Markdown. This guide is how to write one chapter, or one numbered section of one, so that it fits the book and passes its checker. The book&#39;s own brief is <code>content/book/BOOK-STYLE.md</code>; this page condenses it with the checker&#39;s rules and a worked example.</p>
+<h2>Before you write</h2>
+<ol>
+<li>Read the chapter&#39;s entry in <code>content/book/book.json</code>: its fixed <code>title</code>, its <code>about</code> (the brief: cover all of it), its <code>presets</code> and <code>docs</code>. Read its neighbours&#39; entries so you know what is taught before and after.</li>
+<li>Read <code>content/book/FACTS.md</code>: the program&#39;s parameters, systems, states, bodies, the trick table and the running example, all generated by <code>node build/facts.js</code>.</li>
+<li>Read the chapter&#39;s presets (<code>content/presets/&lt;id&gt;.md</code> and the folder beside it) and shelf docs (<code>content/docs/</code>), then the code they point at in <code>src/lib</code>, <code>src/core.js</code> and <code>app/</code>.</li>
+<li>Write. Touch only the chapter&#39;s file.</li>
+<li>Run <code>node test/book-check.js &lt;n&gt;</code> (a number, a letter, or the file name) until it reports no errors, and fix the warnings unless you have a reason.</li>
+<li>Reread it once as the reader: every term defined before use, every figure matching its caption, every number traceable.</li>
+</ol>
+<p>The plan&#39;s shape:</p>
+<pre><code class="language-json">{ &quot;title&quot;: &quot;Kickflips from First Principles&quot;, &quot;subtitle&quot;: &quot;…&quot;,
+  &quot;parts&quot;: [{ &quot;id&quot;: &quot;VII&quot;, &quot;title&quot;: &quot;Drawing&quot;, &quot;about&quot;: &quot;The stage as a technical drawing: …&quot; }],
+  &quot;chapters&quot;: [{ &quot;n&quot;: &quot;47&quot;, &quot;part&quot;: &quot;VII&quot;, &quot;slug&quot;: &quot;drawing-motion&quot;, &quot;title&quot;: &quot;Drawing motion&quot;,
+    &quot;about&quot;: &quot;Onion skins, flight paths, chronophotographs in the manner of Marey, dimension lines.&quot;,
+    &quot;presets&quot;: [&quot;D-03&quot;], &quot;docs&quot;: [], &quot;file&quot;: &quot;47-drawing-motion.md&quot; }] }
+</code></pre>
+<h2>The reader and the voice</h2>
+<p>The reader reads JavaScript and has high-school mathematics: trigonometry, vectors as arrows, the idea of a derivative. Everything else (dot and cross products, quaternions, inertia tensors, impulses, damping ratios, winding numbers, expression graphs, orthographic projection) is introduced in the chapter the plan assigns it to, before it is used. A chapter that needs an earlier idea uses it and links back (<code>[Chapter 9](lab:book?ch=9)</code>) instead of teaching it again.</p>
+<p>The model is Peter Norvig&#39;s technical writing: foundations first, why before how, concrete before abstract, the reader treated as capable.</p>
+<ul>
+<li><strong>Start with the point.</strong> The first paragraph says what the chapter explains and what the reader will understand by the end. No preamble.</li>
+<li><strong>Paragraphs develop ideas.</strong> Bullets only for lists of parallel, complete sentences.</li>
+<li><strong>Why, then how.</strong> Say what problem a mechanism solves and what breaks without it before showing it. When the design chose, name the alternative and why it lost.</li>
+<li><strong>Concrete.</strong> Real code, real numbers from a run, real event logs; every abstract claim gets an example within a paragraph or two.</li>
+<li><strong>No analogies or metaphors.</strong> Explain a system in its own terms. Skating words are the subject, not a metaphor.</li>
+<li><strong>Define terms once</strong>, in bold where they are defined (<strong>winding number</strong>), then use them the same way everywhere. Use the program&#39;s names: thing, component, site, state, param, signal, system, phase, watch, view, plugin, motor, gesture, intent, stance, guide, recognizer.</li>
+<li><strong>Rider</strong> is the person, <strong>board</strong> the whole skateboard, <strong>deck</strong> the wooden part; <code>skater</code> only when naming code (<code>skater/stance</code>). Stance is regular unless you say goofy.</li>
+<li><strong>Frames</strong>: the deck&#39;s +x points to the nose, +y out of the grip tape, +z to the toe side. The world&#39;s +y is up, gravity −9.81 m/s². One step is 1/120 s, with 8 substeps.</li>
+<li><strong>British spelling</strong>, SI units: &quot;0.49 s&quot;, &quot;81 cm&quot; in prose; $9.81,\mathrm{m/s^2}$ with a thin space in maths. En dashes in ranges (1,500–2,500).</li>
+<li><strong>No em dashes.</strong> Use a colon, a comma, parentheses or a new sentence.</li>
+</ul>
+<p>Words and phrases the checker flags: delve, it&#39;s worth noting, it is worth noting, of course, clearly, obviously, it goes without saying, in this chapter we will, landscape, tapestry, crucial, seamless, robust, leverage, as you can see, it&#39;s important to note, imagine, think of it (this, the), like a, just like, magic, nuanced, paramount, embark, journey, simply, basically, essentially, in essence, here&#39;s the thing, let&#39;s dive, unlock, and the em dash itself.</p>
+<h2>Anatomy of a chapter</h2>
+<pre><code class="language-text"># &lt;the chapter title, exactly as in book.json&gt;
+
+Opening: one or two paragraphs. What this chapter explains and why it matters to the game.
+
+## N.1 &lt;first idea&gt;          numbered sections, 4 to 8 of them
+## N.2 …
+## N.k The running example: &lt;what this chapter shows of the kickflip&gt;
+## N.m Key points            complete sentences that summarise; nothing new
+## Exercises                 3 to 5, from a two-minute edit to a short project
+
+An optional closing sentence or two connects to the next chapter.
+</code></pre>
+<ul>
+<li>1,500 to 2,500 words of prose (code, maths and figures do not count; the checker warns under 1,300 and over 3,200). Appendices are as long as their content.</li>
+<li>At least two figures, numbered N.1, N.2… in order.</li>
+<li>At least one quotation of real library code in chapters about the program (Parts I and III to VIII), explained line by line after it.</li>
+<li>A link to each of the chapter&#39;s presets (<code>[D-03 Onion skins and chronophotographs](lab:preset?id=D-03)</code>) and at least one Try it callout.</li>
+<li>Maths derived, not just stated, with a worked example in the program&#39;s numbers.</li>
+<li>Tables for comparisons and for numbers from runs.</li>
+</ul>
+<h2>Anatomy of a section</h2>
+<p>A numbered section (<code>## 47.2 The memory: the history buffer</code>) makes one point. It opens with a sentence that states it, gives the reason it matters, shows the mechanism (code, maths or a figure) and explains it, then ties it to a number from the running example or a run. Most sections are two to six paragraphs. A section refers to its figure in the prose (&quot;Figure 47.1 lays them out…&quot;) before or right after the figure.</p>
+<p>Here is the start of section 47.2 as the book has it:</p>
+<pre><code class="language-markdown">## 47.2 The memory: the history buffer
+
+The runtime keeps a **history**: after every second step, the pose (position and orientation) of every
+body, for the last eight seconds. [Chapter 33](lab:book?ch=33) introduced it for repeatable runs; here
+it is the drawing&#39;s memory.
+
+```js
+// core.js
+class History {
+  constructor(rt, seconds = 8, every = 2) { this.rt = rt; this.every = every; this.cap = Math.ceil(seconds / (rt.dt * every)); this.buf = []; }
+  record() {
+    if (!this.rt.world || this.rt.stepN % this.every) return;
+```
+
+The capacity is eight seconds at one sample every two steps of 1/120 s, $8 / (2/120) = 480$ samples.
+`record` runs after every step and keeps only even-numbered steps, so samples fall on multiples of 1/60 s; …
+</code></pre>
+<p>Note what it does: the bold term is defined in the first sentence; the earlier chapter is linked, not repeated; the quotation names its file and is short; the paragraph after it walks through the code and computes a number from it.</p>
+<h2>The running example</h2>
+<p>One kickflip on flat ground runs through the whole book: preset B-01 at default parameters, played by its key gesture (<code>controls.routine(&#39;kickflip&#39;)</code>: push for 1.6 s, crouch at 2.2 s, flick 0.29 s later, release at 2.52 s). The rider pops at t = 2.525 s, the tail strikes 0.067 s later, the front foot flicks at 2.642 s, the board turns 0.988 times about its long axis, the feet catch it at 2.942 s, the rider lands clean at 3.008 s after 0.49 s in the air, and the recognizer names it a kickflip worth 850 points. FACTS.md has its event log and the deck&#39;s state every 0.05 s.</p>
+<p>Each chapter that can has a section &quot;N.k The running example: …&quot; showing its part of that kickflip with real numbers: Part II its frames and turns, III its momentum and contacts, IV the trick, V the steps and schedule that compute it, VI the input, motors and recognizer, VII its drawing, VIII how to record and test it, IX its score and feel.</p>
+<h2>Figures</h2>
+<p>A figure is a fenced <code>svg</code> block followed by a caption paragraph that starts <code>**Figure N.k.**</code>. It is drawn in the stage&#39;s style: technical drawing, hairlines, ink, grey and one red, on the reader&#39;s background.</p>
+<ul>
+<li>The block starts with <code>&lt;svg</code> and has a <code>viewBox</code> at most 720 wide (<code>viewBox=&quot;0 0 640 260&quot;</code> is typical).</li>
+<li>No literal colours: <code>stroke=&quot;currentColor&quot;</code> or the classes <code>ink</code>, <code>mut</code>, <code>acc</code>, <code>hair</code>; fills <code>none</code> or <code>f-ink</code>, <code>f-mut</code>, <code>f-acc</code>, <code>f-fill</code>, <code>f-fill2</code>, <code>f-paper</code>, <code>f-sel</code>. The Figure component lists what each is for.</li>
+<li>No <code>&lt;style&gt;</code>, <code>&lt;script&gt;</code>, <code>&lt;image&gt;</code>, <code>&lt;foreignObject&gt;</code>; well-formed XML (<code>&amp;lt;</code>, <code>&amp;amp;</code> in text).</li>
+<li>Text 9 to 13 (<code>font-size=&quot;11&quot;</code>); <code>lbl</code> for small uppercase labels, <code>it</code> for variables, <code>b</code> for bold. Maths in labels as Unicode (ω, θ, ½, ², ₀, ·, −, ×).</li>
+<li>Weights: 1 for outlines, 1.6 for the subject, 0.6 for hatching and construction; <code>dash</code> and <code>dot</code> classes for dashed and dotted.</li>
+<li>Arrowheads as a marker with an <code>f-ink</code> path; ids are made unique per figure, so <code>arrow</code> is fine in every figure.</li>
+<li>A figure that claims to show data plots real numbers (from FACTS.md or your own run). A schematic says so in its caption if it could be mistaken for data.</li>
+</ul>
+<h2>Code</h2>
+<p>A <code>js</code> block whose first line is a comment naming a file is a <strong>quotation</strong>, and the checker verifies that every other line appears in that file (whitespace ignored). Name files relative to <code>src/lib</code> (<code>// skate/motors.js</code>, <code>// rigid.js</code>), the runtime as <code>// core.js</code>, the app as <code>// app/draft.js</code>, a preset&#39;s own file as <code>// T-05/main.js</code>. Leave lines out with a line that is just <code>// …</code>. Keep quotations to 5 to 30 lines and explain them in prose afterwards.</p>
+<p>Code that is not a quotation (a sketch, an exercise&#39;s starting point) has no file comment, must run against the real API, and is labelled as yours in the prose. Never invent an API: check names against <code>src/core.js</code>, <code>content/reference.md</code> and the library. Pseudocode goes in <code>text</code> blocks.</p>
+<h2>Links into the workbench</h2>
+<p><code>lab:</code> links make the book a workbench manual: the reader clicks and the app loads a preset, opens a file at a line, pins a trace, plays a trick. The checker resolves every link against the base library and the chapter&#39;s presets. The full list is in <em>The Markdown the reading views render</em>. A Try it callout loads the preset first, then acts:</p>
+<pre><code class="language-markdown">&gt; **Try it.** [Load D-03](lab:preset?id=D-03), [switch to front elevation](lab:view?name=front),
+&gt; [slow time to a quarter](lab:speed?x=0.25) and [play a kickflip](lab:trick?name=kickflip).
+</code></pre>
+<p>Write link text that still reads as prose: in the exported HTML, EPUB and Markdown, workbench links become plain (dotted) text and only links between chapters stay links.</p>
+<h2>Maths</h2>
+<p>KaTeX, rendered as MathML. Inline <code>$\omega = \dot\theta$</code> with no space just inside the dollars and no letter right after the closing one; display maths between lines of <code>$$</code>. <code>\begin{aligned}</code>, <code>\tfrac</code>, <code>\mathbf</code>, <code>\hat</code>, <code>\dot</code>, <code>\lVert</code>, <code>\operatorname</code> all work. Inside a table write <code>|</code> as <code>\vert</code> and norms as <code>\lVert … \rVert</code>. A dollar sign that is not maths is <code>\$</code>.</p>
+<h2>Facts</h2>
+<p>Every number about the program comes from the program: FACTS.md, or a measurement you describe (&quot;measured headless with <code>test/harness.js</code>, the kickflip gesture in B-01 at default parameters&quot;). Real-world numbers (a deck is about 80 cm long; a street ollie rises 30 to 60 cm) can come from general knowledge, stated loosely. Cite only the classics you are sure of (Newell, Newell and Sancha 1972; Baraff&#39;s SIGGRAPH notes; Featherstone; Marey). If the code disagrees with a doc or a note, the code wins: write what the code does and report the difference outside the chapter.</p>
+<h2>What the checker enforces</h2>
+<p><code>node test/book-check.js</code> renders each chapter with the app&#39;s renderer.</p>
+<p><strong>Errors</strong> (the chapter fails): line 1 is not <code># Title</code>; an unclosed code fence; maths KaTeX cannot parse; an SVG that is not well-formed, does not start with <code>&lt;svg</code>, has no <code>viewBox</code>, uses a literal colour or a forbidden element; a <code>lab:</code> link that does not resolve; a quoted file that does not exist, or a quoted line that is not in it; the renderer throwing.</p>
+<p><strong>Warnings</strong>: a title different from the plan&#39;s; sections not numbered N.1, N.2… in order, or fewer than three; under 1,300 or over 3,200 words of prose; a viewBox wider than 760; a font size outside 8 to 18; a figure without a caption or with the wrong number; fewer than two figures; a preset of the chapter never linked; stray <code>$</code> in the rendered text; no exercises; any flagged phrase or an em dash.</p>
+<h2>Checklist</h2>
+<ul>
+<li><input disabled="" type="checkbox"> The title is exactly the plan&#39;s; the opening paragraph states what the chapter explains.</li>
+<li><input disabled="" type="checkbox"> Sections are numbered N.1 to N.m, four to eight of them, ending with Key points and Exercises.</li>
+<li><input disabled="" type="checkbox"> Every term is bold where defined and defined before it is used; earlier chapters are linked, not re-taught.</li>
+<li><input disabled="" type="checkbox"> There is a running-example section with real numbers from FACTS.md or a described measurement.</li>
+<li><input disabled="" type="checkbox"> At least two figures, captioned <strong>Figure N.k.</strong>, referred to in the prose, classes only, real data where they show data.</li>
+<li><input disabled="" type="checkbox"> At least one quotation of real code, short, named, and explained line by line.</li>
+<li><input disabled="" type="checkbox"> Every preset of the chapter is linked; at least one Try it starts by loading its preset.</li>
+<li><input disabled="" type="checkbox"> Three to five exercises, from a quick edit to a short project.</li>
+<li><input disabled="" type="checkbox"> No em dashes, no flagged words, no analogies; British spelling; units with a space.</li>
+<li><input disabled="" type="checkbox"> <code>node test/book-check.js &lt;n&gt;</code> reports no errors.</li>
+</ul>
+</div></section>
+<section id="tokens"><h2 class="x-h">Tokens</h2><h3>Colour</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>light</th><th>dark</th><th>usage</th></tr></thead><tbody><tr><td><code>bg</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>The ground of every surface: page, tiles, header bar, menus, inputs, the side column. There are no tinted panels: a new surface is bg separated by a 1 px hair rule.</td></tr><tr><td><code>fill</code></td><td class="x-sw"><span style="background:#f6f6f6"></span><code>#f6f6f6</code></td><td class="x-sw"><span style="background:#222222"></span><code>#222222</code></td><td>Hover rows (menu items, shelf and contents entries, events, trace headers), inline code chips, the plain callout, figure fills (f-fill). Never a panel background.</td></tr><tr><td><code>fill-2</code></td><td class="x-sw"><span style="background:#e6e6e6"></span><code>#e6e6e6</code></td><td class="x-sw"><span style="background:#3a3a3a"></span><code>#3a3a3a</code></td><td>The darker grey fill in figures (f-fill2) and sparkline areas. Rare in the UI.</td></tr><tr><td><code>ink</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>All primary text and marks, on bg, fill, code-bg and panel. Also the fill of on/primary buttons and selected segments (with bg as their text), the focus outline, and the 1 px rules that mark structure (doc h2 rule, menu border, params top rule).</td></tr><tr><td><code>ink-2</code></td><td class="x-sw"><span style="background:#737373"></span><code>#737373</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td>Secondary text: sub labels, counts, tab labels at rest, notes, placeholders, units, empty states, axis labels. On bg and code-bg in both themes; on fill it is 4.4:1 in light, so keep long text off fill.</td></tr><tr><td><code>grid</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td class="x-sw"><span style="background:#222222"></span><code>#222222</code></td><td>Kiln's minor grid colour. Defined for other Kiln tools; Form Skate's own UI does not use it (the stage draws its grid with Form Skate Stage's st-grid).</td></tr><tr><td><code>grid-major</code></td><td class="x-sw"><span style="background:#e4e4e4"></span><code>#e4e4e4</code></td><td class="x-sw"><span style="background:#2d2d2d"></span><code>#2d2d2d</code></td><td>Kiln's major grid colour. Defined, unused by Form Skate's UI (see grid).</td></tr><tr><td><code>accent</code></td><td class="x-sw"><span style="background:#e2001a"></span><code>#e2001a</code></td><td class="x-sw"><span style="background:#ff3b4a"></span><code>#ff3b4a</code></td><td>The one red, and only for trouble and selection: errors and bails, the selected row's 2 px inset bar, the selected graph node, the Try it callout's rule, the ▸ after a lab: link, the chapter label, the text caret. As text on bg in both themes. Never decoration, never a brand colour.</td></tr><tr><td><code>good</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Kiln's success colour, deliberately the same as ink: success is not coloured. Defined, unused in Form Skate's CSS.</td></tr><tr><td><code>warn</code></td><td class="x-sw"><span style="background:#8c8c8c"></span><code>#8c8c8c</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td>Kiln's warning text in consoles. Defined, unused by Form Skate's views: warnings in the editor gutter are ink and bold instead.</td></tr><tr><td><code>stage</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>Background of diagram areas (.diagram: the dataflow graph). Same as bg.</td></tr><tr><td><code>panel</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>Background of boxes floating over a canvas (.ovl-box). Same as bg.</td></tr><tr><td><code>hair</code></td><td class="x-sw"><span style="background:#d6d6d6"></span><code>#d6d6d6</code></td><td class="x-sw"><span style="background:#3d3d3d"></span><code>#3d3d3d</code></td><td>The 1 px hairline: tile and bar borders, control borders at rest (buttons, segments, toggles, inputs), gutters between tiles, table header rules. A hairline is structure, not a control affordance: at rest it is about 1.5:1 on bg, below 3:1 (the source's look; hover turns a control's border to ink).</td></tr><tr><td><code>rule</code></td><td class="x-sw"><span style="background:#ededed"></span><code>#ededed</code></td><td class="x-sw"><span style="background:#2a2a2a"></span><code>#2a2a2a</code></td><td>The faintest line: between rows of a list or table, under sub headers, the zero line of a trace.</td></tr><tr><td><code>code-bg</code></td><td class="x-sw"><span style="background:#fbfbfb"></span><code>#fbfbfb</code></td><td class="x-sw"><span style="background:#1d1d1d"></span><code>#1d1d1d</code></td><td>Ground of code: the editor, pre.src blocks, inputs that take code or names, the notes editor.</td></tr><tr><td><code>sel</code></td><td class="x-sw"><span style="background:rgba(226, 0, 26, 0.10)"></span><code>rgba(226, 0, 26, 0.10)</code></td><td class="x-sw"><span style="background:rgba(255, 59, 74, 0.16)"></span><code>rgba(255, 59, 74, 0.16)</code></td><td>A red wash: text selection in the editor, the line with an error, the Try it callout, the drop hint while dragging a tab, figure f-sel. Text on it is ink.</td></tr><tr><td><code>tok-key</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Code: keywords, bold. On code-bg.</td></tr><tr><td><code>tok-str</code></td><td class="x-sw"><span style="background:#6b6b6b"></span><code>#6b6b6b</code></td><td class="x-sw"><span style="background:#a6a6a6"></span><code>#a6a6a6</code></td><td>Code: strings, grey. On code-bg.</td></tr><tr><td><code>tok-num</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Code: numbers (and bold literals null, true, false). On code-bg.</td></tr><tr><td><code>tok-expr</code></td><td class="x-sw"><span style="background:#e2001a"></span><code>#e2001a</code></td><td class="x-sw"><span style="background:#ff3b4a"></span><code>#ff3b4a</code></td><td>Code: the lambda arrow =&gt;, red and bold: the only colour in code. On code-bg.</td></tr><tr><td><code>tok-com</code></td><td class="x-sw"><span style="background:#a3a3a3"></span><code>#a3a3a3</code></td><td class="x-sw"><span style="background:#6e6e6e"></span><code>#6e6e6e</code></td><td>Code: comments (italic) and the line numbers in the gutter. On code-bg. Deliberately faint: about 2.4:1 in light and 3.3:1 in dark, below 4.5:1 (the source's choice; comments recede).</td></tr><tr><td><code>tok-punc</code></td><td class="x-sw"><span style="background:#a3a3a3"></span><code>#a3a3a3</code></td><td class="x-sw"><span style="background:#6e6e6e"></span><code>#6e6e6e</code></td><td>Code: punctuation and operators. On code-bg. Faint like tok-com, below 4.5:1 by design.</td></tr><tr><td><code>on-accent</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td>Text on an accent fill: the error toast and the stopped-runtime banner. The source writes it as a literal #fff in both themes; 4.9:1 on the light accent, 3.5:1 on the dark one (below 4.5:1).</td></tr></tbody></table></div><h3>Type</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>family</th><th>stack</th></tr></thead><tbody><tr><td><code>--font-ui</code></td><td><code>Arial, &quot;Helvetica Neue&quot;, Helvetica, sans-serif</code></td></tr><tr><td><code>--font-display</code></td><td><code>Arial, &quot;Helvetica Neue&quot;, Helvetica, sans-serif</code></td></tr><tr><td><code>--font-code</code></td><td><code>ui-monospace, Menlo, Consolas, &quot;Courier New&quot;, monospace</code></td></tr></tbody></table></div><h4>Interface</h4><p class="x-note">Arial in two weights, 400 and 700. The stylesheet calls this family --mono (a name kept from Kiln); it is Arial, not a monospace.</p><div class="x-styles"><div class="x-style"><div class="ui-body x-sample">16 systems · 15 signals · 42 states</div><div class="x-meta"><code>.ui-body</code> 12px / 1.45 400<br>The default for every control, row and label (fs-s).</div></div><div class="x-style"><div class="ui-small x-sample">plays the gesture from skate/controls.js</div><div class="x-meta"><code>.ui-small</code> 10.5px / 1.45 400<br>Sub labels, counts, notes, menu descriptions, kbd keys, small buttons (fs-xs). Usually ink-2.</div></div><div class="x-style"><div class="ui-tab x-sample">Notes  Code  Agent  Docs  Book</div><div class="x-meta"><code>.ui-tab</code> 13px / 1.2 400<br>Tile tabs (fs-m); the active tab is 700 with a 1 px ink underline.</div></div><div class="x-style"><div class="block-title x-sample">Trick pad</div><div class="x-meta"><code>.block-title</code> 13px / 1.2 700<br>A block's h2 in a side column or inspector (fs-m).</div></div><div class="x-style"><div class="brand x-sample">Form Skate</div><div class="x-meta"><code>.brand</code> 15px / 1 700 · -0.01em<br>The name in the header bar, followed by the word workbench in ui-small, 400, ink-2.</div></div><div class="x-style"><div class="project-title x-sample">Flatground</div><div class="x-meta"><code>.project-title</code> 14px / 1.2 700<br>The preset's title in the header's project button, after its code (B-01) in ui-small.</div></div><div class="x-style"><div class="pill-value x-sample">209</div><div class="x-meta"><code>.pill-value</code> 14px / 1.2 700<br>The value in a status pill (ok, 2 errors, a score), with tabular figures.</div></div><div class="x-style"><div class="bignum x-sample">1,059</div><div class="x-meta"><code>.bignum</code> 26px / 1 700 · -0.01em<br>One headline number in a side column (the score). Kiln's base rule is 30px (fs-xl); Form Skate's side column sets 26px.</div></div><div class="x-style"><div class="chapter-label x-sample">CHAPTER 47</div><div class="x-meta"><code>.chapter-label</code> 10.5px / 1 700 · 0.14em<br>Uppercase, in accent: the label above a chapter title; in ink-2 above a part title.</div></div><div class="x-style"><div class="group-label x-sample">PART VII · DRAWING</div><div class="x-meta"><code>.group-label</code> 10.5px / 1.45 400 · 0.06em<br>Uppercase group headers in the shelf and the book contents, ink-2. Menu group headers use the same size without caps.</div></div></div><h4>Reading</h4><p class="x-note">Notes, Docs, Reference and the Book render Markdown in .doc: 13.5px Arial at line height 1.65, at most 76 characters wide (74 in the Book, at 14px).</p><div class="x-styles"><div class="x-style"><div class="doc-body x-sample">The stage is a drafting sheet, not a game camera.</div><div class="x-meta"><code>.doc-body</code> 13.5px / 1.65 400<br>Running text in Notes, Docs and Reference.</div></div><div class="x-style"><div class="book-body x-sample">A kickflip lasts half a second; a drawing of it lasts as long as anyone looks at it.</div><div class="x-meta"><code>.book-body</code> 14px / 1.68 400<br>Running text in the Book (13.5px in a tile narrower than 700px).</div></div><div class="x-style"><div class="doc-h1 x-sample">A tour of the workbench</div><div class="x-meta"><code>.doc-h1</code> 22px / 1.2 700 · -0.01em<br>A note's or doc's title. The paragraph right after it is the lede, 13px in ink-2.</div></div><div class="x-style"><div class="book-h1 x-sample">Drawing motion</div><div class="x-meta"><code>.book-h1</code> 26px / 1.2 700 · -0.01em<br>A chapter title, under its chapter-label.</div></div><div class="x-style"><div class="doc-h2 x-sample">47.1 Time in a still image</div><div class="x-meta"><code>.doc-h2</code> 16px / 1.3 700<br>Sections, with a 1 px ink rule above (17px in the Book). Three or more h2s make the contents line under the title.</div></div><div class="x-style"><div class="doc-h3 x-sample">Subsection</div><div class="x-meta"><code>.doc-h3</code> 13.5px / 1.35 700<br>Subsections.</div></div><div class="x-style"><div class="doc-h4 x-sample">IN THE BOOK</div><div class="x-meta"><code>.doc-h4</code> 12px / 1.35 700 · 0.05em<br>Uppercase, ink-2: the headers of related lists (In the book, Presets that use this, Further reading on the shelf).</div></div><div class="x-style"><div class="caption x-sample">Figure 47.1. The history samples around the running example.</div><div class="x-meta"><code>.caption</code> 12px / 1.5 400<br>Figure captions, ink-2, its leading bold Figure N.k in ink; at most 68 characters wide.</div></div></div><h4>Code</h4><p class="x-note">The system monospace (ui-monospace, Menlo, Consolas). Code is never set in Arial.</p><div class="x-styles"><div class="x-style"><div class="code-editor x-sample">$.system('pop', s =&gt; s</div><div class="x-meta"><code>.code-editor</code> 12px / 18px 400<br>The editor and its gutter: a fixed 18px line so the highlight layer and the textarea line up.</div></div><div class="x-style"><div class="code-block x-sample">const RULES = [</div><div class="x-meta"><code>.code-block</code> 11.5px / 1.5 400<br>pre.src blocks in reading views (10.5px in panels), the IR text (line height 1.6) and the events list (1.55).</div></div><div class="x-style"><div class="code-inline x-sample">rt.step()</div><div class="x-meta"><code>.code-inline</code> 11px / 1.4 400<br>Inline code in panels, on a fill chip. In reading views inline code is 0.9em of the text.</div></div><div class="x-style"><div class="code-name x-sample">recognizer/height</div><div class="x-meta"><code>.code-name</code> 12px / 1.3 700<br>A signal's or state's id as the title of a trace row.</div></div><div class="x-style"><div class="code-small x-sample">skate/motors.js:153</div><div class="x-meta"><code>.code-small</code> 10.5px / 1.5 400<br>Expression text in the inspector, source locations, event detail, logs (11px).</div></div></div><h3>fontSize</h3><p class="x-note">Kiln's five font-size variables. The stylesheet uses them by name (var(--fs-s)); reading views set their own sizes (see Reading).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--fs-xs</code></td><td><code>10.5px</code></td><td>Small text: sub labels, counts, notes, menu descriptions, small buttons, kbd.</td></tr><tr><td><code>--fs-s</code></td><td><code>12px</code></td><td>The base size of the interface (body), buttons, rows, hints.</td></tr><tr><td><code>--fs-m</code></td><td><code>13px</code></td><td>Tile tabs and block titles.</td></tr><tr><td><code>--fs-l</code></td><td><code>18px</code></td><td>Detail titles. Rare in Form Skate.</td></tr><tr><td><code>--fs-xl</code></td><td><code>30px</code></td><td>Kiln's big number. Form Skate's side column overrides it to 26px.</td></tr></tbody></table></div><h3>spacing</h3><p class="x-note">Kiln has no spacing scale: its rules write pixel values directly. These are the values it uses, named by size, with where each one appears. Rows are dense: 4 to 8px inside controls, 12 to 16px at the edges of a block.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--space-2</code></td><td><code>2px</code></td><td>The gap inside tight lists (search results, event rows) and between a title and its small text.</td></tr><tr><td><code>--space-3</code></td><td><code>3px</code></td><td>Small-button vertical padding (3px 8px); the gap between trick pad cells.</td></tr><tr><td><code>--space-4</code></td><td><code>4px</code></td><td>Run controls gap; menu padding top and bottom; the tab strip's left inset.</td></tr><tr><td><code>--space-5</code></td><td><code>5px</code></td><td>Button vertical padding (5px 10px); shelf entries and diagnostics (5px 12px or 14px).</td></tr><tr><td><code>--space-6</code></td><td><code>6px</code></td><td>Gaps between chips, toasts and inline items; toolbar vertical padding; the gap inside small groups.</td></tr><tr><td><code>--space-7</code></td><td><code>7px</code></td><td>Menu item vertical padding (7px 14px); toggle gap; toast vertical padding.</td></tr><tr><td><code>--space-8</code></td><td><code>8px</code></td><td>The usual gap: toolbar, block header, block content, param rows, project button sides.</td></tr><tr><td><code>--space-10</code></td><td><code>10px</code></td><td>Button and pill side padding; the gap in menu items, footers and event rows.</td></tr><tr><td><code>--space-12</code></td><td><code>12px</code></td><td>Header bar gap; block top padding; toolbar, footer and list-row side padding; a tab's left padding.</td></tr><tr><td><code>--space-14</code></td><td><code>14px</code></td><td>Menu item, shelf, contents and hint side padding; side-column block sides; toast sides.</td></tr><tr><td><code>--space-16</code></td><td><code>16px</code></td><td>The standard side inset of a block, param row and header bar.</td></tr><tr><td><code>--space-18</code></td><td><code>18px</code></td><td>A doc's top padding; the gap above a figure's caption block.</td></tr><tr><td><code>--space-20</code></td><td><code>20px</code></td><td>The empty-tile picker's padding.</td></tr><tr><td><code>--space-22</code></td><td><code>22px</code></td><td>A doc's side padding (18px 22px 64px).</td></tr></tbody></table></div><h3>radius</h3><p class="x-note">Square. Nothing in the workbench has rounded corners except two marks: the radio dot in menus and the signals group in the graph (rx 10).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--radius-0</code></td><td><code>0</code></td><td>Every button, input, segment, menu, tile, callout, toast and table. Write border-radius: 0 explicitly on controls so the browser's default rounding does not appear.</td></tr></tbody></table></div><h3>size</h3><p class="x-note">Heights and widths the stylesheet repeats.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--bar-h</code></td><td><code>52px</code></td><td>The header bar.</td></tr><tr><td><code>--strip-h</code></td><td><code>40px</code></td><td>A tile's tab strip, and the file tabs bar in Code.</td></tr><tr><td><code>--toolbar-min-h</code></td><td><code>46px</code></td><td>The toolbar at the top of a view (min-height; it wraps).</td></tr><tr><td><code>--control-h</code></td><td><code>30px</code></td><td>Segments, toggles, pills, filter inputs and selects in a toolbar.</td></tr><tr><td><code>--control-h-sm</code></td><td><code>24px</code></td><td>Small segments (.seg.sm).</td></tr><tr><td><code>--icon-btn</code></td><td><code>32px</code></td><td>Icon buttons (.ibtn), square; 28px in the run controls, 26px in the agent header.</td></tr><tr><td><code>--hint-h</code></td><td><code>30px</code></td><td>The one-line hint bar under the stage.</td></tr><tr><td><code>--row-min-h</code></td><td><code>30px</code></td><td>A parameter row.</td></tr><tr><td><code>--editor-gutter</code></td><td><code>54px</code></td><td>The code editor's line-number gutter.</td></tr><tr><td><code>--side-w</code></td><td><code>288px</code></td><td>A view's side column (inspector, stage side panel).</td></tr><tr><td><code>--shelf-w</code></td><td><code>230px</code></td><td>The Docs shelf.</td></tr><tr><td><code>--contents-w</code></td><td><code>250px</code></td><td>The Book's contents column.</td></tr><tr><td><code>--doc-measure</code></td><td><code>76ch</code></td><td>Maximum width of reading text (.doc).</td></tr><tr><td><code>--book-measure</code></td><td><code>74ch</code></td><td>Maximum width of a chapter.</td></tr><tr><td><code>--line</code></td><td><code>1px</code></td><td>Every rule and border. Lines are the only structure.</td></tr><tr><td><code>--line-mark</code></td><td><code>2px</code></td><td>Marks of state: the selected row's inset bar, a callout's left rule, the focus outline, an active thread's underline.</td></tr><tr><td><code>--line-part</code></td><td><code>3px</code></td><td>The rule above a part title in the Book, the heaviest line in the system.</td></tr></tbody></table></div></section>
+<section id="components"><h2 class="x-h">Components</h2><h3>Containers</h3><article class="x-comp" id="comp-BigNumber"><h4>BigNumber</h4><div class="x-frame"><iframe data-src="components/BigNumber/standalone.html" src="components/BigNumber/standalone.html" title="BigNumber preview" style="height:90px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>One headline number with a one-line caption under it; at most one per block.</p>
+<h2>Use</h2>
+<p><code>.bignum</code> shows the number a block is about: the score in the stage&#39;s side column. The number is bold, tabular, letter-spaced −0.01em (26px in a side column, 30px elsewhere); the caption is ui-small in ink-2 and says what else to compare it with (&quot;best single trick 850&quot;).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;bignum&quot;&gt;&lt;b&gt;1,059&lt;/b&gt;&lt;span&gt;best single trick 850&lt;/span&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do format with thousands separators (<code>toLocaleString()</code>).</li>
+<li>Don&#39;t open a view with a row of big numbers; the workbench shows numbers next to the thing they measure.</li>
+</ul>
+</div><p class="x-files"><code>components/BigNumber/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Block"><h4>Block</h4><div class="x-frame"><iframe data-src="components/Block/standalone.html" src="components/Block/standalone.html" title="Block preview" style="height:430px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A section of a side column or inspector: a heading row (bold title and a small sub label) over its content, closed by a hair rule. There are no cards and no tinted panels; blocks are separated by rules only.</p>
+<h2>Use</h2>
+<p>Put blocks in <code>aside.side</code> (288px, hair rule on its left, scrolls on its own; hidden when its view is narrower than 560px) or at the top of a scrolling view. A block is a flex column with 8px gaps: <code>header</code> (h2 in block-title style, <code>.sub</code> in ui-small ink-2), then a note, a KeyValue list, a Table, a row of <code>.actions</code> links, a grid of buttons. In the side column the padding is 12px 14px; elsewhere 12px 16px 14px.</p>
+<ul>
+<li><code>.note</code>: ink-2, fs-xs, explains the block in a sentence (&quot;Signals are expressions over the world, compiled into one shared DAG and evaluated once per step in the <strong>signals</strong> phase.&quot;).</li>
+<li><code>.empty</code>: what is there when there is nothing (&quot;None yet.&quot;, &quot;Select a node in the graph, a glyph in the code gutter, or a <code>lab:node</code> link.&quot;).</li>
+<li><code>.actions</code>: a row of TextLinks under the content.</li>
+</ul>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;aside class=&quot;side&quot;&gt;
+  &lt;div class=&quot;block&quot;&gt;
+    &lt;header&gt;&lt;h2&gt;Trick pad&lt;/h2&gt;&lt;span class=&quot;sub&quot;&gt;plays the gesture from skate/controls.js&lt;/span&gt;&lt;/header&gt;
+    …
+  &lt;/div&gt;
+&lt;/aside&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do title blocks with a noun (Score, Reads, Writes, Live, Range, Keys) and put the qualifier in <code>.sub</code> (&quot;combo ×1&quot;, &quot;t = 7.36 s&quot;, &quot;6&quot;).</li>
+<li>Don&#39;t box a block with a border or a fill; the rule below it is the only separation.</li>
+</ul>
+</div><p class="x-files"><code>components/Block/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-KeyValue"><h4>KeyValue</h4><div class="x-frame"><iframe data-src="components/KeyValue/standalone.html" src="components/KeyValue/standalone.html" title="KeyValue preview" style="height:230px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A two-column list of measurements: the name small and grey on the left, the value bold and right-aligned with tabular figures.</p>
+<h2>Use</h2>
+<p><code>dl.kv</code> for live readouts in a side column or the inspector. Names are lowercase phrases (&quot;deck height&quot;, &quot;flip · shove · wrap&quot;, &quot;ms / step&quot;, &quot;min · max&quot;); values carry their unit after a space (&quot;4.29 m/s&quot;, &quot;0.08 m&quot;). Several related numbers share a row joined by &quot; · &quot;. A missing value is &quot;—&quot;. <code>dl.kv.keys</code> turns the columns round for key help: the key in a <code>kbd</code> on the left in ink, the action on the right in ink-2, left-aligned.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;dl class=&quot;kv&quot;&gt;
+  &lt;dt&gt;speed&lt;/dt&gt;&lt;dd&gt;4.29 m/s&lt;/dd&gt;
+  &lt;dt&gt;flip · shove · wrap&lt;/dt&gt;&lt;dd&gt;-0.01 · 0.01 · 0.00&lt;/dd&gt;
+&lt;/dl&gt;
+&lt;dl class=&quot;kv keys&quot;&gt;&lt;dt&gt;&lt;kbd&gt;Space&lt;/kbd&gt;&lt;/dt&gt;&lt;dd&gt;crouch; release to pop&lt;/dd&gt;&lt;/dl&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do format numbers with the app&#39;s <code>fmt</code> (two decimals by default, three in the inspector) so columns line up.</li>
+<li>Don&#39;t put more than one unit in a value; split it into two rows.</li>
+</ul>
+</div><p class="x-files"><code>components/KeyValue/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Meter"><h4>Meter</h4><div class="x-frame"><iframe data-src="components/Meter/standalone.html" src="components/Meter/standalone.html" title="Meter preview" style="height:90px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A progress bar: a hair box 8px high with an ink fill from the left; accent when what it measures is bad.</p>
+<h2>Use</h2>
+<p><code>.meter</code> shows how far a long job has gone (an experiment&#39;s runs: <code>.meter.expmeter</code> 120px wide; clip scoring and recording: 160px), always beside a Stop button. <code>.meter.bad i</code> fills in accent. Inside a table cell it is 6px high.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;span class=&quot;meter expmeter&quot;&gt;&lt;i style=&quot;width: 40%&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;button class=&quot;btn sm&quot;&gt;Stop&lt;/button&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do update it from the job&#39;s own progress callback; never animate a fake one.</li>
+</ul>
+</div><p class="x-files"><code>components/Meter/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Table"><h4>Table</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Table/standalone.html" src="components/Table/standalone.html" title="Table preview" style="height:250px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>A plain data table: hair rule under the header, faint rules between rows, the last column right-aligned, tabular figures throughout.</p>
+<h2>Use</h2>
+<p><code>table.rt</code> for runs, results and logs: the stage&#39;s Last tricks, an experiment&#39;s results (the preview shows E-01&#39;s seven runs of Pop height vs take-off speed), the depth-order scores. Header cells are ink-2 fs-xs, 400. Numeric columns take <code>.num</code> (right-aligned, 10px right padding) and are printed with <code>+x.toFixed(3)</code>. Row states:</p>
+<ul>
+<li><code>tr.badrow</code>: every cell in accent (a bail, a failed run).</li>
+<li><code>tr.dimrow</code>: ink-2 (a run that does not count).</li>
+<li><code>tr.sel</code>: an accent underline and a 2px accent bar on the first cell.</li>
+<li><code>tr.clickable</code>: pointer, fill on hover.</li>
+<li><code>td .bad</code> marks one bad value.</li>
+</ul>
+<p>Wide tables scroll inside <code>.tablewrap-x</code>, never the page.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;table class=&quot;rt&quot;&gt;
+  &lt;thead&gt;&lt;tr&gt;&lt;th&gt;t&lt;/th&gt;&lt;th&gt;trick&lt;/th&gt;&lt;th&gt;air&lt;/th&gt;&lt;th&gt;score&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;
+  &lt;tbody&gt;&lt;tr&gt;&lt;td&gt;3.2&lt;/td&gt;&lt;td&gt;kickflip&lt;/td&gt;&lt;td&gt;0.42&lt;/td&gt;&lt;td&gt;850&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;
+&lt;/table&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do name columns by the measured quantity, lowercase, with the unit in the name when it has one (misdrawn_cm2, air).</li>
+<li>Don&#39;t zebra-stripe or box cells.</li>
+</ul>
+</div><p class="x-files"><code>components/Table/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Toast"><h4>Toast</h4><div class="x-frame"><iframe data-src="components/Toast/standalone.html" src="components/Toast/standalone.html" title="Toast preview" style="height:150px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A short message at the bottom centre that confirms or reports, then goes: ink box with bg text, or accent with white text for trouble.</p>
+<h2>Use</h2>
+<p><code>host.toast(msg, bad)</code> pushes onto <code>.toasts</code> (at most three shown, stacked upward, 6px apart). Plain toasts last 2.6 s, bad ones 5.2 s. Say what happened in the past tense or what went wrong and what to do: &quot;Copied&quot;, &quot;Back to the preset as published&quot;, &quot;Saved as U-01&quot;, &quot;Recorded {n} frames (20.0 s)&quot; with the clip&#39;s own count, &quot;Import failed: &quot; and the parser&#39;s message, &quot;Saving files is not available here: kickflips-from-first-principles.md was copied to the clipboard instead&quot;.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;toasts&quot; aria-live=&quot;polite&quot;&gt;
+  &lt;div class=&quot;toast&quot;&gt;Copied&lt;/div&gt;
+  &lt;div class=&quot;toast bad&quot;&gt;no chapter 99&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do start an error with the thing that failed (&quot;Export failed: …&quot;, &quot;no trace recognizer/hight&quot;).</li>
+<li>Don&#39;t use a toast for something the person must act on; that goes in the view (a <code>.fail</code> row, the editor&#39;s diagnostics).</li>
+</ul>
+</div><p class="x-files"><code>components/Toast/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Reading</h3><article class="x-comp" id="comp-BookChapter"><h4>BookChapter</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/BookChapter/standalone.html" src="components/BookChapter/standalone.html" title="BookChapter preview" style="height:1650px;width:820px" loading="lazy"></iframe></div><div class="x-md"><p>One chapter of the book in the workbench: a toolbar with its label, title, previous and next, and Export; a red chapter label over the title; the text at 14px; the presets and docs it pairs with; and links to the neighbouring chapters.</p>
+<h2>Use</h2>
+<p><code>.bmain</code> beside BookContents in <code>.bookview</code>:</p>
+<ol>
+<li><strong>Toolbar</strong>: Contents (only in a narrow tile), <code>.ntitle</code> with &quot;Chapter 47&quot; in <code>.pcode</code> and the title in bold, a spacer, ‹ › IconButtons (their <code>title</code> is the neighbour&#39;s label and title), and Export ▾ (see Menu).</li>
+<li><strong>Part opener</strong> (<code>.bpartopen</code>), only before the first chapter of a part: &quot;PART VII&quot; small caps in ink-2, the part title at 22px under a 3px ink rule, its about in ink-2 over a 1 px ink rule.</li>
+<li><strong>Chapter label</strong> (<code>.bchlabel</code>): &quot;CHAPTER 47&quot; in accent, 10.5px bold, letter-spaced 0.14em; &quot; · not written yet&quot; in ink-2 for a draft.</li>
+<li><strong>The chapter</strong> as a Doc at book size (74ch, 14px/1.68, h1 26px, h2 17px).</li>
+<li><strong>RelatedList</strong> (<code>.bpairs</code>): In the workbench, On the shelf.</li>
+<li><strong>Previous and next</strong> (<code>.bnav</code>): two hair-bordered buttons, small label (&quot;‹ Chapter 46&quot;, &quot;Chapter 48 ›&quot;) over the title in bold.</li>
+</ol>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;doc bchlabel&quot;&gt;&lt;span&gt;Chapter 47&lt;/span&gt;&lt;/div&gt;
+&lt;article class=&quot;doc&quot;&gt;…&lt;/article&gt;
+&lt;div class=&quot;doc bnav&quot;&gt;&lt;button&gt;&lt;small&gt;‹ Chapter 46&lt;/small&gt;&lt;b&gt;Shadows and hatching&lt;/b&gt;&lt;/button&gt;&lt;button class=&quot;nx&quot;&gt;&lt;small&gt;Chapter 48 ›&lt;/small&gt;&lt;b&gt;Drawing forces&lt;/b&gt;&lt;/button&gt;&lt;/div&gt;
+</code></pre>
+<p>How to write the chapter itself is in the section <em>Writing a book section</em>.</p>
+<h2>Known issue</h2>
+<p><code>.bookview .bchlabel</code> sets its own 10.5px font, so its <code>max-width: 74ch</code> is 74 of its own small characters (about 430px) while the chapter&#39;s box is 74ch at 14px (about 575px). In a tile wider than the label&#39;s box the two boxes centre differently and the label sits right of the title: 19px in the &quot;Reading the book&quot; layout at 1440px, 72px at 2200px. Give the label the chapter&#39;s measure (for example, keep the <code>.doc</code> font size on the box and set the small type on its inner <code>span</code>) when you build from this.</p>
+</div><p class="x-files"><code>components/BookChapter/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-BookContents"><h4>BookContents</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/BookContents/standalone.html" src="components/BookContents/standalone.html" title="BookContents preview" style="height:476px;width:560px" loading="lazy"></iframe></div><div class="x-md"><p>The Book&#39;s left column: the book&#39;s title and progress, a search box, and the chapters by part with right-aligned numbers; a search replaces the list with matching chapters, their section and a snippet.</p>
+<h2>Use</h2>
+<p><code>nav.bcontents</code> (250px). The title block (<code>.btitle</code>): the book&#39;s title in 13px bold, &quot;69 chapters&quot; (or &quot;41 of 69 chapters written&quot;) in ink-2. Parts are uppercase group headers (&quot;Part VII · Drawing&quot;, &quot;Appendices&quot;); a chapter is a button with its number (<code>.bn</code>, 1.7em wide, right-aligned, ink-2, tabular; · for the preface, a letter for an appendix) and its title (<code>.bt</code>). The open chapter is bold with a 2px accent inset bar; an unwritten one (<code>.draft</code>) is ink-2.</p>
+<p>Search (&quot;search the book&quot;) keeps chapters that contain every word, most hits first, each with the section of the first hit in <code>em</code> and 170 characters around it in <code>small</code>. Nothing found: &quot;No chapter mentions that.&quot;</p>
+<p>In a tile under 700px the column slides in over the chapter from a Contents button, with a 12% black scrim.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;nav class=&quot;bcontents&quot; aria-label=&quot;Contents of the book&quot;&gt;
+  &lt;div class=&quot;btitle&quot;&gt;&lt;b&gt;Kickflips from First Principles&lt;/b&gt;&lt;small&gt;69 chapters&lt;/small&gt;&lt;/div&gt;
+  &lt;input class=&quot;filter&quot; placeholder=&quot;search the book&quot; aria-label=&quot;Search the book&quot;&gt;
+  &lt;div class=&quot;bpart&quot;&gt;&lt;div class=&quot;grp&quot;&gt;Part VII · Drawing&lt;/div&gt;&lt;button class=&quot;on&quot;&gt;&lt;span class=&quot;bn&quot;&gt;47&lt;/span&gt;&lt;span class=&quot;bt&quot;&gt;Drawing motion&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;
+&lt;/nav&gt;
+</code></pre>
+</div><p class="x-files"><code>components/BookContents/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-BookPartOpener"><h4>BookPartOpener</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/BookPartOpener/standalone.html" src="components/BookPartOpener/standalone.html" title="BookPartOpener preview" style="height:340px;width:820px" loading="lazy"></iframe></div><div class="x-md"><p>The block above the first chapter of a part: the part&#39;s number in small caps, its title under a heavy ink rule, its one-sentence about, closed by an ink rule.</p>
+<h2>Use</h2>
+<p>Shown by BookChapter when the previous chapter is in another part (not for the front matter). Part numbers are roman (I to IX); the appendices read &quot;Appendices&quot;. The about comes from <code>book.json</code> <code>parts[].about</code>.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;doc bpartopen&quot;&gt;&lt;div class=&quot;lbl&quot;&gt;Part VII&lt;/div&gt;&lt;h2&gt;Drawing&lt;/h2&gt;&lt;p&gt;The stage as a technical drawing: …&lt;/p&gt;&lt;/div&gt;
+</code></pre>
+</div><p class="x-files"><code>components/BookPartOpener/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Callout"><h4>Callout</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Callout/standalone.html" src="components/Callout/standalone.html" title="Callout preview" style="height:342px;width:800px" loading="lazy"></iframe></div><div class="x-md"><p>A boxed paragraph set off from the text by a 2px left rule: Try it (red rule on a red wash), Exercise (outlined), Careful (dashed rule) and a plain one (grey fill).</p>
+<h2>Use</h2>
+<p>Written as a Markdown block quote whose first bold word picks the style (<code>app/markdown.js</code>):</p>
+<table>
+<thead>
+<tr>
+<th>starts with</th>
+<th>class</th>
+<th>looks like</th>
+<th>for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Try it.</strong> / <strong>Try.</strong> / <strong>Play.</strong></td>
+<td><code>.callout.try</code></td>
+<td>accent left rule on sel</td>
+<td>steps the reader can do in the workbench in under two minutes, made of lab: links</td>
+</tr>
+<tr>
+<td><strong>Exercise.</strong> / <strong>Challenge.</strong></td>
+<td><code>.callout.exercise</code></td>
+<td>hair box with an ink left rule, no fill</td>
+<td>a task to do in the code</td>
+</tr>
+<tr>
+<td><strong>Careful.</strong> / <strong>Caveat.</strong> / <strong>Warning.</strong> / <strong>Watch out.</strong> / <strong>Note.</strong></td>
+<td><code>.callout.caveat</code></td>
+<td>dashed ink left rule, no fill</td>
+<td>a trap or a limit of the model</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td><code>.callout</code></td>
+<td>ink left rule on fill</td>
+<td>an aside</td>
+</tr>
+</tbody></table>
+<h2>Markup</h2>
+<pre><code class="language-markdown">&gt; **Try it.** [Load D-03](lab:preset?id=D-03), [switch to front elevation](lab:view?name=front) and [play a kickflip](lab:trick?name=kickflip).
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do make every Try it a sequence of links the reader clicks in order: load the preset first, then act.</li>
+<li>Do keep a callout to one paragraph.</li>
+<li>Don&#39;t use a callout to repeat what the text just said.</li>
+</ul>
+</div><p class="x-files"><code>components/Callout/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Doc"><h4>Doc</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Doc/standalone.html" src="components/Doc/standalone.html" title="Doc preview" style="height:1045px;width:800px" loading="lazy"></iframe></div><div class="x-md"><p>The reading surface for Notes, Docs and Reference: Markdown rendered by <code>app/markdown.js</code> into <code>article.doc</code>, 13.5px Arial at line height 1.65, at most 76 characters wide.</p>
+<h2>Use</h2>
+<ul>
+<li><strong>Title</strong> (<code>h1</code>, 22px bold) and <strong>lede</strong> (the first paragraph, 13px ink-2).</li>
+<li><strong>Contents line</strong> (<code>nav.toc</code>): added under the lede when the document has three or more <code>##</code> sections; the section titles in ink-2, linked to their anchors.</li>
+<li><strong>Sections</strong> (<code>h2</code>, 16px bold) open with a 1 px ink rule above and 30px of space: the rule is the section break. <code>h3</code> 13.5px; <code>h4</code> small caps in ink-2 for list headers.</li>
+<li><strong>Body</strong>: paragraphs 10px apart, lists indented 22px, <code>**bold**</code> defines a term, <code>code</code> on a fill chip at 0.9em.</li>
+<li><strong>Links</strong>: ordinary links are ink with a hair underline. A <strong>lab: link</strong> (<code>a.lablink</code>, from <code>[text](lab:…)</code>) drives the workbench: red underline 1.5px and a red ▸ after it. In exports it becomes dotted plain text.</li>
+<li><strong>Tables</strong> (<code>table.rt.doc-t</code> in <code>.tablewrap-x</code>): 12.5px, left-aligned, header ink-2.</li>
+<li><strong>Maths</strong>: KaTeX rendered as MathML, inline at 1.08em, display blocks (<code>.mathblock</code>) at 1.12em.</li>
+<li><strong>Code</strong>: see CodeBlock; figures: see Figure; callouts: see Callout.</li>
+</ul>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;article class=&quot;doc&quot;&gt;
+  &lt;h1 id=&quot;d-a-tour-of-the-workbench&quot;&gt;A tour of the workbench&lt;/h1&gt;
+  &lt;p&gt;Form Skate Workbench is an IDE for one program…&lt;/p&gt;
+  &lt;nav class=&quot;toc&quot;&gt;&lt;a href=&quot;#&quot; data-anchor=&quot;d-the-loop&quot;&gt;The loop&lt;/a&gt;…&lt;/nav&gt;
+  &lt;h2 id=&quot;d-the-loop&quot;&gt;The loop&lt;/h2&gt;
+&lt;/article&gt;
+</code></pre>
+<p>The Markdown a reading view accepts is in the section <em>The Markdown the reading views render</em>.</p>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do let the measure stay narrow (76ch); a wide tile gets white space, not longer lines.</li>
+<li>Don&#39;t style headings with colour or underline; the ink rule above h2 is the only ornament.</li>
+</ul>
+</div><p class="x-files"><code>components/Doc/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-DocShelf"><h4>DocShelf</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/DocShelf/standalone.html" src="components/DocShelf/standalone.html" title="DocShelf preview" style="height:330px;width:820px" loading="lazy"></iframe></div><div class="x-md"><p>The Docs view&#39;s left column: a search box and the shelf of documents grouped by subject, each entry its title over its one-line about.</p>
+<h2>Use</h2>
+<p><code>div.docsview</code> holds <code>nav.shelf</code> (230px, hair rule on the right) and the document&#39;s <code>.scroll</code>. Groups are 10.5px uppercase ink-2 headers (Start here, Maths, Mechanics, Control, Contact, The board, Computation, Drawing, Method). An entry is a button: the title at 12px (bold when open, with a 2px accent inset bar), the about in ink-2 at 10.5px. The search filters on title, about and body. Under 620px of tile width the shelf moves above the document (34% of the height).</p>
+<p>The Book&#39;s contents column (BookContents) is built the same way.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;tabbody docsview&quot;&gt;
+  &lt;nav class=&quot;shelf&quot;&gt;
+    &lt;input class=&quot;filter&quot; placeholder=&quot;search the shelf&quot;&gt;
+    &lt;div class=&quot;shelfgrp&quot;&gt;&lt;div class=&quot;grp&quot;&gt;Start here&lt;/div&gt;&lt;button class=&quot;on&quot;&gt;&lt;b&gt;A tour of the workbench&lt;/b&gt;&lt;small&gt;What each view is for…&lt;/small&gt;&lt;/button&gt;&lt;/div&gt;
+  &lt;/nav&gt;
+  &lt;div class=&quot;scroll&quot;&gt;&lt;article class=&quot;doc&quot;&gt;…&lt;/article&gt;&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do write each doc&#39;s about as one sentence that names what it covers.</li>
+<li>Don&#39;t nest groups.</li>
+</ul>
+</div><p class="x-files"><code>components/DocShelf/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Figure"><h4>Figure</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Figure/standalone.html" src="components/Figure/standalone.html" title="Figure preview" style="height:362px;width:800px" loading="lazy"></iframe></div><div class="x-md"><p>An inline SVG drawing in the stage&#39;s drafting style, scaled to the column and coloured by the theme, with a numbered caption.</p>
+<h2>Use</h2>
+<p>Written as a fenced block with the language <code>svg</code>, followed by a paragraph that starts with <code>**Figure N.k.**</code>; <code>app/markdown.js</code> turns it into <code>figure.fig</code> with the SVG (sanitised, ids made unique, <code>class=&quot;figsvg&quot;</code>, the root&#39;s width becomes its max-width) and a <code>figcaption</code> (12px ink-2, 68 characters wide, the bold label in ink).</p>
+<p>Colour comes only from classes so the drawing works in both themes:</p>
+<table>
+<thead>
+<tr>
+<th>class</th>
+<th>is</th>
+<th>use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>currentColor</code> / <code>ink</code></td>
+<td>ink stroke</td>
+<td>the subject and outlines</td>
+</tr>
+<tr>
+<td><code>mut</code></td>
+<td>ink-2 stroke (or text fill)</td>
+<td>axes, ground, secondary lines</td>
+</tr>
+<tr>
+<td><code>acc</code></td>
+<td>accent stroke (or text fill)</td>
+<td>the one thing the figure is about</td>
+</tr>
+<tr>
+<td><code>hair</code></td>
+<td>hair stroke</td>
+<td>construction lines</td>
+</tr>
+<tr>
+<td><code>f-ink</code> <code>f-mut</code> <code>f-acc</code></td>
+<td>fills</td>
+<td>arrowheads, dots</td>
+</tr>
+<tr>
+<td><code>f-fill</code> <code>f-fill2</code></td>
+<td>grey fills</td>
+<td>areas</td>
+</tr>
+<tr>
+<td><code>f-paper</code></td>
+<td>bg fill</td>
+<td>knock out lines behind a label</td>
+</tr>
+<tr>
+<td><code>f-sel</code></td>
+<td>sel fill</td>
+<td>a faint red region</td>
+</tr>
+<tr>
+<td><code>dash</code> <code>dot</code></td>
+<td>4 3 and 1 3 dashes</td>
+<td>centre lines, free paths</td>
+</tr>
+<tr>
+<td><code>lbl</code> <code>it</code> <code>b</code></td>
+<td>10px uppercase spaced, italic, bold</td>
+<td>labels, variables, emphasis</td>
+</tr>
+</tbody></table>
+<p>Line weights: 1 for outlines, 1.6 for the subject, 0.6 for hatching and construction. Text 9 to 13px in the page&#39;s font. Arrowheads are markers with <code>f-ink</code> paths.</p>
+<h2>Markup</h2>
+<pre><code class="language-markdown">```svg
+&lt;svg viewBox=&quot;0 0 520 170&quot; font-size=&quot;11&quot;&gt;…&lt;/svg&gt;
+```
+
+**Figure 12.1.** The board side-on: deck, two wheels and an upward force at the centre.
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do plot real numbers when a figure claims to show data.</li>
+<li>Don&#39;t write a literal colour (<code>stroke=&quot;#e2001a&quot;</code>) or a <code>&lt;style&gt;</code>; the checker rejects both.</li>
+</ul>
+</div><p class="x-files"><code>components/Figure/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-NotesView"><h4>NotesView</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/NotesView/standalone.html" src="components/NotesView/standalone.html" title="NotesView preview" style="height:766px;width:820px" loading="lazy"></iframe></div><div class="x-md"><p>A preset&#39;s notes: a toolbar naming the preset with an Edit toggle, the notes as a Doc, then related lists; in edit mode a plain Markdown textarea with a help line.</p>
+<h2>Use</h2>
+<p><code>.notes</code> (a column): the toolbar&#39;s <code>.ntitle</code> reads &quot;B-01 <strong>Flatground</strong> · Basics&quot;; &quot;revert notes&quot; (a TextLink) appears when the notes were edited; Edit is a Toggle. Reading mode renders the preset&#39;s Markdown (see Doc) and adds &quot;Further reading on the shelf&quot; and &quot;In the book&quot;. Edit mode (<code>.notes-edit</code>) is a borderless textarea on code-bg in the code face (12px/1.6, 14px 18px padding) with an <code>.ed-foot</code> that says what the notes accept: &quot;Markdown with <code>$…$</code> and <code>$$…$$</code> math, <code>&gt; **Try it**</code> callouts and links like <code>[open](lab:open?file=main.js&amp;line=20)</code>. Saved in this browser.&quot;</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;tabbody col notes&quot;&gt;
+  &lt;div class=&quot;toolbar&quot;&gt;&lt;span class=&quot;ntitle&quot;&gt;&lt;span class=&quot;pcode&quot;&gt;B-01&lt;/span&gt; &lt;b&gt;Flatground&lt;/b&gt; &lt;span class=&quot;pcode&quot;&gt;· Basics&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;sp&quot;&gt;&lt;/span&gt;&lt;button class=&quot;tog&quot;&gt;Edit&lt;/button&gt;&lt;/div&gt;
+  &lt;div class=&quot;scroll&quot;&gt;&lt;article class=&quot;doc&quot;&gt;…&lt;/article&gt;&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+</div><p class="x-files"><code>components/NotesView/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-RelatedList"><h4>RelatedList</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/RelatedList/standalone.html" src="components/RelatedList/standalone.html" title="RelatedList preview" style="height:252px;width:800px" loading="lazy"></iframe></div><div class="x-md"><p>The lists under a document that tie it to the rest of the workbench: In the workbench, On the shelf, In the book, Presets that use this, Further reading on the shelf.</p>
+<h2>Use</h2>
+<p><code>div.doc.related</code> after the document (in the Book, <code>.bpairs</code>). Each list has an <code>h4</code> header (12px bold uppercase ink-2, a hair rule above) and items made of a lab: link with the thing&#39;s code and title, then &quot; — &quot; and its about in <code>.dim</code>. Notes list their shelf docs and the chapters that pair with the preset; docs list chapters and presets; chapters list their presets and docs (from <code>book.json</code>).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;doc related bpairs&quot;&gt;
+  &lt;h4&gt;In the workbench&lt;/h4&gt;
+  &lt;ul&gt;&lt;li&gt;&lt;a href=&quot;#&quot; class=&quot;lablink&quot;&gt;D-03 Onion skins and chronophotographs&lt;/a&gt; &lt;span class=&quot;dim&quot;&gt;— Drawing motion in a still image: …&lt;/span&gt;&lt;/li&gt;&lt;/ul&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do take the titles and abouts from the presets&#39;, docs&#39; and chapters&#39; own frontmatter or plan.</li>
+<li>Don&#39;t list a chapter that is still a draft.</li>
+</ul>
+</div><p class="x-files"><code>components/RelatedList/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Actions</h3><article class="x-comp" id="comp-Button"><h4>Button</h4><div class="x-frame"><iframe data-src="components/Button/standalone.html" src="components/Button/standalone.html" title="Button preview" style="height:150px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A square, hairline-bordered text button: the workbench&#39;s one kind of command button.</p>
+<h2>Use</h2>
+<p>Use <code>.btn</code> for commands in toolbars, menus&#39; footers and blocks. Label it with a verb or the thing it does, in sentence case: &quot;Run&quot;, &quot;Square up&quot;, &quot;Clear&quot;, &quot;Reset all&quot;, &quot;Stop&quot;, &quot;Save&quot;. A command that opens a menu ends with <code> ▾</code> (&quot;Files ▾&quot;, &quot;Export ▾&quot;). Put the keyboard shortcut in a <code>kbd</code> inside the button, hidden on narrow screens with <code>.long</code>.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;button class=&quot;btn&quot;&gt;Square up&lt;/button&gt;
+&lt;button class=&quot;btn primary&quot;&gt;Run&lt;span class=&quot;long&quot;&gt; &lt;kbd&gt;⌘↵&lt;/kbd&gt;&lt;/span&gt;&lt;/button&gt;
+&lt;button class=&quot;btn sm&quot;&gt;Clear&lt;/button&gt;
+&lt;button class=&quot;btn sm primary&quot;&gt;Run&lt;/button&gt;
+&lt;button class=&quot;btn sm&quot; disabled&gt;Run&lt;/button&gt;
+&lt;button class=&quot;btn danger&quot;&gt;Delete&lt;/button&gt;
+&lt;button class=&quot;btn sm&quot;&gt;recognizer/flipTurns &lt;small&gt;number&lt;/small&gt;&lt;/button&gt;
+</code></pre>
+<h2>Variants and states</h2>
+<ul>
+<li><strong>default</strong>: hair border, no fill; hover turns the border ink.</li>
+<li><strong><code>.primary</code></strong> (and <code>.on</code>): ink fill, bg text. Use it for the one action the view is waiting for: Run turns primary only when the code has unsaved edits (<code>host.isDirty()</code>), an experiment&#39;s Run is primary. At most one primary in a view.</li>
+<li><strong><code>.sm</code></strong>: 3px 8px padding, fs-xs. The size for toolbars inside a view (Clear, Reset all, Square up, Show ▾, Order ▾, Clip ▾, Export ▾).</li>
+<li><strong><code>.danger</code></strong>: accent text and border. Only for an action that throws something away; prefer a <code>.danger</code> item inside a menu (Delete skate/grind.js) over a red button on the surface.</li>
+<li><strong><code>:disabled</code></strong>: 40% opacity, hair border. Disable instead of hiding when the reason is temporary (another experiment is running).</li>
+</ul>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do keep corners square (<code>border-radius: 0</code> is in the rule) and the border 1 px.</li>
+<li>Do let a button grow from its label; never set a fixed width.</li>
+<li>Don&#39;t colour a button for emphasis. Red means trouble.</li>
+<li>Don&#39;t put an icon glyph in a text button except the trailing ▾ and the leading ■ of &quot;■ Live&quot;.</li>
+</ul>
+</div><p class="x-files"><code>components/Button/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-IconButton"><h4>IconButton</h4><div class="x-frame"><iframe data-src="components/IconButton/standalone.html" src="components/IconButton/standalone.html" title="IconButton preview" style="height:120px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A 32px square button that shows one text glyph; also the borderless tab action used for + and ↺.</p>
+<h2>Use</h2>
+<p><code>.ibtn</code> holds a single glyph with an <code>aria-label</code> and a <code>title</code> that says what it does and its shortcut: run controls (▶ / ❚❚ Play and Pause, ⏭ &quot;Step 1/120 s (Shift: 12 steps)&quot;, ↺ &quot;Reset the world (keeps the code)&quot;), the book&#39;s ‹ › previous and next chapter, the theme switch. <code>.tabact</code> is a full-height, borderless action at the end of a strip (the + that opens a view in a tile) or a row (the ↺ that resets one parameter).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;button class=&quot;ibtn&quot; title=&quot;Pause&quot; aria-label=&quot;Pause&quot;&gt;❚❚&lt;/button&gt;
+&lt;button class=&quot;ibtn&quot; title=&quot;Step 1/120 s (Shift: 12 steps)&quot; aria-label=&quot;Step&quot;&gt;⏭&lt;/button&gt;
+&lt;button class=&quot;ibtn&quot; disabled aria-label=&quot;Previous chapter&quot;&gt;‹&lt;/button&gt;
+&lt;button class=&quot;tabact plus&quot; title=&quot;Open a view in this tile&quot;&gt;+&lt;/button&gt;
+&lt;button class=&quot;tabact&quot; title=&quot;default 15&quot;&gt;↺&lt;/button&gt;
+</code></pre>
+<h2>States</h2>
+<ul>
+<li>At rest: no border. Hover: a hair border appears.</li>
+<li>Disabled: the browser&#39;s default dimming; keep the glyph so the layout does not jump.</li>
+<li>Inside <code>.runctl</code> it shrinks to 28px.</li>
+</ul>
+<h2>Glyphs</h2>
+<p>Use the glyphs the app uses, set in the UI font: ▶ ❚❚ ⏭ ⏮ ↺ ‹ › × + ▾ ▸ ■. The theme switch draws its sun, moon and half disc as a 16px inline SVG with <code>stroke=&quot;currentColor&quot;</code> and stroke-width 1.4, because those glyphs are missing from many fonts. No icon fonts, no emoji.</p>
+</div><p class="x-files"><code>components/IconButton/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-TextLink"><h4>TextLink</h4><div class="x-frame"><iframe data-src="components/TextLink/standalone.html" src="components/TextLink/standalone.html" title="TextLink preview" style="height:130px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>Underlined text that does something: a quiet command, a source location, a node id, a heading that pins.</p>
+<h2>Use</h2>
+<ul>
+<li><strong><code>.link</code></strong>: small (fs-xs), ink-2, underlined; a secondary command in a footer, an actions row or a toolbar: &quot;revert notes&quot;, &quot;revert file&quot;, &quot;pin trace&quot;, &quot;open in Params&quot;. <code>.link.strong</code> is ink and bold for the primary location (&quot;skate/motors.js:153&quot;); <code>.link.bad</code> is accent.</li>
+<li><strong><code>.linkhd</code></strong>: a button that looks like the heading or title inside it (a block&#39;s h2, an experiment&#39;s name, a trace id). Clicking selects or pins.</li>
+<li><strong><code>.nid</code></strong>: an id in a list or in IR text: ink, underlined with a hair line that turns ink on hover. <code>.on</code> is the selected id (accent, bold), <code>.dim</code> an id that cannot be followed (ink-2, no underline).</li>
+</ul>
+<p>Links inside Markdown (<code>a.lablink</code>, with a red underline and ▸) are part of the reading views: see Doc.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;actions&quot;&gt;&lt;button class=&quot;link strong&quot;&gt;skate/motors.js:153&lt;/button&gt; &lt;button class=&quot;link&quot;&gt;tick at 159&lt;/button&gt;&lt;/div&gt;
+&lt;button class=&quot;linkhd&quot;&gt;&lt;h2&gt;flipTurns&lt;/h2&gt;&lt;/button&gt;
+&lt;div class=&quot;refs&quot;&gt;&lt;button class=&quot;nid&quot;&gt;intent/pop&lt;/button&gt;&lt;button class=&quot;nid on&quot;&gt;pop/snap&lt;/button&gt;&lt;button class=&quot;nid dim&quot;&gt;board/deck.forces (additive)&lt;/button&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do write link text in lowercase unless it is a name or a path.</li>
+<li>Don&#39;t use <code>.link</code> for navigation between views; views are reached through <code>host.focus</code> or a lab: link.</li>
+</ul>
+</div><p class="x-files"><code>components/TextLink/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Code</h3><article class="x-comp" id="comp-CodeBlock"><h4>CodeBlock</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/CodeBlock/standalone.html" src="components/CodeBlock/standalone.html" title="CodeBlock preview" style="height:432px;width:900px" loading="lazy"></iframe></div><div class="x-md"><p>Code shown, not edited: a <code>pre.src</code> block on code-bg with a hair border, an expression in the inspector, and the IR as text with clickable ids.</p>
+<h2>Use</h2>
+<ul>
+<li><strong><code>pre.src</code></strong>: code and data in panels (10.5px, wraps, at most 280px high and then scrolls; event detail, error source) and in reading views (11.5px, <code>white-space: pre</code>, scrolls sideways, full height). Highlight JavaScript with the editor&#39;s token classes.</li>
+<li><strong><code>code.exprtxt</code></strong>: a signal&#39;s expression in the inspector, on code-bg with a hair border: <code>axisTurns(flipAxis, axis(board/deck, y), takeoff)</code>.</li>
+<li><strong><code>pre.irtext</code></strong>: the compiled program, 11.5px/1.6. Comment lines (<code>#</code>) take <code>.cm</code> (tok-com). Ids of systems, states and signals are <code>.nid</code> buttons that select in the graph; expression nodes (n35) highlight their definition (<code>.hl</code>: fill and a 2px accent inset bar).</li>
+</ul>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;pre class=&quot;src lang-js&quot;&gt;&lt;span class=&quot;tk-k&quot;&gt;const&lt;/span&gt; RULES …&lt;/pre&gt;
+&lt;code class=&quot;exprtxt&quot;&gt;position(board/deck).y&lt;/code&gt;
+&lt;pre class=&quot;irtext&quot;&gt;&lt;div class=&quot;cm&quot;&gt;# program flatground&lt;/div&gt;&lt;div&gt;    &quot;id&quot;: &quot;&lt;button class=&quot;nid&quot;&gt;pilot/drive&lt;/button&gt;&quot;,&lt;/div&gt;&lt;/pre&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do quote real code with its file and line nearby (<code>skate/recognizer.js:58</code>).</li>
+<li>Don&#39;t shrink code below 10.5px or set it in the UI font.</li>
+</ul>
+</div><p class="x-files"><code>components/CodeBlock/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-CodeEditor"><h4>CodeEditor</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/CodeEditor/standalone.html" src="components/CodeEditor/standalone.html" title="CodeEditor preview" style="height:420px;width:900px" loading="lazy"></iframe></div><div class="x-md"><p>The library editor: a 54px gutter of line numbers and declaration glyphs, highlighted code on code-bg, the error line washed red, diagnostics under it and a one-line build footer.</p>
+<h2>Use</h2>
+<p>The editor is a transparent <code>textarea</code> over a <code>pre</code> that holds the highlighted lines (<code>highlightLines</code> in <code>app/highlight.js</code>), both at 12px/18px in the code face so they line up. Run is Ctrl/Cmd+Enter (or Ctrl+S); Ctrl+/ comments lines; Tab indents two spaces; Enter keeps the indentation and adds two after an opening bracket.</p>
+<ul>
+<li><strong>Gutter</strong> (<code>.egutter .gutter-in</code>): line numbers in tok-com. A declaration gets a glyph button before its number that selects it in the Graph: ■ system, λ signal, ○ state, ◇ param, ◎ watch, ▢ view, △ thing. An error line&#39;s number is accent and bold (<code>.err</code>); a warning&#39;s is ink and bold (<code>.warn</code>).</li>
+<li><strong>Code</strong>: keywords bold, strings grey, comments italic and faint, <code>=&gt;</code> red and bold (the only colour in code), punctuation faint. The caret is accent; the selection is sel.</li>
+<li><strong>Error line</strong>: <code>.ln-err</code> washes the whole line in sel.</li>
+<li><strong>Diagnostics</strong> (<code>.diags</code>, under an accent rule): one <code>.diag</code> button per error (×, accent) or warning (!) with <code>file:line</code> and the message; clicking opens the place.</li>
+<li><strong>Footer</strong> (<code>.ed-foot</code>): <code>compiled</code> in bold, the time and what the hot edit kept, or <code>does not compile: …</code> in accent; then notes, the cursor position and &quot;revert file&quot;.</li>
+</ul>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;ed&quot;&gt;
+  &lt;div class=&quot;egutter&quot;&gt;&lt;div class=&quot;gutter-in&quot;&gt;&lt;div&gt;&lt;button class=&quot;gl&quot; title=&quot;system pop/pop&quot;&gt;■&lt;/button&gt;153&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;
+  &lt;div class=&quot;code&quot;&gt;&lt;pre aria-hidden=&quot;true&quot;&gt;&lt;div&gt;…highlighted line…&lt;/div&gt;&lt;/pre&gt;&lt;textarea aria-label=&quot;Source of skate/motors.js&quot;&gt;&lt;/textarea&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;diags&quot;&gt;&lt;button class=&quot;diag bad&quot;&gt;&lt;b&gt;×&lt;/b&gt;&lt;span class=&quot;ln&quot;&gt;skate/motors.js:156&lt;/span&gt;&lt;span&gt;…&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;
+&lt;div class=&quot;ed-foot&quot;&gt;&lt;span&gt;&lt;b&gt;compiled&lt;/b&gt; in 7.6 ms · hot: kept 37 states, …&lt;/span&gt;&lt;span class=&quot;sp&quot;&gt;&lt;/span&gt;&lt;span&gt;Ln 156, Col 25&lt;/span&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do report a build in numbers: milliseconds, what was kept, how many systems and signals.</li>
+<li>Don&#39;t add colour themes for code; the token colours are tokens (tok-*) and change with the light and dark themes only.</li>
+</ul>
+</div><p class="x-files"><code>components/CodeEditor/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Navigation</h3><article class="x-comp" id="comp-DockTile"><h4>DockTile</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/DockTile/standalone.html" src="components/DockTile/standalone.html" title="DockTile preview" style="height:230px;width:1000px" loading="lazy"></iframe></div><div class="x-md"><p>A tile of the dock: a 40px strip of view tabs over the view&#39;s body; tiles sit side by side or stacked, split by 1 px gutters you drag to resize.</p>
+<h2>Use</h2>
+<p>The workbench is one dock (<code>.dock</code>) of nested splits (<code>.dsplit.row</code> / <code>.dsplit.col</code>, each child a <code>.dcell</code> sized by flex) ending in tiles (<code>section.tile</code>). A tile&#39;s strip (<code>.dstrip</code>) holds its tabs (<code>.dtabs</code> &gt; <code>.dtab</code>) and a <code>+</code> (<code>.tabact.plus</code>) that opens a closed view in this tile. Tab labels are the view&#39;s one-word title: Notes, Docs, Book, Code, Agent, Reference, Stage, Graph, IR, Traces, Events, Params, Experiments.</p>
+<ul>
+<li>Active tab: <code>.dtab.on</code>, ink, 700, with a 1 px ink underline (inset shadow).</li>
+<li>A badge (<code>.count</code>) after the label: a count in a 1 px box (Traces 4, Params 3); <code>.count.bad</code> in accent for errors (Code 1).</li>
+<li>Close (<code>.x</code>, ×) appears on hover and on the active tab; it turns accent on hover.</li>
+<li>Gutters (<code>.gutter.row</code> 1 px wide, <code>.gutter.col</code> 1 px high) have an invisible 9px grab zone and turn ink on hover or focus; they are focusable (<code>role=&quot;separator&quot;</code>).</li>
+</ul>
+<p>The tile body (<code>.tilebody</code>) is a size container named <code>tile</code>: views switch to one column under 640px of tile width, not window width.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;section class=&quot;tile&quot; data-tile=&quot;t1&quot;&gt;
+  &lt;div class=&quot;dstrip&quot;&gt;
+    &lt;div class=&quot;dtabs&quot; role=&quot;tablist&quot;&gt;
+      &lt;div class=&quot;dtab on&quot;&gt;&lt;button class=&quot;lbl&quot; role=&quot;tab&quot; aria-selected=&quot;true&quot;&gt;Traces&lt;span class=&quot;count&quot;&gt;4&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;x&quot; aria-label=&quot;Close Traces&quot;&gt;×&lt;/button&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;rel&quot;&gt;&lt;button class=&quot;tabact plus&quot; title=&quot;Open a view in this tile&quot;&gt;+&lt;/button&gt;&lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;tilebody&quot;&gt;…the view…&lt;/div&gt;
+&lt;/section&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do let people move views: tabs drag onto another strip (move), a tile&#39;s edge (split) or its middle (join). See DragFeedback.</li>
+<li>Don&#39;t add view-level chrome above the strip; a view starts with its own Toolbar.</li>
+</ul>
+<h2>Known issue</h2>
+<p>In the app, an older editor rule in <code>app/kiln.css</code> (<code>.gutter { width: 44px; border-right: … }</code>) also matches the dock&#39;s gutters, so a horizontal gutter (<code>.gutter.col</code>) is 44px wide instead of spanning its split, and only its left 44px can be dragged. <code>components/bundle.css</code> leaves that rule out; the editor&#39;s own gutter is <code>.egutter</code>.</p>
+</div><p class="x-files"><code>components/DockTile/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-DragFeedback"><h4>DragFeedback</h4><div class="x-frame"><iframe data-src="components/DragFeedback/standalone.html" src="components/DragFeedback/standalone.html" title="DragFeedback preview" style="height:230px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>While a tab is dragged: a label that follows the pointer, and a red-washed box (or a 2px red marker in a tab strip) where it will land.</p>
+<h2>Use</h2>
+<p><code>.drag-ghost</code> follows the pointer 12px right and 10px down: ink fill, bg text, the view&#39;s title in bold and the target in small text (&quot;split right&quot;, &quot;add as a tab&quot;, &quot;move here&quot;, or &quot;drop on a tile&quot; when over nothing). <code>.drop-hint</code> covers the half or whole tile the drop would fill: sel wash, 2px accent border, its label in a small accent-bordered box. Over a tab strip it becomes <code>.drop-hint.marker</code>, a 2px accent bar between tabs. Both are <code>position: fixed</code> and ignore the pointer.</p>
+<p>Dropping within 22% of a tile&#39;s edge splits it on that side; the middle adds the view as a tab. Gutters drag with <code>body.resizing-x</code> / <code>.resizing-y</code> set so the cursor holds while the pointer crosses canvases.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;drop-hint&quot; style=&quot;left:520px;top:92px;width:460px;height:500px&quot;&gt;&lt;span&gt;split right&lt;/span&gt;&lt;/div&gt;
+&lt;div class=&quot;drag-ghost&quot; style=&quot;left:812px;top:240px&quot;&gt;Traces &lt;small&gt;split right&lt;/small&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do say the result of the drop in words; colour alone does not say what happens.</li>
+<li>Don&#39;t animate more than the 0.08s slide of the hint between targets.</li>
+</ul>
+</div><p class="x-files"><code>components/DragFeedback/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-FileTabs"><h4>FileTabs</h4><div class="x-frame"><iframe data-src="components/FileTabs/standalone.html" src="components/FileTabs/standalone.html" title="FileTabs preview" style="height:80px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The open files of the Code view as tabs in the code face, with a • for unsaved edits, then the Files menu and Run.</p>
+<h2>Use</h2>
+<p><code>.toolbar.filebar</code> &gt; <code>.filetabs</code> &gt; <code>.ftab</code> (one per open file). The active file is ink and bold with a 1 px ink underline; others are ink-2. A file with edits shows &quot; •&quot; after its path. The × (<code>.x</code>, 50% opacity) closes a tab when more than one is open. After a spacer: <code>Files ▾</code> (every file of the library with its line count and &quot;· edited&quot;; a new-file field; Revert; Delete in accent) and Run with ⌘↵, primary when anything is dirty.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;toolbar filebar&quot;&gt;
+  &lt;div class=&quot;filetabs&quot;&gt;
+    &lt;span class=&quot;ftab&quot;&gt;&lt;button&gt;main.js&lt;/button&gt;&lt;button class=&quot;x&quot; aria-label=&quot;close main.js&quot;&gt;×&lt;/button&gt;&lt;/span&gt;
+    &lt;span class=&quot;ftab on&quot;&gt;&lt;button&gt;skate/motors.js •&lt;/button&gt;&lt;button class=&quot;x&quot; aria-label=&quot;close skate/motors.js&quot;&gt;×&lt;/button&gt;&lt;/span&gt;
+  &lt;/div&gt;
+  &lt;span class=&quot;sp&quot;&gt;&lt;/span&gt;
+  &lt;div class=&quot;rel&quot;&gt;&lt;button class=&quot;btn&quot;&gt;Files ▾&lt;/button&gt;&lt;/div&gt;
+  &lt;button class=&quot;btn primary&quot;&gt;Run &lt;kbd&gt;⌘↵&lt;/kbd&gt;&lt;/button&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do show paths relative to the library root (skate/motors.js), never absolute.</li>
+<li>Don&#39;t truncate a path in the middle; the strip scrolls sideways instead.</li>
+</ul>
+</div><p class="x-files"><code>components/FileTabs/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-HeaderBar"><h4>HeaderBar</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/HeaderBar/standalone.html" src="components/HeaderBar/standalone.html" title="HeaderBar preview" style="height:204px;width:1240px" loading="lazy"></iframe></div><div class="x-md"><p>The 52px bar across the top: the name, the preset, the run controls, Run, then status pills, Layout and the theme switch on the right.</p>
+<h2>Use</h2>
+<p>There is one header bar per app. Left to right:</p>
+<ol>
+<li><code>.brand</code>: &quot;Form Skate&quot; in brand style, then <code>&lt;i&gt;workbench&lt;/i&gt;</code> (ui-small, 400, ink-2), closed by a 1 px hair rule.</li>
+<li><code>.proj</code> &gt; <code>.projbtn</code>: the preset&#39;s code (B-01, <code>.pcode</code>), its title (<code>.ptitle</code>, 700, 14px), &quot;edited&quot; in <code>.pcode</code> when there are unsaved edits, and a ▾ caret. It opens the preset Menu.</li>
+<li><code>.runctl</code>: Play/Pause, Step, Reset as IconButtons, the clock (<code>.clock</code>, bold, tabular, two decimals; <code>&lt;em&gt;</code> &quot; stopped&quot; in accent when the runtime failed) and a time-scale <code>select</code> (1×, 0.5×, 0.25×, 0.1×, 2×).</li>
+<li>Run (<code>.btn</code>, <code>.primary</code> when the code is dirty) with <code>kbd</code> ⌘↵.</li>
+<li><code>.sp</code> spacer, then <code>.pill</code>s: build status (&quot;ok&quot; and &quot;16 systems · 15 signals · 42 states&quot;; <code>.bad</code> with &quot;2 errors&quot; or &quot;stopped&quot;; <code>.busy</code> adds a blinking square), and the score (<code>.pill.score</code>: &quot;1,059&quot; &quot;score ×2&quot;).</li>
+<li>Layout menu button (▦ Layout) and the theme IconButton (system → light → dark).</li>
+</ol>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;header class=&quot;bar&quot;&gt;
+  &lt;div class=&quot;brand&quot;&gt;Form Skate &lt;i&gt;workbench&lt;/i&gt;&lt;/div&gt;
+  &lt;div class=&quot;proj&quot;&gt;&lt;button class=&quot;projbtn&quot;&gt;&lt;span class=&quot;pcode&quot;&gt;B-01&lt;/span&gt;&lt;span class=&quot;ptitle&quot;&gt;Flatground&lt;/span&gt;&lt;span class=&quot;caret&quot;&gt;▾&lt;/span&gt;&lt;/button&gt;&lt;/div&gt;
+  &lt;div class=&quot;runctl&quot;&gt;…&lt;span class=&quot;clock&quot;&gt;5.66&lt;em&gt;&lt;/em&gt;&lt;/span&gt;&lt;select&gt;…&lt;/select&gt;&lt;/div&gt;
+  &lt;button class=&quot;btn&quot;&gt;Run&lt;span class=&quot;long&quot;&gt; &lt;kbd&gt;⌘↵&lt;/kbd&gt;&lt;/span&gt;&lt;/button&gt;
+  &lt;span class=&quot;sp&quot;&gt;&lt;/span&gt;
+  &lt;button class=&quot;pill&quot;&gt;&lt;b&gt;ok&lt;/b&gt;&lt;span&gt;16 systems · 15 signals · 42 states&lt;/span&gt;&lt;/button&gt;
+&lt;/header&gt;
+</code></pre>
+<h2>Narrow screens</h2>
+<p>Under 1180px pill sub labels hide; under 900px &quot;workbench&quot; hides; under 640px the pills, the time scale and the Layout menu hide, and <code>.long</code> texts swap for <code>.short</code> ones. Hide words, never controls the user needs to run the program.</p>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do keep the bar on bg with a hair rule under it; no fill, no shadow.</li>
+<li>Do make a pill a button when it leads somewhere (the build pill opens Code on errors, Graph otherwise).</li>
+<li>Don&#39;t add a logo: the name set in type is the mark.</li>
+</ul>
+</div><p class="x-files"><code>components/HeaderBar/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Menu"><h4>Menu</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Menu/standalone.html" src="components/Menu/standalone.html" title="Menu preview" style="height:500px;width:1100px" loading="lazy"></iframe></div><div class="x-md"><p>A dropdown opened from a button: an ink-bordered box on bg, one item per row with a title and a small description, grouped by small headers.</p>
+<h2>Use</h2>
+<p>Menus hold choices and commands that do not fit a toolbar: presets, files, layouts, export formats, overlays, depth-order strategies, clips. <code>Menu</code> in <code>app/ui/common.jsx</code> renders <code>&lt;div class=&quot;rel&quot;&gt;</code> with the button and, when open, <code>&lt;div class=&quot;menu&quot;&gt;</code> below it (6px gap). Clicking an item closes it unless the item has <code>data-keep</code> (checkbox rows, fields); a click outside or Escape closes it.</p>
+<p>Each item is a <code>button</code> with:</p>
+<ul>
+<li>an optional <code>.code</code> column (preset ids: B-01), 34px;</li>
+<li><code>.t</code>, the title, sentence case (&quot;Export project&quot;, &quot;The whole book as an e-book&quot;);</li>
+<li><code>small</code>, one line of ink-2 that says what happens or what you get (&quot;.epub for Apple Books, Kobo, Calibre and other readers&quot;, &quot;files, notes and settings as .json&quot;).</li>
+</ul>
+<p>Group with <code>.grp</code> (preset groups: Basics, Physics…) or <code>.mh</code> (a header: &quot;Library — every file is editable&quot;, &quot;Depth order <small>src/lib/depth-order.js</small>&quot;). Separate command sections with <code>hr</code>. A closing <code>p.note</code> explains a rule of the menu (&quot;Drag a tab to move it; drop it on a tile&#39;s edge to split. The layout is kept in this browser.&quot;).</p>
+<h2>Variants</h2>
+<ul>
+<li><code>.menu.right</code>: aligned to the button&#39;s right edge (menus near the right side).</li>
+<li>Check rows: <code>&lt;span class=&quot;box on&quot;&gt;</code> (a 9px square, filled when on) before <code>.t</code>; radio rows: <code>&lt;span class=&quot;radio on&quot;&gt;</code> (the only round mark in the system). Used by Show, Order and Clip.</li>
+<li><code>.on</code> on an item: the current choice, bold.</li>
+<li><code>button.danger</code>: accent text, for Delete.</li>
+<li><code>button:disabled</code>: 45% opacity, no hover (&quot;Replay&quot; before anything is recorded).</li>
+<li>Widths: <code>.presets</code> 380px, <code>.files</code> 300px, <code>.bexport</code> 300px, <code>.layouts</code> 290px, <code>.overlays</code> 280px, <code>.ordermenu</code>/<code>.clipmenu</code> 340px.</li>
+</ul>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do describe every item in its <code>small</code> line; a menu is where the workbench explains itself.</li>
+<li>Do end a label that opens a file picker or a second step with &quot;…&quot; (&quot;Import project…&quot;, &quot;Load clip…&quot;).</li>
+<li>Don&#39;t nest menus.</li>
+</ul>
+</div><p class="x-files"><code>components/Menu/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-TilePicker"><h4>TilePicker</h4><div class="x-frame"><iframe data-src="components/TilePicker/standalone.html" src="components/TilePicker/standalone.html" title="TilePicker preview" style="height:220px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>What an empty tile shows: a lead sentence and a grid of the closed views, each a bordered button with the view&#39;s title and what it is for.</p>
+<h2>Use</h2>
+<p>When the last tab leaves a tile that is kept (the drop target of a split), the body shows <code>.picker</code>. Each button is the view&#39;s <code>title</code> in bold (fs-m) over its <code>about</code> in ink-2, lowercase: &quot;the drafting sheet you skate on&quot;, &quot;dataflow between systems by phase&quot;, &quot;parameter sweeps, headless&quot;. The same titles and abouts fill the <code>+</code> menu of a strip (&quot;Every view is open. Drag a tab here to move it.&quot; when none are closed).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;picker&quot;&gt;
+  &lt;p class=&quot;lead&quot;&gt;An empty tile. Open a view:&lt;/p&gt;
+  &lt;div class=&quot;pgrid&quot;&gt;
+    &lt;button&gt;&lt;b&gt;Graph&lt;/b&gt;&lt;small&gt;dataflow between systems by phase&lt;/small&gt;&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do write each view&#39;s about as a lowercase phrase with no full stop, under 45 characters.</li>
+<li>Don&#39;t leave a tile blank: an empty state always says what to do next.</li>
+</ul>
+</div><p class="x-files"><code>components/TilePicker/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Toolbar"><h4>Toolbar</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/Toolbar/standalone.html" src="components/Toolbar/standalone.html" title="Toolbar preview" style="height:200px;width:900px" loading="lazy"></iframe></div><div class="x-md"><p>The row at the top of a view (46px minimum, wraps) that holds its controls, and the 30px hint bar that can close a view at the bottom.</p>
+<h2>Use</h2>
+<p>Every view opens with <code>.toolbar</code>: filters first, then modes (Segmented, Toggle), then small buttons and menus, then a <code>.lbl</code> sentence that explains the view in ink-2 fs-xs (&quot;Live: a change takes effect on the next step. Edit the code to change a default.&quot;). Gap 8px, padding 6px 12px, a hair rule below.</p>
+<p><code>.hint</code> sits at the bottom of a canvas view: a bold state word (<code>b</code>: &quot;Click the stage&quot;, &quot;Riding&quot;, &quot;Replay&quot;) then the keys in ink-2, separated by &quot; · &quot;, truncated with an ellipsis rather than wrapped.</p>
+<p><code>.ntitle</code> in a toolbar names the document shown: the code in <code>.pcode</code> then the title in bold (&quot;B-01 <strong>Flatground</strong> · Basics&quot;, &quot;Chapter 47 <strong>Drawing motion</strong>&quot;).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;toolbar&quot;&gt;
+  &lt;input class=&quot;filter&quot; placeholder=&quot;filter&quot;&gt;
+  &lt;button class=&quot;tog&quot; aria-pressed=&quot;false&quot;&gt;Changed (0)&lt;/button&gt;
+  &lt;span class=&quot;lbl&quot;&gt;Live: a change takes effect on the next step. Edit the code to change a default.&lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;hint&quot;&gt;&lt;b&gt;Click the stage&lt;/b&gt;&lt;span&gt;↑ push · ←→ carve · Space pop · J/L flick&lt;/span&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do keep one toolbar per view; a second row of controls goes inside the view (a <code>.reshd</code>, a block header).</li>
+<li>Do explain the view in its <code>.lbl</code> in one or two plain sentences.</li>
+<li>Don&#39;t put the view&#39;s title in the toolbar; the tab already says it (documents are the exception: <code>.ntitle</code>).</li>
+</ul>
+</div><p class="x-files"><code>components/Toolbar/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Panels</h3><article class="x-comp" id="comp-EventList"><h4>EventList</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/EventList/standalone.html" src="components/EventList/standalone.html" title="EventList preview" style="height:278px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>Everything the program emitted, newest first: a monospaced log of time, type and a one-line summary, filtered by type chips and a search.</p>
+<h2>Use</h2>
+<p>The Events view: a Toolbar with type chips (<code>.chips.evchips</code>; a chip is on when filled ink, its count in <code>small</code>), a 130px search (<code>.evsearch</code>) and Clear; then <code>.evlist</code> in the code face at 11.5px/1.55. Each <code>.ev</code> row is a grid: time with three decimals (right-aligned, tabular, ink-2), type (ink-2), and what happened (<code>.what</code>) with its source after &quot; — &quot; in ink-2. Click a row to open its data as <code>pre.src.evdetail</code> (four decimals) and mark it (<code>.sel</code>, 2px accent inset bar). Errors, bails and unlanded tricks are <code>.ev.bad</code> (type, source and summary in accent).</p>
+<p>Summaries are written by the view: a trick as &quot;kickflip · flip 0.99 shove 0.00 wrap 0.00 air 0.42 s&quot;; anything else as its fields &quot;key value&quot; joined by &quot; · &quot;.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;evlist&quot;&gt;
+  &lt;div class=&quot;ev&quot;&gt;&lt;span class=&quot;t&quot;&gt;2.525&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;pop&lt;/span&gt;&lt;span class=&quot;what&quot;&gt;snap 15 · jump 3&lt;span class=&quot;s&quot;&gt; — pop/pop&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do keep one line per event; details go in the expansion.</li>
+<li>Don&#39;t colour event types; only trouble is red.</li>
+</ul>
+</div><p class="x-files"><code>components/EventList/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-ExperimentRow"><h4>ExperimentRow</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/ExperimentRow/standalone.html" src="components/ExperimentRow/standalone.html" title="ExperimentRow preview" style="height:560px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>An experiment exported by the preset: its name, how many runs, a Run button, and when it has run, a header, a scatter plot with axis pickers and the table of runs.</p>
+<h2>Use</h2>
+<p>The Experiments view lists <code>experiments.js</code>&#39;s exports (<code>.explist</code>, one <code>.exprow</code> each): the name as a <code>.linkhd</code> in bold, &quot;7 runs&quot; (and &quot;· last run 1.4 s&quot; once run) in <code>.sub</code>, a spacer, and <code>Run</code> (<code>.btn.sm.primary</code>; disabled while another runs). A running row swaps Run for a Meter and Stop. The shown experiment is <code>.exprow.on</code> (2px accent inset bar).</p>
+<p>Results open with <code>.reshd</code> (the name in bold, &quot;7 runs&quot; in <code>.sub</code>, a 2px ink rule above), then <code>.expres</code>: a toolbar of selects (x, y, series) and &quot;mean by x&quot;, the scatter, and the Table.</p>
+<p>The scatter (<code>svg.roof.scatter</code>, 520 × 260) draws grid lines in rule, tick labels and axis names in 9.5px ink-2, points as 3.6px circles: series 0 filled ink, others hollow with ink outlines and different marks (square, diamond, cross, triangle) and line dashes. Hovering a series turns its marks accent.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;explist&quot;&gt;
+  &lt;div class=&quot;exprow on&quot;&gt;&lt;button class=&quot;linkhd&quot;&gt;&lt;b&gt;Pop height vs take-off speed&lt;/b&gt;&lt;/button&gt;&lt;span class=&quot;sub&quot;&gt;7 runs&lt;/span&gt;&lt;span class=&quot;sp&quot;&gt;&lt;/span&gt;&lt;button class=&quot;btn sm primary&quot;&gt;Run&lt;/button&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;div class=&quot;reshd&quot;&gt;&lt;b&gt;Pop height vs take-off speed&lt;/b&gt;&lt;span class=&quot;sub&quot;&gt;7 runs&lt;/span&gt;&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do tell series apart by mark shape and dash, never by colour alone.</li>
+<li>Do plot the real rows; the table under the plot holds every number.</li>
+</ul>
+</div><p class="x-files"><code>components/ExperimentRow/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-GraphDiagram"><h4>GraphDiagram</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/GraphDiagram/standalone.html" src="components/GraphDiagram/standalone.html" title="GraphDiagram preview" style="height:330px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>The dataflow graph: one column per phase, systems as 168 × 40 boxes, edges as hairline curves with arrowheads; the selected node and its edges in accent.</p>
+<h2>Use</h2>
+<p><code>svg.graph</code> inside <code>.diagram.graphscroll</code> (on the stage colour, scrolls both ways). Columns are headed &quot;1. INPUT&quot;, &quot;2. CONTROLS&quot;… in 10px uppercase ink-2 (<code>.colhd</code>). Nodes are <code>g.node.&lt;kind&gt;</code>:</p>
+<ul>
+<li><code>system</code>: a white box with an ink outline, its id bold (<code>.nl</code>, 11.5px) and its phase small (<code>.ns</code>, 9.5px, ink-2).</li>
+<li><code>signals</code>: a group of derived signals; rounded (rx 10) and dashed (4 2), labelled &quot;λ 3 signals&quot;.</li>
+<li><code>watch</code>: filled and marked with a 2px corner at the top right.</li>
+<li><code>.sel</code>: accent outline 2px; <code>.bad</code>: accent outline on a sel wash (the system that stopped); <code>.dim</code>: hair outline, ink-2 text.</li>
+</ul>
+<p>Edges are <code>g.edge</code> &gt; <code>path</code> in ink-2 with the <code>ah</code> arrowhead. A dashed edge (<code>.dash</code>, 4 3) means the reader runs before the writer in the step, so it sees the previous step&#39;s value. Edges of the selected node turn accent and carry a label of the states they carry (<code>.elabel</code>). Hover turns an edge ink.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;svg class=&quot;graph&quot; width=&quot;1640&quot; height=&quot;398&quot;&gt;
+  &lt;text class=&quot;colhd&quot; x=&quot;16&quot; y=&quot;18&quot;&gt;1. input&lt;/text&gt;
+  &lt;g class=&quot;edge dash&quot;&gt;&lt;path d=&quot;M184,54 C…&quot; marker-end=&quot;url(#ah)&quot;/&gt;&lt;/g&gt;
+  &lt;g class=&quot;node system sel&quot; transform=&quot;translate(248,142)&quot;&gt;&lt;rect width=&quot;168&quot; height=&quot;40&quot; rx=&quot;0&quot;/&gt;&lt;text class=&quot;nl&quot; x=&quot;8&quot; y=&quot;16&quot;&gt;pop/pop&lt;/text&gt;&lt;text class=&quot;ns&quot; x=&quot;8&quot; y=&quot;31&quot;&gt;controls&lt;/text&gt;&lt;/g&gt;
+&lt;/svg&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do encode kinds by outline, dash and corner marks, not by hue.</li>
+<li>Do say in the toolbar what a dashed edge means.</li>
+<li>Don&#39;t draw more than one accent: only the selection or the failure is red.</li>
+</ul>
+</div><p class="x-files"><code>components/GraphDiagram/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Inspector"><h4>Inspector</h4><div class="x-frame"><iframe data-src="components/Inspector/standalone.html" src="components/Inspector/standalone.html" title="Inspector preview" style="height:506px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The side column of the Graph and IR views: what the selected node is, where it is declared, what it reads and writes, and its live values.</p>
+<h2>Use</h2>
+<p><code>aside.side</code> with Blocks, in this order:</p>
+<ol>
+<li><strong>The id</strong> as the title, its kind and phase in <code>.sub</code> (&quot;system · controls&quot;), the system&#39;s own <code>describe</code> text as a <code>.note</code>, and its source as <code>.link.strong</code> (&quot;skate/motors.js:153&quot;) with a second link to its tick (&quot;tick at 159&quot;).</li>
+<li><strong>Reads</strong> and <strong>Writes</strong>, each with its count in <code>.sub</code> and its references as <code>.nid</code> buttons in <code>.refs</code> (code face). Additive writes say &quot;(additive)&quot;. A reference that is not a node of the program is <code>.nid.dim</code>.</li>
+<li><strong>Expression</strong> for a signal, as <code>code.exprtxt</code>.</li>
+<li><strong>Live</strong>: &quot;t = 3.77 s&quot; in <code>.sub</code>, then a KeyValue list (value, ms / step, calls, local.*) with three decimals.</li>
+<li><strong>Range</strong> for a param: default, min · max, unit, and &quot;open in Params&quot;.</li>
+</ol>
+<p>With nothing selected the block says how to select something.</p>
+<h2>Markup</h2>
+<p>See Block, KeyValue, TextLink. The ids are buttons so the keyboard reaches them.</p>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do put the links to the source first; reading the code is the next step.</li>
+<li>Do separate adjacent action links with a space or a gap (the inspector&#39;s source links currently touch).</li>
+</ul>
+</div><p class="x-files"><code>components/Inspector/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-TraceRow"><h4>TraceRow</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/TraceRow/standalone.html" src="components/TraceRow/standalone.html" title="TraceRow preview" style="height:120px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>One pinned signal or state over time: its id and type, the latest value and range, and a 56px plot drawn in ink on the page&#39;s ground.</p>
+<h2>Use</h2>
+<p>The Traces view stacks <code>.trace</code> rows under its Toolbar (window 2, 5, 10 or 20 s; Freeze; a filter that adds traces). The header (<code>.trace-h</code>) has the id as a <code>.linkhd</code> in the code face, bold (click selects it in the graph), its kind and type in <code>.sub</code> (&quot;signal · number&quot;), the readout (<code>.tv</code>: &quot;0.082   range 0.06 … 0.47&quot;, and for vectors &quot;x solid · y dashed · z dotted&quot;), and × to unpin.</p>
+<p>The plot is a <code>canvas.spark</code> the view draws itself, reading the theme from CSS: the series in ink at 1.2px (vector components: x solid, y dashed 4 3, z dotted 1 2, the second and third in ink-2), the zero line in rule, events as dashed vertical ticks (pop and trick in ink-2 with the trick&#39;s name in 9px Arial; a bail in accent). The y range pads the data by 10%.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;trace&quot;&gt;
+  &lt;div class=&quot;trace-h&quot;&gt;&lt;button class=&quot;linkhd&quot;&gt;&lt;b&gt;recognizer/height&lt;/b&gt;&lt;/button&gt;&lt;span class=&quot;sub&quot;&gt;signal · number&lt;/span&gt;&lt;span class=&quot;tv&quot;&gt;0.082   range 0.06 … 0.47&lt;/span&gt;&lt;button class=&quot;x&quot; aria-label=&quot;unpin recognizer/height&quot;&gt;×&lt;/button&gt;&lt;/div&gt;
+  &lt;canvas class=&quot;spark&quot;&gt;&lt;/canvas&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do read colours from the CSS variables at draw time so the plot follows the theme.</li>
+<li>Do separate series by dash pattern, not hue.</li>
+</ul>
+</div><p class="x-files"><code>components/TraceRow/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Inputs</h3><article class="x-comp" id="comp-Field"><h4>Field</h4><div class="x-frame"><iframe data-src="components/Field/standalone.html" src="components/Field/standalone.html" title="Field preview" style="height:150px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>Text inputs, selects and range sliders: square, hairline, on bg (or code-bg for code and names), with placeholders that say what to type.</p>
+<h2>Use</h2>
+<ul>
+<li><strong><code>.filter</code></strong>: the search or filter box at the start of a toolbar or the top of a column, 30px high, 160px wide (auto in the shelf and contents). Placeholders are lowercase and specific: &quot;search the shelf&quot;, &quot;search the book&quot;, &quot;filter lines&quot;, &quot;filter&quot;, &quot;add a trace: filter signals and states&quot;.</li>
+<li><strong><code>.evsearch</code></strong>: the same box at 130px in the Events toolbar.</li>
+<li><strong><code>select</code></strong> in a toolbar: 30px high, hair border, bg. Option text says the value with its unit or role (&quot;1×&quot;, &quot;every 2nd frame&quot;, &quot;Compare: off&quot;).</li>
+<li><strong><code>input[type=range]</code></strong>: <code>accent-color: var(--ink)</code>. In a toolbar it is 92px wide after a <code>.lbl</code> (&quot;Zoom&quot;); in a parameter row it fills its cell.</li>
+<li><strong><code>.newfile input</code></strong>: a name typed inside a menu (&quot;new file, e.g. skate/grind.js&quot;, &quot;save as my preset: title&quot;), on code-bg in the code face.</li>
+</ul>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;input class=&quot;filter&quot; placeholder=&quot;filter lines&quot;&gt;
+&lt;span class=&quot;lbl&quot;&gt;Zoom&lt;/span&gt;&lt;input type=&quot;range&quot; min=&quot;0.25&quot; max=&quot;4&quot; step=&quot;0.05&quot; aria-label=&quot;Zoom&quot;&gt;
+&lt;select aria-label=&quot;Time scale&quot;&gt;&lt;option&gt;1×&lt;/option&gt;&lt;option&gt;0.5×&lt;/option&gt;&lt;/select&gt;
+</code></pre>
+<h2>States</h2>
+<p>Focus: the border turns ink and the outline is removed (the border is the focus mark). Enter commits where a field creates something; Escape closes the menu around it.</p>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do label a field by its placeholder or a <code>.lbl</code> before it, and give it an <code>aria-label</code>.</li>
+<li>Don&#39;t add clear buttons, icons in fields or rounded corners.</li>
+</ul>
+</div><p class="x-files"><code>components/Field/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-ParamRow"><h4>ParamRow</h4><div class="x-frame"><iframe data-src="components/ParamRow/standalone.html" src="components/ParamRow/standalone.html" title="ParamRow preview" style="height:200px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>One live parameter: its label and short id, a slider over its range, the value with its unit, and a ↺ that appears once it differs from the default.</p>
+<h2>Use</h2>
+<p>The Params view lists every <code>$.param</code> grouped by component (<code>.psub</code> sticky headers: &quot;brake&quot;, &quot;pop&quot;, &quot;flick&quot;). A change takes effect on the next step; the code holds the default. Rows are 30px minimum, in a 4-column grid: label, control, value, reset.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;scroll paramlist&quot;&gt;
+  &lt;div class=&quot;psub&quot;&gt;pop&lt;/div&gt;
+  &lt;div class=&quot;prow&quot; data-param=&quot;pop/snap&quot;&gt;
+    &lt;span class=&quot;pn&quot; title=&quot;pop/snap&quot;&gt;tail snap (nose-up spin the slam starts) &lt;i&gt;snap&lt;/i&gt;&lt;/span&gt;
+    &lt;span class=&quot;pc&quot;&gt;&lt;input type=&quot;range&quot; min=&quot;0&quot; max=&quot;30&quot; step=&quot;0.1&quot; aria-label=&quot;tail snap&quot;&gt;&lt;/span&gt;
+    &lt;span class=&quot;pv&quot;&gt;20 rad/s&lt;/span&gt;
+    &lt;button class=&quot;tabact&quot; title=&quot;default 15&quot;&gt;↺&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<h2>States</h2>
+<ul>
+<li>Changed: the ↺ button is enabled and shows; unchanged rows keep the empty, disabled button so columns do not shift.</li>
+<li>Highlighted (<code>.hl</code>, arrived through <code>lab:param</code> or the inspector): fill background and a 2px accent inset bar on the left.</li>
+<li>The value is bold ink with tabular figures: <code>+(+v).toFixed(4)</code> then the unit after a space (&quot;0.11 m&quot;, &quot;160 N&quot;, &quot;15 rad/s&quot;).</li>
+</ul>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do write the label as the param&#39;s <code>label</code> in the code (lowercase, a phrase that says what it does) and the id&#39;s last segment in <code>&lt;i&gt;</code> (roman, ink-2).</li>
+<li>Don&#39;t show sliders without a unit when the param has one.</li>
+</ul>
+</div><p class="x-files"><code>components/ParamRow/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Segmented"><h4>Segmented</h4><div class="x-frame"><iframe data-src="components/Segmented/standalone.html" src="components/Segmented/standalone.html" title="Segmented preview" style="height:120px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A row of mutually exclusive choices sharing one hairline box; the chosen one is filled ink.</p>
+<h2>Use</h2>
+<p>Pick one of two to six short options: the stage view (Axo, Front, Side, Plan), a trace window (2 s, 5 s, 10 s, 20 s), a replay speed (¼, ½, 1×). Labels are one or two words; put the full name in <code>title</code> (Axo → &quot;Axonometric&quot;). The group has <code>role=&quot;group&quot;</code> and an <code>aria-label</code>; each button carries <code>aria-pressed</code>.</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;div class=&quot;seg&quot; role=&quot;group&quot; aria-label=&quot;View&quot;&gt;
+  &lt;button class=&quot;on&quot; aria-pressed=&quot;true&quot; title=&quot;Axonometric&quot;&gt;Axo&lt;/button&gt;
+  &lt;button aria-pressed=&quot;false&quot; title=&quot;Front elevation&quot;&gt;Front&lt;/button&gt;
+&lt;/div&gt;
+&lt;div class=&quot;seg sm&quot; role=&quot;group&quot; aria-label=&quot;Window&quot;&gt;…&lt;/div&gt;
+</code></pre>
+<h2>Variants and states</h2>
+<ul>
+<li><code>.seg</code>: 30px high (control-h), fs-s, 11px side padding.</li>
+<li><code>.seg.sm</code>: 24px high, fs-xs, 8px padding. Use it inside a view&#39;s toolbar.</li>
+<li>Selected: <code>.on</code> or <code>aria-pressed=&quot;true&quot;</code>, ink fill and bg text. Unselected labels are ink-2 and turn ink on hover.</li>
+<li><code>.seg.dis</code>: the whole group at 40% when the choice does not apply right now.</li>
+</ul>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do use it when every option fits on one line; use a <code>select</code> for longer lists (time scale 1×, 0.5×…).</li>
+<li>Don&#39;t use it for on/off: that is a Toggle.</li>
+</ul>
+</div><p class="x-files"><code>components/Segmented/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Toggle"><h4>Toggle</h4><div class="x-frame"><iframe data-src="components/Toggle/standalone.html" src="components/Toggle/standalone.html" title="Toggle preview" style="height:110px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>An on/off button with a 9px square mark: empty when off, filled ink when on. Also the inline checkbox label <code>.chk</code>.</p>
+<h2>Use</h2>
+<p><code>.tog</code> switches a mode of the view: Track, Follow, Freeze, Edit, &quot;Changed (3)&quot;. The label names the mode, not the action (&quot;Freeze&quot;, not &quot;Freeze traces&quot;). It is a button with <code>aria-pressed</code>. <code>.chk</code> is a native checkbox with its label, for options inside a toolbar row of a panel (&quot;axonometric&quot;, &quot;side + Track&quot;, &quot;mean by x&quot;).</p>
+<h2>Markup</h2>
+<pre><code class="language-html">&lt;button class=&quot;tog on&quot; aria-pressed=&quot;true&quot; title=&quot;Keep the rider in the middle&quot;&gt;Follow&lt;/button&gt;
+&lt;button class=&quot;tog&quot; aria-pressed=&quot;false&quot; title=&quot;Stop scrolling (the simulation keeps running)&quot;&gt;Freeze&lt;/button&gt;
+&lt;label class=&quot;chk&quot;&gt;&lt;input type=&quot;checkbox&quot; checked&gt; axonometric&lt;/label&gt;
+</code></pre>
+<h2>States</h2>
+<ul>
+<li>Off: ink-2 label, hollow mark, hair border. On: ink label, filled mark. Hover: ink border.</li>
+<li><code>.chk</code> uses <code>accent-color: var(--ink)</code> so the native box is ink, never the browser&#39;s blue.</li>
+</ul>
+<h2>Do and don&#39;t</h2>
+<ul>
+<li>Do give every toggle a <code>title</code> saying what it does in a sentence.</li>
+<li>Don&#39;t use a toggle to run something once; that is a Button.</li>
+</ul>
+</div><p class="x-files"><code>components/Toggle/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article></section>
+<section id="assets"><h2 class="x-h">Assets</h2><div class="x-md"><p>Screenshots of the real workbench at 1440 × 900, preset B-01 Flatground, the autopilot riding. Use them to see how the components sit together; build from the components and tokens, not from these pictures.</p>
+<ul>
+<li><code>workbench-default.png</code>: the default layout (&quot;Code beside the stage&quot;), light: Notes open on the left, the stage with its side column, Traces below.</li>
+<li><code>workbench-book.png</code>: the Book tab open on Chapter 47, Drawing motion: chapter label, title, lede, contents line, numbered sections.</li>
+<li><code>workbench-code-params.png</code>: Code open on skate/motors.js at the pop motor, Params below the stage with pop/snap highlighted.</li>
+<li><code>workbench-graph.png</code>: the layout &quot;The program: code, graph, IR&quot; with pop/pop selected in the Graph and the inspector beside it.</li>
+<li><code>workbench-default-dark.png</code>: the default layout in the dark theme.</li>
+</ul>
+</div><div class="x-shots"><figure><a href="assets/Screens/workbench-default.png"><img src="assets/Screens/workbench-default.png" alt="workbench-default.png" loading="lazy"></a><figcaption><code>assets/Screens/workbench-default.png</code></figcaption></figure><figure><a href="assets/Screens/workbench-book.png"><img src="assets/Screens/workbench-book.png" alt="workbench-book.png" loading="lazy"></a><figcaption><code>assets/Screens/workbench-book.png</code></figcaption></figure><figure><a href="assets/Screens/workbench-code-params.png"><img src="assets/Screens/workbench-code-params.png" alt="workbench-code-params.png" loading="lazy"></a><figcaption><code>assets/Screens/workbench-code-params.png</code></figcaption></figure><figure><a href="assets/Screens/workbench-graph.png"><img src="assets/Screens/workbench-graph.png" alt="workbench-graph.png" loading="lazy"></a><figcaption><code>assets/Screens/workbench-graph.png</code></figcaption></figure><figure><a href="assets/Screens/workbench-default-dark.png"><img src="assets/Screens/workbench-default-dark.png" alt="workbench-default-dark.png" loading="lazy"></a><figcaption><code>assets/Screens/workbench-default-dark.png</code></figcaption></figure></div></section>
+<section id="export"><h2 class="x-h">EXPORT.md</h2><div class="x-md"><h1>About this export</h1>
+<p>This folder is a complete copy of the <strong>Form Skate Workbench</strong> design system, exported on 2026-10-29 from <a href="https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG">https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG</a> (version 1793208608-1cf1).</p>
+<p>Open <code>index.html</code> in a browser to read it offline: the brand book, every section, the tokens in both themes, each component&#39;s live preview beside its guidelines, and the screenshots. The theme button cycles system, light and dark.</p>
+<h2>What is here</h2>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>README.md</code></td>
+<td>the brand book: start here</td>
+</tr>
+<tr>
+<td><code>*.md</code></td>
+<td>further sections</td>
+</tr>
+<tr>
+<td><code>tokens.json</code></td>
+<td>the tokens (colours in 2 themes, type, spacing and other families)</td>
+</tr>
+<tr>
+<td><code>tokens.css</code></td>
+<td>the same tokens as CSS custom properties, compiled the way the design system page compiles them: <code>:root, [data-theme=&quot;light&quot;]</code> then <code>[data-theme=&quot;…&quot;]</code> per further theme, one class per text style</td>
+</tr>
+<tr>
+<td><code>components/bundle.css</code></td>
+<td>the components&#39; stylesheet; it expects <code>tokens.css</code> before it</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/README.md</code></td>
+<td>the component&#39;s guidelines</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/preview.html</code></td>
+<td>its preview exactly as published (it relies on the page preloading tokens.css, bundle.css)</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/standalone.html</code></td>
+<td>the same preview with those files linked, so it opens on its own; add <code>#light</code> or <code>#dark</code> to the address to pick a theme</td>
+</tr>
+<tr>
+<td><code>assets/</code></td>
+<td>5 screenshots of the real app, with a README per group</td>
+</tr>
+<tr>
+<td><code>design-system.json</code></td>
+<td>the system&#39;s index (title, namespace, asset records; the <code>blob</code> ids refer to the online copy)</td>
+</tr>
+<tr>
+<td><code>index.html</code></td>
+<td>the offline browser</td>
+</tr>
+</tbody></table>
+<h2>Using it elsewhere</h2>
+<p>Load <code>tokens.css</code>, then <code>components/bundle.css</code>, and set <code>data-theme=&quot;light&quot;</code> or <code>data-theme=&quot;dark&quot;</code> on the root element. Use the class names and markup each component&#39;s README gives.</p>
+<p>The files under <code>components/</code> and the Markdown are unchanged from the published system. <code>tokens.css</code>, the <code>standalone.html</code> files, <code>index.html</code>, <code>fonts/</code> and this file were added by the export.</p>
+</div></section>
+</main>
+</div>
+<script>
+(function () {
+  var mode = window.__dsMode || 'system', btn = document.getElementById('x-theme'), mq = matchMedia('(prefers-color-scheme: dark)');
+  function theme() { return mode === 'system' ? (mq.matches ? 'dark' : 'light') : mode; }
+  function apply() {
+    var t = theme(); document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = 'Theme: ' + mode;
+    document.querySelectorAll('iframe[data-src]').forEach(function (f) { f.src = f.getAttribute('data-src') + '#' + t; });
+  }
+  btn.addEventListener('click', function () { mode = mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system'; try { localStorage.setItem('ds-theme', mode); } catch (e) {} apply(); });
+  mq.addEventListener && mq.addEventListener('change', function () { if (mode === 'system') apply(); });
+  addEventListener('message', function (e) {
+    if (!e.data || typeof e.data.dsHeight !== 'number') return;
+    document.querySelectorAll('iframe').forEach(function (f) { if (f.contentWindow === e.source && !f.closest('.x-cover')) f.style.height = Math.min(Math.max(e.data.dsHeight, 40), 4000) + 'px'; });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

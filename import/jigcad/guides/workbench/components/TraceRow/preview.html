@@ -1,0 +1,30 @@
+<!-- @dsCard group="Panels" height=120 width=760 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>TraceRow</title>
+<style>.traces{margin:12px;border:1px solid var(--hair)}</style></head>
+<body>
+
+<div class="traces"><div class="trace">
+  <div class="trace-h"><button class="linkhd"><b>recognizer/height</b></button><span class="sub">signal · number</span><span class="tv" id="tv"></span><button class="x" aria-label="unpin recognizer/height">×</button></div>
+  <canvas class="spark" id="cv"></canvas>
+</div></div>
+<script>
+// the running example's deck height (FACTS.md, every 0.05 s), drawn the way TracesView draws a trace
+var S = [[2.158, 0.082], [2.208, 0.082], [2.258, 0.085], [2.308, 0.085], [2.358, 0.083], [2.408, 0.081], [2.458, 0.081], [2.508, 0.081], [2.558, 0.18], [2.608, 0.322], [2.658, 0.404], [2.708, 0.462], [2.758, 0.492], [2.808, 0.491], [2.858, 0.461], [2.908, 0.405], [2.958, 0.319], [3.008, 0.086], [3.058, 0.068], [3.108, 0.081], [3.158, 0.084], [3.208, 0.084], [3.258, 0.084], [3.308, 0.083], [3.358, 0.083]], EV = [[2.525, 'pop'], [3.242, 'trick', 'kickflip']];
+function draw() {
+  var c = document.getElementById('cv'), r = c.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  var g = c.getContext('2d'), W = r.width, H = r.height; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  var css = getComputedStyle(c), ink = css.getPropertyValue('--ink').trim(), mut = css.getPropertyValue('--ink-2').trim();
+  var t0 = 2.1, t1 = 3.4, lo = 1e9, hi = -1e9; S.forEach(function (p) { lo = Math.min(lo, p[1]); hi = Math.max(hi, p[1]); });
+  var pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+  var X = function (t) { return (t - t0) / (t1 - t0) * W; }, Y = function (v) { return H - 4 - (v - lo) / (hi - lo) * (H - 8); };
+  EV.forEach(function (e) { var x = X(e[0]); g.strokeStyle = mut; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); g.setLineDash([]); if (e[2]) { g.fillStyle = mut; g.font = '9px Arial'; g.fillText(e[2], x + 3, 9); } });
+  g.strokeStyle = ink; g.lineWidth = 1.2; g.beginPath(); S.forEach(function (p, i) { i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])); }); g.stroke();
+  document.getElementById('tv').textContent = '0.083   range ' + (lo + pad).toFixed(2) + ' … ' + (hi - pad).toFixed(2);
+}
+draw(); new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>
+</body>
+</html>

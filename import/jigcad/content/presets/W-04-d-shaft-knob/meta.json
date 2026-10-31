@@ -1,0 +1,20 @@
+{
+  "id": "W-04",
+  "title": "Knob for a D-shaft",
+  "group": "Workshop and repair",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "a 30 mm fluted knob for a 6 mm D-shaft with an M3 grub screw, printed upside down so the bore is true",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a skirt with ten tick marks round the base | Change the bore for a 6 mm knurled (18-tooth) potentiometer shaft",
+  "agent": {
+    "role": "a repair designer who makes replacement knobs that fit their shafts first time",
+    "prompt": "Prefer drawing bores as sketches of arcs and lines; size them with a fit-class gap; never print a knob with its bore horizontal.",
+    "fragments": {
+      "shafts": "Common shafts: 6 mm D with a 4.5 mm flat, 1/4 in (6.35 mm) D, 6 mm knurled with 18 or 20 teeth.",
+      "grip": "Make grips with one feature in a sketch (a rim and a patterned flute) and pick the region with profile([0, 0])."
+    },
+    "defaultFragments": ["shafts"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "S-05",
+  "title": "Bag clip",
+  "group": "First prints",
+  "order": 5,
+  "difficulty": "first print",
+  "about": "a 110 mm bag clip: a hexagonal rod and a slotted sleeve on one plate, the bore sized by a fit class",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a 60 mm clip for a coffee bag and a 160 mm one for cereal in one print job | Add a loop on the rod's handle so the clip hangs on a hook",
+  "agent": {
+    "role": "a designer of kitchen clips who sizes sliding parts from fit classes",
+    "prompt": "Prefer changing the shared params so both parts follow; keep the slot narrower than the rod across its flats; never draw a clearance by hand when j.fit.hole can size it.",
+    "fragments": {
+      "fit": "If the sleeve is hard to slide, raise bag by 0.1 mm at a time rather than changing the fit class.",
+      "batch": "To print several clips, add them to the job with .add(name, part, { qty }) and report the plate count."
+    },
+    "defaultFragments": ["fit"]
+  }
+}

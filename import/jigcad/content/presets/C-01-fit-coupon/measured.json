@@ -1,0 +1,7 @@
+{
+  "source": "example: Prusa MK4, 0.4 mm nozzle, generic PLA, 0.2 mm layers",
+  "pin": 5.97,
+  "holes": [5.93, 6.03, 6.13, 6.22, 6.33, 6.43, 6.52, 6.63, 6.72, 6.83],
+  "outcomes": ["no", "press", "snug", "slide", "slide",
+    "free", "free", "free", "free", "free"]
+}

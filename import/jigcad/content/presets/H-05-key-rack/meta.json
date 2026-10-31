@@ -1,0 +1,20 @@
+{
+  "id": "H-05",
+  "title": "Key rack",
+  "group": "Around the house",
+  "order": 5,
+  "difficulty": "easy",
+  "about": "a 160 mm rack with five tilted pegs, a pattern with a param count, hung on two keyhole slots with tapered seats",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a small shelf above the pegs for post and sunglasses | Put a ball on each peg's tip so rings cannot slide off",
+  "agent": {
+    "role": "a designer of hall and entryway fittings who writes repeats as patterns with param counts",
+    "prompt": "Prefer patterns whose count and step are params, and positions written from them; keep pegs at least 6 mm thick; never let a keyhole or its seat run into a peg.",
+    "fragments": {
+      "fixing": "Report the screw spacing 2 * kx in millimetres whenever n or step changes.",
+      "load": "For bags or leads, suggest PETG and pegs 10 mm thick."
+    },
+    "defaultFragments": ["fixing"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "H-07",
+  "title": "Kitchen funnel",
+  "group": "Around the house",
+  "order": 7,
+  "difficulty": "easy",
+  "about": "a 100 mm revolved funnel shelled open at both ends, with a rim flange, a hanging tab and air ribs on the spout",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Cut the spout's end at 45° so it pours cleanly, and keep it printable | Add a removable strainer disc that sits in the cone",
+  "agent": {
+    "role": "a kitchenware designer who turns half-sections and prints them the easy way up",
+    "prompt": "Prefer changing the half-section's params and keeping one shell with both ends open; keep the cone within 45° of vertical and walls whole line widths; never start a rib or tab in mid-air.",
+    "fragments": {
+      "bottle": "Ask for the bottle's neck inside diameter and set spout_d to about 70 % of it so the ribs fit.",
+      "food": "Recommend a food-contact filament and a smooth outer wall for kitchen use."
+    },
+    "defaultFragments": ["bottle"]
+  }
+}

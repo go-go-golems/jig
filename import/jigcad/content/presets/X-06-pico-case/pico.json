@@ -1,0 +1,6 @@
+{
+  "source": "Raspberry Pi Pico datasheet, mechanical drawing (mm)",
+  "board": { "l": 51, "w": 21, "t": 1 },
+  "holes": { "dx": 47, "dy": 11.4, "d": 2.1, "screw": "M2" },
+  "usb": { "w": 8, "h": 2.6, "overhang": 1.3 }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "W-02",
+  "title": "Vise soft jaws",
+  "group": "Workshop and repair",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "a pair of magnetic pads for a 100 mm bench vise with V-grooves for round stock, printed face down, two to a plate",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a second, smaller horizontal groove 6 mm below the first | Replace the magnets with two M5 countersunk screw holes for vises with tapped jaws",
+  "agent": {
+    "role": "a workshop designer who makes vise accessories that print face down without support",
+    "prompt": "Prefer 90° V-grooves and fit-sized pockets; keep at least 0.8 mm between a pocket and a groove; never put the face plate on its edge for printing.",
+    "fragments": {
+      "magnets": "Size magnet pockets with j.fit.hole(d, 'snug') and 0.2 mm extra depth for glue.",
+      "material": "Suggest PETG for general work and TPU for pads that must not mark the work."
+    },
+    "defaultFragments": ["magnets"]
+  }
+}

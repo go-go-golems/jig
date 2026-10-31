@@ -1,0 +1,19 @@
+{
+  "id": "C-06",
+  "title": "Wall thickness",
+  "group": "Calibration",
+  "order": 6,
+  "difficulty": "easy",
+  "about": "six fins from one to four line widths thick: see which walls your slicer fills, which it leaves gaps in and which it drops",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the test for a 0.6 mm nozzle printer | Add fins at 1.2 and 1.6 line widths | Explain how 1.5 lw becomes a length",
+  "agent": {
+    "role": "a print-process engineer who sizes walls in extrusion lines",
+    "prompt": "Prefer line widths (lw) over millimetres for walls; edit the widths list rather than adding features; never make a structural wall thinner than lw(2).",
+    "fragments": {
+      "lw": "Write print-relative sizes with lw and layer so they follow the printer profile."
+    },
+    "defaultFragments": ["lw"]
+  }
+}

@@ -1,0 +1,28 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>NotesView</title>
+<style>.pair{display:flex;flex-direction:column;gap:12px;padding:10px}.notes{border:1px solid var(--hair)}.notes-edit textarea{height:120px;flex:none}</style></head>
+<body>
+
+<div class="pair">
+<div class="tabbody col notes"><div class="toolbar"><span class="ntitle"><span class="pcode">B-01</span> <b>Flatground</b> <span class="pcode">· Basics</span></span><span class="sp"></span><button class="tog" aria-pressed="false" title="Edit these notes (markdown, $math$, lab: links)">Edit</button></div>
+<div><article class="doc" style="padding-bottom:18px"><h1 id="p-flatground">Flatground</h1>
+<p>A skater rides a lot with a funbox in it. The autopilot pushes, carves round the course and plays a trick on each straight; press any key on the stage and you are riding instead. Everything you see — the rigid-body physics, the legs, the motors that flip the board, the recognizer that names the trick, the hairline drawing — is code in the <b>Code</b> view, and every file is yours to change.</p>
+<div class="callout try"><p><b>Try it.</b> Click the stage, hold <b>↑</b> to push, then press and release <b>Space</b> to ollie. Hold <b>J</b> while you release Space for a <a href="#" class="lablink" data-lab="lab:trick?name=kickflip">kickflip</a>, <b>I</b> for a <a href="#" class="lablink" data-lab="lab:trick?name=popShoveIt">pop shove-it</a>, <b>J + I + Shift</b> for a <a href="#" class="lablink" data-lab="lab:trick?name=treFlip">360 flip</a>. The trick pad on the right plays the same key gestures for you.</p></div>
+<h2 id="p-what-is-on-the-screen">What is on the screen</h2>
+<p>The <b>stage</b> is a drafting sheet, not a game camera: an orthographic projection (parallel rays, no perspective) so lengths along each axis keep one scale, the one in the scale bar. Shadows are hatched like a pencil drawing; the ghost decks are an onion skin of the last jump, and the dimension line on the floor measures take-off to landing. Switch to the <a href="#" class="lablink" data-lab="lab:view?name=side&amp;track=1">side elevation</a> with <i>Track</i> on and the board is always seen in profile — the best view for flips.</p></article></div></div>
+<div class="tabbody col notes"><div class="toolbar"><span class="ntitle"><span class="pcode">B-01</span> <b>Flatground</b> <span class="pcode">· Basics</span></span><span class="sp"></span><button class="link">revert notes</button><button class="tog on" aria-pressed="true">Edit</button></div>
+<div class="notes-edit"><textarea spellcheck="false" aria-label="Notes markdown"># Flatground
+
+A skater rides a lot with a funbox in it. The autopilot pushes, carves round the course and plays a trick on each straight; press any key on the stage and you are riding instead. Everything you see — the rigid-body physics, the legs, the motors that flip the board, the recognizer that names the trick, the hairline drawing — is code in the **Code** view, and every file is yours to change.
+
+&gt; **Try it.** Click the stage, hold **↑** to push, then press and release **Space** to ollie. Hold **J** while you release Space for a [kickflip](lab:trick?name=kickflip), **I** for a [pop shove-it](lab:trick?name=popShoveIt), **J + I + Shift** for a [360 flip](lab:trick?name=treFlip). The trick pad on the right plays the same key gestures for you.
+
+## What is on the screen
+
+The **stage** is a drafting sheet, not a game camera: an orthographic projection (parallel rays, no perspective) so lengths along each axis keep one scale, the one in the scale bar. Shadows are hatched like a pencil drawing; the ghost decks are an onion skin of the last jump, and the dimension line on the floor measures take-off to landing. Switch to the [side elevation](lab:view?name=side&amp;track=1) with *Track* on and the board is always seen in profile — the best view for flips.
+</textarea><div class="ed-foot"><span>Markdown with <code>$…$</code> and <code>$$…$$</code> math, <code>&gt; **Try it**</code> callouts and links like <code>[open](lab:open?file=main.js&amp;line=20)</code>. Saved in this browser.</span></div></div></div>
+</div>
+</body>
+</html>

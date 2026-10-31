@@ -1,0 +1,30 @@
+<!-- @dsCard group="Stage parts" height=380 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OverlayMenu</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>body { background: var(--st-bg); } .stagebox { position: relative; height: 100%; } .skate-stage { position: relative; }
+  body { background: var(--bg); } .anchor { position: relative; height: 4px; margin: 0 12px; } .menu { position: relative; top: 0; }
+</style>
+</head>
+<body>
+<div class="anchor"></div>
+<div class="menu overlays" style="position:relative;margin:0 12px;max-width:360px;max-height:none" id="m"></div>
+<script>
+  var on = new Set(window.FormSkateStage.DEFAULT_OVERLAYS), m = document.getElementById('m');
+  function paint() {
+    m.innerHTML = '';
+    window.FormSkateStage.OVERLAYS.forEach(function (o) {
+      var b = document.createElement('button'); b.className = on.has(o[0]) ? 'on' : '';
+      b.innerHTML = '<span class="box' + (on.has(o[0]) ? ' on' : '') + '"></span><span class="t"></span><small></small>';
+      b.querySelector('.t').textContent = o[1]; b.querySelector('small').textContent = o[2];
+      b.onclick = function () { on.has(o[0]) ? on.delete(o[0]) : on.add(o[0]); paint(); };
+      m.appendChild(b);
+    });
+  }
+  paint();
+</script>
+</body>
+</html>

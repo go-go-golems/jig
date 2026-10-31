@@ -1,0 +1,32 @@
+<!-- @dsCard group="Sheet" height=480 width=760 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SheetFurniture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  
+</style>
+</head>
+<body>
+<canvas id="c" style="height:470px"></canvas>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var pose = S.figurePose(), deck = S.deckPose();
+  boot(function () {
+    S.sheet(document.getElementById('c'), { view: 'front', zoom: 1, target: [0, 0.9, 0] }).draw(function (g) { S.drawBoard(g, deck); S.drawFigure(g, pose); }, {
+      scaleBar: true, titleBlock: { sheet: 'D-01', rows: [['PRESET', 'D-01 Orthographic views'], ['LAST TRICK', 'kickflip · 0.42 s'], ['SPEED', '2.98 m/s · t 3.3 s'], ['VIEW', 'Front elevation']] } });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>BigNumber</title>
+<style>.side{height:auto;width:300px;border:0}.side .block{border:0}</style></head>
+<body>
+
+<aside class="side"><div class="block"><div class="bignum"><b>1,059</b><span>best single trick 850</span></div></div></aside>
+</body>
+</html>

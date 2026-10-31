@@ -1,0 +1,19 @@
+{
+  "id": "M-07",
+  "title": "Spur gear pair",
+  "group": "Mechanisms",
+  "order": 7,
+  "difficulty": "medium",
+  "about": "an 18:36 involute spur pair on a base whose pegs sit at the centre distance j.inspect.gearMesh computes",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it 3:1 with a 15-tooth pinion and fix the undercut with profile shift | Add a crank handle to the pinion | Explain the contact ratio and what happens below 1.1",
+  "agent": {
+    "role": "a gear designer who checks every pair with j.inspect.gearMesh before building on it",
+    "prompt": "Prefer tooth counts and module over dimensions; take centre distances from gearMesh; never place gears at a typed distance.",
+    "fragments": {
+      "mesh": "Report centre distance, contact ratio and backlash from j.inspect.gearMesh after every change."
+    },
+    "defaultFragments": ["mesh"]
+  }
+}

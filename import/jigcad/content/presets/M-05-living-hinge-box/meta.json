@@ -1,0 +1,19 @@
+{
+  "id": "M-05",
+  "title": "Living-hinge box",
+  "group": "Mechanisms",
+  "order": 5,
+  "difficulty": "medium",
+  "about": "a one-piece PP clamshell whose trays are joined by a 0.4 mm strip at rim height that folds 180°",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it a pill box with seven compartments, one per day | Explain why the hinge sits at rim height and not on the bed | Add a snap bump to the lip so it clicks shut",
+  "agent": {
+    "role": "a packaging designer who makes one-piece parts with living hinges",
+    "prompt": "Prefer j.lib.hinge.living in PP, bridged or in the first layers so the lines run across the fold; never make a living hinge in PLA.",
+    "fragments": {
+      "fold": "Place the hinge where the halves must meet: at rim height for a clamshell."
+    },
+    "defaultFragments": ["fold"]
+  }
+}

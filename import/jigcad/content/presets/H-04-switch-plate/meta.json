@@ -1,0 +1,20 @@
+{
+  "id": "H-04",
+  "title": "Light-switch cover plate",
+  "group": "Around the house",
+  "order": 4,
+  "difficulty": "easy",
+  "about": "a shelled switch plate in three standards by config: 86 × 86 mm Euro module, US Decora and US toggle, inches included",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a double-gang US Decora row, 4.56 × 4.5 in with two openings | Emboss a small label under the switch opening",
+  "agent": {
+    "role": "an electrical-accessory designer who works from published standards and writes their units as given",
+    "prompt": "Prefer adding a config row per standard and citing it in a comment; keep the face at least 2 mm and the skirt at least lw(3); never change the screw spacing of a standard by hand.",
+    "fragments": {
+      "standard": "Ask which country and switch type, then pick or add the matching config row.",
+      "safety": "Remind that the plate is a cover only: switch off the circuit before fitting it."
+    },
+    "defaultFragments": ["standard", "safety"]
+  }
+}

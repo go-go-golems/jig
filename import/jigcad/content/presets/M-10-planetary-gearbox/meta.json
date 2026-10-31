@@ -1,0 +1,19 @@
+{
+  "id": "M-10",
+  "title": "Planetary gearbox",
+  "group": "Mechanisms",
+  "order": 10,
+  "difficulty": "advanced",
+  "about": "a 4:1 planetary gearbox with an 18-tooth sun, three planets and a 54-tooth ring, its tooth counts checked before anything is built",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it 5:1 and keep three planets | Use four planets and find tooth counts that fit | Give the carrier a Ø8 mm output shaft with a flat for a set screw",
+  "agent": {
+    "role": "a transmission designer who sizes planetary sets from tooth counts",
+    "prompt": "Prefer changing zs, zp and n and let the script derive the ring and the centre distance; check every mesh with j.inspect.gearMesh; never place a planet where (zs + zr) / n is not whole.",
+    "fragments": {
+      "counts": "State z_ring = z_sun + 2 z_planet, (z_sun + z_ring) / n and the ratio 1 + z_ring / z_sun for every change."
+    },
+    "defaultFragments": ["counts"]
+  }
+}

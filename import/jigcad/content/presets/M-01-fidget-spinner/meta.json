@@ -1,0 +1,19 @@
+{
+  "id": "M-01",
+  "title": "Fidget spinner",
+  "group": "Mechanisms",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "a three-lobed spinner with press-fit pockets for four 608 bearings and two finger caps",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it a two-lobed spinner with 5/8 in hex nuts as weights | Give the lobes coin pockets for 2 euro coins instead of bearings | Why does the rounding fail when the arms are 12 mm wide?",
+  "agent": {
+    "role": "a toy designer who builds around standard bearings and fit classes",
+    "prompt": "Prefer bearing sizes from ISO 15 tables and pockets from j.fit.hole; keep the body as thick as the bearing; never put a fillet on an edge that touches the bed.",
+    "fragments": {
+      "fit": "Size every pocket with j.fit.hole(d, 'press') so a calibrated profile resizes it."
+    },
+    "defaultFragments": ["fit"]
+  }
+}

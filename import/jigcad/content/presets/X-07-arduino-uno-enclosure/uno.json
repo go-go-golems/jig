@@ -1,0 +1,13 @@
+{
+  "source": "Arduino Uno Rev3: board 2.7 × 2.1 in; holes at (550, 100), (600, 2000), (2600, 300), (2600, 1400) mils from the corner by the power jack; connectors measured",
+  "board": { "l": 68.58, "w": 53.34, "t": 1.6 },
+  "holes": [[13.97, 2.54], [15.24, 50.8], [66.04, 7.62], [66.04, 35.56]],
+  "ports": [
+    { "name": "power", "y": 7.62, "w": 9.0, "h": 11.0 },
+    { "name": "usb", "y": 38.1, "w": 12.0, "h": 10.9 }
+  ],
+  "headers": [
+    { "name": "digital", "x0": 26.0, "x1": 66.0, "y": 50.8 },
+    { "name": "analog", "x0": 26.0, "x1": 64.0, "y": 2.54 }
+  ]
+}

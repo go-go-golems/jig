@@ -1,0 +1,53 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Form Skate Stage</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--st-bg); color: var(--st-ink); font-family: var(--font-display); overflow: hidden; }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; }
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; overflow: hidden; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .ink { fill: var(--st-ink); }
+  .tone { fill: var(--st-shadow); }
+  .path { fill: var(--st-blue); }
+  .sig { fill: var(--st-rec); }
+  .blk { rx: var(--radius-none); }
+  .ground { stroke: var(--st-ink); stroke-width: var(--stroke-ground); fill: none; }
+  .hatch { stroke: var(--st-muted); stroke-width: var(--stroke-hatch); fill: none; }
+  .words { position: absolute; left: 24px; bottom: 24px; max-width: 440px; }
+  .name { margin: 0; font-size: 72px; line-height: 0.95; font-weight: 700; letter-spacing: -0.01em; color: var(--st-ink); }
+  .tag { margin: 12px 0 0 2px; font-size: 14px; line-height: 20px; color: var(--st-muted); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <div class="art" aria-hidden="true">
+    <svg viewBox="0 0 480 288" width="480" height="288">
+      <!--
+        blocks      st-ink slab 168 × 233 bled off the top (the drawing's ink, the identity) · st-shadow 144 × 144 (the hatch's tone, for relief) · st-blue 48 × 48 on it (the overlay hue the stage uses most) · st-ink band 24 wide bled off the right · st-rec 12 × 12 (a signal, kept small) — about 25% of 960 × 288
+        arrangement an elevation: every block stands on one ground line at y = 232, as bodies stand on the stage's ground
+        pattern     the elevation's poché, from "the ground in an elevation is a section cut": a stroke-ground (1.4 px) line over a hatch-ground-band (18 px) band of stroke-hatch (0.6 px) st-muted lines at hatch-ground-pitch (7 px), 45° rising right, 57 lines
+        scales      sides in multiples of stage-inset (12 px) and chip-gap (6 px); corners radius-none; the text block inset 2 × stage-inset
+      -->
+      <defs><clipPath id="band"><rect x="96" y="232" width="384" height="18"/></clipPath></defs>
+      <rect class="tone blk" x="96" y="88" width="144" height="144"/>
+      <rect class="path blk" x="192" y="40" width="48" height="48"/>
+      <rect class="ink blk" x="264" y="-1" width="168" height="233"/>
+      <rect class="ink blk" x="456" y="-1" width="24" height="233"/>
+      <rect class="sig blk" x="72" y="220" width="12" height="12"/>
+      <g clip-path="url(#band)">
+        <path class="hatch" d="M78,250 L96,232 M85,250 L103,232 M92,250 L110,232 M99,250 L117,232 M106,250 L124,232 M113,250 L131,232 M120,250 L138,232 M127,250 L145,232 M134,250 L152,232 M141,250 L159,232 M148,250 L166,232 M155,250 L173,232 M162,250 L180,232 M169,250 L187,232 M176,250 L194,232 M183,250 L201,232 M190,250 L208,232 M197,250 L215,232 M204,250 L222,232 M211,250 L229,232 M218,250 L236,232 M225,250 L243,232 M232,250 L250,232 M239,250 L257,232 M246,250 L264,232 M253,250 L271,232 M260,250 L278,232 M267,250 L285,232 M274,250 L292,232 M281,250 L299,232 M288,250 L306,232 M295,250 L313,232 M302,250 L320,232 M309,250 L327,232 M316,250 L334,232 M323,250 L341,232 M330,250 L348,232 M337,250 L355,232 M344,250 L362,232 M351,250 L369,232 M358,250 L376,232 M365,250 L383,232 M372,250 L390,232 M379,250 L397,232 M386,250 L404,232 M393,250 L411,232 M400,250 L418,232 M407,250 L425,232 M414,250 L432,232 M421,250 L439,232 M428,250 L446,232 M435,250 L453,232 M442,250 L460,232 M449,250 L467,232 M456,250 L474,232 M463,250 L481,232 M470,250 L488,232"/>
+      </g>
+      <line class="ground" x1="0" y1="232" x2="480" y2="232"/>
+    </svg>
+  </div>
+  <div class="words">
+    <h1 class="name">Form Skate<br>Stage</h1>
+    <p class="tag">Hairlines, hatching and four orthographic views.</p>
+  </div>
+</div>
+</body>
+</html>

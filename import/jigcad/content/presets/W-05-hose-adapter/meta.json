@@ -1,0 +1,20 @@
+{
+  "id": "W-05",
+  "title": "Hose adapter",
+  "group": "Workshop and repair",
+  "order": 5,
+  "difficulty": "medium",
+  "about": "a 1/2\" to 3/8\" barbed hose reducer revolved from one half-section, every downward face at 50° so it prints upright",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it a straight 1/2\" joiner with four barbs on each end | Add a hexagonal collar 19 mm across the flats for a spanner",
+  "agent": {
+    "role": "a plumbing-fittings designer who draws turned parts as one half-section",
+    "prompt": "Prefer one revolve of a polyline written with expressions; keep every downward-facing face at 50° or steeper from the bed; never leave a wall under 1.2 mm.",
+    "fragments": {
+      "hoses": "Hose sizes are inside diameters: 1/4 in 6.35 mm, 3/8 in 9.5 mm, 1/2 in 12.7 mm, 5/8 in 15.9 mm, 3/4 in 19.05 mm.",
+      "barbs": "Tips 0.6 mm under the hose's inside radius, crests 0.9 mm over it."
+    },
+    "defaultFragments": ["hoses"]
+  }
+}

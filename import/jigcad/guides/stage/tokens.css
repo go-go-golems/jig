@@ -1,0 +1,152 @@
+/* Form Skate Stage — generated from tokens.json */
+:root, [data-theme="light"] {
+  --st-bg: #ffffff;
+  --st-grid: #efefef;
+  --st-major: #dcdcdc;
+  --st-shadow: #9a9a9a;
+  --st-ink: #111111;
+  --st-muted: #6e6e6e;
+  --st-rec: #d23a2a;
+  --st-warn: #b0650a;
+  --st-soft: #f0f0f0;
+  --st-blue: #1f6fc4;
+  --st-green: #1e8a5a;
+  --st-violet: #7b45c9;
+  --st-amber: #d98e04;
+  --st-teal: #12868f;
+  --st-ghost: #4a86c8;
+  --bg: #ffffff;
+  --ink: #1a1a1a;
+  --ink-2: #737373;
+  --fill: #f6f6f6;
+  --hair: #d6d6d6;
+  --accent: #e2001a;
+  --on-accent: #ffffff;
+}
+[data-theme="dark"] {
+  --st-bg: #101010;
+  --st-grid: #1a1a1a;
+  --st-major: #262626;
+  --st-shadow: #5e5e5e;
+  --st-ink: #f2f2f2;
+  --st-muted: #9a9a9a;
+  --st-rec: #ff5a48;
+  --st-warn: #f0a83c;
+  --st-soft: #222222;
+  --st-blue: #4da3ff;
+  --st-green: #3ecf8e;
+  --st-violet: #a77bff;
+  --st-amber: #ffb627;
+  --st-teal: #2fc4cf;
+  --st-ghost: #6aa8f0;
+  --bg: #1a1a1a;
+  --ink: #f2f2f2;
+  --ink-2: #9a9a9a;
+  --fill: #222222;
+  --hair: #3d3d3d;
+  --accent: #ff3b4a;
+  --on-accent: #ffffff;
+}
+:root {
+  --stage-inset: 12px;
+  --chip-gap: 6px;
+  --chip-pad-y: 5px;
+  --chip-pad-x: 8px;
+  --toast-pad-top: 8px;
+  --toast-pad-x: 12px;
+  --toast-pad-bottom: 7px;
+  --toast-gap: 3px;
+  --toast-top-narrow: 46px;
+  --banner-pad-y: 7px;
+  --banner-pad-x: 12px;
+  --hint-height: 30px;
+  --hint-pad-x: 14px;
+  --hint-gap: 12px;
+  --radius-none: 0px;
+  --fs-xs: 10.5px;
+  --fs-s: 12px;
+  --stroke-silhouette: 2px;
+  --stroke-ring: 0.55px;
+  --stroke-ghost: 0.8px;
+  --stroke-ground: 1.4px;
+  --stroke-grid: 0.6px;
+  --stroke-hatch: 0.6px;
+  --stroke-poly: 1px;
+  --stroke-overlay: 1px;
+  --stroke-dim-ext: 0.7px;
+  --stroke-dim-tick: 1.4px;
+  --stroke-changes: 2.4px;
+  --stroke-trail-centre: 1.2px;
+  --stroke-trail-nose: 0.8px;
+  --stroke-chrono-deck: 1.6px;
+  --stroke-winding: 1.3px;
+  --stroke-fbd: 1.5px;
+  --hatch-tile: 6px;
+  --hatch-angle: 45deg;
+  --hatch-ground-pitch: 7px;
+  --hatch-ground-band: 18px;
+  --boundary-band: 0.35m;
+  --opacity-ring: 0.7;
+  --opacity-ghost-base: 0.18;
+  --opacity-ghost-span: 0.5;
+  --opacity-ghost-fill: 0.3;
+  --opacity-trail-centre: 0.85;
+  --opacity-trail-nose: 0.6;
+  --opacity-truth: 0.5;
+  --opacity-course: 0.7;
+  --opacity-dim-oldest: 0.35;
+  --opacity-chrono-oldest: 0.25;
+  --dash-course: 2 4;
+  --dash-course-target: 1 3;
+  --dash-guide: 3 2;
+  --dash-trail-nose: 3 3;
+  --dash-chrono-hips: 2 3;
+  --dot-default: 2px;
+  --dot-contact: 2.6px;
+  --dot-joint: 2.2px;
+  --dot-com: 3.5px;
+  --dot-bolt: 0.9px;
+  --dot-trail-tick: 1.6px;
+  --dot-target: 3px;
+  --ring-min-span: 6px;
+  --arrowhead-max: 7px;
+  --dim-tick: 8px;
+  --dim-overshoot: 12%;
+  --truth-cell: 3px;
+  --view-axo-yaw: 38deg;
+  --view-axo-pitch: 27deg;
+  --view-front-yaw: 0deg;
+  --view-side-yaw: -90deg;
+  --view-plan-pitch: 90deg;
+  --sun: -0.5 -1 -0.38;
+  --scale-elevation: min(W / 5.5, H / 3.1);
+  --scale-plan: min(W, H) / 7.5;
+  --target-height: 0.9m;
+  --zoom-min: 0.25;
+  --zoom-max: 5;
+  --follow-half-life: 0.32s;
+  --follow-lead: 0.4s;
+  --track-half-life: 0.5s;
+  --orbit-rate: 0.008;
+  --drag-threshold: 4px;
+  --title-block-width: 250px;
+  --title-block-row: 15px;
+  --title-block-min: 640px 460px;
+  --scale-bar-inset: 14px 18px;
+  --scale-bar-rule: 1 m;
+  --font-plex: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
+}
+.canvas-label { font-family: var(--font-plex); font-size: 9.5px; font-weight: 500; }
+.canvas-label-sm { font-family: var(--font-plex); font-size: 8px; font-weight: 500; }
+.canvas-dim { font-family: var(--font-plex); font-size: 8.5px; font-weight: 500; }
+.canvas-key { font-family: var(--font-plex); font-size: 9px; font-weight: 500; }
+.canvas-sheet-label { font-family: var(--font-plex); font-size: 10px; font-weight: 700; }
+.canvas-default { font-family: var(--font-plex); font-size: 10px; font-weight: 500; }
+.canvas-title { font-family: var(--font-display); font-size: 9.5px; font-weight: 700; }
+.chip { font-family: var(--font-plex); font-size: 10px; line-height: 1; font-weight: 600; letter-spacing: 0.08em; }
+.chip-ghost { font-family: var(--font-plex); font-size: 10px; line-height: 1; font-weight: 400; }
+.toast-detail { font-family: var(--font-plex); font-size: 10.5px; line-height: 1.3; font-weight: 400; }
+.toast-name { font-family: var(--font-display); font-size: 22px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; }
+.hint { font-family: var(--font-display); font-size: 12px; line-height: 1.45; font-weight: 400; }
+.banner { font-family: var(--font-display); font-size: 12px; line-height: 1.45; font-weight: 400; }

@@ -1,0 +1,11 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>UserMessage — preview</title></head>
+<body>
+<div class="agent-log" style="overflow:visible">
+<div class="msg user"><span class="who">You</span><div class="body">Make the kickflip spin faster and check it still lands</div></div>
+<div class="msg user"><span class="who">You</span><div class="body">Change the flick motor's default spin from 19 to 21, then run every trick gesture with test() before and after and show only the gestures whose recognized name changed</div></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "id": "X-08",
+  "title": "Raspberry Pi 4 case",
+  "group": "Electronics",
+  "order": 8,
+  "difficulty": "advanced",
+  "about": "a base with M2.5 insert standoffs and a vented lid, two bodies on one plate, every socket opening from a table, split at the board so nothing needs a bridge",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a 30 mm fan mount over the vents with four M3 holes on 24 mm centres | Add an opening for the GPIO header so a ribbon cable can come out",
+  "agent": {
+    "role": "an enclosure designer who builds Raspberry Pi cases from the board's drawing",
+    "prompt": "Prefer rows in pi4.json over hand-placed cuts; split cases at the board so openings are notches from an edge; never move a standoff or tube off the 58 × 49 mm hole rectangle.",
+    "fragments": {
+      "board": "Raspberry Pi 4: 85 × 56 mm, M2.5 holes 3.5 mm in on 58 × 49 mm; USB-C 11.2, HDMI 26.0 and 39.5, audio 53.5 mm along the long edge; USB 9.0 and 27.0, Ethernet 45.75 mm up the short edge.",
+      "thermal": "Keep vents over the processor and suggest PETG or ASA for cases of boards that run warm."
+    },
+    "defaultFragments": ["board"]
+  }
+}

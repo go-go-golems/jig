@@ -1,0 +1,14 @@
+<!-- @dsCard group="Actions" height=150 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Button</title>
+<style>.demo{padding:16px;display:flex;flex-direction:column;gap:12px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cap{color:var(--ink-2);font-size:var(--fs-xs);min-width:150px}</style></head>
+<body>
+
+<div class="demo">
+  <div class="row"><span class="cap">default · primary (dirty)</span><button class="btn">Run<span class="long"> <kbd>⌘↵</kbd></span></button><button class="btn primary">Run<span class="long"> <kbd>⌘↵</kbd></span></button><button class="btn">Files ▾</button></div>
+  <div class="row"><span class="cap">small · primary · disabled</span><button class="btn sm">Square up</button><button class="btn sm">Clear</button><button class="btn sm">Reset all</button><button class="btn sm primary">Run</button><button class="btn sm" disabled>Run</button><button class="btn sm">Export <span class="caret">▾</span></button></div>
+  <div class="row"><span class="cap">with a type · danger</span><button class="btn sm">recognizer/flipTurns <small class="dim">number</small></button><button class="btn danger">Delete skate/grind.js</button></div>
+</div>
+</body>
+</html>

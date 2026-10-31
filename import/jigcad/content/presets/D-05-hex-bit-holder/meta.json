@@ -1,0 +1,20 @@
+{
+  "id": "D-05",
+  "title": "Hex-bit holder",
+  "group": "Desk and storage",
+  "order": 5,
+  "difficulty": "medium",
+  "about": "thirty 1/4\" screwdriver bits in three stepped rows: hexagonal pockets sized from the standard plus a gap on each flat",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a fourth row of longer pockets for 50 mm power bits | Emboss the bit type along the front edge of each step",
+  "agent": {
+    "role": "a workshop-storage designer who sizes pockets from standards and a per-flat gap",
+    "prompt": "Prefer one sketch per row with a linear pattern over separate cuts per pocket; keep pockets vertical so they print true; never set a gap outside 0.05–0.3 mm per flat.",
+    "fragments": {
+      "standard": "Bits are 1/4 in (6.35 mm) across the flats, ISO 1173 E6.3; 4 mm bits are 4 mm across the flats.",
+      "steps": "Change the side profile in `side` for new steps, and keep each row's sketch on its own tread height."
+    },
+    "defaultFragments": ["standard"]
+  }
+}

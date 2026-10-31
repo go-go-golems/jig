@@ -1,0 +1,20 @@
+{
+  "id": "H-06",
+  "title": "Egg cup",
+  "group": "Around the house",
+  "order": 6,
+  "difficulty": "easy",
+  "about": "a revolved egg cup whose spherical bowl is solved in an expression from the egg size, four to a plate",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Give the cup a hollow foot for salt | Make the outside follow the bowl with a second arc and keep it printable",
+  "agent": {
+    "role": "a tableware designer who turns half-sections and sizes them from the food they hold",
+    "prompt": "Prefer deriving radii and centres in expressions from egg; keep the wall at the thinnest point at least 2 mm and every outside surface within 45°; never fillet the bed edge.",
+    "fragments": {
+      "eggs": "Use 40, 43 and 46 mm for small, medium and large hen's eggs; 30 mm for quail is too small for this profile.",
+      "batch": "Change qty in the print job for a set and report the plate count."
+    },
+    "defaultFragments": ["eggs"]
+  }
+}

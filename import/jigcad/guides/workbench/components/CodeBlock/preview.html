@@ -1,0 +1,22 @@
+<!-- @dsCard group="Code" height=432 width=900 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>CodeBlock</title>
+<style>.demo{padding:16px;display:flex;flex-direction:column;gap:10px}.doc{padding:0;max-width:none}.cap{color:var(--ink-2);font-size:var(--fs-xs)}</style></head>
+<body>
+
+<div class="demo">
+  <span class="cap">pre.src in a reading view · skate/recognizer.js:58</span>
+  <div class="doc"><pre class="src lang-js"><span class="tk-k">const</span> RULES <span class="tk-p">=</span> <span class="tk-p">[</span>
+  <span class="tk-p">[</span><span class="tk-s">'impossible'</span><span class="tk-p">,</span> m <span class="tk-e">=&gt;</span> near<span class="tk-p">(</span>Math<span class="tk-p">.</span>abs<span class="tk-p">(</span>m<span class="tk-p">.</span>wrap<span class="tk-p">),</span> <span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)],</span>
+  <span class="tk-p">[</span><span class="tk-s">'360 flip'</span><span class="tk-p">,</span> m <span class="tk-e">=&gt;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>flip<span class="tk-p">,</span> <span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)</span> <span class="tk-p">&amp;&amp;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>shove<span class="tk-p">,</span> <span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)],</span>
+  <span class="tk-p">[</span><span class="tk-s">'laser flip'</span><span class="tk-p">,</span> m <span class="tk-e">=&gt;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>flip<span class="tk-p">,</span> <span class="tk-p">-</span><span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)</span> <span class="tk-p">&amp;&amp;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>shove<span class="tk-p">,</span> <span class="tk-p">-</span><span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)],</span>
+  <span class="tk-p">[</span><span class="tk-s">'360 hardflip'</span><span class="tk-p">,</span> m <span class="tk-e">=&gt;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>flip<span class="tk-p">,</span> <span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)</span> <span class="tk-p">&amp;&amp;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>shove<span class="tk-p">,</span> <span class="tk-p">-</span><span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)],</span>
+  <span class="tk-p">[</span><span class="tk-s">'360 inward heelflip'</span><span class="tk-p">,</span> m <span class="tk-e">=&gt;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>flip<span class="tk-p">,</span> <span class="tk-p">-</span><span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)</span> <span class="tk-p">&amp;&amp;</span> near<span class="tk-p">(</span>m<span class="tk-p">.</span>shove<span class="tk-p">,</span> <span class="tk-n">1</span><span class="tk-p">,</span> <span class="tk-n">0.3</span><span class="tk-p">)],</span></pre></div>
+  <span class="cap">code.exprtxt · recognizer/flipTurns</span>
+  <code class="exprtxt">axisTurns(flipAxis, axis(board/deck, y), takeoff)</code>
+  <span class="cap">pre.irtext</span>
+  <div style="border:1px solid var(--hair);max-height:130px;overflow:hidden"><pre class="irtext" style="padding:8px 12px"><div class="cm"># program flatground</div><div class="cm"># 8 things · 16 systems · 15 signals over 39 expression nodes (7 shared) · 42 states · 1 watches</div><div></div><div>phases: input → controls → forces → assistance → physics → signals → observe</div><div></div><div>[input]</div><div>  {</div><div>    "kind": "system",</div><div>    "id": "<button class="nid on">pilot/drive</button>",</div><div>    "phase": "input",</div></pre></div>
+</div>
+</body>
+</html>

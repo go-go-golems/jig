@@ -1,0 +1,20 @@
+{
+  "id": "X-07",
+  "title": "Arduino Uno enclosure",
+  "group": "Electronics",
+  "order": 7,
+  "difficulty": "advanced",
+  "about": "a base with insert standoffs and socket notches and a lid with header windows for an Arduino Uno, every feature from a board table",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add the ICSP header to uno.json and a window for it in the lid | Make the base deep enough for a shield stacked on the Uno",
+  "agent": {
+    "role": "an enclosure designer who drives every board feature from a table",
+    "prompt": "Prefer adding rows to uno.json over hand-placed features; give every socket a 1 mm gap all round; never move a standoff off the board's real hole positions.",
+    "fragments": {
+      "board": "Arduino Uno Rev3: 68.58 × 53.34 mm, holes at (550, 100), (600, 2000), (2600, 300), (2600, 1400) mils, USB-B centred 1.5 in up the socket edge, power jack 0.3 in up.",
+      "loops": "Make one feature per table row with forEach or reduce, and name it after the row."
+    },
+    "defaultFragments": ["loops"]
+  }
+}

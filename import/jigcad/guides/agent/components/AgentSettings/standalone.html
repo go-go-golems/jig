@@ -1,0 +1,24 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>AgentSettings — preview</title></head>
+<body>
+<div class="ds-pad" style="padding:0;gap:0">
+<div class="agent-set">
+  <span class="ctl-l">Mode</span><div class="seg sm" role="group"><button class="on" aria-pressed="true">Auto</button><button class="" aria-pressed="false">Ask</button><button class="" aria-pressed="false">Read-only</button></div>
+  <span class="ctl-l">Model</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Fast</button><button class="on" aria-pressed="true">Balanced</button><button class="" aria-pressed="false">Deep</button></div>
+  <span class="ctl-l">Thinking</span><div class="seg sm" role="group"><button class="on" aria-pressed="true">Auto</button><button class="" aria-pressed="false">Low</button><button class="" aria-pressed="false">Med</button><button class="" aria-pressed="false">High</button></div>
+</div>
+<div class="agent-set">
+  <span class="ctl-l">Mode</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Auto</button><button class="on" aria-pressed="true">Ask</button><button class="" aria-pressed="false">Read-only</button></div>
+  <span class="ctl-l">Model</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Fast</button><button class="" aria-pressed="false">Balanced</button><button class="on" aria-pressed="true">Deep</button></div>
+  <span class="ctl-l">Thinking</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Auto</button><button class="" aria-pressed="false">Low</button><button class="" aria-pressed="false">Med</button><button class="on" aria-pressed="true">High</button></div>
+</div>
+<div class="agent-set">
+  <span class="ctl-l">Mode</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Auto</button><button class="" aria-pressed="false">Ask</button><button class="on" aria-pressed="true">Read-only</button></div>
+  <span class="ctl-l">Model</span><div class="seg sm" role="group"><button class="on" aria-pressed="true">Fast</button><button class="" aria-pressed="false">Balanced</button><button class="" aria-pressed="false">Deep</button></div>
+  <span class="ctl-l">Thinking</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Auto</button><button class="on" aria-pressed="true">Low</button><button class="" aria-pressed="false">Med</button><button class="" aria-pressed="false">High</button></div>
+</div>
+</div>
+</body>
+</html>

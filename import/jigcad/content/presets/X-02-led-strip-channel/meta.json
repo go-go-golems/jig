@@ -1,0 +1,20 @@
+{
+  "id": "X-02",
+  "title": "LED strip channel",
+  "group": "Electronics",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "a 200 mm channel for a 10 mm LED strip with a slide-in diffuser: one extruded section and a strip sized from its grooves",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add an end cap that plugs into the channel with a slot for the cable | Make a 45° corner version for the back of a shelf",
+  "agent": {
+    "role": "a lighting designer who makes printed channels for LED strips",
+    "prompt": "Prefer one extruded section with expressions over separate features; size the diffuser from the grooves and the slide gap; never leave a groove roof flatter than 45° when the channel prints on its back.",
+    "fragments": {
+      "strips": "LED strips are 5, 8, 10 or 12 mm wide; COB strips need 5 mm to the diffuser, dotted strips 8 mm or more.",
+      "diffuser": "Print diffusers 1.0–1.6 mm thick in natural PETG or PLA."
+    },
+    "defaultFragments": ["strips"]
+  }
+}

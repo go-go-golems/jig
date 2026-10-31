@@ -1,0 +1,46 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Trail</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="front" style="height:290px"></canvas><figcaption><b>Front elevation</b> 35 samples, a ghost every fifth (1/12 s): 7 ghosts fading in</figcaption></figure>
+  <figure><canvas id="plan" style="height:290px"></canvas><figcaption><b>Plan</b> the flip axis lies along the path, so the nose path (teal, dashed) runs with the centre's (blue, a tick every 50 ms)</figcaption></figure>
+</div>
+<p class="cap">Example motion shaped on the book's running kickflip: take-off 2.525 s, peak 0.496 m at 2.783 s, one turn from the flick (2.642 s) to the catch (2.942 s), landing 3.008 s, window closing at 3.108 s.</p>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+  var samples = [];
+  for (var i = 0; i < 35; i++) {
+    var t = 2.525 + i / 60, y = t < 2.783 ? 0.496 - (0.496 - 0.107) * Math.pow((t - 2.783) / 0.258, 2) : t < 3.008 ? 0.496 - (0.496 - 0.088) * Math.pow((t - 2.783) / 0.225, 2) : 0.088;
+    samples.push({ t: t, p: [-0.8 + 2.94 * (t - 2.525), y, 0], q: Q.x(2 * Math.PI * 0.988 * smooth((t - 2.642) / 0.3)) });
+  }
+  var last = samples[samples.length - 1];
+  boot(function () {
+    ['front', 'plan'].forEach(function (v) {
+      S.sheet(document.getElementById(v), { view: v, scale: v === 'plan' ? 105 : 158, target: v === 'plan' ? [0.03, 0, 0] : [0.03, 0.35, 0], overlays: ['trail', 'shadows', 'grid'] }).draw(function (g) {
+        if (v === 'plan') { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 4 }); }
+        g.layer = 'ghost'; S.drawTrail(g, samples); g.layer = 'figure'; S.drawBoard(g, last);
+      });
+    });
+  });
+</script>
+</body>
+</html>

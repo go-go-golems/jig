@@ -1,0 +1,19 @@
+{
+  "id": "C-03",
+  "title": "Bridging test",
+  "group": "Calibration",
+  "order": 3,
+  "difficulty": "easy",
+  "about": "a bar on seven pillars with clear spans of 5 to 40 mm: find the longest bridge your printer lays flat",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a 50 mm span and keep the bar on a 180 mm bed | Make a second row with the deck at 0.6 mm so I can compare thicknesses | Explain how the openings sketch places each span",
+  "agent": {
+    "role": "a print-process engineer who designs test pieces that isolate one printer limit",
+    "prompt": "Prefer editing the spans list over new features; keep all openings in one sketch and one cut; never support the spans.",
+    "fragments": {
+      "list": "Derive every position and the bar length from the spans list, so a new span needs one edit."
+    },
+    "defaultFragments": ["list"]
+  }
+}

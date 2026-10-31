@@ -1,0 +1,19 @@
+{
+  "id": "M-08",
+  "title": "Print-in-place hinged box",
+  "group": "Mechanisms",
+  "order": 8,
+  "difficulty": "advanced",
+  "about": "a box and lid printed side by side, already joined by a five-knuckle pin hinge, checked as an assembly in its print pose",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a magnet pocket at the front of base and lid so it stays shut | Make the hinge seven knuckles and check the gaps again | Explain why the webs stop 2.5 mm below the axis",
+  "agent": {
+    "role": "a mechanism designer who prints assemblies in one piece",
+    "prompt": "Prefer j.lib.hinge.pin with the printInPlace fit class and check every change with .printInPlace(); never leave a knuckle's underside overhanging; never let the halves come closer than the clearance.",
+    "fragments": {
+      "pose": "Check gaps in the print pose and at several joint angles; there is no swept-volume check yet."
+    },
+    "defaultFragments": ["pose"]
+  }
+}

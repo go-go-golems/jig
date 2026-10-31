@@ -1,0 +1,20 @@
+{
+  "id": "W-10",
+  "title": "Hinge repair plate",
+  "group": "Workshop and repair",
+  "order": 10,
+  "difficulty": "medium",
+  "about": "a plate that remounts a 35 mm concealed hinge on a damaged cupboard door, its screw pattern picked from a table",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a row for the 52/5.5 pattern's 4 mm pilot screws | Make a mirrored plate for the other hinge, with the fixing screws moved clear of a door handle",
+  "agent": {
+    "role": "a furniture-repair designer who places holes from hardware standards",
+    "prompt": "Prefer boring patterns from hinges.csv over hand-placed holes; keep the plate edge flush with the door edge; never put a fixing screw inside the old cup bore.",
+    "fragments": {
+      "patterns": "Concealed hinges: 35 mm cup, screw patterns 45/9.5 (Blum), 48/6 (Hettich, Salice), 52/5.5; boring distance 3–6 mm.",
+      "screws": "Fix the plate with 4 × 16 mm countersunk chipboard screws; replace the hinge screws with ones 4 mm longer."
+    },
+    "defaultFragments": ["patterns"]
+  }
+}

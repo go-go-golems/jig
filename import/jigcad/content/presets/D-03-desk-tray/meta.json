@@ -1,0 +1,20 @@
+{
+  "id": "D-03",
+  "title": "Desk tray with compartments",
+  "group": "Desk and storage",
+  "order": 3,
+  "difficulty": "easy",
+  "about": "a 160 × 100 mm tray whose compartments are one patterned cut with scooped floors, sized by configs",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a config for a 2 × 2 tray for a phone, keys and coins | Make the middle compartment of the back row twice as wide",
+  "agent": {
+    "role": "a desk-organiser designer who sizes compartments from the outside dimensions and the wall count",
+    "prompt": "Prefer deriving sizes with expressions over setting them; keep walls and floors whole numbers of lines and layers; never fillet a bed edge.",
+    "fragments": {
+      "configs": "Add new layouts as entries in .configs({…}) rather than editing the params.",
+      "removal": "Model compartments as cuts from a solid block, not as walls added to a floor."
+    },
+    "defaultFragments": ["configs", "removal"]
+  }
+}

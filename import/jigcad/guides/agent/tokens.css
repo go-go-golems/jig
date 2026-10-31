@@ -1,0 +1,86 @@
+/* Form Skate Agent — generated from tokens.json */
+:root, [data-theme="light"] {
+  --bg: #ffffff;
+  --fill: #f6f6f6;
+  --ink: #1a1a1a;
+  --ink-2: #737373;
+  --hair: #d6d6d6;
+  --rule: #ededed;
+  --accent: #e2001a;
+  --code-bg: #fbfbfb;
+  --tok-key: #1a1a1a;
+  --tok-str: #6b6b6b;
+  --tok-num: #1a1a1a;
+  --tok-expr: #e2001a;
+  --tok-com: #a3a3a3;
+  --tok-punc: #a3a3a3;
+}
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --fill: #222222;
+  --ink: #f2f2f2;
+  --ink-2: #9a9a9a;
+  --hair: #3d3d3d;
+  --rule: #2a2a2a;
+  --accent: #ff3b4a;
+  --code-bg: #1d1d1d;
+  --tok-key: #f2f2f2;
+  --tok-str: #a6a6a6;
+  --tok-num: #f2f2f2;
+  --tok-expr: #ff3b4a;
+  --tok-com: #6e6e6e;
+  --tok-punc: #6e6e6e;
+}
+:root {
+  --fs-xs: 10.5px;
+  --fs-s: 12px;
+  --fs-m: 13px;
+  --space-3: 3px;
+  --space-4: 4px;
+  --space-5: 5px;
+  --space-6: 6px;
+  --space-7: 7px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-11: 11px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --radius-0: 0;
+  --line-1: 1px;
+  --line-2: 2px;
+  --opacity-disabled: 0.4;
+  --opacity-reverted: 0.55;
+  --dot-step: 7px;
+  --dot-thinking: 6px;
+  --textarea-min: 54px;
+  --textarea-max: 160px;
+  --step-code-max: 280px;
+  --result-max: 260px;
+  --empty-text-max: 520px;
+  --user-msg-max: 92%;
+  --eval-timeout: 25 s;
+  --result-cut: 9000 chars;
+  --result-stored: 3000 chars;
+  --turns-stored: 30 turns;
+  --history-code: 100 chars;
+  --history-result: 160 chars;
+  --thread-title: 32 chars;
+  --suggestions: 6;
+  --yaml-decimals: 5;
+  --yaml-items: 60;
+  --context-diagnostics: 8;
+  --font-ui: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-code: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+.body { font-family: var(--font-ui); font-size: 12px; line-height: 1.45; font-weight: 400; }
+.answer { font-family: var(--font-ui); font-size: 12px; line-height: 1.55; font-weight: 400; }
+.answer-heading { font-family: var(--font-ui); font-size: 13px; line-height: 1.55; font-weight: 700; }
+.label { font-family: var(--font-ui); font-size: 10.5px; line-height: 1.45; font-weight: 400; }
+.label-strong { font-family: var(--font-ui); font-size: 10.5px; line-height: 1.45; font-weight: 700; }
+.button { font-family: var(--font-ui); font-size: 12px; line-height: 1.2; font-weight: 400; }
+.step-code { font-family: var(--font-code); font-size: 10.5px; line-height: 1.5; font-weight: 400; }
+.step-first-line { font-family: var(--font-code); font-size: 10.5px; line-height: 1.4; font-weight: 400; }
+.result { font-family: var(--font-code); font-size: 10.5px; line-height: 1.5; font-weight: 400; }
+.inline-code { font-family: var(--font-code); font-size: 0.92em; font-weight: 400; }

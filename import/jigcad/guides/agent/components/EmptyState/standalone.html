@@ -1,0 +1,13 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>EmptyState — preview</title></head>
+<body>
+<div class="agent-log" style="overflow:visible">
+<div class="agent-empty">
+  <p>Ask for a change and the agent edits the library, rebuilds, and tests it headlessly. It works through one tool, <b>eval</b>, with the same API you see in the Reference.</p>
+  <div class="sugg"><button>Explain how a kickflip happens, from the key press to the trick event</button><button>Add a new trick to the recognizer and test it</button><button>Why does the rider sometimes bail on the funbox?</button><button>Explain what happens in one step of this program, phase by phase</button><button>Make the kickflip spin faster and check it still lands</button></div>
+</div>
+</div>
+</body>
+</html>

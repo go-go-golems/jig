@@ -1,0 +1,14 @@
+import { build, tally, K, oc, curveType, surfType } from './base.mjs';
+const t0 = performance.now();
+const { bodies, data } = await build(`return j.lib.gear.spur({ module: mm(2), teeth: 18, width: mm(8) })`);
+console.log('ms', (performance.now() - t0).toFixed(0), data.summary.faces, data.summary.volume);
+const b = bodies[0];
+console.log(JSON.stringify(tally(b)));
+const polesHist = {};
+b.edges.list.forEach(e => { if (curveType(e) === 'BSplineCurve') { const ad = new oc.BRepAdaptor_Curve(e); const h = ad.BSpline(); const c = h.get ? h.get() : h; const k = `${c.Degree()}/${c.NbPoles()}`; polesHist[k] = (polesHist[k] ?? 0) + 1; ad.delete(); } });
+console.log('bspline edges deg/poles', polesHist);
+const names = {}; b.names.forEach((n, i) => { const role = n.replace(/.*\.t\d+\./, '').replace(/[\]#].*/, ''); const key = role + ':' + surfType(b.faces.list[i]); names[key] = (names[key] ?? 0) + 1; });
+console.log(names);
+const t1 = performance.now();
+const h = await build(`return j.lib.gear.helical({ module: mm(2), teeth: 18, width: mm(8) })`);
+console.log('helical ms', (performance.now() - t1).toFixed(0), JSON.stringify(tally(h.bodies[0])));

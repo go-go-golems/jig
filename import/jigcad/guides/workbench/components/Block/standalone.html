@@ -1,0 +1,25 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>Block</title>
+<style>.side{height:auto;border:1px solid var(--hair);margin:12px;width:300px}.row2{display:flex;gap:16px;align-items:flex-start}</style></head>
+<body>
+
+<div class="row2">
+<aside class="side">
+  <div class="block"><header><h2>Score</h2><span class="sub">combo ×1</span></header>
+    <div class="bignum"><b>209</b><span>best single trick 209</span></div>
+    <dl class="kv"><dt>phase</dt><dd>ride</dd><dt>speed</dt><dd>4.29 m/s</dd><dt>deck height</dt><dd>0.08 m</dd><dt>driver</dt><dd>autopilot</dd></dl>
+  </div>
+  <div class="block"><header><h2>Last tricks</h2></header><p class="empty">None yet.</p></div>
+  <div class="block"><header><h2>Inspector</h2></header><p class="note">Select a node in the graph, a glyph in the code gutter, or a <code>lab:node</code> link. You see what it reads and writes, where it was declared, and its live state.</p></div>
+</aside>
+<aside class="side">
+  <div class="block"><header><h2>pop/pop</h2><span class="sub">system · controls</span></header>
+    <p class="note">On the pop: an impulse down at the tail, the rider jumps, the rear foot stays on until the tail strikes, the front foot slides.</p>
+    <div class="actions" style="padding:0"><button class="link strong">skate/motors.js:153</button> <button class="link">tick at 159</button></div></div>
+  <div class="block"><header><h2>Live</h2><span class="sub">t = 7.36 s</span></header><dl class="kv"><dt>ms / step</dt><dd>0.0042</dd><dt>calls</dt><dd>883</dd></dl></div>
+</aside>
+</div>
+</body>
+</html>

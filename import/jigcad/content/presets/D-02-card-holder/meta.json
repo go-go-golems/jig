@@ -1,0 +1,20 @@
+{
+  "id": "D-02",
+  "title": "Business-card holder",
+  "group": "Desk and storage",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "a desk stand for fifty cards: one side profile with a leaning back, extruded to width, and a thumb notch",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a second, lower step in front so it holds two kinds of cards | Round the top edge of the back with a 1.5 mm fillet",
+  "agent": {
+    "role": "a desk-accessory designer who builds parts from one well-dimensioned side profile",
+    "prompt": "Prefer one profile written with expressions over several boxes; keep leans under 45°; never make a wall thinner than 2 line widths.",
+    "fragments": {
+      "profile": "Change the polyline in `side` rather than adding features, and keep every point an expression of the params.",
+      "cards": "Use real card sizes: 85 × 55 mm (EU), 88.9 × 50.8 mm (US), 85.6 × 54 mm (ISO 7810 ID-1)."
+    },
+    "defaultFragments": ["profile", "cards"]
+  }
+}

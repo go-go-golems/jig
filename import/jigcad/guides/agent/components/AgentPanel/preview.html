@@ -1,0 +1,102 @@
+<!-- @dsCard group="Panel" height=1000 subtitle="The whole panel, as one tile of the workbench" -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>AgentPanel — preview</title></head>
+<body>
+<div class="tabbody col agent-panel" style="height:1000px">
+<div class="threads"><span class="th on"><button>Make the kickflip spin faster an</button><button class="x" aria-label="close thread">×</button></span><span class="th"><button>New thread</button><button class="x" aria-label="close thread">×</button></span><button class="new">+ New</button></div>
+<div class="agent-set">
+  <span class="ctl-l">Mode</span><div class="seg sm" role="group"><button class="on" aria-pressed="true">Auto</button><button class="" aria-pressed="false">Ask</button><button class="" aria-pressed="false">Read-only</button></div>
+  <span class="ctl-l">Model</span><div class="seg sm" role="group"><button class="" aria-pressed="false">Fast</button><button class="on" aria-pressed="true">Balanced</button><button class="" aria-pressed="false">Deep</button></div>
+  <span class="ctl-l">Thinking</span><div class="seg sm" role="group"><button class="on" aria-pressed="true">Auto</button><button class="" aria-pressed="false">Low</button><button class="" aria-pressed="false">Med</button><button class="" aria-pressed="false">High</button></div>
+</div>
+<div class="agent-log">
+<div class="msg user"><span class="who">You</span><div class="body">Make the kickflip spin faster and check it still lands</div></div>
+<div class="msg agent"><span class="who">Agent</span>
+<details class="tool">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">return files.grep('spin = ', 'skate/motors.js');</span><span class="ms">5 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">return</span> files<span class="tk-p">.</span>grep<span class="tk-p">(</span><span class="tk-s">'spin = '</span><span class="tk-p">,</span> <span class="tk-s">'skate/motors.js'</span><span class="tk-p">);</span></pre>
+    <pre class="res">- "skate/motors.js:192  exports.flickMotor = ({ board, rider, intent, spin = 19 } = {}) =&gt; $ =&gt; {"
+- "skate/motors.js:248  exports.scoopMotor = ({ board, rider, intent, spin = 11, flipping = null } = {}) =&gt; $ =&gt; {"
+- "skate/motors.js:305  exports.wrapMotor = ({ board, rider, intent, spin = 20 } = {}) =&gt; $ =&gt; {"</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const r = test('kickflip'), k = r.tricks[0];</span><span class="ms">137 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> r <span class="tk-p">=</span> test<span class="tk-p">(</span><span class="tk-s">'kickflip'</span><span class="tk-p">),</span> k <span class="tk-p">=</span> r<span class="tk-p">.</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> c <span class="tk-p">=</span> r<span class="tk-p">.</span>events<span class="tk-p">.</span>find<span class="tk-p">(</span>e <span class="tk-e">=&gt;</span> e<span class="tk-p">.</span>type <span class="tk-p">===</span> <span class="tk-s">'catch'</span><span class="tk-p">);</span>
+<span class="tk-k">return</span> <span class="tk-p">{</span> name<span class="tk-p">:</span> k<span class="tk-p">.</span>name<span class="tk-p">,</span> landed<span class="tk-p">:</span> k<span class="tk-p">.</span>landed<span class="tk-p">,</span> flip<span class="tk-p">:</span> k<span class="tk-p">.</span>flip<span class="tk-p">,</span> air<span class="tk-p">:</span> k<span class="tk-p">.</span>air<span class="tk-p">,</span> score<span class="tk-p">:</span> k<span class="tk-p">.</span>score<span class="tk-p">,</span> catchAfter<span class="tk-p">:</span> c<span class="tk-p">.</span>after <span class="tk-p">};</span></pre>
+    <pre class="res">name: kickflip
+landed: true
+flip: 0.988
+air: 0.417
+score: 850
+catchAfter: 0.308</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool" open>
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const names = ['ollie', 'kickflip', 'heelflip', 'popShoveIt', 'fsShoveIt', 'shove360',</span><span class="ms">3397 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> names <span class="tk-p">=</span> <span class="tk-p">[</span><span class="tk-s">'ollie'</span><span class="tk-p">,</span> <span class="tk-s">'kickflip'</span><span class="tk-p">,</span> <span class="tk-s">'heelflip'</span><span class="tk-p">,</span> <span class="tk-s">'popShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'fsShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'shove360'</span><span class="tk-p">,</span>
+  <span class="tk-s">'varialKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'hardflip'</span><span class="tk-p">,</span> <span class="tk-s">'inwardHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'varialHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'treFlip'</span><span class="tk-p">,</span> <span class="tk-s">'laserFlip'</span><span class="tk-p">,</span>
+  <span class="tk-s">'doubleKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'doubleHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'impossible'</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> before <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+files<span class="tk-p">.</span>edit<span class="tk-p">(</span><span class="tk-s">'skate/motors.js'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 19 }'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 21 }'</span><span class="tk-p">);</span>
+<span class="tk-k">const</span> after <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+<span class="tk-k">return</span> names<span class="tk-p">.</span>map<span class="tk-p">((</span>n<span class="tk-p">,</span> i<span class="tk-p">)</span> <span class="tk-e">=&gt;</span> <span class="tk-p">({</span> gesture<span class="tk-p">:</span> n<span class="tk-p">,</span> before<span class="tk-p">:</span> before<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> after<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> score<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>score <span class="tk-p">}))</span>
+  <span class="tk-p">.</span>filter<span class="tk-p">(</span>r <span class="tk-e">=&gt;</span> r<span class="tk-p">.</span>before <span class="tk-p">!==</span> r<span class="tk-p">.</span>after<span class="tk-p">);</span></pre>
+    <pre class="res">- gesture: varialHeelflip
+  before: varial heelflip
+  after: laser flip
+  score: 2373</pre>
+    <div class="row"><button class="link">revert files to before this step</button><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const r = test('kickflip'), k = r.tricks[0];</span><span class="ms">84 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> r <span class="tk-p">=</span> test<span class="tk-p">(</span><span class="tk-s">'kickflip'</span><span class="tk-p">),</span> k <span class="tk-p">=</span> r<span class="tk-p">.</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> c <span class="tk-p">=</span> r<span class="tk-p">.</span>events<span class="tk-p">.</span>find<span class="tk-p">(</span>e <span class="tk-e">=&gt;</span> e<span class="tk-p">.</span>type <span class="tk-p">===</span> <span class="tk-s">'catch'</span><span class="tk-p">);</span>
+<span class="tk-k">return</span> <span class="tk-p">{</span> name<span class="tk-p">:</span> k<span class="tk-p">.</span>name<span class="tk-p">,</span> landed<span class="tk-p">:</span> k<span class="tk-p">.</span>landed<span class="tk-p">,</span> flip<span class="tk-p">:</span> k<span class="tk-p">.</span>flip<span class="tk-p">,</span> air<span class="tk-p">:</span> k<span class="tk-p">.</span>air<span class="tk-p">,</span> score<span class="tk-p">:</span> k<span class="tk-p">.</span>score<span class="tk-p">,</span> catchAfter<span class="tk-p">:</span> c<span class="tk-p">.</span>after <span class="tk-p">};</span></pre>
+    <pre class="res">name: kickflip
+landed: true
+flip: 0.988
+air: 0.408
+score: 845
+catchAfter: 0.283</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">return run();</span><span class="ms">13 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">return</span> run<span class="tk-p">();</span></pre>
+    <pre class="res">ok: true
+ms: 7
+kept: 
+  states: 37
+  bodies: 4
+  locals: 12
+  nodes: 7
+  params: 0
+warnings: []</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<div class="md doc-inline"><p>I raised the flick motor's default spin from 19 to 21 rad/s at <a href="#" class="lablink" data-lab="lab:open?file=skate/motors.js&amp;line=192">skate/motors.js:192</a> and rebuilt; the running world kept its 37 states and 4 bodies.</p>
+<p>Measured in fresh worlds before and after the edit, the kickflip still lands. The catch comes 0.283 s after the flick instead of 0.308 s, the flip stays at 0.988 turns, the air goes from 0.417 to 0.408 s and the score from 850 to 845. <a href="#" class="lablink" data-lab="lab:trick?name=kickflip">Play a kickflip</a> to see it.</p>
+<p>The flick motor serves every flip trick, so I also ran all fifteen gestures. One changed name: the <b>varial heelflip</b> is now recognized as a <b>laser flip</b>, worth 2,373 points. Should I look for a rate that keeps it a varial heelflip, or keep 21 rad/s?</p></div>
+</div>
+</div>
+<div class="composer">
+  <textarea placeholder="Ask the agent: “make heelflips catch earlier”, “add a manual trick”, “why did that bail?”" aria-label="Message to the agent"></textarea>
+  <div class="row"><span class="meta">Enter sends · Shift+Enter for a new line · steps run as they come</span>
+    <button class="btn primary" disabled>Send</button></div>
+</div>
+</div>
+</body>
+</html>

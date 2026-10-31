@@ -1,0 +1,71 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Screens": {
+      "files": {
+        "stage-axo.png": {
+          "blob": "f720f8b989c2add01c26580041abe7b0",
+          "name": "stage-axo.png",
+          "size": 110064,
+          "type": "image/png"
+        },
+        "stage-overlays.png": {
+          "blob": "3e24c567fae8b363a16e58ada12ee787",
+          "name": "stage-overlays.png",
+          "size": 108396,
+          "type": "image/png"
+        },
+        "stage-plan.png": {
+          "blob": "85079da2016a1ab28995b2dfb7314569",
+          "name": "stage-plan.png",
+          "size": 40214,
+          "type": "image/png"
+        },
+        "stage-side-track-kickflip.png": {
+          "blob": "944cf7ea7473bdda956561320ac27599",
+          "name": "stage-side-track-kickflip.png",
+          "size": 59132,
+          "type": "image/png"
+        },
+        "stage-trail-dark.png": {
+          "blob": "d17b344b08fb5372d5d5f2741d3f1c11",
+          "name": "stage-trail-dark.png",
+          "size": 55405,
+          "type": "image/png"
+        }
+      },
+      "name": "Screens",
+      "order": [
+        "stage-axo.png",
+        "stage-side-track-kickflip.png",
+        "stage-plan.png",
+        "stage-overlays.png",
+        "stage-trail-dark.png"
+      ],
+      "tile": "l"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-10-28T17:23:23Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [
+    "Screens"
+  ],
+  "lastChange": {
+    "at": "2026-10-28T17:27:49.619Z",
+    "by": "Claude",
+    "note": "Built from the Form Skate workbench source",
+    "via": "Claude"
+  },
+  "layout": "files",
+  "libraries": [],
+  "namespace": "FormSkateStage",
+  "sections": {},
+  "title": "Form Skate Stage"
+}

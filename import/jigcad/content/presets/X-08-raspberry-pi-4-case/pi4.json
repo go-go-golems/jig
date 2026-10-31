@@ -1,0 +1,15 @@
+{
+  "source": "Raspberry Pi 4 Model B mechanical drawing (mm), origin at the corner by the USB-C socket; connector heights measured",
+  "board": { "l": 85, "w": 56, "t": 1.4 },
+  "holes": [[3.5, 3.5], [61.5, 3.5], [3.5, 52.5], [61.5, 52.5]],
+  "ports": [
+    { "name": "usb-c", "edge": "front", "at": 11.2, "w": 9.0, "z0": 0, "h": 3.3 },
+    { "name": "hdmi-0", "edge": "front", "at": 26.0, "w": 7.2, "z0": 0, "h": 3.6 },
+    { "name": "hdmi-1", "edge": "front", "at": 39.5, "w": 7.2, "z0": 0, "h": 3.6 },
+    { "name": "audio", "edge": "front", "at": 53.5, "w": 6.5, "z0": 0, "h": 6.0 },
+    { "name": "usb-2", "edge": "right", "at": 9.0, "w": 13.5, "z0": 0, "h": 16.0 },
+    { "name": "usb-3", "edge": "right", "at": 27.0, "w": 13.5, "z0": 0, "h": 16.0 },
+    { "name": "ethernet", "edge": "right", "at": 45.75, "w": 16.0, "z0": 0, "h": 13.5 },
+    { "name": "sd", "edge": "left", "at": 28.0, "w": 12.0, "z0": -2.6, "h": 1.2 }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "C-01",
+  "title": "Fit coupon",
+  "group": "Calibration",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "ten graded holes, ten pins and a proof block: measure them once and j.fit.calibrate gives every hole on the shelf your printer's clearances",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the coupon for a 3 mm pin with gaps from 0.02 to 0.30 mm | Explain how the slide hole of the proof block got its size, step by step | Label every hole, and tell me what it costs in compile time",
+  "agent": {
+    "role": "a calibration engineer who turns printed test pieces into fit profiles",
+    "prompt": "Prefer measured numbers in measured.json over constants in the script; keep the coupon raw (no fit classes on its holes); never invent measurements.",
+    "fragments": {
+      "measure": "Say exactly what to measure, with which tool, and where the number goes in measured.json.",
+      "profile": "Build the profile with j.fit.calibrate and j.fit.profile; give holeComp as a length, taken at the size that matters."
+    },
+    "defaultFragments": ["measure", "profile"]
+  }
+}

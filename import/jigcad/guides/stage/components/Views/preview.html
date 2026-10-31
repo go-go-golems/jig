@@ -1,0 +1,39 @@
+<!-- @dsCard group="Projection" height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Views</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="axo" style="height:250px"></canvas><figcaption><b>Axo</b> yaw 38° · pitch 27°</figcaption></figure>
+  <figure><canvas id="front" style="height:250px"></canvas><figcaption><b>Front</b> yaw 0° · pitch 0°</figcaption></figure>
+  <figure><canvas id="side" style="height:250px"></canvas><figcaption><b>Side</b> yaw −90° · pitch 0°</figcaption></figure>
+  <figure><canvas id="plan" style="height:250px"></canvas><figcaption><b>Plan</b> yaw 0° · pitch 90°</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var pose = S.figurePose(), deck = S.deckPose();
+  boot(function () {
+    ['axo', 'front', 'side', 'plan'].forEach(function (v) {
+      var s = S.sheet(document.getElementById(v), { view: v, scale: v === 'plan' ? 85 : 92, target: v === 'plan' ? [0, 0, 0] : [0, 0.86, 0] });
+      s.draw(function (g) { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 6 }); g.layer = 'figure'; S.drawBoard(g, deck); S.drawFigure(g, pose); });
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Hatching</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="box" style="height:220px"></canvas><figcaption><b>Poché on props</b> B-01's funbox in plan: slopes filled 'hatch', the top filled 'stage'</figcaption></figure>
+  <figure><canvas id="lot" style="height:220px"></canvas><figcaption><b>The lot's edge</b> a 0.35 m hatched band, outlined both sides at 1 px</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  // the funbox's corners, as src/lib/skate/terrain.js funbox() computes them (B-01: at [0, 0, 6], 1.6 × 1.4 m top, 0.3 m high, 0.8 m slopes)
+  function funbox(g, at, heading, length, width, height, slope) {
+    var c = Math.cos(heading), s = Math.sin(heading);
+    var toWorld = function (u, w, y) { return [at[0] + s * u + c * w, y, at[2] + c * u - s * w]; };
+    var rect = function (hu, hw, y) { return [toWorld(hu, hw, y), toWorld(hu, -hw, y), toWorld(-hu, -hw, y), toWorld(-hu, hw, y)]; };
+    var top = rect(length / 2, width / 2, height), foot = rect(length / 2 + slope, width / 2 + slope, 0);
+    for (var i = 0; i < 4; i++) { var j = (i + 1) % 4; g.poly([top[i], top[j], foot[j], foot[i]], { fill: 'hatch', name: 'slope' }); }
+    g.poly(top, { fill: 'stage', name: 'top', bias: 0.01 });
+  }
+  boot(function () {
+    S.sheet(document.getElementById('box'), { view: 'plan', scale: 52, target: [0, 0, 0] }).draw(function (g) { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 6 }); g.layer = 'figure'; funbox(g, [0, 0, 0], 0, 1.6, 1.4, 0.3, 0.8); });
+    S.sheet(document.getElementById('lot'), { scale: 60, target: [2.4, 0, 2.4] }).draw(function (g) { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 3 }); g.boundary({ size: 3, band: 0.35 }); g.layer = 'figure'; S.drawBoard(g, S.deckPose([1.6, 0.088, 1.4])); });
+  });
+</script>
+</body>
+</html>

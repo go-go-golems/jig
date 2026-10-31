@@ -1,0 +1,20 @@
+{
+  "id": "S-09",
+  "title": "Cabinet knob",
+  "group": "First prints",
+  "order": 9,
+  "difficulty": "easy",
+  "about": "a 32 mm revolved knob with twelve grip grooves and an M4 heat-set insert, printed upside down without support",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a mushroom knob with a domed top that still prints without support | Replace the insert with a self-tapping hole for a 4 mm wood screw",
+  "agent": {
+    "role": "a cabinet-hardware designer who turns profiles and prints them without support",
+    "prompt": "Prefer editing the half-section and its expressions; keep every surface within 45° in the print direction; never fillet the bed edge or leave a flat ledge facing the bed.",
+    "fragments": {
+      "fixing": "Ask how the knob is fixed (M4 bolt, 8-32 bolt or wood screw) and pick the matching hole spec.",
+      "configs": "Add knob sizes as config rows rather than changing the defaults."
+    },
+    "defaultFragments": ["fixing"]
+  }
+}

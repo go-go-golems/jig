@@ -1,0 +1,50 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Form Skate Workbench</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font-display); overflow: hidden; }
+  .cover { position: relative; height: 288px; overflow: hidden; }
+  .art { position: absolute; top: 0; left: 480px; width: 480px; height: 288px; }
+  .art svg { display: block; width: 480px; height: 288px; }
+  .ink { fill: var(--ink); }
+  .fill2 { fill: var(--fill-2); }
+  .acc { fill: var(--accent); }
+  .tile { rx: var(--radius-0); }
+  .hair { stroke: var(--hair); stroke-width: 1; }
+  .under { stroke: var(--ink); stroke-width: 1; }
+  .cut { stroke: var(--bg); stroke-width: 1; }
+  .words { position: absolute; left: var(--space-22); bottom: var(--space-22); max-width: 440px; }
+  .name { margin: 0; font-size: 72px; line-height: .92; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+  .tag { margin: var(--space-8) 0 0 2px; font-family: var(--font-ui); font-size: 13px; line-height: 18px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <div class="art" aria-hidden="true">
+    <svg viewBox="0 0 480 288" width="480" height="288">
+      <!--
+        blocks      ink 168×288 (the code tile, bleeding top and bottom) · fill-2 311×104 (the panels tile) · accent 8×31 once (a selected row's bar: red only for selection) ≈ 29% of 960×288; the stage tile is the ground itself
+        arrangement the default dock, "Code beside the stage": columns 36 / 64, the right column 64 / 36, tiles flush and split by 1 px gutters of ground
+        pattern     hairline rules, from "lines are the structure": the hair rule under the tab strip, the 1 px ink underline of the active tab, two row rules cut from the panels tile in the ground
+        scales      widths space-14 × 12 = 168; strip-h 40; row pitch 32; gutters line 1px; corners radius-0
+      -->
+      <rect class="ink tile" x="0" y="0" width="168" height="288"/>
+      <rect class="fill2 tile" x="169" y="184" width="311" height="104"/>
+      <line class="hair" x1="169" y1="40.5" x2="480" y2="40.5"/>
+      <line class="under" x1="185" y1="39.5" x2="241" y2="39.5"/>
+      <line class="cut" x1="169" y1="224.5" x2="480" y2="224.5"/>
+      <line class="cut" x1="169" y1="256.5" x2="480" y2="256.5"/>
+      <rect class="acc tile" x="169" y="225" width="8" height="31"/>
+    </svg>
+  </div>
+  <div class="words">
+    <h1 class="name">Form Skate<br>Workbench</h1>
+    <p class="tag">Swiss rules for a live IDE: one ink, 1 px lines, red only for trouble.</p>
+  </div>
+</div>
+</body>
+</html>

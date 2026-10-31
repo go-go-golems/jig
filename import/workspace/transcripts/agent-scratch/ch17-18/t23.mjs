@@ -1,0 +1,11 @@
+import { K, oc } from './base.mjs';
+const G = await import('/home/claude/jigcad/src/engine/sketch/geom2d.js');
+const F = await import('/home/claude/jigcad/src/engine/fonts.js');
+const P = [[0,0],[10,20],[20,0],[30,20],[40,0],[50,20]];
+const s = G.sampleSpline(P, { fit: 'control', degree: 3, per: 16 });
+console.log('jig sampleBSpline samples', s.length, 'u=1.5 ->', s[40]);
+const B = [[0,0],[10,20],[30,20],[40,0]];
+console.log('jig bezierPoint 0.25', F.bezierPoint(B, 0.25));
+const arr = new oc.NCollection_Array1_gp_Pnt(1, 4); B.forEach((p, i) => arr.SetValue(i + 1, K.pnt(p)));
+const bz = new oc.Geom_BezierCurve(arr);
+const q = bz.Value(0.25); console.log('OCC Bezier 0.25', q.X(), q.Y());

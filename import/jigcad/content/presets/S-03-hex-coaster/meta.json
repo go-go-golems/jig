@@ -1,0 +1,20 @@
+{
+  "id": "S-03",
+  "title": "Hex-pattern coaster",
+  "group": "First prints",
+  "order": 3,
+  "difficulty": "first print",
+  "about": "a 90 mm coaster with nineteen hexagonal drip pockets: one hexagon patterned on a hex lattice",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the pockets circles and compare the volume | Add a cork-sized recess on the underside for a 3 mm cork disc",
+  "agent": {
+    "role": "a designer of tableware prints who works with patterns and filters",
+    "prompt": "Prefer changing the lattice and the filter over adding features; keep webs at least lw(2); never let a pocket break through the rim or the floor.",
+    "fragments": {
+      "speed": "Keep the cell count under about 40 so the part compiles in well under 1.5 s.",
+      "size": "Ask for the diameter of the mug base and keep d at least 10 mm larger."
+    },
+    "defaultFragments": ["speed"]
+  }
+}

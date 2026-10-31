@@ -1,0 +1,35 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>HeaderBar</title>
+<style>.stack{display:flex;flex-direction:column;gap:14px;padding:12px 0}.cap{color:var(--ink-2);font-size:var(--fs-xs);padding:0 16px}</style></head>
+<body>
+
+<div class="stack">
+  <span class="cap">running, clean</span>
+  <header class="bar">
+    <div class="brand">Form Skate <i>workbench</i></div>
+    <div class="proj"><button class="projbtn"><span class="pcode">B-01</span><span class="ptitle">Flatground</span><span class="caret">▾</span></button></div>
+    <div class="runctl"><button class="ibtn" title="Pause" aria-label="Pause">❚❚</button><button class="ibtn" title="Step 1/120 s (Shift: 12 steps)" aria-label="Step">⏭</button><button class="ibtn" title="Reset the world (keeps the code)" aria-label="Reset">↺</button><span class="clock">5.66<em></em></span><select aria-label="Time scale"><option>1×</option><option>0.5×</option><option>0.25×</option><option>0.1×</option><option>2×</option></select></div>
+    <button class="btn">Run<span class="long"> <kbd>⌘↵</kbd></span></button>
+    <span class="sp"></span>
+    <button class="pill" title="compiled"><b>ok</b><span>16 systems · 15 signals · 42 states</span></button>
+    <span class="pill score"><b>209</b><span>score</span></span>
+    <div class="rel"><button class="btn laymenu"><span><span class="glyph">▦</span><span class="long"> Layout</span></span></button></div>
+    <button class="ibtn" title="Theme: system" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor" stroke="none"/></svg></button>
+  </header>
+  <span class="cap">edited, stopped with errors</span>
+  <header class="bar">
+    <div class="brand">Form Skate <i>workbench</i></div>
+    <div class="proj"><button class="projbtn"><span class="pcode">T-02</span><span class="ptitle">Kickflip</span><span class="pcode">edited</span><span class="caret">▾</span></button></div>
+    <div class="runctl"><button class="ibtn" title="Play" aria-label="Play">▶</button><button class="ibtn" aria-label="Step">⏭</button><button class="ibtn" aria-label="Reset">↺</button><span class="clock">2.53<em> stopped</em></span><select aria-label="Time scale"><option>0.25×</option></select></div>
+    <button class="btn primary">Run<span class="long"> <kbd>⌘↵</kbd></span></button>
+    <span class="sp"></span>
+    <button class="pill bad"><b>2 errors</b><span>16 systems · 15 signals · 42 states</span></button>
+    <span class="pill score"><b>1,059</b><span>score ×2</span></span>
+    <div class="rel"><button class="btn laymenu"><span><span class="glyph">▦</span><span class="long"> Layout</span></span></button></div>
+    <button class="ibtn" title="Theme: system" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor" stroke="none"/></svg></button>
+  </header>
+</div>
+</body>
+</html>

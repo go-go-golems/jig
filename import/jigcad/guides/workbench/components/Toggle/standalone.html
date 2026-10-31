@@ -1,0 +1,13 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>Toggle</title>
+<style>.demo{padding:16px;display:flex;flex-direction:column;gap:12px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cap{color:var(--ink-2);font-size:var(--fs-xs);min-width:150px}</style></head>
+<body>
+
+<div class="demo">
+  <div class="row"><span class="cap">.tog off · on</span><button class="tog" aria-pressed="false" title="Turn the sheet with the rider's heading">Track</button><button class="tog on" aria-pressed="true" title="Keep the rider in the middle">Follow</button><button class="tog" aria-pressed="false">Freeze</button><button class="tog" aria-pressed="false">Changed (0)</button><button class="tog on" aria-pressed="true">Edit</button></div>
+  <div class="row"><span class="cap">.chk</span><label class="chk"><input type="checkbox" checked> axonometric</label><label class="chk"><input type="checkbox"> axonometric + Track</label><label class="chk"><input type="checkbox" checked> side + Track</label><label class="chk"><input type="checkbox"> mean by x</label></div>
+</div>
+</body>
+</html>

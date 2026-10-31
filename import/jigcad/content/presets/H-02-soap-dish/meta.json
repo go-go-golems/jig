@@ -1,0 +1,20 @@
+{
+  "id": "H-02",
+  "title": "Soap dish with drain slots",
+  "group": "Around the house",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "a 110 × 75 mm soap dish whose slats drain through ten slots into 45°-roofed channels: no overhang anywhere",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make an oval dish with the same slot and channel logic | Add a lip at one end so the dish drains towards the basin",
+  "agent": {
+    "role": "a bathroom-accessory designer who prints wet-area parts without supports",
+    "prompt": "Prefer patterned cuts written from the dish size; keep slats at least 4 mm and every roof at 45°; never leave a flat bridge over a water channel.",
+    "fragments": {
+      "speed": "Keep the slot count under about 14: each patterned cut adds compile time.",
+      "material": "Use PETG or ASA for parts that live in a shower."
+    },
+    "defaultFragments": ["speed"]
+  }
+}

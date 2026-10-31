@@ -1,0 +1,20 @@
+{
+  "id": "D-01",
+  "title": "Pen cup with pointed windows",
+  "group": "Desk and storage",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "a 70 mm hexagonal pen cup with six 45°-pointed windows, cut once and patterned",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the windows round-topped and see what the overhang check says | Add a second row of shorter windows above the first",
+  "agent": {
+    "role": "a desk-accessory designer who keeps every opening printable without supports",
+    "prompt": "Prefer 45° pointed or diamond openings over round tops; keep a solid band at the floor and the rim; never let a window post get thinner than 3 line widths.",
+    "fragments": {
+      "pattern": "When you add openings, cut one and repeat it with j.pattern rather than writing several cuts.",
+      "bed": "Chamfer edges that touch the bed; fillet only edges that do not."
+    },
+    "defaultFragments": ["pattern", "bed"]
+  }
+}

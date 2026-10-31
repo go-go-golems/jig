@@ -1,0 +1,20 @@
+{
+  "id": "H-10",
+  "title": "Napkin holder",
+  "group": "Around the house",
+  "order": 10,
+  "difficulty": "easy",
+  "about": "a 170 mm U-profile napkin holder with pointed windows cut through both walls by one patterned sketch",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a weighted bar that rests on the napkins, on two pins | Replace the windows with a row of circles and compare the overhang check",
+  "agent": {
+    "role": "a tableware designer who builds holders from one extruded profile",
+    "prompt": "Prefer one profile and patterned through-cuts over separate walls; keep window tops at 45° points and at least 6 mm of wall round every window; never fillet the bed edge.",
+    "fragments": {
+      "napkins": "Ask for the folded napkin size and set W about 5 mm larger and H about half of it.",
+      "speed": "To print quicker, thin t to 2.4 mm before cutting more windows."
+    },
+    "defaultFragments": ["napkins"]
+  }
+}

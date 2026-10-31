@@ -1,0 +1,7 @@
+return j.sketch('frame', { on: j.plane.XY })
+  .polyline('r', [[0, 0], [40, 0], [40, 30], [0, 30]], { closed: true })
+  .line('d1', 'r.1.start', 'r.2.end')
+  .line('d2', 'r.1.end', 'r.3.end')
+  .line('e', 'r.2.end', [80, 30])
+  .dim('r.1', 40).dim('r.2', 30).dim('r.3', 40).dim('r.4', 30)
+  .dim('d1', 50).dim('d2', 50).dim('e', 40)

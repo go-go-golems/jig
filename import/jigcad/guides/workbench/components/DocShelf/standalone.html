@@ -1,0 +1,14 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>DocShelf</title>
+<style>.docsview{height:310px;margin:10px;border:1px solid var(--hair)}</style></head>
+<body>
+
+<div class="tabbody docsview"><nav class="shelf"><input class="filter" placeholder="search the shelf" aria-label="Search the shelf"><div class="shelfgrp"><div class="grp">Start here</div><button class="on"><b>A tour of the workbench</b><small>What each view is for, how a change flows from code to stage, and how to find your way around.</small></button><button><b>The FORM model</b><small>Things, sites, states, params, signals, systems, watches, views: what each primitive is for and how they compose.</small></button></div><div class="shelfgrp"><div class="grp">Maths</div><button><b>Vectors, frames, dot and cross</b><small>The vector toolkit every system uses: dot products as projections, cross products as rotations and areas, frames.</small></button><button><b>Quaternions for rotations</b><small>Unit quaternions as rotations: axis–angle, composition, rotating vectors, log and exp, slerp, integrating ω.</small></button></div></nav>
+<div class="scroll"><article class="doc"><h1 id="p-a-tour-of-the-workbench">A tour of the workbench</h1>
+<p>Form Skate Workbench is an IDE for one program: a skateboard game built on a small simulation framework, <code>@form/core</code>. Every part of the game — physics, legs, the motors that flip the board, the recognizer that names tricks, the drawing — is ordinary JavaScript in the <b>Code</b> view, and the workbench is built to let you change any of it while it runs and see what happened. <a href="#" class="lablink" data-lab="lab:book?ch=2">Chapter 2</a> of the book is a longer tour.</p>
+<nav class="toc"><a href="#" data-anchor="p-the-loop">The loop</a><a href="#" data-anchor="p-the-views">The views</a><a href="#" data-anchor="p-links-in-the-notes">Links in the notes</a></nav>
+</article></div></div>
+</body>
+</html>

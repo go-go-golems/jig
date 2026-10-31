@@ -1,0 +1,37 @@
+<!-- @dsCard group="Depth order" height=380 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DepthOrder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="a" style="height:320px"></canvas><figcaption id="ca"><b>centroid</b>, part by part</figcaption></figure>
+  <figure><canvas id="b" style="height:320px"></canvas><figcaption id="cb"><b>deck plane</b>, chain outlines (the stage's default)</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var pose = S.figurePose({ crouch: 0.3 }), deck = S.deckPose();
+  function one(id, order, chains, cap, label) {
+    var s = S.sheet(document.getElementById(id), { view: 'axo', yaw: 2.3, pitch: -0.1, scale: 168, target: [0.05, 0.86, 0], order: order, chains: chains, overlays: ['truth'] });
+    var g = s.draw(function (g) { S.drawBoard(g, deck); S.drawFigure(g, pose); });
+    var t = g.truth; document.getElementById(cap).innerHTML = '<b>' + label + '</b> · Truth: ' + (t ? Math.round(t.wrongCm2) + ' cm² drawn wrong (st-rec cells)' : '—');
+  }
+  boot(function () { one('a', 'centroid', false, 'ca', 'centroid, part by part'); one('b', 'deck plane', true, 'cb', 'deck plane + chain outlines'); });
+</script>
+</body>
+</html>

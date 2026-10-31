@@ -1,0 +1,10 @@
+// A print job: six bins and two lids, auto orientation, skyline plates.
+const bin = j.part('bin')
+  .extrude(j.sketch('b', { on: j.plane.XY }).rect('r', 40, 40, { center: true, r: 4 }).profiles(), mm(30), { id: 'body' })
+  .shell(j.feat('body').endFace(), mm(1.6), { id: 'shell' })
+const lid = j.part('lid')
+  .extrude(j.sketch('l', { on: j.plane.XY }).rect('r', 120, 80, { center: true }).profiles(), mm(3), { id: 'plate' })
+return j.print('batch', { printer: j.printer('mk4') })
+  .add('bin', bin, { qty: 6 })
+  .add('lid', lid, { qty: 2 })
+  .plates({ pack: 'skyline', spacing: mm(5) })

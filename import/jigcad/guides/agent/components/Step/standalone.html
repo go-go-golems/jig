@@ -1,0 +1,75 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>Step — preview</title></head>
+<body>
+<div class="ds-pad">
+<details class="tool">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const r = test('kickflip'), k = r.tricks[0];</span><span class="ms">137 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> r <span class="tk-p">=</span> test<span class="tk-p">(</span><span class="tk-s">'kickflip'</span><span class="tk-p">),</span> k <span class="tk-p">=</span> r<span class="tk-p">.</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> c <span class="tk-p">=</span> r<span class="tk-p">.</span>events<span class="tk-p">.</span>find<span class="tk-p">(</span>e <span class="tk-e">=&gt;</span> e<span class="tk-p">.</span>type <span class="tk-p">===</span> <span class="tk-s">'catch'</span><span class="tk-p">);</span>
+<span class="tk-k">return</span> <span class="tk-p">{</span> name<span class="tk-p">:</span> k<span class="tk-p">.</span>name<span class="tk-p">,</span> landed<span class="tk-p">:</span> k<span class="tk-p">.</span>landed<span class="tk-p">,</span> flip<span class="tk-p">:</span> k<span class="tk-p">.</span>flip<span class="tk-p">,</span> air<span class="tk-p">:</span> k<span class="tk-p">.</span>air<span class="tk-p">,</span> score<span class="tk-p">:</span> k<span class="tk-p">.</span>score<span class="tk-p">,</span> catchAfter<span class="tk-p">:</span> c<span class="tk-p">.</span>after <span class="tk-p">};</span></pre>
+    <pre class="res">name: kickflip
+landed: true
+flip: 0.988
+air: 0.417
+score: 850
+catchAfter: 0.308</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool" open>
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const names = ['ollie', 'kickflip', 'heelflip', 'popShoveIt', 'fsShoveIt', 'shove360',</span><span class="ms">3397 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> names <span class="tk-p">=</span> <span class="tk-p">[</span><span class="tk-s">'ollie'</span><span class="tk-p">,</span> <span class="tk-s">'kickflip'</span><span class="tk-p">,</span> <span class="tk-s">'heelflip'</span><span class="tk-p">,</span> <span class="tk-s">'popShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'fsShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'shove360'</span><span class="tk-p">,</span>
+  <span class="tk-s">'varialKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'hardflip'</span><span class="tk-p">,</span> <span class="tk-s">'inwardHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'varialHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'treFlip'</span><span class="tk-p">,</span> <span class="tk-s">'laserFlip'</span><span class="tk-p">,</span>
+  <span class="tk-s">'doubleKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'doubleHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'impossible'</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> before <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+files<span class="tk-p">.</span>edit<span class="tk-p">(</span><span class="tk-s">'skate/motors.js'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 19 }'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 21 }'</span><span class="tk-p">);</span>
+<span class="tk-k">const</span> after <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+<span class="tk-k">return</span> names<span class="tk-p">.</span>map<span class="tk-p">((</span>n<span class="tk-p">,</span> i<span class="tk-p">)</span> <span class="tk-e">=&gt;</span> <span class="tk-p">({</span> gesture<span class="tk-p">:</span> n<span class="tk-p">,</span> before<span class="tk-p">:</span> before<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> after<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> score<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>score <span class="tk-p">}))</span>
+  <span class="tk-p">.</span>filter<span class="tk-p">(</span>r <span class="tk-e">=&gt;</span> r<span class="tk-p">.</span>before <span class="tk-p">!==</span> r<span class="tk-p">.</span>after<span class="tk-p">);</span></pre>
+    <pre class="res">- gesture: varialHeelflip
+  before: varial heelflip
+  after: laser flip
+  score: 2373</pre>
+    <div class="row"><button class="link">revert files to before this step</button><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool run">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">return files.grep('spin = ', 'skate/motors.js');</span><span class="ms">running…</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">return</span> files<span class="tk-p">.</span>grep<span class="tk-p">(</span><span class="tk-s">'spin = '</span><span class="tk-p">,</span> <span class="tk-s">'skate/motors.js'</span><span class="tk-p">);</span></pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool err" open>
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">files.edit('skate/motors.js', 'spin = 18 }', 'spin = 21 }');</span><span class="ms">5 ms</span></summary>
+  <div class="tb">
+    <pre class="src">files<span class="tk-p">.</span>edit<span class="tk-p">(</span><span class="tk-s">'skate/motors.js'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 18 }'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 21 }'</span><span class="tk-p">);</span></pre>
+    <pre class="res bad">Error: edit: text not found in skate/motors.js (it must match exactly, including spaces) (line 3)</pre>
+    <div class="row"><button class="link">copy code</button></div>
+  </div>
+</details>
+<details class="tool reverted">
+  <summary><i class="dot"></i><span class="nm">eval</span><span class="first">const names = ['ollie', 'kickflip', 'heelflip', 'popShoveIt', 'fsShoveIt', 'shove360',</span><span class="ms">3397 ms</span></summary>
+  <div class="tb">
+    <pre class="src"><span class="tk-k">const</span> names <span class="tk-p">=</span> <span class="tk-p">[</span><span class="tk-s">'ollie'</span><span class="tk-p">,</span> <span class="tk-s">'kickflip'</span><span class="tk-p">,</span> <span class="tk-s">'heelflip'</span><span class="tk-p">,</span> <span class="tk-s">'popShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'fsShoveIt'</span><span class="tk-p">,</span> <span class="tk-s">'shove360'</span><span class="tk-p">,</span>
+  <span class="tk-s">'varialKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'hardflip'</span><span class="tk-p">,</span> <span class="tk-s">'inwardHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'varialHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'treFlip'</span><span class="tk-p">,</span> <span class="tk-s">'laserFlip'</span><span class="tk-p">,</span>
+  <span class="tk-s">'doubleKickflip'</span><span class="tk-p">,</span> <span class="tk-s">'doubleHeelflip'</span><span class="tk-p">,</span> <span class="tk-s">'impossible'</span><span class="tk-p">];</span>
+<span class="tk-k">const</span> before <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+files<span class="tk-p">.</span>edit<span class="tk-p">(</span><span class="tk-s">'skate/motors.js'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 19 }'</span><span class="tk-p">,</span> <span class="tk-s">'spin = 21 }'</span><span class="tk-p">);</span>
+<span class="tk-k">const</span> after <span class="tk-p">=</span> names<span class="tk-p">.</span>map<span class="tk-p">(</span>n <span class="tk-e">=&gt;</span> test<span class="tk-p">(</span>n<span class="tk-p">).</span>tricks<span class="tk-p">[</span><span class="tk-n">0</span><span class="tk-p">]);</span>
+<span class="tk-k">return</span> names<span class="tk-p">.</span>map<span class="tk-p">((</span>n<span class="tk-p">,</span> i<span class="tk-p">)</span> <span class="tk-e">=&gt;</span> <span class="tk-p">({</span> gesture<span class="tk-p">:</span> n<span class="tk-p">,</span> before<span class="tk-p">:</span> before<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> after<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>name<span class="tk-p">,</span> score<span class="tk-p">:</span> after<span class="tk-p">[</span>i<span class="tk-p">].</span>score <span class="tk-p">}))</span>
+  <span class="tk-p">.</span>filter<span class="tk-p">(</span>r <span class="tk-e">=&gt;</span> r<span class="tk-p">.</span>before <span class="tk-p">!==</span> r<span class="tk-p">.</span>after<span class="tk-p">);</span></pre>
+    <pre class="res">- gesture: varialHeelflip
+  before: varial heelflip
+  after: laser flip
+  score: 2373</pre>
+    <div class="row"><span class="dim">reverted</span><button class="link">copy code</button></div>
+  </div>
+</details>
+</div>
+</body>
+</html>

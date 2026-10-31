@@ -1,0 +1,13 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>KeyValue</title>
+<style>.row2{display:flex;gap:28px;padding:16px;align-items:flex-start}.row2 dl{width:300px}</style></head>
+<body>
+
+<div class="row2">
+  <dl class="kv"><dt>phase</dt><dd>ride</dd><dt>speed</dt><dd>4.29 m/s</dd><dt>deck height</dt><dd>0.08 m</dd><dt>flip · shove · wrap</dt><dd>-0.01 · 0.01 · 0.00</dd><dt>driver</dt><dd>autopilot</dd><dt>default</dt><dd>15.000</dd><dt>min · max</dt><dd>0 · 30</dd><dt>unit</dt><dd>rad/s</dd></dl>
+  <dl class="kv keys"><dt><kbd>↑ / W</kbd></dt><dd>push</dd><dt><kbd>← →</kbd></dt><dd>carve</dd><dt><kbd>↓</kbd></dt><dd>brake</dd><dt><kbd>Space</kbd></dt><dd>crouch; release to pop</dd><dt><kbd>J / L</kbd></dt><dd>kick / heel flick</dd><dt><kbd>I / K</kbd></dt><dd>backside / frontside scoop</dd><dt><kbd>U</kbd></dt><dd>wrap (impossible)</dd><dt><kbd>R</kbd></dt><dd>back on the board</dd></dl>
+</div>
+</body>
+</html>

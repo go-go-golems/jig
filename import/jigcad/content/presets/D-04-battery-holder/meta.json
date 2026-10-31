@@ -1,0 +1,20 @@
+{
+  "id": "D-04",
+  "title": "Battery holder",
+  "group": "Desk and storage",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "a block of pockets for AA, AAA, C or D cells: cell sizes from a table, the grid from a count",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add 9 V batteries to the table and give them rectangular pockets | Mark one pocket row for spent cells with a groove along the side",
+  "agent": {
+    "role": "a storage designer who sizes pockets from standard part tables and fit classes",
+    "prompt": "Prefer adding rows to cells.csv over new params; size every pocket with j.fit; never hard-code a grid that a count can decide.",
+    "fragments": {
+      "table": "Keep cell sizes in cells.csv with units, one row per cell type, and cite the standard.",
+      "fit": "Use j.fit.hole(d, 'free') for pockets a part drops into."
+    },
+    "defaultFragments": ["table", "fit"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "S-04",
+  "title": "Plant label stake",
+  "group": "First prints",
+  "order": 4,
+  "difficulty": "first print",
+  "about": "a 60 × 25 mm label on a ribbed 90 mm spike: three extrudes that join because they touch",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a set of five labels on one plate | Give the panel a 1 mm raised border so paint does not run off",
+  "agent": {
+    "role": "a gardener who designs simple printed tools for the greenhouse",
+    "prompt": "Prefer adding a touching extrude over editing a sketch; keep the panel flat for writing; never make the spike thinner than 1.6 mm.",
+    "fragments": {
+      "batch": "Print several labels in one job with .add(name, part, { qty }) and report the plate count.",
+      "outdoor": "Use PETG or ASA for labels that stay outside."
+    },
+    "defaultFragments": ["outdoor"]
+  }
+}

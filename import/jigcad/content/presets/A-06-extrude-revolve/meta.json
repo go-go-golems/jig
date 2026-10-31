@@ -1,0 +1,8 @@
+{
+  "id": "A-06",
+  "title": "Extrude and revolve",
+  "group": "Foundations",
+  "about": "A plate with four holes and a ring revolved on it: Cavalieri and Pappus as volumes you can check.",
+  "view": "axo",
+  "overlays": "shadows,grid,dims"
+}

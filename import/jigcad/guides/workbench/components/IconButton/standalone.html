@@ -1,0 +1,20 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>IconButton</title>
+<style>.demo{padding:16px;display:flex;flex-direction:column;gap:12px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cap{color:var(--ink-2);font-size:var(--fs-xs);min-width:150px}.strip{display:flex;align-items:stretch;height:40px;border:1px solid var(--hair)}.prowdemo{display:flex;align-items:center;gap:8px;height:30px;border:1px solid var(--rule);padding:0 0 0 12px}</style></head>
+<body>
+
+<div class="demo">
+  <div class="row"><span class="cap">run controls · book · theme</span>
+    <span class="runctl"><button class="ibtn" title="Pause" aria-label="Pause">❚❚</button><button class="ibtn" title="Step 1/120 s (Shift: 12 steps)" aria-label="Step">⏭</button><button class="ibtn" title="Reset the world (keeps the code)" aria-label="Reset">↺</button></span>
+    <button class="ibtn" disabled aria-label="Previous chapter">‹</button><button class="ibtn" aria-label="Next chapter">›</button>
+    <button class="ibtn" title="Theme: system" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor" stroke="none"/></svg></button>
+  </div>
+  <div class="row"><span class="cap">tab actions</span>
+    <div class="strip"><button class="tabact plus" title="Open a view in this tile">+</button></div>
+    <div class="prowdemo"><span>tail snap <span class="dim">snap</span></span><b>20 rad/s</b><button class="tabact" title="default 15">↺</button></div>
+  </div>
+</div>
+</body>
+</html>

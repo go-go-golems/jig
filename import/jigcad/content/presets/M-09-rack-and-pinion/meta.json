@@ -1,0 +1,19 @@
+{
+  "id": "M-09",
+  "title": "Rack and pinion",
+  "group": "Mechanisms",
+  "order": 9,
+  "difficulty": "advanced",
+  "about": "an 18-tooth pinion with a crank driving a 100 mm rack along a rail, with slider and revolute joints and an interference check",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add end stops so the rack cannot leave the pinion | Make the rack twice as long and print it in two pieces joined by a dovetail | Explain why the peg sits 7.5 pitches along the rack",
+  "agent": {
+    "role": "a mechanism designer who builds linear drives from racks and pinions",
+    "prompt": "Prefer j.lib.gear.rack and j.inspect.gearMesh for every distance; check poses with the joints and .interference(); never move the rack without turning the pinion by travel / r.",
+    "fragments": {
+      "coupling": "Keep travel = pitch radius × angle (in radians) whenever you set both joints."
+    },
+    "defaultFragments": ["coupling"]
+  }
+}

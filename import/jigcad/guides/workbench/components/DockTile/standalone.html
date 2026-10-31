@@ -1,0 +1,27 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>DockTile</title>
+<style>.dock{height:200px;margin:12px;border:1px solid var(--hair)}.fake{padding:14px 16px;color:var(--ink-2)}</style></head>
+<body>
+
+<div class="dock"><div class="dsplit row">
+  <div class="dcell" style="flex:0.45 1 0"><section class="tile">
+    <div class="dstrip"><div class="dtabs" role="tablist">
+      <div class="dtab on"><button class="lbl" role="tab" aria-selected="true">Notes</button><button class="x" aria-label="Close Notes">×</button></div>
+      <div class="dtab"><button class="lbl" role="tab">Code<span class="count bad">1</span></button><button class="x" aria-label="Close Code">×</button></div>
+      <div class="dtab"><button class="lbl" role="tab">Agent</button><button class="x" aria-label="Close Agent">×</button></div>
+      <div class="dtab"><button class="lbl" role="tab">Docs</button><button class="x" aria-label="Close Docs">×</button></div>
+      <div class="dtab"><button class="lbl" role="tab">Book</button><button class="x" aria-label="Close Book">×</button></div>
+    </div><div class="rel"><button class="tabact plus" title="Open a view in this tile">+</button></div></div>
+    <div class="tilebody"><p class="fake">the active view</p></div>
+  </section></div>
+  <div class="gutter row" role="separator" tabindex="0"></div>
+  <div class="dcell" style="flex:0.55 1 0"><div class="dsplit col">
+    <div class="dcell" style="flex:0.5 1 0"><section class="tile"><div class="dstrip"><div class="dtabs" role="tablist"><div class="dtab on"><button class="lbl" role="tab" aria-selected="true">Stage</button><button class="x" aria-label="Close Stage">×</button></div></div><div class="rel"><button class="tabact plus">+</button></div></div><div class="tilebody"></div></section></div>
+    <div class="gutter col" role="separator" tabindex="0"></div>
+    <div class="dcell" style="flex:0.5 1 0"><section class="tile"><div class="dstrip"><div class="dtabs" role="tablist"><div class="dtab on"><button class="lbl" role="tab" aria-selected="true">Traces<span class="count">4</span></button><button class="x">×</button></div><div class="dtab"><button class="lbl" role="tab">Events</button><button class="x">×</button></div><div class="dtab"><button class="lbl" role="tab">Params<span class="count">3</span></button><button class="x">×</button></div></div><div class="rel"><button class="tabact plus">+</button></div></div><div class="tilebody"></div></section></div>
+  </div></div>
+</div></div>
+</body>
+</html>

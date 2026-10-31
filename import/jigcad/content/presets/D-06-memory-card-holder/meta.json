@@ -1,0 +1,20 @@
+{
+  "id": "D-06",
+  "title": "Memory-card holder",
+  "group": "Desk and storage",
+  "order": 6,
+  "difficulty": "easy",
+  "about": "eight SD and twelve microSD cards in upright slots: one column per row of a card table, names engraved in front",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add miniSD cards (21.5 × 20 × 1.4 mm) to cards.csv | Lean every slot back 10° so the cards are easier to read",
+  "agent": {
+    "role": "a desk-storage designer who lays out slots from a table of card formats",
+    "prompt": "Prefer adding rows to cards.csv over new params or cuts; size every slot from the card plus `gap` on each side; never make a slot narrower than three line widths.",
+    "fragments": {
+      "table": "Keep card sizes in cards.csv in millimetres, one row per format, and cite the SD Association or ISO size in a comment.",
+      "labels": "Engrave labels 0.6 mm deep on the top face with j.region.text, at most as wide as the column."
+    },
+    "defaultFragments": ["table"]
+  }
+}

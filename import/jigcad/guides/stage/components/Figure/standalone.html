@@ -1,0 +1,35 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Figure</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="ride" style="height:330px"></canvas><figcaption><b>Riding</b> 22 joints, 19 lofts in 6 chains, drawn as one outline per chain</figcaption></figure>
+  <figure><canvas id="rig" style="height:330px"></canvas><figcaption><b>Rig overlay</b> violet sticks and hollow joints, the centre of mass in st-rec</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var pose = S.figurePose({ crouch: 0.2 }), deck = S.deckPose();
+  boot(function () {
+    S.sheet(document.getElementById('ride'), { scale: 150, target: [0, 0.85, 0] }).draw(function (g) { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 4 }); g.layer = 'figure'; S.drawBoard(g, deck); S.drawFigure(g, pose); });
+    S.sheet(document.getElementById('rig'), { view: 'front', scale: 150, target: [0, 0.85, 0], overlays: ['rig'] }).draw(function (g) { S.drawBoard(g, deck); S.drawFigure(g, pose); });
+  });
+</script>
+</body>
+</html>

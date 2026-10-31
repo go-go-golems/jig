@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Skate Agent</title>
+<script>(function(){var m='system';try{m=localStorage.getItem('ds-theme')||'system';}catch(e){}var t=m==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;document.documentElement.setAttribute('data-theme',t);window.__dsMode=m;})();</script>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  :root { --x-ui: var(--font-ui, var(--font-display, Arial, "Helvetica Neue", Helvetica, sans-serif)); --x-code: var(--font-code, var(--font-plex, ui-monospace, Menlo, Consolas, monospace)); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 400 14px/1.55 var(--x-ui); }
+  .x-wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  .x-nav { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; border-right: 1px solid var(--hair); padding: 20px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .x-nav b { font: 700 15px/1.2 var(--x-ui); margin-bottom: 12px; }
+  .x-nav a { color: var(--ink-2); text-decoration: none; padding: 3px 0; font-size: 13px; }
+  .x-nav a:hover { color: var(--ink); }
+  .x-nav .x-sub { padding-left: 10px; font-size: 12px; }
+  .x-nav button { margin-top: 16px; background: none; color: var(--ink); border: 1px solid var(--hair); padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+  .x-nav button:hover { border-color: var(--ink); }
+  main { min-width: 0; padding: 24px max(16px, 3vw) 80px; }
+  section { border-top: 1px solid var(--ink); padding-top: 12px; margin-top: 48px; }
+  section:first-child { border-top: 0; margin-top: 0; }
+  h1, h2, h3, h4 { text-wrap: balance; line-height: 1.2; }
+  h2.x-h { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin: 0 0 8px; }
+  .x-md { max-width: 74ch; }
+  .x-md h1 { font-size: 26px; margin: 8px 0 12px; }
+  .x-md h2 { font-size: 18px; margin: 28px 0 8px; }
+  .x-md h3 { font-size: 15px; margin: 20px 0 6px; }
+  .x-md code, .x-tab code, .x-meta code, .x-files code { font: 400 0.9em var(--x-code); background: var(--fill); padding: 0 3px; }
+  .x-md pre { background: var(--fill); padding: 10px 12px; overflow: auto; border: 1px solid var(--hair); }
+  .x-md pre code { background: none; padding: 0; font-size: 12px; }
+  .x-md table, .x-tab { border-collapse: collapse; font-size: 13px; }
+  .x-md th, .x-md td, .x-tab th, .x-tab td { border-bottom: 1px solid var(--hair); padding: 5px 10px 5px 0; text-align: left; vertical-align: top; }
+  .x-md a { color: var(--ink); }
+  .x-md blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--hair); color: var(--ink-2); }
+  .x-scroll { overflow-x: auto; max-width: 100%; }
+  .x-sw span { display: inline-block; width: 18px; height: 18px; border: 1px solid var(--hair); vertical-align: middle; margin-right: 6px; }
+  .x-sw code { white-space: nowrap; }
+  .x-note { color: var(--ink-2); font-size: 13px; max-width: 74ch; }
+  .x-styles { display: flex; flex-direction: column; gap: 10px; }
+  .x-style { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; border-bottom: 1px solid var(--hair); padding-bottom: 8px; }
+  .x-sample { overflow-wrap: anywhere; }
+  .x-meta { color: var(--ink-2); font-size: 12px; }
+  .x-comp { margin: 20px 0 36px; }
+  .x-comp h4 { font-size: 16px; margin: 0 0 8px; }
+  .x-frame iframe { display: block; border: 1px solid var(--hair); background: var(--bg); max-width: none; }
+  .x-cover iframe { width: 960px; border: 1px solid var(--hair); display: block; }
+  .x-cover { overflow-x: auto; margin-bottom: 24px; }
+  .x-files { color: var(--ink-2); font-size: 12px; }
+  .x-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .x-shots figure { margin: 0; }
+  .x-shots img { width: 100%; border: 1px solid var(--hair); display: block; }
+  .x-shots figcaption { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  @media (max-width: 760px) { .x-wrap { grid-template-columns: 1fr; } .x-nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--hair); } .x-style { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="x-wrap">
+<nav class="x-nav"><b>Form Skate Agent</b>
+<a href="#overview">Overview</a>
+<a href="#sec-extending">Extending the agent</a>
+<a href="#sec-how-the-agent-works">How the agent works</a>
+<a href="#sec-lab-links">lab: links</a>
+<a href="#sec-modes-and-permissions">Modes and permissions</a>
+<a href="#sec-patterns">Patterns</a>
+<a href="#sec-system-prompt">The system prompt</a>
+<a href="#sec-the-eval-tool">The eval tool</a>
+<a href="#sec-voice">Voice</a>
+<a href="#tokens">Tokens</a>
+<a href="#components">Components</a><a class="x-sub" href="#comp-AgentMessage">Conversation</a><a class="x-sub" href="#comp-AgentPanel">Panel</a><a class="x-sub" href="#comp-AgentSettings">Input</a><a class="x-sub" href="#comp-Approval">Steps</a><a class="x-sub" href="#comp-OffBanner">Status</a>
+<a href="#assets">Assets</a>
+<a href="#export">About this export</a>
+<button id="x-theme" type="button">Theme: system</button>
+</nav>
+<main>
+<section id="overview"><h2 class="x-h">Overview</h2>
+<div class="x-cover"><iframe data-src="components/Cover/standalone.html" src="components/Cover/standalone.html" title="Cover" style="height:288px"></iframe></div>
+<div class="x-md"><p>The Form Skate agent is a coding agent that lives in one tile of the workbench and works through a single tool, <code>eval</code>, which runs JavaScript in the page with the workbench&#39;s lab API in scope. Every step shows up as a collapsible block with its code, its time and its result, and the files are snapshotted before each step so the person can revert it.</p>
+<p>Use this system to build the same kind of agent into another tool, to extend this one, or to write the way it writes. Start with the section that matches the job:</p>
+<ul>
+<li><strong>How the agent works</strong>: the turn, the tool rounds, what the model receives, step records, revert, threads and storage.</li>
+<li><strong>The eval tool</strong>: the tool schema, how code runs, every name in the scope, the YAML result format, the Read-only guard.</li>
+<li><strong>Modes and permissions</strong>: Auto, Ask and Read-only; Model and Thinking; what the panel says when Claude is unavailable or a turn fails.</li>
+<li><strong>Patterns</strong>: how the agent should work, with do and don&#39;t examples.</li>
+<li><strong>Voice</strong>: how its answers read.</li>
+<li><strong>The system prompt</strong>: the instructions and the context block, quoted in full.</li>
+<li><strong>lab: links</strong>: the links an answer can carry into the workbench.</li>
+<li><strong>Extending the agent</strong>: recipes for a new scope function, link action, mode or context line.</li>
+</ul>
+<h2>Build an agent like this one</h2>
+<ol>
+<li><strong>Give the model one tool.</strong> Name it <code>eval</code>; its input is <code>{ code }</code>, the body of an async function. Run the code against a scope object made for the purpose and return the value as YAML text. Do not add a tool per action: with one tool the model writes the loop (fifteen tests, two fields each, a comparison) and the person reads it.</li>
+<li><strong>Build the scope from the app&#39;s public API.</strong> Here it is <code>labScope(host)</code> from <code>app/host.js</code>, plus <code>console</code>, <code>log</code> and <code>lab</code>; the host object itself is deleted from the scope. The scope is documented in the same Reference the person reads, and the whole Reference is appended to the instructions, so the agent&#39;s API and the person&#39;s are one document.</li>
+<li><strong>Bound every step.</strong> Race the code against <code>eval-timeout</code> (25 s), cut the result at <code>result-cut</code> (9,000 characters) and tell the model how to return less.</li>
+<li><strong>Snapshot before, offer revert after.</strong> Copy the files before each step. When the step changed a file, show <em>revert files to before this step</em>.</li>
+<li><strong>Send instructions once and context every time.</strong> The instructions and the Reference ride on the first user turn; a <code>[context]</code> block of live state rides on the latest. Earlier steps go back to the model as one line each.</li>
+<li><strong>Let the person choose how much to approve.</strong> Auto runs each step, Ask waits for <em>Run this step</em> or <em>Decline</em>, Read-only makes every editing path throw.</li>
+<li><strong>Plan for absence.</strong> When <code>claude.use(&#39;sample&#39;)</code> gives <code>null</code>, show the off banner, disable Send and the suggestions, and keep the rest of the app working. Map every error code to one plain sentence.</li>
+</ol>
+<h2>How the agent behaves</h2>
+<ul>
+<li>Look before changing: <code>files.grep</code>, <code>files.read</code>, <code>describe</code>, <code>inspect</code>.</li>
+<li>Change with <code>files.edit</code> on exact, unique text; then <code>run()</code> and read <code>{ ok, errors }</code>.</li>
+<li>Verify in a fresh world with <code>test()</code>, before and after, and report the numbers the run returned.</li>
+<li>Sweep everything that shares the changed code, not only the trick that was named.</li>
+<li>Say which world a number came from: live params, build options and the stage&#39;s history do not reach a headless test.</li>
+<li>Answer in a few short paragraphs of Markdown, naming files and lines, with <code>lab:</code> links the person can click.</li>
+</ul>
+<h2>How it looks</h2>
+<p>The panel follows the workbench&#39;s Kiln rules (Form Skate Workbench, linked below).</p>
+<ul>
+<li>The ground is <code>bg</code>, text is <code>ink</code>, secondary text is <code>ink-2</code>. One family, <code>ui</code> (Arial), in two weights, 400 and 700. Sizes come from <code>fs-xs</code> (10.5px), <code>fs-s</code> (12px) and <code>fs-m</code> (13px) only.</li>
+<li>Structure is drawn with <code>line-1</code> rules: <code>hair</code> for controls and boxes, <code>rule</code> for the quietest dividers. No shadows and no rounded corners (<code>radius-0</code>). The only tinted grounds are <code>code-bg</code> behind code and the textarea, and <code>fill</code> behind inline code.</li>
+<li><code>accent</code> red marks what needs the person or what failed: a step waiting for approval, a failed step, the label of a turn that errored, Stop, the small marker after a <code>lab:</code> link, and the <code>=&gt;</code> arrow in code. Never use it as decoration or as a fill behind text.</li>
+<li>Pressed and primary controls invert: an <code>ink</code> fill with <code>bg</code> text (the pressed segment, Send, Run this step).</li>
+<li>Show state by form as well as colour. A step&#39;s square dot (<code>dot-step</code>) blinks while the step runs, turns <code>accent</code> and keeps blinking while it waits, stays <code>accent</code> when the step failed; a reverted step drops to <code>opacity-reverted</code> with its first line struck through; the turn being written shows <em>Thinking</em> or <em>Working</em> with a blinking square (<code>dot-thinking</code>).</li>
+<li>The only motion is the blink: keyframes <code>bl</code> (<code>50% { opacity: 0 }</code>), 0.8 s, <code>steps(2)</code>. Nothing slides or fades.</li>
+<li>Code is in the <code>code</code> family at 10.5px. Results are YAML, never JSON.</li>
+<li>Copy is plain and short. The person is <strong>You</strong>, the model is <strong>Agent</strong>. Controls are named Mode, Model and Thinking; their options Auto, Ask, Read-only; Fast, Balanced, Deep; Auto, Low, Med, High. Buttons are verbs: Send, Stop, Run this step, Decline, + New.</li>
+</ul>
+<h2>Using the components</h2>
+<p><code>components/bundle.css</code> is the panel&#39;s own CSS; colours and sizes resolve through this system&#39;s tokens. Each component&#39;s guidelines give the exact markup. There is no JavaScript bundle: the app renders this markup from React, but nothing here depends on React, and the previews are static renditions with real content from the app (the step results in them were produced by running the code shown).</p>
+<h2>The other Form Skate systems</h2>
+<ul>
+<li><a href="https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG">Form Skate Workbench</a>: the Kiln shell around this panel, its tokens, controls, editor, reading views and the guide to writing a book section.</li>
+<li><a href="https://claude.ai/artifact/J3P5XmY4B7uyZJZzgLaZYy">Form Skate Stage</a>: the drafting-sheet stage the agent&#39;s runs play out on.</li>
+</ul>
+</div></section>
+<section id="sec-extending"><h2 class="x-h">extending.md</h2><div class="x-md"><h1>Extending the agent</h1>
+<p>Four changes cover most needs. Each touches the scope or the view in one place and the documentation the model reads in another, because the Reference is part of the instructions.</p>
+<h2>Add a scope function</h2>
+<ol>
+<li>Add it to the object <code>labScope(host)</code> returns in <code>app/host.js</code>. Return small plain data: numbers rounded, ids as strings, no runtime objects. <code>yaml()</code> will print whatever you return, and the model pays for every character.</li>
+<li>Throw an <code>Error</code> with a message that says how to fix the call, as <code>files.edit</code> does: <em>edit: text occurs 3 times in skate/motors.js; include more context so it is unique</em>.</li>
+<li>If it changes code, notes or params, guard it in Read-only mode: add its name to <code>READONLY</code> in <code>app/ui/agent.jsx</code> (or, for a method on <code>game</code>, to the pattern in the <code>guard</code> call).</li>
+<li>Document it in <code>content/reference.md</code> under &quot;The agent&#39;s eval scope&quot;. The Reference is appended to the instructions, so the model learns it on the next send; the person reads the same line in the Reference tab.</li>
+</ol>
+<pre><code class="language-js">// an example, not in the library: a small read-only helper inside labScope&#39;s api object in app/host.js
+lastTrick: () =&gt; { const e = rt().events.list({ type: &#39;trick&#39;, last: 1 })[0]; return e ? { t: +e.t.toFixed(3), name: e.data.name, landed: e.data.landed, score: e.data.score } : null; },
+</code></pre>
+<h2>Add a lab: link action</h2>
+<ol>
+<li>Add a <code>case</code> to the <code>switch</code> in <code>Host.link</code> (<code>app/host.js</code>). Read parameters from <code>q</code>, act, call <code>this.focus({ view })</code> to bring the right view forward, and return <code>true</code>; on a bad target, <code>this.toast(&#39;no … &#39; + id, true)</code> and return <code>false</code>.</li>
+<li>List it in the Reference&#39;s &quot;lab: links&quot; section, so the agent can write it, and in the book&#39;s appendix of links for readers.</li>
+<li>Add a matching <code>case</code> to <code>test/linkcheck.js</code>, which <code>test/links.js</code> and the book check use; an action it does not know is reported as <em>unknown action</em>. The case returns <code>null</code> for a good link or a short reason for a bad one.</li>
+</ol>
+<h2>Add a mode</h2>
+<ol>
+<li>Add an option to the Mode <code>Seg</code> in <code>AgentView</code>: <code>{ value, label, title }</code>, where <code>title</code> is the tooltip.</li>
+<li>Branch on <code>S.settings.mode</code> where the step runs: in <code>execute</code> for something that happens before a step (as Ask waits for approval), or in <code>runEval</code> for a different scope (as Read-only swaps in throwing functions).</li>
+<li>Add its words to the composer&#39;s meta line.</li>
+<li>Add one sentence to the instructions telling the model what the mode means for it, as the line for Ask and Read-only does.</li>
+</ol>
+<h2>Add a line to the context block</h2>
+<p>Add a <code>lines.push(…)</code> to <code>context(host)</code> in <code>app/ui/agent.jsx</code>. Keep it to one line of live state the model cannot cheaply get with <code>eval</code>, and leave it out when it does not apply, as the diagnostics and pinned-trace lines do. Every line is sent with every message.</p>
+<h2>Change a limit</h2>
+<table>
+<thead>
+<tr>
+<th>limit</th>
+<th>where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>25 s per step</td>
+<td>the <code>setTimeout</code> in <code>runEval</code></td>
+</tr>
+<tr>
+<td>9,000 characters per result</td>
+<td><code>if (out.length &gt; 9000)</code> in <code>runEval</code></td>
+</tr>
+<tr>
+<td>3,000 characters per stored result, 30 turns per thread</td>
+<td><code>persist()</code></td>
+</tr>
+<tr>
+<td>100 and 160 characters per earlier step</td>
+<td><code>toTurns()</code></td>
+</tr>
+<tr>
+<td>5 decimals, 60 items, 64 numbers, 80 keys, 5 levels</td>
+<td><code>yaml()</code></td>
+</tr>
+<tr>
+<td>8 diagnostics, 5 tricks</td>
+<td><code>context()</code></td>
+</tr>
+</tbody></table>
+<h2>Keep one tool</h2>
+<p>The design rests on a single <code>eval</code>. A second page tool is possible (the <code>tools</code> array takes several, up to the limit the capability reports), but each one needs its own schema and description, and the model cannot combine them in one loop the way it combines scope functions in one step. Prefer a new scope function.</p>
+</div></section>
+<section id="sec-how-the-agent-works"><h2 class="x-h">how-the-agent-works.md</h2><div class="x-md"><h1>How the agent works</h1>
+<p>The agent is one React view, <code>AgentView</code> in <code>app/ui/agent.jsx</code>, shown in the workbench&#39;s <strong>Agent</strong> tab. It keeps its threads in a module-level object, asks the page&#39;s <code>sample</code> capability for Claude, and gives Claude one page function, <code>eval</code>. Everything below is what that file does.</p>
+<h2>The parts</h2>
+<table>
+<thead>
+<tr>
+<th>part</th>
+<th>where</th>
+<th>what it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>S</code></td>
+<td>agent.jsx:9</td>
+<td><code>{ threads, active, settings }</code>, read from browser storage at load; settings default to <code>{ mode: &#39;auto&#39;, tier: &#39;default&#39;, effort: &#39;&#39; }</code></td>
+</tr>
+<tr>
+<td><code>persist()</code></td>
+<td>agent.jsx:11</td>
+<td>writes threads (trimmed), the active thread and the settings back to storage</td>
+</tr>
+<tr>
+<td><code>getSample()</code></td>
+<td>agent.jsx:13</td>
+<td>calls <code>window.claude.use(&#39;sample&#39;)</code> once and remembers the promise; <code>null</code> when the capability is missing or throws</td>
+</tr>
+<tr>
+<td><code>yaml()</code></td>
+<td>agent.jsx:16</td>
+<td>turns any value into the YAML text the model reads</td>
+</tr>
+<tr>
+<td><code>runEval()</code></td>
+<td>agent.jsx:43</td>
+<td>builds the scope, runs one step&#39;s code, formats the result</td>
+</tr>
+<tr>
+<td><code>instructions()</code></td>
+<td>agent.jsx:73</td>
+<td>the instructions, ending with the whole Reference</td>
+</tr>
+<tr>
+<td><code>context()</code></td>
+<td>agent.jsx:88</td>
+<td>the <code>[context]</code> block of live state</td>
+</tr>
+<tr>
+<td><code>toTurns()</code></td>
+<td>agent.jsx:101</td>
+<td>the thread as the turn list <code>sample()</code> takes</td>
+</tr>
+<tr>
+<td><code>AgentView</code></td>
+<td>agent.jsx:118</td>
+<td>the panel: threads, settings, log, composer; <code>send</code>, <code>revert</code>, <code>newThread</code>, <code>closeThread</code></td>
+</tr>
+</tbody></table>
+<h2>One turn</h2>
+<p><code>send(text)</code> (agent.jsx:127) runs a whole turn:</p>
+<ol>
+<li>It ignores empty text and does nothing while a turn is running.</li>
+<li>It awaits <code>getSample()</code>. With no capability it sets the off message <em>Claude is not available here, so the agent is off. Everything else in the workbench works.</em> and stops.</li>
+<li>It appends the user turn and, if the thread is still called <em>New thread</em>, titles it with the first 32 characters of the text.</li>
+<li>It appends an agent turn <code>{ role: &#39;agent&#39;, text: &#39;&#39;, steps: [], pending: true }</code>, clears the composer, marks the panel busy and saves.</li>
+<li>It makes a fresh <code>AbortController</code>; <strong>Stop</strong> calls <code>abort()</code> on it.</li>
+<li>It defines the <code>eval</code> tool (see the eval tool section) and calls <code>sample</code>:</li>
+</ol>
+<pre><code class="language-js">// app/ui/agent.jsx:157–161
+const turns = toTurns(host, th);
+const opts = { signal: ctl.current.signal, modelTier: S.settings.tier, tools: [evalTool], onText: ({ text }) =&gt; { turn.text = text; re(); } };
+if (S.settings.effort) opts.effort = S.settings.effort;
+const res = await sample(turns, opts);
+turn.text = res.text; if (res.truncated) turn.note = &#39;The answer hit the length limit.&#39;;
+</code></pre>
+<ol start="7">
+<li><code>onText</code> assigns the whole answer so far to the turn on every call, so the answer streams into the log.</li>
+<li>A rejection becomes a one-line note on the turn (modes and permissions lists each one). Any text that had already streamed is kept, except after <code>refused</code>, where it is cleared.</li>
+<li>The turn stops pending, the panel stops being busy, and the thread is saved.</li>
+</ol>
+<h2>The loop belongs to the capability</h2>
+<p>The view has no loop of its own and no step counter. One <code>sample()</code> call carries the whole turn: Claude calls <code>eval</code>, the page runs <code>execute</code>, the result goes back, and Claude calls <code>eval</code> again or writes its answer. The <code>sample</code> capability makes these rounds and, per its contract, allows a handful of them and makes the last one an answer. Each round re-reads everything so far, which is one more reason to keep results small. Stop rejects the call with <code>cancelled</code>, aborts a running <code>execute</code> through its <code>context.signal</code>, and makes no further round; what the steps already did stays done.</p>
+<h2>What the model receives</h2>
+<p><code>toTurns</code> (agent.jsx:101–114) rebuilds the conversation every turn:</p>
+<ul>
+<li>A user turn is sent as its text.</li>
+<li>An agent turn is sent as one line per step, then its answer (or <code>(no answer)</code>):
+<code>[eval] &lt;first line of code, up to 100 characters&gt; → &lt;result with whitespace collapsed, up to 160 characters&gt;</code>, with <code>, later reverted</code> after <code>eval</code> when the person reverted that step.</li>
+<li>Trailing agent turns are dropped, so the list ends on a user turn.</li>
+<li>The first user turn is prefixed with the instructions and a <code>---</code> line; the last user turn is prefixed with the context block. Two turns of the same role in a row are merged.</li>
+</ul>
+<p>On the first message of a thread both prefixes land on the same turn, so it reads: context block, instructions, Reference, <code>---</code>, the person&#39;s words. In B-01 that first turn is 17,619 characters. Its context block, captured from a real run:</p>
+<pre><code class="language-text">[context]
+preset: B-01 Flatground (Basics) — The whole game, as the library ships it: a lot, a funbox, a board, a rider, fifteen tricks.
+world: t = 3.86 s, running at 1×, driver autopilot
+build: ok (16 systems, 15 signals, 42 states)
+files: depth-order.js, experiments.js, main.js, rigid.js, skate/assist.js, skate/board.js, skate/controls.js, skate/figure.js, skate/index.js, skate/motors.js, skate/recognizer.js, skate/rider.js, skate/terrain.js (* edited)
+pinned traces: recognizer/height, recognizer/flipTurns, recognizer/shoveTurns, recognizer/wrapTurns
+[/context]
+</code></pre>
+<p>When they apply, the block also lists up to eight warnings and errors with <code>file:line</code>, the system that stopped the runtime, the node selected in the Graph, and the last five tricks with their flip, shove and air. A failed build reads <code>build: FAILS — &lt;message&gt;</code>.</p>
+<p>So the model&#39;s memory is uneven: earlier answers come back whole, earlier step results only as a 160-character fragment. A measurement the agent did not write into its answer has to be measured again.</p>
+<h2>A step</h2>
+<p><code>execute</code> (agent.jsx:139–154) creates one step record per call:</p>
+<pre><code class="language-js">const step = { code, result: null, running: true, ms: 0, snapshot: { files: Object.assign({}, host.files) } };
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>code</code></td>
+<td>the code Claude sent</td>
+</tr>
+<tr>
+<td><code>running</code></td>
+<td>true until the code returns or is declined</td>
+</tr>
+<tr>
+<td><code>asking</code>, <code>resolve</code></td>
+<td>set in Ask mode while the step waits for the person</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>the YAML text the model received (or <em>The person declined this step.</em>)</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>the code threw, timed out, or was declined</td>
+</tr>
+<tr>
+<td><code>ms</code></td>
+<td>how long <code>runEval</code> took</td>
+</tr>
+<tr>
+<td><code>snapshot.files</code></td>
+<td>a copy of every file before the step</td>
+</tr>
+<tr>
+<td><code>changed</code></td>
+<td>any file differs from the snapshot, or one was deleted</td>
+</tr>
+<tr>
+<td><code>reverted</code></td>
+<td>the person reverted this step or an earlier one in the turn</td>
+</tr>
+</tbody></table>
+<p>The panel re-renders on every change, so a step appears with a blinking dot as soon as Claude calls it and fills in when it returns.</p>
+<h2>Revert</h2>
+<pre><code class="language-js">// app/ui/agent.jsx:174–179
+const revert = (turn, i) =&gt; {
+  const s = turn.steps[i]; if (!s.snapshot) { host.toast(&#39;This step’s snapshot is gone (reloaded page)&#39;, true); return; }
+  host.files = Object.assign({}, s.snapshot.files); host.saveEdits();
+  for (let j = i; j &lt; turn.steps.length; j++) turn.steps[j].reverted = true;
+  host.build({}); host.toast(&#39;Reverted the files to before that step and rebuilt&#39;); re(); persist();
+};
+</code></pre>
+<p>Revert restores files only. A param changed with <code>setParam</code> stays changed, and the live world keeps whatever the steps did to it. The link shows only on a step that changed files and still has its snapshot.</p>
+<h2>Threads and storage</h2>
+<ul>
+<li>Threads sit in a bar above the settings; <strong>+ New</strong> adds <code>{ id: &#39;a&#39; + Date.now().toString(36), title: &#39;New thread&#39;, turns: [] }</code> and is disabled while a turn runs. Closing the last thread leaves a fresh <em>New thread</em>.</li>
+<li><code>persist()</code> keeps the last 30 turns of each thread, drops each step&#39;s <code>snapshot</code> and <code>resolve</code>, and trims results over 3,000 characters with <code>\n…</code>. So after a reload the revert links are gone.</li>
+<li>Storage is the browser&#39;s <code>localStorage</code> under the prefix <code>formskate.v1.</code>: <code>threads</code>, <code>thread</code> (the active id) and <code>agentSettings</code>. Every read and write is wrapped in <code>try</code>, so the panel works without storage, for that page load only.</li>
+</ul>
+<h2>Where the person meets it</h2>
+<ul>
+<li>The Agent tab is in every layout, always in the same tile as Code.</li>
+<li>A <code>lab:ask?q=…</code> link anywhere in the workbench brings the tab forward with the question in the composer. It never sends it.</li>
+<li>A new thread shows the empty state: one paragraph and up to six requests (the preset&#39;s own suggestions, then <em>Explain what happens in one step of this program, phase by phase</em> and <em>Make the kickflip spin faster and check it still lands</em>). Clicking one sends it.</li>
+<li>The log scrolls to the bottom on every render.</li>
+<li>The answer is rendered by the workbench&#39;s Markdown renderer (<code>render(text, { highlight, toc: false })</code>), the same one that renders notes, docs and the book. A click on a <code>lab:</code> link calls <code>host.link(href)</code>.</li>
+</ul>
+</div></section>
+<section id="sec-lab-links"><h2 class="x-h">lab-links.md</h2><div class="x-md"><h1>lab: links</h1>
+<p>A <code>lab:</code> link is an ordinary Markdown link whose target starts with <code>lab:</code>. In an agent answer it is how the agent hands the person a place or an action: open this line, pin this trace, play this trick. The same links work in notes, docs, the Reference and the book.</p>
+<h2>How they render and run</h2>
+<p>The renderer turns <code>[text](lab:…)</code> into <code>&lt;a href=&quot;#&quot; class=&quot;lablink&quot; data-lab=&quot;lab:…&quot;&gt;text&lt;/a&gt;</code>. In an answer the link is underlined in <code>ink</code> with an <code>accent</code> underline colour, followed by a small <code>accent</code> ▸ marker (<code>.doc-inline a.lablink::after</code>). A click calls <code>host.link(href)</code>.</p>
+<p><code>host.link</code> replaces <code>lab:</code> with <code>lab://x/</code> and parses the result as a URL: the path is the action, the query holds the parameters, decoded the way a browser decodes a form. Nothing checks a link before it is clicked; a target that does not exist shows a red toast such as <em>no trace …</em>, and an <code>open</code> link whose <code>find</code> text is missing opens the file at line 1.</p>
+<h2>The actions</h2>
+<table>
+<thead>
+<tr>
+<th>action</th>
+<th>parameters</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>open</code></td>
+<td><code>file</code>, then <code>find</code> or <code>line</code></td>
+<td>opens a file in Code at a line; prefer <code>find</code>, which survives edits above it</td>
+</tr>
+<tr>
+<td><code>trace</code> (or <code>pin</code>)</td>
+<td><code>id</code>, comma-separated</td>
+<td>pins signals and states in Traces</td>
+</tr>
+<tr>
+<td><code>node</code> (or <code>select</code>)</td>
+<td><code>id</code>, optional <code>in</code></td>
+<td>selects a node in the Graph and shows its Inspector</td>
+</tr>
+<tr>
+<td><code>trick</code> (or <code>perform</code>)</td>
+<td><code>name</code></td>
+<td>plays a gesture 0.02 s after the click, as the person&#39;s input</td>
+</tr>
+<tr>
+<td><code>param</code></td>
+<td><code>id</code>, optional <code>value</code></td>
+<td>sets a param in the running world; without a value, opens it in Params</td>
+</tr>
+<tr>
+<td><code>preset</code></td>
+<td><code>id</code></td>
+<td>loads a preset</td>
+</tr>
+<tr>
+<td><code>doc</code></td>
+<td><code>id</code>, optional <code>at</code></td>
+<td>opens a shelf doc at a heading&#39;s slug</td>
+</tr>
+<tr>
+<td><code>book</code></td>
+<td><code>ch</code>, optional <code>at</code></td>
+<td>opens a chapter of the book (<code>P</code>, 1–62, <code>A</code>–<code>F</code>)</td>
+</tr>
+<tr>
+<td><code>view</code></td>
+<td><code>name</code>, optional <code>track</code></td>
+<td>sets the stage camera: <code>axo</code>, <code>front</code>, <code>side</code>, <code>plan</code></td>
+</tr>
+<tr>
+<td><code>overlay</code></td>
+<td><code>name</code>, optional <code>on</code></td>
+<td>shows, hides or toggles a stage overlay</td>
+</tr>
+<tr>
+<td><code>speed</code></td>
+<td><code>x</code></td>
+<td>sets the time scale</td>
+</tr>
+<tr>
+<td><code>show</code> (or <code>tile</code>)</td>
+<td><code>view</code></td>
+<td>brings a view forward (<code>agent</code>, <code>code</code>, <code>traces</code>, …)</td>
+</tr>
+<tr>
+<td><code>order</code></td>
+<td><code>name</code></td>
+<td>picks a depth-order strategy</td>
+</tr>
+<tr>
+<td><code>exp</code> (or <code>run</code>)</td>
+<td><code>name</code></td>
+<td>runs an experiment</td>
+</tr>
+<tr>
+<td><code>record</code></td>
+<td>optional <code>trick</code>, <code>seconds</code>, <code>replay</code></td>
+<td>records a clip headless and replays it</td>
+</tr>
+<tr>
+<td><code>replay</code>, <code>score</code></td>
+<td>none</td>
+<td>replays the current clip; scores its drawing order</td>
+</tr>
+<tr>
+<td><code>reset</code>, <code>build</code></td>
+<td>none</td>
+<td>restarts the world; rebuilds keeping the world</td>
+</tr>
+<tr>
+<td><code>autopilot</code></td>
+<td>optional <code>on</code></td>
+<td>hands the board to the autopilot, or takes it back</td>
+</tr>
+<tr>
+<td><code>ask</code></td>
+<td><code>q</code></td>
+<td>puts a question in the agent&#39;s composer; it does not send it</td>
+</tr>
+</tbody></table>
+<h2>Writing them</h2>
+<p>The link text says what the click does or where it goes: <a href="lab:open?file=skate/motors.js&line=192">skate/motors.js:192</a>, <a href="lab:trick?name=kickflip">play a kickflip</a>, <a href="lab:trace?id=recognizer/flipTurns">pin the flip turns</a>.</p>
+<p>Escape these characters inside a parameter value:</p>
+<table>
+<thead>
+<tr>
+<th>in a value</th>
+<th>write</th>
+<th>because</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>a space</td>
+<td>a space</td>
+<td>spaces are allowed and decoded back</td>
+</tr>
+<tr>
+<td><code>&amp;</code></td>
+<td><code>%26</code></td>
+<td><code>&amp;</code> separates parameters</td>
+</tr>
+<tr>
+<td><code>#</code></td>
+<td><code>%23</code></td>
+<td><code>#</code> starts a fragment, which is dropped</td>
+</tr>
+<tr>
+<td><code>+</code></td>
+<td><code>%2B</code></td>
+<td><code>+</code> decodes to a space</td>
+</tr>
+<tr>
+<td><code>%</code></td>
+<td><code>%25</code></td>
+<td><code>%</code> starts an escape</td>
+</tr>
+<tr>
+<td><code>(</code> and <code>)</code></td>
+<td>at most one balanced pair, or <code>%28</code> and <code>%29</code></td>
+<td>the renderer finds the end of the link by its parentheses</td>
+</tr>
+<tr>
+<td><code>$</code></td>
+<td>avoid</td>
+<td>the renderer reads it as the start of inline maths</td>
+</tr>
+</tbody></table>
+<p>A link to a file, param, signal, node, gesture or experiment refers to the program that is loaded. An answer is about the loaded preset, so its links resolve; a note that depends on another preset loads it first with a <code>preset</code> link.</p>
+<h2>In the agent&#39;s scope</h2>
+<p>The agent can follow a link itself with <code>link(href)</code>, and open a chapter for the person with <code>book.open(n, at)</code>, which is <code>link(&#39;lab:book?ch=&#39; + n + (at ? &#39;&amp;at=&#39; + at : &#39;&#39;))</code>.</p>
+</div></section>
+<section id="sec-modes-and-permissions"><h2 class="x-h">modes-and-permissions.md</h2><div class="x-md"><h1>Modes and permissions</h1>
+<p>The settings bar under the threads holds three segmented controls: <strong>Mode</strong>, <strong>Model</strong> and <strong>Thinking</strong>. All three are saved in the browser (<code>agentSettings</code>) and apply to the next step or turn.</p>
+<h2>Mode</h2>
+<table>
+<thead>
+<tr>
+<th>option</th>
+<th>value</th>
+<th>tooltip</th>
+<th>composer meta line</th>
+<th>what happens to a step</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auto</td>
+<td><code>auto</code></td>
+<td>runs each step</td>
+<td>steps run as they come</td>
+<td>runs at once</td>
+</tr>
+<tr>
+<td>Ask</td>
+<td><code>ask</code></td>
+<td>you approve each step</td>
+<td>you approve each step</td>
+<td>opens with its code and waits for <strong>Run this step</strong> or <strong>Decline</strong></td>
+</tr>
+<tr>
+<td>Read-only</td>
+<td><code>read</code></td>
+<td>no edits</td>
+<td>read-only</td>
+<td>runs with the guarded scope: editing code, notes or params throws</td>
+</tr>
+</tbody></table>
+<p>The instructions tell the model about both restrictive modes: <em>In Ask mode the person approves each eval; in Read-only mode edits are refused: say what you would change instead.</em></p>
+<h3>Ask</h3>
+<p>While a step waits, its box and dot turn <code>accent</code>, the dot blinks, the time slot reads <strong>waiting for you</strong>, and the box is open so the code can be read before it runs.</p>
+<ul>
+<li><strong>Run this step</strong> resolves the wait with <code>true</code>; the step runs as in Auto.</li>
+<li><strong>Decline</strong> resolves it with <code>false</code>. The step is marked failed with the result <em>The person declined this step.</em>, and Claude receives: <em>Declined by the person. Ask what they want instead, or explain the change without running it.</em></li>
+<li><strong>Stop</strong> aborts the whole call. A waiting step resolves as declined.</li>
+</ul>
+<h3>Read-only</h3>
+<p><code>files.write</code>, <code>files.edit</code>, <code>run</code>, <code>reset</code>, <code>setParam</code> and <code>setNotes</code> throw, and so do <code>game.setParam</code>, <code>game.set</code>, <code>game.add</code>, <code>game.edit</code> and <code>game.reset</code>; <code>lab</code> is the guarded scope too, and <code>game.paramValues</code> comes back as a copy. Code can still drive and knock the live world (<code>perform</code>, <code>step</code>, <code>world.applyImpulse</code>). Present Read-only as protection against an accidental edit, never as a sandbox.</p>
+<h2>Model and Thinking</h2>
+<table>
+<thead>
+<tr>
+<th>Model option</th>
+<th><code>modelTier</code> sent</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Fast</td>
+<td><code>quick</code></td>
+</tr>
+<tr>
+<td>Balanced</td>
+<td><code>default</code> (the default)</td>
+</tr>
+<tr>
+<td>Deep</td>
+<td><code>complex</code></td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>Thinking option</th>
+<th><code>effort</code> sent</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Auto</td>
+<td>nothing (the default)</td>
+</tr>
+<tr>
+<td>Low</td>
+<td><code>low</code></td>
+</tr>
+<tr>
+<td>Med</td>
+<td><code>medium</code></td>
+</tr>
+<tr>
+<td>High</td>
+<td><code>high</code></td>
+</tr>
+</tbody></table>
+<p>The page never names a model. Per the <code>sample</code> contract, <code>effort</code> applies where the platform runs the chosen tier with thinking and is otherwise ignored.</p>
+<h2>When Claude is not available</h2>
+<p>On mount the panel asks for the capability once. If it resolves <code>null</code>, the off banner appears above the log and Send and the suggestions are disabled. If a later call fails with one of the codes below, the banner appears with that code&#39;s sentence. The rest of the workbench keeps working. The banner always starts with <strong>The agent is off here.</strong> and then gives one of these:</p>
+<table>
+<thead>
+<tr>
+<th>cause</th>
+<th>sentence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>no capability at load</td>
+<td>Claude is not available in this view, so the agent cannot run. Everything else in the workbench works.</td>
+</tr>
+<tr>
+<td>no capability when sending</td>
+<td>Claude is not available here, so the agent is off. Everything else in the workbench works.</td>
+</tr>
+<tr>
+<td><code>not_granted</code></td>
+<td>Claude is not allowed for this page. You can allow it from the artifact’s permissions.</td>
+</tr>
+<tr>
+<td><code>sampling_disabled</code></td>
+<td>Claude is not available for this account.</td>
+</tr>
+<tr>
+<td><code>not_declared</code></td>
+<td>This page no longer asks for Claude.</td>
+</tr>
+<tr>
+<td><code>capability_disabled</code></td>
+<td>Claude is unavailable in this view.</td>
+</tr>
+<tr>
+<td><code>tools_unavailable</code></td>
+<td>This view cannot run the agent’s tool.</td>
+</tr>
+<tr>
+<td><code>capability_removed</code></td>
+<td>This app version cannot run the agent.</td>
+</tr>
+</tbody></table>
+<p>The same sentence is also left as a note on the turn that failed.</p>
+<h2>When a turn ends early</h2>
+<p>Other outcomes become a note under the turn, in <code>ink-2</code> at <code>fs-xs</code>. A turn with a note and no text gets the error class, and its <strong>Agent</strong> label turns <code>accent</code>.</p>
+<table>
+<thead>
+<tr>
+<th>outcome</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Stop (<code>cancelled</code>)</td>
+<td>Stopped.</td>
+</tr>
+<tr>
+<td><code>rate_limited</code></td>
+<td>Too many requests just now; try again in a little while.</td>
+</tr>
+<tr>
+<td><code>prompt_too_large</code></td>
+<td>The conversation is too long. Start a new thread.</td>
+</tr>
+<tr>
+<td><code>refused</code></td>
+<td>Claude declined this request. (Any streamed text is cleared.)</td>
+</tr>
+<tr>
+<td>the answer was truncated</td>
+<td>The answer hit the length limit.</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>Interrupted: <em>the error&#39;s message or code</em></td>
+</tr>
+</tbody></table>
+<p>The panel never retries on its own. Whatever text had streamed before a failure stays on screen, except after <code>refused</code>.</p>
+<h2>Consent and cost</h2>
+<p>The page declares the <code>sample</code> capability. The viewer is asked for consent at the first call; a call draws on the viewer&#39;s own Claude usage, every tool round is another request, and calls with tools are never cached. That is why the agent runs only when the person presses Send, clicks a suggestion or sends a prepared <code>lab:ask</code> question.</p>
+</div></section>
+<section id="sec-patterns"><h2 class="x-h">patterns.md</h2><div class="x-md"><h1>Patterns</h1>
+<p>These are the working habits the agent&#39;s instructions ask for, and the ones Chapter 54 of the book (&quot;Working with the agent&quot;) shows by measurement. Each says where it comes from.</p>
+<h2>Look before you change</h2>
+<p><em>Instructions:</em> &quot;Look before you change: files.grep / files.read(path, from, to) to find code; describe(id) / inspect(pattern) for the compiled program.&quot;</p>
+<ul>
+<li>Do: <code>return files.grep(&#39;spin = &#39;, &#39;skate/motors.js&#39;);</code>, then read the lines around the hit.</li>
+<li>Don&#39;t: write an edit from memory of what the file probably says.</li>
+</ul>
+<h2>Edit exact text, then rebuild</h2>
+<p><em>Instructions:</em> &quot;Change code with files.edit(path, find, replace) (exact, unique text) rather than rewriting files. Then call run() — the running world keeps its state — and read the result: { ok, errors }.&quot;</p>
+<ul>
+<li>Do: <code>files.edit(&#39;skate/motors.js&#39;, &#39;spin = 19 }&#39;, &#39;spin = 21 }&#39;); return run();</code></li>
+<li>Don&#39;t: <code>files.write</code> a whole file to change one number. When <code>edit</code> throws <em>text occurs N times</em>, add context until the text is unique.</li>
+</ul>
+<h2>Verify in a fresh world, before and after</h2>
+<p><em>Instructions:</em> &quot;Verify with test({ trick: &#39;kickflip&#39; }) or test({ script, seconds, opts }) — a fresh headless world — and look at tricks / events / failed. Compare before and after when tuning.&quot;</p>
+<p>A before-and-after pair from <code>test</code> is exact, because the program is deterministic: any difference comes from the edit. Report both numbers.</p>
+<h2>Keep results small</h2>
+<p><em>Instructions:</em> &quot;Keep results small: pick fields, slice arrays.&quot;</p>
+<ul>
+<li>Do: <code>const k = test(&#39;kickflip&#39;).tricks[0]; return { name: k.name, landed: k.landed, air: k.air, score: k.score };</code></li>
+<li>Don&#39;t: <code>return test(&#39;kickflip&#39;);</code> when two fields are wanted. Every round re-reads every earlier result, and results over 9,000 characters are cut.</li>
+</ul>
+<h2>Name a measured quantity</h2>
+<p><em>Chapter 54.4:</em> &quot;Make the kickflip feel snappier&quot; leaves the agent to decide what snappier means; &quot;make the catch come earlier, measured by the <code>catch</code> event&#39;s <code>after</code>&quot; gives it a target and a test. When a request is vague, pick the quantity, say which one, and measure it.</p>
+<h2>Sweep everything that shares the changed code</h2>
+<p><em>Chapter 54.4:</em> the flick motor serves every trick with a flick, so the honest unit to check is the list of gestures. Raising its default spin from 19 to 21 rad/s keeps the kickflip landing (850 → 845 points), and the same sweep finds the change the narrow check misses:</p>
+<pre><code class="language-yaml">- gesture: varialHeelflip
+  before: varial heelflip
+  after: laser flip
+  score: 2373
+</code></pre>
+<p>&quot;Yes, it still lands&quot; would have been true and misleading. Use <code>query(q =&gt; q.systems().where(n =&gt; n.reads(&#39;flick/spin&#39;)))</code> to find who shares a value.</p>
+<h2>Say which world a number came from</h2>
+<p><em>Chapter 54.5:</em> a headless run is exact, but it can answer a different question from the person&#39;s.</p>
+<ul>
+<li>Live params do not reach <code>test</code>: it builds at the declared defaults. After <code>setParam(&#39;flick/spin&#39;, 30)</code>, <code>test</code> still answers for 19 rad/s.</li>
+<li><code>opts</code> replace the preset&#39;s build options: <code>test({ trick, opts })</code> rebuilds through <code>createSkateGame(opts)</code>.</li>
+<li>The stage&#39;s world has a history: a gesture pressed in the air or just after a fakie landing behaves differently from the routine <code>test</code> plays from rest.</li>
+<li>One run is one sample: a margin needs perturbed runs and a rate.</li>
+</ul>
+<p>So state the gestures, the starting state, the param values and any perturbation behind a claim like &quot;it still lands&quot;.</p>
+<h2>Measure again rather than remember</h2>
+<p>Earlier step results come back to the model only as a 160-character fragment. When an earlier table matters, run it again or ask the person to keep it (for example with <code>setNotes</code>).</p>
+<h2>In Read-only, describe the change</h2>
+<p><em>Instructions:</em> &quot;in Read-only mode edits are refused: say what you would change instead.&quot; Give the file, the line and the exact replacement, so the person can switch to Auto or Ask and have it applied.</p>
+<h2>Hand the person the way in</h2>
+<p><em>Instructions:</em> &quot;Name files and lines; you may include lab: links, which the person can click.&quot; An answer that changed <code>skate/motors.js:192</code> links to it; an answer about a trick links to playing it. See the lab: links section.</p>
+<h2>Remember what revert restores</h2>
+<p>Revert restores files and rebuilds; it does not restore params, and it cannot undo what steps did to the live world. When a step changed a param, say so in the answer.</p>
+</div></section>
+<section id="sec-system-prompt"><h2 class="x-h">system-prompt.md</h2><div class="x-md"><h1>The system prompt</h1>
+<p>The <code>sample</code> capability has no system prompt the page controls: Claude sees only the turns the page sends. So the agent&#39;s instructions travel inside the first user turn of every call, followed by the workbench&#39;s whole Reference (<code>content/reference.md</code>, about 15,000 characters), a <code>---</code> line and the person&#39;s first message. The latest user turn is prefixed with the context block. Both are rebuilt on every send, so a thread picks up a changed Reference or a new preset at once.</p>
+<h2>The instructions, verbatim</h2>
+<p>From <code>instructions(host)</code> in <code>app/ui/agent.jsx:73–87</code>; the last line, <code>${host.reference}</code>, is replaced by the Reference.</p>
+<pre><code class="language-text">You are the coding agent inside Form Skate Workbench, an IDE for building a skateboard game from the ground up on @form/core, a small JavaScript simulation framework (things, sites, links, states, derived signals, systems, watches, views). The game&#39;s library is a set of editable files (main.js, rigid.js, skate/*.js, experiments.js). The person you are helping sees the code, a live drafting-style stage, traces, events, params and a dataflow graph.
+
+You have one tool, eval: it runs an async JavaScript function body in the page and returns the value (as YAML) plus anything you console.log. Use it to read files, edit them, rebuild, test tricks headlessly, read traces and events, and change params. The scope is described below under &quot;The agent&#39;s eval scope&quot;. Keep results small: pick fields, slice arrays.
+
+How to work:
+- Look before you change: files.grep / files.read(path, from, to) to find code; describe(id) / inspect(pattern) for the compiled program.
+- Change code with files.edit(path, find, replace) (exact, unique text) rather than rewriting files. Then call run() — the running world keeps its state — and read the result: { ok, errors }.
+- Verify with test({ trick: &#39;kickflip&#39; }) or test({ script, seconds, opts }) — a fresh headless world — and look at tricks / events / failed. Compare before and after when tuning.
+- In Ask mode the person approves each eval; in Read-only mode edits are refused: say what you would change instead.
+- Answer in a few short paragraphs of markdown. Name files and lines; you may include lab: links, which the person can click: [open](lab:open?file=skate/motors.js&amp;line=120), [pin](lab:trace?id=recognizer/flipTurns), [try it](lab:trick?name=kickflip), [select](lab:node?id=pop/pop), [doc](lab:doc?id=rigid-bodies). Use $…$ for maths.
+- Physics is in SI units: metres, seconds, kilograms, newtons, radians. The step is 1/120 s with 8 substeps.
+${host.reference}
+</code></pre>
+<h2>What each part does</h2>
+<table>
+<thead>
+<tr>
+<th>part</th>
+<th>its job</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>The first paragraph</td>
+<td>Says where the agent is and what the person sees, so the agent can refer to the stage, traces, events, params and graph by name.</td>
+</tr>
+<tr>
+<td>&quot;You have one tool, eval&quot;</td>
+<td>Explains the tool in one paragraph, points to the scope section of the Reference, and sets the first habit: keep results small.</td>
+</tr>
+<tr>
+<td>&quot;How to work&quot;</td>
+<td>The working loop in four steps: look (<code>files.grep</code>, <code>files.read</code>, <code>describe</code>, <code>inspect</code>), edit (<code>files.edit</code>, exact and unique), rebuild (<code>run()</code>), verify (<code>test</code>, before and after).</td>
+</tr>
+<tr>
+<td>The modes line</td>
+<td>Tells the agent what Ask and Read-only mean for it, and what to do when an edit is refused.</td>
+</tr>
+<tr>
+<td>The answer line</td>
+<td>Sets the shape of answers: a few short paragraphs of Markdown, files and lines named, <code>lab:</code> links, <code>$…$</code> maths. Its five example links are real actions.</td>
+</tr>
+<tr>
+<td>The units line</td>
+<td>SI units and the 1/120 s step, so measured numbers are read correctly.</td>
+</tr>
+<tr>
+<td>The Reference</td>
+<td>Every name the agent can call, the same document the person reads in the Reference tab. Its last section, &quot;The agent&#39;s eval scope&quot;, lists the scope.</td>
+</tr>
+</tbody></table>
+<h2>The context block</h2>
+<p>From <code>context(host)</code> in <code>app/ui/agent.jsx:88–100</code>:</p>
+<pre><code class="language-js">function context(host) {
+  const rt = host.rt, p = host.preset, bi = host.buildInfo;
+  const lines = [`preset: ${p.id} ${p.title} (${p.group}) — ${p.about || &#39;&#39;}`];
+  if (rt) lines.push(`world: t = ${rt.time.toFixed(2)} s, ${host.running ? &#39;running&#39; : &#39;paused&#39;} at ${host.speed}×, driver ${host.autopilotOn() ? &#39;autopilot&#39; : &#39;person&#39;}`);
+  lines.push(bi ? (bi.ok ? `build: ok (${bi.stats ? `${bi.stats.systems} systems, ${bi.stats.signals} signals, ${bi.stats.states} states` : &#39;&#39;})` : `build: FAILS — ${bi.message}`) : &#39;build: none&#39;);
+  const errs = host.diags.filter(d =&gt; d.severity !== &#39;info&#39;); if (errs.length) lines.push(&#39;diagnostics:\n&#39; + errs.slice(0, 8).map(d =&gt; `  ${d.severity} ${d.src ? d.src.file + &#39;:&#39; + d.src.line : &#39;&#39;} ${d.message}`).join(&#39;\n&#39;));
+  if (rt &amp;&amp; rt.failed) lines.push(`runtime stopped: ${rt.failed.system} — ${rt.failed.error.message} at ${rt.failed.src ? rt.failed.src.file + &#39;:&#39; + rt.failed.src.line : &#39;?&#39;}`);
+  lines.push(&#39;files: &#39; + Object.keys(host.files).sort().map(f =&gt; f + (host.isDirty(f) ? &#39;*&#39; : &#39;&#39;)).join(&#39;, &#39;) + &#39; (* edited)&#39;);
+  if (host.selection) lines.push(&#39;selected node: &#39; + host.selection);
+  if (rt) { const tr = rt.events.list({ type: &#39;trick&#39;, last: 5 }).map(e =&gt; `${e.data.name}${e.data.landed ? &#39;&#39; : &#39; (bail)&#39;} flip ${fmt(e.data.measurements.flip)} shove ${fmt(e.data.measurements.shove)} air ${fmt(e.data.measurements.air)}`); if (tr.length) lines.push(&#39;last tricks: &#39; + tr.join(&#39;; &#39;)); }
+  if (host.pinned.length) lines.push(&#39;pinned traces: &#39; + host.pinned.join(&#39;, &#39;));
+  return &#39;[context]\n&#39; + lines.join(&#39;\n&#39;) + &#39;\n[/context]&#39;;
+}
+</code></pre>
+<p>A real block from preset B-01 is quoted in How the agent works. Lines appear only when they apply: diagnostics only when there are warnings or errors, the stopped system only when the runtime failed, the selected node only when there is one, tricks only after some were recognized, pinned traces only when some are pinned.</p>
+<h2>Writing instructions for an agent like this</h2>
+<ul>
+<li>Keep them short and operational: where the agent is, its one tool, the loop, the modes, the answer shape, the units.</li>
+<li>Append the API reference instead of describing the API in the prompt, and keep that reference the one the person reads.</li>
+<li>Put live state in a context block on the latest turn, not in the instructions, so the instructions stay the same from turn to turn.</li>
+</ul>
+</div></section>
+<section id="sec-the-eval-tool"><h2 class="x-h">the-eval-tool.md</h2><div class="x-md"><h1>The eval tool</h1>
+<p><code>eval</code> is the agent&#39;s only tool. Claude sends JavaScript; the page runs it with the lab scope and sends back YAML. The model decides what code to send; the page decides what that code can reach.</p>
+<h2>The schema</h2>
+<pre><code class="language-js">// app/ui/agent.jsx:135–138
+const evalTool = {
+  name: &#39;eval&#39;,
+  description: &#39;Run an async JavaScript function body in the workbench with the lab API in scope (files, run, test, trace, events, inspect, params, setParam, …). Returns the value as YAML plus console.log output. Use `return` to return a value.&#39;,
+  inputSchema: { type: &#39;object&#39;, properties: { code: { type: &#39;string&#39;, description: &#39;the body of an async function; return what you want to see&#39; } }, required: [&#39;code&#39;] },
+  execute: async ({ code }, c) =&gt; { … },
+};
+</code></pre>
+<p><code>execute</code> coerces <code>code</code> to a string, records the step, waits for approval in Ask mode, runs <code>runEval</code>, stores the result on the step and returns the result text to Claude.</p>
+<h2>How the code runs</h2>
+<pre><code class="language-js">// app/ui/agent.jsx:59–68
+const names = Object.keys(scope).filter(k =&gt; /^[A-Za-z_$][\w$]*$/.test(k));
+const t0 = performance.now(); let value, error = null;
+try {
+  const fn = new Function(...names, &#39;&quot;use strict&quot;;\nreturn (async () =&gt; {\n&#39; + code + &#39;\n})();\n//# sourceURL=agent-eval.js&#39;);
+  value = await Promise.race([fn(...names.map(k =&gt; scope[k])), new Promise((_, rej) =&gt; setTimeout(() =&gt; rej(new Error(&#39;eval timed out after 25 s&#39;)), 25000))]);
+} catch (e) { error = e; }
+</code></pre>
+<ul>
+<li>Every scope name becomes a parameter of a strict function whose body is an async arrow around the step&#39;s code. So the code can <code>await</code>, must <code>return</code> what it wants seen, and its <code>const</code> and <code>let</code> names do not carry over to the next step. Each step gets a new scope object.</li>
+<li>The race abandons the wait after 25 s with <em>eval timed out after 25 s</em>. It only catches code that awaits: a synchronous loop that never ends blocks the page, because the timer cannot fire.</li>
+<li>An error comes back as <code>Error: &lt;message&gt; (line N)</code>, with N taken from the <code>agent-eval.js</code> frame of the stack. In the current build N is two higher than the line in the step&#39;s code: a throw from the first line reports <code>(line 3)</code>.</li>
+<li>Anything passed to <code>console.log</code> or <code>log</code> is collected; strings as they are, other values as one-line YAML. <code>console.warn</code> and <code>console.error</code> add <code>warn: </code> and <code>error: </code> lines.</li>
+<li>With logs, the result is <code>logs:</code>, the lines, <code>---</code>, then the value.</li>
+<li>A result over 9,000 characters is cut, and the model reads <code>… cut (N chars). Return less: pick fields, slice arrays.</code></li>
+</ul>
+<p>A real result with logs, from <code>const e = test(&#39;heelflip&#39;).events; console.log(e.length, &#39;events&#39;); return e.filter(x =&gt; x.type === &#39;catch&#39;);</code>:</p>
+<pre><code class="language-yaml">logs:
+6 events
+---
+- t: 2.95
+  type: catch
+  by: flick
+  after: 0.317
+</code></pre>
+<p>A real error, from an edit whose text was not in the file:</p>
+<pre><code class="language-text">Error: edit: text not found in skate/motors.js (it must match exactly, including spaces) (line 3)
+</code></pre>
+<h2>The scope</h2>
+<p><code>labScope(host)</code> in <code>app/host.js</code> builds the API; <code>runEval</code> adds <code>lab</code> (the same scope as one object), <code>console</code> and <code>log</code>, and deletes <code>host</code> (the whole workbench) from both. The names, by what they act on:</p>
+<table>
+<thead>
+<tr>
+<th>group</th>
+<th>name</th>
+<th>returns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>files</td>
+<td><code>files.list()</code></td>
+<td><code>[{ path, lines, edited }]</code>, sorted</td>
+</tr>
+<tr>
+<td></td>
+<td><code>files.read(path, from?, to?)</code></td>
+<td>the whole file; with <code>from</code>, numbered lines <code>from</code>…<code>to</code> (40 lines by default)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>files.grep(pattern, path?)</code></td>
+<td>up to 80 lines <code>file:line  text</code> (text trimmed to 160 characters)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>files.edit(path, find, replace)</code></td>
+<td><code>{ path, line }</code>; throws when <code>find</code> is missing or occurs more than once</td>
+</tr>
+<tr>
+<td></td>
+<td><code>files.write(path, src)</code></td>
+<td><code>{ path, lines }</code></td>
+</tr>
+<tr>
+<td>the live world</td>
+<td><code>game</code>, <code>world</code></td>
+<td>the stage&#39;s runtime and its world</td>
+</tr>
+<tr>
+<td></td>
+<td><code>read(id)</code>, <code>trace(id)</code></td>
+<td>a state&#39;s or signal&#39;s value now; its trace, read with <code>.last(s).values()</code>, <code>.summary()</code> or <code>.plot()</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>events(type?, last = 20)</code></td>
+<td><code>[{ t, type, source, …data }]</code>, numbers to 3 decimals</td>
+</tr>
+<tr>
+<td></td>
+<td><code>params(glob = &#39;**&#39;)</code></td>
+<td><code>[{ id, value, default, min, max, unit, label }]</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>setParam(id, v)</code></td>
+<td>the new value</td>
+</tr>
+<tr>
+<td></td>
+<td><code>run()</code></td>
+<td><code>{ ok: true, ms, kept, warnings }</code> or <code>{ ok: false, errors: [{ message, at }] }</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>reset()</code>, <code>pause()</code>, <code>play()</code></td>
+<td><code>&#39;reset&#39;</code>, <code>&#39;paused&#39;</code>, <code>&#39;playing&#39;</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>step(n = 1)</code>, <code>advance(seconds = 1)</code>, <code>perform(trick)</code></td>
+<td>the time; <code>{ time, failed }</code>; <code>true</code> once the gesture is scheduled, <code>false</code> when there is no such gesture</td>
+</tr>
+<tr>
+<td>fresh worlds</td>
+<td><code>test(o)</code></td>
+<td><code>{ ok, time, ms, failed, tricks, events }</code> from a new headless runtime; <code>test(&#39;kickflip&#39;)</code> means <code>test({ trick: &#39;kickflip&#39; })</code></td>
+</tr>
+<tr>
+<td></td>
+<td><code>simulate(o)</code></td>
+<td>that runtime itself</td>
+</tr>
+<tr>
+<td>the program</td>
+<td><code>describe(id)</code>, <code>inspect(glob)</code>, <code>query(fn)</code>, <code>diagnostics()</code></td>
+<td>the compiled program&#39;s nodes; <code>[{ severity, message, at }]</code></td>
+</tr>
+<tr>
+<td>the bench</td>
+<td><code>open(file, line)</code>, <code>select(id)</code>, <code>view(name, track?)</code>, <code>overlay(name, on = true)</code>, <code>pin(id)</code>, <code>link(href)</code></td>
+<td>they drive the workbench&#39;s views</td>
+</tr>
+<tr>
+<td></td>
+<td><code>notes()</code>, <code>setNotes(md)</code>, <code>doc(id)</code></td>
+<td>the preset&#39;s notes; their new length; a shelf doc&#39;s Markdown</td>
+</tr>
+<tr>
+<td></td>
+<td><code>book.contents()</code>, <code>book.chapter(n)</code>, <code>book.search(text)</code>, <code>book.open(n, at?)</code></td>
+<td><code>[{ n, part, title, about, written }]</code>; a chapter&#39;s Markdown; <code>[{ n, title, hits }]</code>; opens it for the person</td>
+</tr>
+<tr>
+<td></td>
+<td><code>experiment(name, { full })</code></td>
+<td>the experiment&#39;s rows, also shown in Experiments</td>
+</tr>
+<tr>
+<td></td>
+<td><code>depthOrder.list()</code>, <code>depthOrder.use(name)</code></td>
+<td>the stage&#39;s drawing-order strategies</td>
+</tr>
+<tr>
+<td></td>
+<td><code>clip.info()</code>, <code>clip.record(seconds, trick?)</code>, <code>clip.useRecording()</code>, <code>clip.replay()</code>, <code>clip.stop()</code>, <code>clip.score(o)</code>, <code>clip.cameras</code></td>
+<td>recording, replaying and scoring clips</td>
+</tr>
+<tr>
+<td>helpers</td>
+<td><code>FORM</code>, <code>V</code>, <code>Q</code>, <code>console</code>, <code>log</code>, <code>lab</code></td>
+<td>the core, vector and quaternion maths, logging, the scope itself</td>
+</tr>
+</tbody></table>
+<p><code>test</code> builds its world from the files as they are now, including edits not yet run, at the declared default params. It plays the trick&#39;s routine for at least 3.6 s and keeps eleven event types (<code>trick</code>, <code>bail</code>, <code>land</code>, <code>pop</code>, <code>flick</code>, <code>scoop</code>, <code>wrap</code>, <code>catch</code>, <code>tailStrike</code>, <code>respawn</code>, <code>error</code>). Live params never reach it.</p>
+<h2>The result format: yaml()</h2>
+<p><code>yaml()</code> (agent.jsx:16–41) writes compact YAML for the model, never JSON:</p>
+<table>
+<thead>
+<tr>
+<th>value</th>
+<th>written as</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>number</td>
+<td>rounded to 5 decimals (<code>0.98765</code>); <code>NaN</code> and <code>Infinity</code> as words</td>
+</tr>
+<tr>
+<td>string</td>
+<td>bare when short and plain (letters, digits, spaces and <code>.,:/()+-·×→%</code>, under 120 characters), quoted JSON otherwise, a `</td>
+</tr>
+<tr>
+<td>function</td>
+<td><code>[function name]</code></td>
+</tr>
+<tr>
+<td>a handle with <code>kind</code> and <code>id</code></td>
+<td><code>kind id</code>, e.g. <code>system pop/pop</code></td>
+</tr>
+<tr>
+<td>the runtime</td>
+<td><code>[Runtime t=3.542 failed=false]</code></td>
+</tr>
+<tr>
+<td>world, host</td>
+<td><code>[World]</code>, <code>[Host]</code></td>
+</tr>
+<tr>
+<td>list of numbers</td>
+<td>one line, up to 64 items, then <code>… N items</code></td>
+</tr>
+<tr>
+<td>other lists</td>
+<td><code>- </code> items, up to 60, then <code># … N more</code></td>
+</tr>
+<tr>
+<td>objects</td>
+<td><code>key: value</code> lines, up to 80 keys, then <code># … N more keys</code></td>
+</tr>
+<tr>
+<td>deeper than 5 levels</td>
+<td><code>[array N]</code> or <code>{…}</code></td>
+</tr>
+<tr>
+<td>Map, Set, typed array</td>
+<td>as an object, a list, a list</td>
+</tr>
+<tr>
+<td>a repeated object</td>
+<td><code>[circular]</code></td>
+</tr>
+</tbody></table>
+<p>A real result, from <code>return params(&#39;flick/*&#39;);</code> (first entry of eight):</p>
+<pre><code class="language-yaml">- id: flick/spin
+  value: 19
+  default: 19
+  min: 0
+  max: 45
+  unit: rad/s
+  label: flip rate per turn
+</code></pre>
+<h2>The Read-only guard</h2>
+<pre><code class="language-js">// app/ui/agent.jsx:42, 50–57
+const READONLY = new Set([&#39;run&#39;, &#39;reset&#39;, &#39;setParam&#39;, &#39;setNotes&#39;]);
+if (readOnly) {
+  for (const k of READONLY) scope[k] = () =&gt; { throw new Error(`read-only mode: ${k}() is off`); };
+  const off = k =&gt; () =&gt; { throw new Error(`read-only mode: ${String(k)}() is off`); };
+  const guard = (obj, test) =&gt; obj &amp;&amp; new Proxy(obj, { get: (t, k) =&gt; test(String(k)) ? off(k) : k === &#39;paramValues&#39; ? new Map(t[k]) : (typeof t[k] === &#39;function&#39; ? t[k].bind(t) : t[k]) });
+  scope.game = guard(host.rt, k =&gt; /^(setParam|edit|reset|set|add)$/.test(k));
+  scope.lab = Object.assign({}, scope);
+}
+</code></pre>
+<p><code>files.write</code> and <code>files.edit</code> are replaced too (agent.jsx:46). Real results in Read-only mode:</p>
+<pre><code class="language-text">Error: read-only mode: files.edit is off (line 3)
+Error: read-only mode: files.write is off (line 3)     ← lab.files.write
+Error: read-only mode: setParam() is off (line 3)      ← game.setParam
+</code></pre>
+<p>The guard protects code, notes and params from an accidental edit. It is not a sandbox: <code>perform</code>, <code>step</code>, <code>advance</code> and <code>world.applyImpulse</code> still drive the live world.</p>
+</div></section>
+<section id="sec-voice"><h2 class="x-h">voice.md</h2><div class="x-md"><h1>Voice</h1>
+<h2>What the instructions ask for</h2>
+<p>The instructions set the shape of every answer:</p>
+<blockquote>
+<p>Answer in a few short paragraphs of markdown. Name files and lines; you may include lab: links, which the person can click: <a href="lab:open?file=skate/motors.js&line=120">open</a>, <a href="lab:trace?id=recognizer/flipTurns">pin</a>, <a href="lab:trick?name=kickflip">try it</a>, <a href="lab:node?id=pop/pop">select</a>, <a href="lab:doc?id=rigid-bodies">doc</a>. Use $…$ for maths.</p>
+<p>Physics is in SI units: metres, seconds, kilograms, newtons, radians. The step is 1/120 s with 8 substeps.</p>
+</blockquote>
+<p>So an answer is:</p>
+<ul>
+<li><strong>A few short paragraphs.</strong> Not a report, not a list of everything the steps printed. The steps are already on screen above the answer.</li>
+<li><strong>Concrete.</strong> It names the file and line it changed, the numbers it measured and their units.</li>
+<li><strong>Linked.</strong> Places and actions are <code>lab:</code> links, so the person can go there with one click.</li>
+<li><strong>Plain Markdown.</strong> Bold for the names that matter, inline code for identifiers, a table when there are more than a few numbers to compare, <code>$…$</code> for maths.</li>
+</ul>
+<h2>The shape of a good answer</h2>
+<p>This answer closed the thread in the screenshots. Its numbers are the results of the steps above it.</p>
+<blockquote>
+<p>I raised the flick motor&#39;s default spin from 19 to 21 rad/s at <a href="lab:open?file=skate/motors.js&line=192">skate/motors.js:192</a> and rebuilt; the running world kept its 37 states and 4 bodies.</p>
+<p>Measured in fresh worlds before and after the edit, the kickflip still lands. The catch comes 0.283 s after the flick instead of 0.308 s, the flip stays at 0.988 turns, the air goes from 0.417 to 0.408 s and the score from 850 to 845. <a href="lab:trick?name=kickflip">Play a kickflip</a> to see it.</p>
+<p>The flick motor serves every flip trick, so I also ran all fifteen gestures. One changed name: the <strong>varial heelflip</strong> is now recognized as a <strong>laser flip</strong>, worth 2,373 points. Should I look for a rate that keeps it a varial heelflip, or keep 21 rad/s?</p>
+</blockquote>
+<ul>
+<li>The first paragraph says what changed, where, and that it was rebuilt.</li>
+<li>The second gives the measurement that answers the request: before and after, with units, and which world it came from.</li>
+<li>The third reports what else the change touched and ends with the one decision the person has to make.</li>
+</ul>
+<h2>Habits</h2>
+<ul>
+<li>Give the answer as a number the person can check: &quot;0.283 s instead of 0.308 s&quot;, not &quot;noticeably faster&quot;.</li>
+<li>Say which world: &quot;measured in fresh worlds&quot;, &quot;in the live world at flick/spin 30&quot;.</li>
+<li>Keep &quot;it still lands&quot; attached to its conditions: which gestures, from which starting state, at which param values.</li>
+<li>Say what the run left out when it matters: live params, build options that replace the preset&#39;s, the stage&#39;s history, a single sample.</li>
+<li>In Read-only mode, describe the edit you would make instead of saying you cannot.</li>
+</ul>
+<h2>The panel&#39;s own words</h2>
+<p>The interface speaks the same way: short, literal, no exclamation marks.</p>
+<ul>
+<li>Empty state: &quot;Ask for a change and the agent edits the library, rebuilds, and tests it headlessly. It works through one tool, <strong>eval</strong>, with the same API you see in the Reference.&quot;</li>
+<li>Composer placeholder: &quot;Ask the agent: “make heelflips catch earlier”, “add a manual trick”, “why did that bail?”&quot;</li>
+<li>Meta line: &quot;Enter sends · Shift+Enter for a new line · steps run as they come&quot;</li>
+<li>Toasts: &quot;Reverted the files to before that step and rebuilt&quot;, &quot;Copied&quot;.</li>
+<li>Notes: &quot;Stopped.&quot;, &quot;The conversation is too long. Start a new thread.&quot;</li>
+</ul>
+</div></section>
+<section id="tokens"><h2 class="x-h">Tokens</h2><h3>Colour</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>light</th><th>dark</th><th>usage</th></tr></thead><tbody><tr><td><code>bg</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>The ground of the whole agent panel: thread bar, settings bar, log, composer. Also the text colour on ink fills (the pressed Mode/Model/Thinking segment and the primary Send and Run this step buttons).</td></tr><tr><td><code>fill</code></td><td class="x-sw"><span style="background:#f6f6f6"></span><code>#f6f6f6</code></td><td class="x-sw"><span style="background:#222222"></span><code>#222222</code></td><td>Behind inline code and callouts in the agent's rendered answer (.doc-inline code, .doc-inline .callout). Text on it is ink.</td></tr><tr><td><code>ink</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Primary text on bg, code-bg and fill: the user's message, the answer, step code and step results. Also the 1px box around the user's message and the off banner, the pressed segment fill, the primary button fill, the running-step dot and the focus outline (2px, offset 1px).</td></tr><tr><td><code>ink-2</code></td><td class="x-sw"><span style="background:#737373"></span><code>#737373</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td>Secondary text on bg: the You and Agent labels, control labels (Mode, Model, Thinking), unpressed segments and thread tabs, the step's first line and time, the composer's meta line, Thinking and Working, the revert and copy links, turn notes such as Stopped.</td></tr><tr><td><code>hair</code></td><td class="x-sw"><span style="background:#d6d6d6"></span><code>#d6d6d6</code></td><td class="x-sw"><span style="background:#3d3d3d"></span><code>#3d3d3d</code></td><td>1px lines that frame controls and blocks on bg: segment and button borders, the step box, the composer's top rule and textarea border, the thread bar's bottom rule and tab dividers, the 2px left rule of a step result. Below 3:1 on bg in both themes (source value, kept): every framed control also carries a text label, so the line is never the only cue.</td></tr><tr><td><code>rule</code></td><td class="x-sw"><span style="background:#ededed"></span><code>#ededed</code></td><td class="x-sw"><span style="background:#2a2a2a"></span><code>#2a2a2a</code></td><td>The quietest 1px line: under the settings bar, between a step's summary and its body. Decorative only.</td></tr><tr><td><code>accent</code></td><td class="x-sw"><span style="background:#e2001a"></span><code>#e2001a</code></td><td class="x-sw"><span style="background:#ff3b4a"></span><code>#ff3b4a</code></td><td>Red for things that need the person: a step waiting for approval (border, blinking dot, the words waiting for you), a step that failed (border, dot, result text), an agent turn that ended in an error (its Agent label), the Stop button, the close × on hover, and the small marker after a lab: link. As text it reads on bg and code-bg in both themes. Never decoration, never a fill behind text.</td></tr><tr><td><code>code-bg</code></td><td class="x-sw"><span style="background:#fbfbfb"></span><code>#fbfbfb</code></td><td class="x-sw"><span style="background:#1d1d1d"></span><code>#1d1d1d</code></td><td>Behind step code (pre.src) and inside the composer textarea. Text on it is ink; highlighted tokens use the tok-* colours.</td></tr><tr><td><code>tok-key</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>JavaScript keywords in step code (.tk-k, bold), on code-bg.</td></tr><tr><td><code>tok-str</code></td><td class="x-sw"><span style="background:#6b6b6b"></span><code>#6b6b6b</code></td><td class="x-sw"><span style="background:#a6a6a6"></span><code>#a6a6a6</code></td><td>String literals in step code (.tk-s), on code-bg.</td></tr><tr><td><code>tok-num</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Numbers (.tk-n) and the literals null, true, false, undefined (.tk-b, bold) in step code, on code-bg.</td></tr><tr><td><code>tok-expr</code></td><td class="x-sw"><span style="background:#e2001a"></span><code>#e2001a</code></td><td class="x-sw"><span style="background:#ff3b4a"></span><code>#ff3b4a</code></td><td>The lambda arrow =&gt; in step code (.tk-e, bold), on code-bg: the workbench's one accent in code. Same value as accent.</td></tr><tr><td><code>tok-com</code></td><td class="x-sw"><span style="background:#a3a3a3"></span><code>#a3a3a3</code></td><td class="x-sw"><span style="background:#6e6e6e"></span><code>#6e6e6e</code></td><td>Comments in step code (.tk-c, italic), on code-bg. Below 4.5:1 in both themes (source value, kept): comments are meant to recede.</td></tr><tr><td><code>tok-punc</code></td><td class="x-sw"><span style="background:#a3a3a3"></span><code>#a3a3a3</code></td><td class="x-sw"><span style="background:#6e6e6e"></span><code>#6e6e6e</code></td><td>Punctuation and operators in step code (.tk-p), on code-bg. Below 4.5:1 in both themes (source value, kept): the code's shape reads from ink keywords and names.</td></tr></tbody></table></div><h3>Type</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>family</th><th>stack</th></tr></thead><tbody><tr><td><code>--font-ui</code></td><td><code>Arial, &quot;Helvetica Neue&quot;, Helvetica, sans-serif</code></td></tr><tr><td><code>--font-display</code></td><td><code>Arial, &quot;Helvetica Neue&quot;, Helvetica, sans-serif</code></td></tr><tr><td><code>--font-code</code></td><td><code>ui-monospace, Menlo, Consolas, &quot;Courier New&quot;, monospace</code></td></tr></tbody></table></div><h4>Panel</h4><p class="x-note">One family in two weights, 400 and 700. In the app this stack is the variable --mono, a historical name: it is Arial, not a monospace.</p><div class="x-styles"><div class="x-style"><div class="body x-sample">Make the kickflip spin faster and check it still lands</div><div class="x-meta"><code>.body</code> 12px / 1.45 400<br>The panel's base text: the user's message, the off banner, suggestion buttons, the composer textarea.</div></div><div class="x-style"><div class="answer x-sample">Measured in fresh worlds before and after the edit, the kickflip still lands.</div><div class="x-meta"><code>.answer</code> 12px / 1.55 400<br>The agent's rendered Markdown answer (.md.doc-inline). Paragraphs 8px apart.</div></div><div class="x-style"><div class="answer-heading x-sample">Before and after</div><div class="x-meta"><code>.answer-heading</code> 13px / 1.55 700<br>h1 to h3 inside an answer: all one size, 10px above and 4px below, no rule.</div></div><div class="x-style"><div class="label x-sample">Agent</div><div class="x-meta"><code>.label</code> 10.5px / 1.45 400<br>Small text in ink-2: the You and Agent labels, Mode/Model/Thinking labels, small segments, thread tabs, step summaries and times, the composer meta line, Thinking, turn notes, link buttons.</div></div><div class="x-style"><div class="label-strong x-sample">eval</div><div class="x-meta"><code>.label-strong</code> 10.5px / 1.45 700<br>The active thread tab, the word eval in a step summary, waiting for you on a step that asks.</div></div><div class="x-style"><div class="button x-sample">Send</div><div class="x-meta"><code>.button</code> 12px / 1.2 400<br>Send and Stop (.btn). The small buttons Run this step and Decline (.btn.sm) use label size.</div></div></div><h4>Code</h4><p class="x-note">The system monospace stack; nothing is downloaded.</p><div class="x-styles"><div class="x-style"><div class="step-code x-sample">files.edit('skate/motors.js', 'spin = 19 }', 'spin = 21 }');</div><div class="x-meta"><code>.step-code</code> 10.5px / 1.5 400<br>The code of an eval step inside its open box (pre.src), and code blocks in answers.</div></div><div class="x-style"><div class="step-first-line x-sample">return files.grep('spin = ', 'skate/motors.js');</div><div class="x-meta"><code>.step-first-line</code> 10.5px / 1.4 400<br>The first non-empty line of a step's code in its one-line summary, cut with an ellipsis.</div></div><div class="x-style"><div class="result x-sample">name: kickflip<br>landed: true<br>score: 850</div><div class="x-meta"><code>.result</code> 10.5px / 1.5 400<br>A step's YAML result (pre.res): pre-wrapped, 2px hair rule on the left, red when the step failed.</div></div><div class="x-style"><div class="inline-code x-sample">test('kickflip')</div><div class="x-meta"><code>.inline-code</code> 0.92em 400<br>Inline code in an answer: 0.92 of the answer size, on fill, 3px side padding.</div></div></div><h3>fontSize</h3><p class="x-note">The Kiln size scale, as the app's own variables. The agent panel uses three of its five steps.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--fs-xs</code></td><td><code>10.5px</code></td><td>Labels, tabs, step summaries, results, meta line, small segments and small buttons.</td></tr><tr><td><code>--fs-s</code></td><td><code>12px</code></td><td>Body text, answers, suggestions, the off banner, Send and Stop.</td></tr><tr><td><code>--fs-m</code></td><td><code>13px</code></td><td>Headings inside an answer.</td></tr></tbody></table></div><h3>spacing</h3><p class="x-note">Named by their pixel value. The source writes them as literals in the CSS; these are the values the agent panel actually uses.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--space-3</code></td><td><code>3px</code></td><td>Small button vertical padding (Run this step, Decline); side padding of inline code.</td></tr><tr><td><code>--space-4</code></td><td><code>4px</code></td><td>Gap between a message's label and its body; step box vertical padding and outer margin.</td></tr><tr><td><code>--space-5</code></td><td><code>5px</code></td><td>Gap between suggestion buttons; their vertical padding; button vertical padding.</td></tr><tr><td><code>--space-6</code></td><td><code>6px</code></td><td>Gaps inside a step body and its link row; row gap of the settings bar.</td></tr><tr><td><code>--space-7</code></td><td><code>7px</code></td><td>Thread tab vertical padding; settings bar vertical padding.</td></tr><tr><td><code>--space-8</code></td><td><code>8px</code></td><td>Step box side padding and summary column gap; result left indent; composer row gap; textarea padding; small button side padding; small segment side padding.</td></tr><tr><td><code>--space-10</code></td><td><code>10px</code></td><td>User message and off banner side padding; button side padding; space above an answer heading; space under the empty-state text.</td></tr><tr><td><code>--space-11</code></td><td><code>11px</code></td><td>Side padding of a normal (not small) segment button.</td></tr><tr><td><code>--space-12</code></td><td><code>12px</code></td><td>Log top and bottom padding; composer side padding; thread tab side padding.</td></tr><tr><td><code>--space-14</code></td><td><code>14px</code></td><td>Gap between turns in the log.</td></tr><tr><td><code>--space-16</code></td><td><code>16px</code></td><td>The panel's side gutter: settings bar, log, off banner.</td></tr></tbody></table></div><h3>radius</h3><p class="x-note">Square everywhere. Every control sets border-radius: 0.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--radius-0</code></td><td><code>0</code></td><td>All corners: buttons, segments, step boxes, the user's message, the textarea.</td></tr></tbody></table></div><h3>lineWidth</h3><p class="x-note">Lines carry the structure; there are no shadows.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--line-1</code></td><td><code>1px</code></td><td>Every box and rule: controls, step boxes, the user's message, bars.</td></tr><tr><td><code>--line-2</code></td><td><code>2px</code></td><td>Emphasis: the active thread tab's underline (inset), a step result's left rule, a callout's left rule, the focus outline.</td></tr></tbody></table></div><h3>opacity</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--opacity-disabled</code></td><td><code>0.4</code></td><td>Disabled Send, + New while a turn runs, disabled suggestions.</td></tr><tr><td><code>--opacity-reverted</code></td><td><code>0.55</code></td><td>A step whose files were reverted; its first line is also struck through.</td></tr></tbody></table></div><h3>size</h3><p class="x-note">Fixed sizes and caps in the agent panel.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--dot-step</code></td><td><code>7px</code></td><td>The square status dot in a step summary (ink; accent when asking or failed; blinks while running or asking).</td></tr><tr><td><code>--dot-thinking</code></td><td><code>6px</code></td><td>The blinking square after Thinking and Working.</td></tr><tr><td><code>--textarea-min</code></td><td><code>54px</code></td><td>Composer textarea minimum height.</td></tr><tr><td><code>--textarea-max</code></td><td><code>160px</code></td><td>Composer textarea maximum height (resizable vertically between the two).</td></tr><tr><td><code>--step-code-max</code></td><td><code>280px</code></td><td>Maximum height of a step's code before it scrolls.</td></tr><tr><td><code>--result-max</code></td><td><code>260px</code></td><td>Maximum height of a step's result, and of a code block in an answer, before it scrolls.</td></tr><tr><td><code>--empty-text-max</code></td><td><code>520px</code></td><td>Maximum width of the empty-state paragraph.</td></tr><tr><td><code>--user-msg-max</code></td><td><code>92%</code></td><td>Maximum width of the user's message box.</td></tr></tbody></table></div><h3>limits</h3><p class="x-note">The numbers that bound the agent's loop, from app/ui/agent.jsx. They are behaviour, listed here so they can be found and quoted.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--eval-timeout</code></td><td><code>25 s</code></td><td>An eval still running after this is abandoned with the error eval timed out after 25 s.</td></tr><tr><td><code>--result-cut</code></td><td><code>9000 chars</code></td><td>A longer step result is cut, with the note Return less: pick fields, slice arrays.</td></tr><tr><td><code>--result-stored</code></td><td><code>3000 chars</code></td><td>Step results longer than this are trimmed when the thread is saved in the browser.</td></tr><tr><td><code>--turns-stored</code></td><td><code>30 turns</code></td><td>Each thread keeps its last 30 turns in browser storage.</td></tr><tr><td><code>--history-code</code></td><td><code>100 chars</code></td><td>An earlier step is replayed to the model as the first line of its code, cut to this length.</td></tr><tr><td><code>--history-result</code></td><td><code>160 chars</code></td><td>and the first 160 characters of its result, whitespace collapsed.</td></tr><tr><td><code>--thread-title</code></td><td><code>32 chars</code></td><td>A new thread is titled with the first 32 characters of its first message.</td></tr><tr><td><code>--suggestions</code></td><td><code>6</code></td><td>At most six suggested requests in the empty state: the preset's tries, then two standing ones.</td></tr><tr><td><code>--yaml-decimals</code></td><td><code>5</code></td><td>Numbers in results are rounded to five decimal places.</td></tr><tr><td><code>--yaml-items</code></td><td><code>60</code></td><td>Lists show at most 60 items (64 for lists of plain numbers), objects 80 keys, nesting 5 levels.</td></tr><tr><td><code>--context-diagnostics</code></td><td><code>8</code></td><td>The context block lists at most eight warnings and errors, and the last five tricks.</td></tr></tbody></table></div></section>
+<section id="components"><h2 class="x-h">Components</h2><h3>Conversation</h3><article class="x-comp" id="comp-AgentMessage"><h4>AgentMessage</h4><div class="x-frame"><iframe data-src="components/AgentMessage/standalone.html" src="components/AgentMessage/standalone.html" title="AgentMessage preview" style="height:700px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>One agent turn: the <strong>Agent</strong> label, its eval steps in the order they ran, then the rendered Markdown answer.</p>
+<pre><code class="language-html">&lt;div class=&quot;msg agent&quot;&gt;
+  &lt;span class=&quot;who&quot;&gt;Agent&lt;/span&gt;
+  &lt;details class=&quot;tool&quot;&gt;…&lt;/details&gt;            &lt;!-- one Step per eval call --&gt;
+  &lt;div class=&quot;md doc-inline&quot;&gt;…rendered answer…&lt;/div&gt;
+  &lt;span class=&quot;note&quot;&gt;Stopped.&lt;/span&gt;           &lt;!-- only when the turn ended early --&gt;
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the steps, the answer text and an optional note. Render the answer with the workbench renderer (<code>render(text, { highlight, toc: false })</code>) and route clicks on <code>a.lablink</code> to <code>host.link(a.dataset.lab)</code>.</p>
+<ul>
+<li>While the turn is pending with no text yet, show <code>&lt;span class=&quot;thinking&quot;&gt;Thinking&lt;/span&gt;</code>, or <code>Working</code> once a step has run; a 6px <code>ink-2</code> square blinks after the word.</li>
+<li>The answer streams in: each <code>onText</code> call replaces the text with the whole answer so far.</li>
+<li>The answer is <code>fs-s</code> with line height 1.55, paragraphs 8px apart; headings are <code>fs-m</code> bold; inline code sits on <code>fill</code>; <code>lab:</code> links are underlined in <code>accent</code> with a small <code>accent</code> ▸ after them.</li>
+<li>A turn that ended with only a note gets the class <code>error</code>, and its <strong>Agent</strong> label turns <code>accent</code>.</li>
+<li>Notes are <code>ink-2</code> at <code>fs-xs</code>: <em>Stopped.</em>, <em>The answer hit the length limit.</em>, <em>Too many requests just now; try again in a little while.</em>, <em>The conversation is too long. Start a new thread.</em>, <em>Claude declined this request.</em>, <em>Interrupted: …</em></li>
+<li>Do keep the steps above the answer, so the reader sees the evidence first. Don&#39;t hide the steps behind a single &quot;show work&quot; toggle; each step folds on its own.</li>
+</ul>
+</div><p class="x-files"><code>components/AgentMessage/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-EmptyState"><h4>EmptyState</h4><div class="x-frame"><iframe data-src="components/EmptyState/standalone.html" src="components/EmptyState/standalone.html" title="EmptyState preview" style="height:260px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>What a new thread shows: one paragraph about the agent and up to six requests to start from.</p>
+<pre><code class="language-html">&lt;div class=&quot;agent-log&quot;&gt;
+  &lt;div class=&quot;agent-empty&quot;&gt;
+    &lt;p&gt;Ask for a change and the agent edits the library, rebuilds, and tests it headlessly. It works through one tool, &lt;b&gt;eval&lt;/b&gt;, with the same API you see in the Reference.&lt;/p&gt;
+    &lt;div class=&quot;sugg&quot;&gt;&lt;button&gt;Explain how a kickflip happens, from the key press to the trick event&lt;/button&gt; …&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the suggestions: the preset&#39;s own <code>tries</code> first, then <em>Explain what happens in one step of this program, phase by phase</em> and <em>Make the kickflip spin faster and check it still lands</em>, six at most.</p>
+<ul>
+<li>The paragraph is <code>ink-2</code>, at most 520px wide. Suggestions are <code>hair</code>-framed buttons stacked 5px apart, sized to their text; the border turns <code>ink</code> on hover.</li>
+<li>A click sends the suggestion at once. Suggestions are disabled while a turn runs or when Claude is unavailable.</li>
+<li>Do write suggestions as requests the agent can measure. Don&#39;t use them for help text.</li>
+</ul>
+</div><p class="x-files"><code>components/EmptyState/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-ThreadTabs"><h4>ThreadTabs</h4><div class="x-frame"><iframe data-src="components/ThreadTabs/standalone.html" src="components/ThreadTabs/standalone.html" title="ThreadTabs preview" style="height:96px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A strip of tabs, one per conversation thread, with <strong>+ New</strong> pinned to the right.</p>
+<pre><code class="language-html">&lt;div class=&quot;threads&quot;&gt;
+  &lt;span class=&quot;th on&quot;&gt;&lt;button&gt;Make the kickflip spin faster an&lt;/button&gt;&lt;button class=&quot;x&quot; aria-label=&quot;close thread&quot;&gt;×&lt;/button&gt;&lt;/span&gt;
+  &lt;span class=&quot;th&quot;&gt;&lt;button&gt;New thread&lt;/button&gt;&lt;button class=&quot;x&quot; aria-label=&quot;close thread&quot;&gt;×&lt;/button&gt;&lt;/span&gt;
+  &lt;button class=&quot;new&quot;&gt;+ New&lt;/button&gt;
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the threads (<code>{ id, title }</code>), the active id, and handlers for select, close and new.</p>
+<ul>
+<li>The active tab is <code>ink</code> and bold with a 2px inset <code>ink</code> underline; the others are <code>ink-2</code>. Tabs are <code>fs-xs</code>, divided by <code>hair</code> rules.</li>
+<li>A thread is titled <em>New thread</em> until its first message, then by the first 32 characters of that message, cut without an ellipsis.</li>
+<li>The close × turns <code>accent</code> on hover. Closing the last thread leaves a fresh <em>New thread</em>.</li>
+<li><strong>+ New</strong> stays visible while the strip scrolls sideways (<code>position: sticky</code>) and is disabled while a turn runs.</li>
+<li>Do keep titles as the person&#39;s own words. Don&#39;t rename threads with a summary the model wrote.</li>
+</ul>
+</div><p class="x-files"><code>components/ThreadTabs/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-UserMessage"><h4>UserMessage</h4><div class="x-frame"><iframe data-src="components/UserMessage/standalone.html" src="components/UserMessage/standalone.html" title="UserMessage preview" style="height:170px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The person&#39;s message: a <strong>You</strong> label over their words in a 1px <code>ink</code> box.</p>
+<pre><code class="language-html">&lt;div class=&quot;msg user&quot;&gt;&lt;span class=&quot;who&quot;&gt;You&lt;/span&gt;&lt;div class=&quot;body&quot;&gt;Make the kickflip spin faster and check it still lands&lt;/div&gt;&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the text exactly as sent.</p>
+<ul>
+<li>The label is <code>ink-2</code> at <code>fs-xs</code>, 4px above the box. The box has 8px 10px padding, keeps line breaks (<code>pre-wrap</code>), sits at the left and is at most 92% wide.</li>
+<li>The person&#39;s message is the only box drawn in <code>ink</code>; the agent&#39;s answer has no box. That difference, not colour, tells the two apart.</li>
+<li>Don&#39;t render the person&#39;s text as Markdown.</li>
+</ul>
+</div><p class="x-files"><code>components/UserMessage/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Panel</h3><article class="x-comp" id="comp-AgentPanel"><h4>AgentPanel</h4><div class="x-frame"><iframe data-src="components/AgentPanel/standalone.html" src="components/AgentPanel/standalone.html" title="AgentPanel preview" style="height:1000px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The whole agent panel as it fills one tile of the workbench: threads, settings, off banner, log and composer, top to bottom.</p>
+<pre><code class="language-html">&lt;div class=&quot;tabbody col agent-panel&quot;&gt;
+  &lt;div class=&quot;threads&quot;&gt;…&lt;/div&gt;          &lt;!-- ThreadTabs --&gt;
+  &lt;div class=&quot;agent-set&quot;&gt;…&lt;/div&gt;        &lt;!-- AgentSettings --&gt;
+  &lt;div class=&quot;agent-off&quot;&gt;…&lt;/div&gt;        &lt;!-- OffBanner, only when the agent cannot run --&gt;
+  &lt;div class=&quot;agent-log&quot;&gt;…&lt;/div&gt;        &lt;!-- EmptyState, or UserMessage and AgentMessage turns --&gt;
+  &lt;div class=&quot;composer&quot;&gt;…&lt;/div&gt;         &lt;!-- Composer --&gt;
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> a container with a height; the panel is a flex column and only the log scrolls.</p>
+<ul>
+<li>The log has 12px 16px padding and 14px between turns, scrolls on its own (<code>overscroll-behavior: contain</code>) and jumps to the bottom on every update.</li>
+<li>The bars are separated by single rules: <code>hair</code> under the threads, <code>rule</code> under the settings, <code>hair</code> over the composer.</li>
+<li>The panel never sets its own width; it takes the tile&#39;s. At 518px wide the settings bar wraps to two rows.</li>
+</ul>
+</div><p class="x-files"><code>components/AgentPanel/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Input</h3><article class="x-comp" id="comp-AgentSettings"><h4>AgentSettings</h4><div class="x-frame"><iframe data-src="components/AgentSettings/standalone.html" src="components/AgentSettings/standalone.html" title="AgentSettings preview" style="height:120px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The bar of three small segmented controls, Mode, Model and Thinking, under the threads.</p>
+<pre><code class="language-html">&lt;div class=&quot;agent-set&quot;&gt;
+  &lt;span class=&quot;ctl-l&quot;&gt;Mode&lt;/span&gt;
+  &lt;div class=&quot;seg sm&quot; role=&quot;group&quot;&gt;
+    &lt;button class=&quot;on&quot; aria-pressed=&quot;true&quot; title=&quot;runs each step&quot;&gt;Auto&lt;/button&gt;
+    &lt;button aria-pressed=&quot;false&quot; title=&quot;you approve each step&quot;&gt;Ask&lt;/button&gt;
+    &lt;button aria-pressed=&quot;false&quot; title=&quot;no edits&quot;&gt;Read-only&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;span class=&quot;ctl-l&quot;&gt;Model&lt;/span&gt; … Fast · Balanced · Deep
+  &lt;span class=&quot;ctl-l&quot;&gt;Thinking&lt;/span&gt; … Auto · Low · Med · High
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the current values and a change handler; the app saves them per browser.</p>
+<ul>
+<li>Labels are <code>ink-2</code> at <code>fs-xs</code>. A small segment is 24px tall with 8px side padding; the pressed one inverts to an <code>ink</code> fill with <code>bg</code> text.</li>
+<li>The bar wraps onto a second row in a narrow tile (row gap 6px, column gap 8px) and its padding drops to 6px 12px under 640px.</li>
+<li>Values sent: Fast <code>quick</code>, Balanced <code>default</code>, Deep <code>complex</code>; Thinking Auto sends nothing, Low/Med/High send <code>low</code>/<code>medium</code>/<code>high</code>.</li>
+<li>Do keep each option one short word. Don&#39;t add a fourth control here; settings that change per step belong in the step.</li>
+</ul>
+</div><p class="x-files"><code>components/AgentSettings/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Composer"><h4>Composer</h4><div class="x-frame"><iframe data-src="components/Composer/standalone.html" src="components/Composer/standalone.html" title="Composer preview" style="height:360px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The input at the foot of the panel: a textarea, a line of hints, and Send or Stop.</p>
+<pre><code class="language-html">&lt;div class=&quot;composer&quot;&gt;
+  &lt;textarea placeholder=&quot;Ask the agent: “make heelflips catch earlier”, “add a manual trick”, “why did that bail?”&quot; aria-label=&quot;Message to the agent&quot;&gt;&lt;/textarea&gt;
+  &lt;div class=&quot;row&quot;&gt;
+    &lt;span class=&quot;meta&quot;&gt;Enter sends · Shift+Enter for a new line · steps run as they come&lt;/span&gt;
+    &lt;button class=&quot;btn primary&quot;&gt;Send&lt;/button&gt;          &lt;!-- while a turn runs: &lt;button class=&quot;btn danger&quot;&gt;Stop&lt;/button&gt; --&gt;
+  &lt;/div&gt;
+&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the draft text, the mode (for the meta line), whether a turn is running, and send and stop handlers.</p>
+<ul>
+<li>The textarea sits on <code>code-bg</code> in a <code>hair</code> frame that turns <code>ink</code> on focus, 54px tall and resizable up to 160px.</li>
+<li>Enter sends; Shift+Enter adds a line. The meta line ends with the mode: <em>steps run as they come</em>, <em>you approve each step</em> or <em>read-only</em>.</li>
+<li><strong>Send</strong> is the primary button and is disabled (0.4 opacity) while the draft is empty or Claude is unavailable. While a turn runs it is replaced by <strong>Stop</strong> in <code>accent</code>, which aborts the call.</li>
+<li>A <code>lab:ask?q=…</code> link fills the textarea and leaves the sending to the person.</li>
+<li>Do keep the placeholder as example requests. Don&#39;t send on blur or on a timer.</li>
+</ul>
+</div><p class="x-files"><code>components/Composer/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Steps</h3><article class="x-comp" id="comp-Approval"><h4>Approval</h4><div class="x-frame"><iframe data-src="components/Approval/standalone.html" src="components/Approval/standalone.html" title="Approval preview" style="height:560px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>In Ask mode, a step opens with its code and two buttons and waits for the person before it runs.</p>
+<pre><code class="language-html">&lt;details class=&quot;tool ask&quot; open&gt;
+  &lt;summary&gt;&lt;i class=&quot;dot&quot;&gt;&lt;/i&gt;&lt;span class=&quot;nm&quot;&gt;eval&lt;/span&gt;&lt;span class=&quot;first&quot;&gt;const names = [&#39;ollie&#39;, …&lt;/span&gt;&lt;span class=&quot;ms&quot;&gt;waiting for you&lt;/span&gt;&lt;/summary&gt;
+  &lt;div class=&quot;tb&quot;&gt;
+    &lt;pre class=&quot;src&quot;&gt;…&lt;/pre&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;button class=&quot;btn primary sm&quot;&gt;Run this step&lt;/button&gt;&lt;button class=&quot;btn sm&quot;&gt;Decline&lt;/button&gt;&lt;/div&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;button class=&quot;link&quot;&gt;copy code&lt;/button&gt;&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/details&gt;
+</code></pre>
+<p><strong>You provide</strong> a promise the buttons resolve: <code>true</code> to run, <code>false</code> to decline. Abort resolves it with <code>false</code>.</p>
+<ul>
+<li>The box and dot are <code>accent</code>, the dot blinks, and <strong>waiting for you</strong> replaces the time in bold <code>accent</code>.</li>
+<li><strong>Run this step</strong> is the primary button (<code>ink</code> fill, <code>bg</code> text); <strong>Decline</strong> is the plain small button.</li>
+<li>A declined step becomes a failed step with the result <em>The person declined this step.</em>; the model receives <em>Declined by the person. Ask what they want instead, or explain the change without running it.</em></li>
+<li>Do show the whole code before asking. Don&#39;t ask for approval of a summary.</li>
+</ul>
+</div><p class="x-files"><code>components/Approval/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Step"><h4>Step</h4><div class="x-frame"><iframe data-src="components/Step/standalone.html" src="components/Step/standalone.html" title="Step preview" style="height:620px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>One eval call as a collapsible box: a one-line summary, and inside it the code, the result and the step&#39;s links.</p>
+<pre><code class="language-html">&lt;details class=&quot;tool&quot;&gt;
+  &lt;summary&gt;&lt;i class=&quot;dot&quot;&gt;&lt;/i&gt;&lt;span class=&quot;nm&quot;&gt;eval&lt;/span&gt;&lt;span class=&quot;first&quot;&gt;return files.grep(&#39;spin = &#39;, &#39;skate/motors.js&#39;);&lt;/span&gt;&lt;span class=&quot;ms&quot;&gt;5 ms&lt;/span&gt;&lt;/summary&gt;
+  &lt;div class=&quot;tb&quot;&gt;
+    &lt;pre class=&quot;src&quot;&gt;&lt;!-- code highlighted with .tk-* spans --&gt;&lt;/pre&gt;
+    &lt;pre class=&quot;res&quot;&gt;- &quot;skate/motors.js:192  exports.flickMotor = …&quot;&lt;/pre&gt;
+    &lt;div class=&quot;row&quot;&gt;&lt;button class=&quot;link&quot;&gt;revert files to before this step&lt;/button&gt;&lt;button class=&quot;link&quot;&gt;copy code&lt;/button&gt;&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/details&gt;
+</code></pre>
+<p><strong>You provide</strong> the step record: <code>code</code>, <code>result</code>, <code>ms</code>, and the flags <code>running</code>, <code>asking</code>, <code>error</code>, <code>changed</code>, <code>reverted</code>.</p>
+<table>
+<thead>
+<tr>
+<th>state</th>
+<th>class</th>
+<th>summary</th>
+<th>look</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>done</td>
+<td><code>tool</code></td>
+<td>time in ms</td>
+<td><code>hair</code> box, <code>ink</code> dot</td>
+</tr>
+<tr>
+<td>running</td>
+<td><code>tool run</code></td>
+<td>running…</td>
+<td>the dot blinks</td>
+</tr>
+<tr>
+<td>waiting for approval</td>
+<td><code>tool ask</code></td>
+<td><strong>waiting for you</strong> in <code>accent</code></td>
+<td><code>accent</code> box and blinking dot, opened (see Approval)</td>
+</tr>
+<tr>
+<td>failed or declined</td>
+<td><code>tool err</code></td>
+<td>time</td>
+<td><code>accent</code> box and dot; the result is <code>accent</code> with an <code>accent</code> left rule</td>
+</tr>
+<tr>
+<td>reverted</td>
+<td><code>tool reverted</code></td>
+<td>time</td>
+<td>whole box at 0.55 opacity, first line struck through; <em>reverted</em> in <code>ink-2</code> replaces the revert link</td>
+</tr>
+</tbody></table>
+<ul>
+<li>The summary grid is dot (8px column), <strong>eval</strong>, the first non-empty code line in the <code>code</code> family (cut with an ellipsis), and the time.</li>
+<li>Inside, the code is <code>ink</code> on <code>code-bg</code> with a <code>hair</code> frame, up to 280px tall; the result is YAML, pre-wrapped, behind a 2px <code>hair</code> left rule, up to 260px tall.</li>
+<li><em>revert files to before this step</em> shows only when the step changed files and its snapshot still exists (it is not saved across reloads). Reverting marks this step and every later step in the turn as reverted, rebuilds, and toasts <em>Reverted the files to before that step and rebuilt</em>.</li>
+<li><em>copy code</em> copies the code and toasts <em>Copied</em>.</li>
+<li>Steps start folded; one opens on its own only while it waits for approval.</li>
+<li>Do show the code exactly as the model sent it. Don&#39;t summarise a step in prose; the first line of code is the summary.</li>
+</ul>
+</div><p class="x-files"><code>components/Step/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Status</h3><article class="x-comp" id="comp-OffBanner"><h4>OffBanner</h4><div class="x-frame"><iframe data-src="components/OffBanner/standalone.html" src="components/OffBanner/standalone.html" title="OffBanner preview" style="height:210px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A boxed notice above the log that says the agent cannot run here and that the rest of the workbench still works.</p>
+<pre><code class="language-html">&lt;div class=&quot;agent-off&quot;&gt;&lt;b&gt;The agent is off here.&lt;/b&gt;Claude is not available in this view, so the agent cannot run. Everything else in the workbench works.&lt;/div&gt;
+</code></pre>
+<p><strong>You provide</strong> the sentence for the cause (see Modes and permissions for every code and its sentence).</p>
+<ul>
+<li>1px <code>ink</code> box, <code>fs-s</code>, 8px 10px padding, 10px 16px of margin above and to the sides. The bold first line is always <em>The agent is off here.</em></li>
+<li>It appears when the capability is missing at load (then Send and the suggestions are disabled too) or when a call fails with a code that means the agent cannot work in this view.</li>
+<li>Do say what still works. Don&#39;t use <code>accent</code> for it: nothing failed that the person did.</li>
+</ul>
+</div><p class="x-files"><code>components/OffBanner/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article></section>
+<section id="assets"><h2 class="x-h">Assets</h2><div class="x-md"><p>Screenshots of the agent in the real workbench (preset B-01). The eval steps in them were run by the app&#39;s own eval tool against the live page; Claude&#39;s side was scripted for the screenshots, so the answer text is an example written in the agent&#39;s voice from those step results.</p>
+<ul>
+<li><code>agent-thread-light.png</code> — 1440 × 900, light. The whole workbench with the Agent tab open on a finished thread: the request, five folded eval steps with their times, and the answer with two <code>lab:</code> links. Use it to see the panel in context.</li>
+<li><code>agent-ask-dark.png</code> — 518 × 848, dark, the Agent tile only. Ask mode with Deep and High thinking: a step waiting for approval, open, with Run this step and Decline, and Stop in the composer.</li>
+<li><code>agent-empty-light.png</code> — 518 × 848, light, the Agent tile only. A new thread&#39;s empty state with B-01&#39;s suggestions.</li>
+</ul>
+</div><div class="x-shots"><figure><a href="assets/Screens/agent-thread-light.png"><img src="assets/Screens/agent-thread-light.png" alt="agent-thread-light.png" loading="lazy"></a><figcaption><code>assets/Screens/agent-thread-light.png</code></figcaption></figure><figure><a href="assets/Screens/agent-ask-dark.png"><img src="assets/Screens/agent-ask-dark.png" alt="agent-ask-dark.png" loading="lazy"></a><figcaption><code>assets/Screens/agent-ask-dark.png</code></figcaption></figure><figure><a href="assets/Screens/agent-empty-light.png"><img src="assets/Screens/agent-empty-light.png" alt="agent-empty-light.png" loading="lazy"></a><figcaption><code>assets/Screens/agent-empty-light.png</code></figcaption></figure></div></section>
+<section id="export"><h2 class="x-h">EXPORT.md</h2><div class="x-md"><h1>About this export</h1>
+<p>This folder is a complete copy of the <strong>Form Skate Agent</strong> design system, exported on 2026-10-29 from <a href="https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM">https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM</a> (version 1793208168-ca1b).</p>
+<p>Open <code>index.html</code> in a browser to read it offline: the brand book, every section, the tokens in both themes, each component&#39;s live preview beside its guidelines, and the screenshots. The theme button cycles system, light and dark.</p>
+<h2>What is here</h2>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>README.md</code></td>
+<td>the brand book: start here</td>
+</tr>
+<tr>
+<td><code>*.md</code></td>
+<td>further sections</td>
+</tr>
+<tr>
+<td><code>tokens.json</code></td>
+<td>the tokens (colours in 2 themes, type, spacing and other families)</td>
+</tr>
+<tr>
+<td><code>tokens.css</code></td>
+<td>the same tokens as CSS custom properties, compiled the way the design system page compiles them: <code>:root, [data-theme=&quot;light&quot;]</code> then <code>[data-theme=&quot;…&quot;]</code> per further theme, one class per text style</td>
+</tr>
+<tr>
+<td><code>components/bundle.css</code></td>
+<td>the components&#39; stylesheet; it expects <code>tokens.css</code> before it</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/README.md</code></td>
+<td>the component&#39;s guidelines</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/preview.html</code></td>
+<td>its preview exactly as published (it relies on the page preloading tokens.css, bundle.css)</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/standalone.html</code></td>
+<td>the same preview with those files linked, so it opens on its own; add <code>#light</code> or <code>#dark</code> to the address to pick a theme</td>
+</tr>
+<tr>
+<td><code>assets/</code></td>
+<td>3 screenshots of the real app, with a README per group</td>
+</tr>
+<tr>
+<td><code>design-system.json</code></td>
+<td>the system&#39;s index (title, namespace, asset records; the <code>blob</code> ids refer to the online copy)</td>
+</tr>
+<tr>
+<td><code>index.html</code></td>
+<td>the offline browser</td>
+</tr>
+</tbody></table>
+<h2>Using it elsewhere</h2>
+<p>Load <code>tokens.css</code>, then <code>components/bundle.css</code>, and set <code>data-theme=&quot;light&quot;</code> or <code>data-theme=&quot;dark&quot;</code> on the root element. Use the class names and markup each component&#39;s README gives.</p>
+<p>The files under <code>components/</code> and the Markdown are unchanged from the published system. <code>tokens.css</code>, the <code>standalone.html</code> files, <code>index.html</code>, <code>fonts/</code> and this file were added by the export.</p>
+</div></section>
+</main>
+</div>
+<script>
+(function () {
+  var mode = window.__dsMode || 'system', btn = document.getElementById('x-theme'), mq = matchMedia('(prefers-color-scheme: dark)');
+  function theme() { return mode === 'system' ? (mq.matches ? 'dark' : 'light') : mode; }
+  function apply() {
+    var t = theme(); document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = 'Theme: ' + mode;
+    document.querySelectorAll('iframe[data-src]').forEach(function (f) { f.src = f.getAttribute('data-src') + '#' + t; });
+  }
+  btn.addEventListener('click', function () { mode = mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system'; try { localStorage.setItem('ds-theme', mode); } catch (e) {} apply(); });
+  mq.addEventListener && mq.addEventListener('change', function () { if (mode === 'system') apply(); });
+  addEventListener('message', function (e) {
+    if (!e.data || typeof e.data.dsHeight !== 'number') return;
+    document.querySelectorAll('iframe').forEach(function (f) { if (f.contentWindow === e.source && !f.closest('.x-cover')) f.style.height = Math.min(Math.max(e.data.dsHeight, 40), 4000) + 'px'; });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

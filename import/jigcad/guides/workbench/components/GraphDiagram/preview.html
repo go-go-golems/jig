@@ -1,0 +1,133 @@
+<!-- @dsCard group="Panels" height=330 width=760 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>GraphDiagram</title>
+<style>.diagram{margin:12px;border:1px solid var(--hair);height:300px;overflow:hidden}</style></head>
+<body>
+
+<div class="diagram graphscroll"><svg class="graph" viewBox="0 0 712 290" width="712" height="290"><defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="ahead"></path></marker></defs><text class="colhd" x="16" y="18">1. input</text><text class="colhd" x="248" y="18">2. controls</text><text class="colhd" x="480" y="18">3. forces</text><text class="colhd" x="712" y="18">4. assistance</text><text class="colhd" x="944" y="18">5. physics</text><text class="colhd" x="1176" y="18">6. signals</text><text class="colhd" x="1408" y="18">7. observe</text><g class="edge"><path d="M648,54 C796,54 796,54 944,54" marker-end="url(#ah)"></path><title>board/trucks → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M648,108 C796,108 796,54 944,54" marker-end="url(#ah)"></path><title>skater/stance → rigid/step
+board/deck.forces
+skater/body.forces
+skater/body.forces
+board/deck.forces</title></g><g class="edge"><path d="M648,162 C796,162 796,54 944,54" marker-end="url(#ah)"></path><title>frontGuide/guide → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M648,216 C796,216 796,54 944,54" marker-end="url(#ah)"></path><title>rearGuide/guide → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M416,54 C680,54 680,54 944,54" marker-end="url(#ah)"></path><title>push/push → rigid/step
+board/deck.forces
+skater/body.forces
+board/deck.forces
+skater/body.forces</title></g><g class="edge"><path d="M416,108 C680,108 680,54 944,54" marker-end="url(#ah)"></path><title>brake/brake → rigid/step
+board/deck.forces
+skater/body.forces
+board/deck.forces
+skater/body.forces</title></g><g class="edge sel"><path d="M416,162 C680,162 680,54 944,54" marker-end="url(#ah)"></path><title>pop/pop → rigid/step
+board/deck.forces
+board/deck.forces</title><g class="elabel"><text x="680" y="104">deck.forces</text></g></g><g class="edge"><path d="M416,216 C680,216 680,54 944,54" marker-end="url(#ah)"></path><title>flick/flick → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M416,270 C680,270 680,54 944,54" marker-end="url(#ah)"></path><title>scoop/scoop → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M416,324 C680,324 680,54 944,54" marker-end="url(#ah)"></path><title>wrap/wrap → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M648,270 C796,270 796,54 944,54" marker-end="url(#ah)"></path><title>carry/guide → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge"><path d="M880,54 C912,54 912,54 944,54" marker-end="url(#ah)"></path><title>landing/landingAssistance → rigid/step
+board/deck.forces
+board/deck.forces</title></g><g class="edge dash"><path d="M648,108 C698,168 -34,114 16,54" marker-end="url(#ah)"></path><title>skater/stance → pilot/drive
+skater/phase
+skater/travel</title></g><g class="edge"><path d="M648,108 C698,168 430,222 480,162" marker-end="url(#ah)"></path><title>skater/stance → frontGuide/guide
+skater/phase
+skater/frontFoot.pose</title></g><g class="edge"><path d="M648,108 C698,168 430,276 480,216" marker-end="url(#ah)"></path><title>skater/stance → rearGuide/guide
+skater/phase
+skater/rearFoot.pose</title></g><g class="edge dash"><path d="M648,108 C698,168 198,114 248,54" marker-end="url(#ah)"></path><title>skater/stance → push/push
+skater/phase
+skater/travel</title></g><g class="edge dash"><path d="M648,108 C698,168 198,168 248,108" marker-end="url(#ah)"></path><title>skater/stance → brake/brake
+skater/phase</title></g><g class="edge dash sel"><path d="M648,108 C698,168 198,222 248,162" marker-end="url(#ah)"></path><title>skater/stance → pop/pop
+skater/phase</title><g class="elabel"><text x="448" y="131">phase</text></g></g><g class="edge dash"><path d="M648,108 C698,168 198,276 248,216" marker-end="url(#ah)"></path><title>skater/stance → flick/flick
+skater/phase
+skater/left</title></g><g class="edge dash"><path d="M648,108 C698,168 198,330 248,270" marker-end="url(#ah)"></path><title>skater/stance → scoop/scoop
+skater/phase
+skater/travel</title></g><g class="edge dash"><path d="M648,108 C698,168 198,384 248,324" marker-end="url(#ah)"></path><title>skater/stance → wrap/wrap
+skater/phase
+skater/travel</title></g><g class="edge"><path d="M648,108 C698,168 430,330 480,270" marker-end="url(#ah)"></path><title>skater/stance → carry/guide
+skater/phase
+skater/carry</title></g><g class="edge"><path d="M648,108 C680,108 680,54 712,54" marker-end="url(#ah)"></path><title>skater/stance → landing/landingAssistance
+skater/phase
+skater/travel</title></g><g class="edge"><path d="M648,108 C1028,108 1028,108 1408,108" marker-end="url(#ah)"></path><title>skater/stance → recognizer/trickActivity
+skater/phase</title></g><g class="edge"><path d="M648,108 C912,108 912,54 1176,54" marker-end="url(#ah)"></path><title>skater/stance → signals:recognizer
+skater/left
+skater/travel
+skater/rearFoot.pose</title></g><g class="edge"><path d="M648,108 C698,168 430,114 480,54" marker-end="url(#ah)"></path><title>skater/stance → board/trucks
+board/lean</title></g><g class="edge"><path d="M184,54 C234,114 -34,168 16,108" marker-end="url(#ah)"></path><title>pilot/drive → controls/keys
+pilot/pad
+pilot/lean</title></g><g class="edge"><path d="M184,108 C216,108 216,54 248,54" marker-end="url(#ah)"></path><title>controls/keys → push/push
+intent/push
+intent/crouch</title></g><g class="edge"><path d="M184,108 C216,108 216,108 248,108" marker-end="url(#ah)"></path><title>controls/keys → brake/brake
+intent/brake</title></g><g class="edge"><path d="M184,108 C332,108 332,108 480,108" marker-end="url(#ah)"></path><title>controls/keys → skater/stance
+intent/lean
+intent/crouch
+intent/reset</title></g><g class="edge sel"><path d="M184,108 C216,108 216,162 248,162" marker-end="url(#ah)"></path><title>controls/keys → pop/pop
+intent/pop</title><g class="elabel"><text x="216" y="131">pop</text></g></g><g class="edge"><path d="M184,108 C216,108 216,216 248,216" marker-end="url(#ah)"></path><title>controls/keys → flick/flick
+intent/pop
+intent/flick</title></g><g class="edge"><path d="M184,108 C216,108 216,270 248,270" marker-end="url(#ah)"></path><title>controls/keys → scoop/scoop
+intent/pop
+intent/scoop</title></g><g class="edge"><path d="M184,108 C216,108 216,324 248,324" marker-end="url(#ah)"></path><title>controls/keys → wrap/wrap
+intent/pop
+intent/wrap</title></g><g class="edge"><path d="M416,54 C448,54 448,108 480,108" marker-end="url(#ah)"></path><title>push/push → skater/stance
+skater/releaseRear
+skater/nudgeRear</title></g><g class="edge"><path d="M416,54 C448,54 448,216 480,216" marker-end="url(#ah)"></path><title>push/push → rearGuide/guide
+skater/releaseRear</title></g><g class="edge"><path d="M416,54 C564,54 564,54 712,54" marker-end="url(#ah)"></path><title>push/push → landing/landingAssistance
+skater/releaseRear</title></g><g class="edge"><path d="M416,108 C448,108 448,108 480,108" marker-end="url(#ah)"></path><title>brake/brake → skater/stance
+skater/releaseRear
+skater/nudgeRear</title></g><g class="edge"><path d="M416,108 C448,108 448,216 480,216" marker-end="url(#ah)"></path><title>brake/brake → rearGuide/guide
+skater/releaseRear</title></g><g class="edge"><path d="M416,108 C564,108 564,54 712,54" marker-end="url(#ah)"></path><title>brake/brake → landing/landingAssistance
+skater/releaseRear</title></g><g class="edge sel"><path d="M416,162 C448,162 448,108 480,108" marker-end="url(#ah)"></path><title>pop/pop → skater/stance
+skater/releaseRear
+skater/jump
+skater/releaseFront
+skater/nudgeFront</title><g class="elabel"><text x="448" y="131">releaseRear, jump +2</text></g></g><g class="edge sel"><path d="M416,162 C448,162 448,216 480,216" marker-end="url(#ah)"></path><title>pop/pop → rearGuide/guide
+skater/releaseRear</title><g class="elabel"><text x="448" y="185">releaseRear</text></g></g><g class="edge sel"><path d="M416,162 C564,162 564,54 712,54" marker-end="url(#ah)"></path><title>pop/pop → landing/landingAssistance
+skater/releaseRear
+skater/releaseFront</title><g class="elabel"><text x="564" y="104">releaseRear, releaseFront</text></g></g><g class="edge"><path d="M416,216 C448,216 448,108 480,108" marker-end="url(#ah)"></path><title>flick/flick → skater/stance
+skater/releaseRear
+skater/releaseFront
+skater/nudgeFront</title></g><g class="edge"><path d="M416,216 C448,216 448,216 480,216" marker-end="url(#ah)"></path><title>flick/flick → rearGuide/guide
+skater/releaseRear</title></g><g class="edge"><path d="M416,216 C564,216 564,54 712,54" marker-end="url(#ah)"></path><title>flick/flick → landing/landingAssistance
+skater/releaseRear
+skater/releaseFront</title></g><g class="edge"><path d="M416,270 C448,270 448,108 480,108" marker-end="url(#ah)"></path><title>scoop/scoop → skater/stance
+skater/releaseRear
+skater/nudgeRear
+skater/releaseFront</title></g><g class="edge"><path d="M416,270 C448,270 448,216 480,216" marker-end="url(#ah)"></path><title>scoop/scoop → rearGuide/guide
+skater/releaseRear</title></g><g class="edge"><path d="M416,270 C564,270 564,54 712,54" marker-end="url(#ah)"></path><title>scoop/scoop → landing/landingAssistance
+skater/releaseRear
+skater/releaseFront</title></g><g class="edge"><path d="M416,324 C448,324 448,108 480,108" marker-end="url(#ah)"></path><title>wrap/wrap → skater/stance
+skater/releaseRear
+skater/nudgeRear
+skater/releaseFront
+skater/nudgeFront</title></g><g class="edge"><path d="M416,324 C448,324 448,216 480,216" marker-end="url(#ah)"></path><title>wrap/wrap → rearGuide/guide
+skater/releaseRear</title></g><g class="edge"><path d="M416,324 C564,324 564,54 712,54" marker-end="url(#ah)"></path><title>wrap/wrap → landing/landingAssistance
+skater/releaseRear
+skater/releaseFront</title></g><g class="edge sel"><path d="M416,162 C448,162 448,162 480,162" marker-end="url(#ah)"></path><title>pop/pop → frontGuide/guide
+skater/releaseFront</title><g class="elabel"><text x="448" y="158">releaseFront</text></g></g><g class="edge"><path d="M416,216 C448,216 448,162 480,162" marker-end="url(#ah)"></path><title>flick/flick → frontGuide/guide
+skater/releaseFront</title></g><g class="edge"><path d="M416,270 C448,270 448,162 480,162" marker-end="url(#ah)"></path><title>scoop/scoop → frontGuide/guide
+skater/releaseFront</title></g><g class="edge"><path d="M416,324 C448,324 448,162 480,162" marker-end="url(#ah)"></path><title>wrap/wrap → frontGuide/guide
+skater/releaseFront</title></g><g class="edge sel"><path d="M416,162 C448,162 448,270 480,270" marker-end="url(#ah)"></path><title>pop/pop → carry/guide
+pop/popping</title><g class="elabel"><text x="448" y="212">popping</text></g></g><g class="edge sel"><path d="M416,162 C912,162 912,108 1408,108" marker-end="url(#ah)"></path><title>pop/pop → recognizer/trickActivity
+pop/popping</title><g class="elabel"><text x="912" y="131">popping</text></g></g><g class="edge"><path d="M416,324 C448,324 448,270 480,270" marker-end="url(#ah)"></path><title>wrap/wrap → carry/guide
+wrap/wrapping</title></g><g class="edge dash"><path d="M1112,54 C1162,114 430,168 480,108" marker-end="url(#ah)"></path><title>rigid/step → skater/stance
+board/deck.pose
+skater/body.pose</title></g><g class="edge dash"><path d="M1112,54 C1162,114 -34,114 16,54" marker-end="url(#ah)"></path><title>rigid/step → pilot/drive
+board/deck.pose</title></g><g class="edge"><path d="M1112,54 C1144,54 1144,54 1176,54" marker-end="url(#ah)"></path><title>rigid/step → signals:recognizer
+board/deck.pose</title></g><g class="edge"><path d="M1344,54 C1376,54 1376,108 1408,108" marker-end="url(#ah)"></path><title>signals:recognizer → recognizer/trickActivity
+recognizer/airborne
+recognizer/spinRate
+recognizer/flipTurns
+recognizer/shoveTurns
+recognizer/footWinding
+recognizer/wrapTurns
+recognizer/height
+recognizer/speed</title></g><g class="node system" transform="translate(480,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">board/trucks</text><text class="ns" x="8" y="31">forces</text></g><g class="node system" transform="translate(480,88)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">skater/stance</text><text class="ns" x="8" y="31">forces</text></g><g class="node system" transform="translate(16,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">pilot/drive</text><text class="ns" x="8" y="31">input</text></g><g class="node system" transform="translate(16,88)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">controls/keys</text><text class="ns" x="8" y="31">input</text></g><g class="node system" transform="translate(480,142)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">frontGuide/guide</text><text class="ns" x="8" y="31">forces</text></g><g class="node system" transform="translate(480,196)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">rearGuide/guide</text><text class="ns" x="8" y="31">forces</text></g><g class="node system" transform="translate(248,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">push/push</text><text class="ns" x="8" y="31">controls</text></g><g class="node system" transform="translate(248,88)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">brake/brake</text><text class="ns" x="8" y="31">controls</text></g><g class="node system sel" transform="translate(248,142)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">pop/pop</text><text class="ns" x="8" y="31">controls</text></g><g class="node system" transform="translate(248,196)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">flick/flick</text><text class="ns" x="8" y="31">controls</text></g><g class="node system" transform="translate(248,250)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">scoop/scoop</text><text class="ns" x="8" y="31">controls</text></g><g class="node system" transform="translate(248,304)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">wrap/wrap</text><text class="ns" x="8" y="31">controls</text></g><g class="node system" transform="translate(480,250)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">carry/guide</text><text class="ns" x="8" y="31">forces</text></g><g class="node system" transform="translate(712,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">…nding/landingAssistance</text><text class="ns" x="8" y="31">assistance · every 33 ms</text></g><g class="node system" transform="translate(1408,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">score/tally</text><text class="ns" x="8" y="31">observe</text></g><g class="node system" transform="translate(944,34)"><rect width="168" height="40" rx="0"></rect><text class="nl" x="8" y="16">rigid/step</text><text class="ns" x="8" y="31">physics</text></g><g class="node signals" transform="translate(1176,34)"><rect width="168" height="40" rx="10"></rect><text class="nl" x="8" y="16">recognizer</text><text class="ns" x="8" y="31">λ 15 signals</text></g><g class="node watch" transform="translate(1408,88)"><rect width="168" height="40" rx="0"></rect><path class="corner" d="M158,0 L168,0 L168,10"></path><text class="nl" x="8" y="16">recognizer/trickActivity</text><text class="ns" x="8" y="31">watch · 10 reads</text></g></svg></div>
+</body>
+</html>

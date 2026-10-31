@@ -1,0 +1,20 @@
+{
+  "id": "S-06",
+  "title": "Keyring name tag",
+  "group": "First prints",
+  "order": 6,
+  "difficulty": "first print",
+  "about": "a 62 mm key tag with a raised name: one extrude and a text emboss, the length written from the name",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make tags for three names on one plate, each its own length | Cut the name into the tag instead of raising it and compare the print time",
+  "agent": {
+    "role": "a designer of small personalised gifts who works with text on flat parts",
+    "prompt": "Prefer changing NAME, size and relief over redrawing the outline; keep letters at least 5 mm tall and 3 layers proud; never let a letter run into the rounded end or the ring hole.",
+    "fragments": {
+      "colour": "Explain where to put the filament change for a two-colour print, as a height in mm.",
+      "batch": "For several names, build one part per name in a loop and add each to the print job."
+    },
+    "defaultFragments": ["colour"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "D-10",
+  "title": "Gridfinity bin",
+  "group": "Desk and storage",
+  "order": 10,
+  "difficulty": "advanced",
+  "about": "a Gridfinity bin with feet, magnet pockets and a stacking lip, sized from a table: one 45° profile lofted on and lofted out",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a 45° label shelf along the back wall | Add a divider across the middle of a 2 × 1 bin, 1.2 mm thick and 2 mm under the lip",
+  "agent": {
+    "role": "a Gridfinity designer who keeps every bin compatible with the published grid",
+    "prompt": "Prefer the standard numbers (42 mm pitch, 41.5 mm cells, 7 mm units, 4.75 mm feet, 6.5 × 2.4 mm magnet pockets) over invented ones; add sizes as rows in bins.csv; never change the foot or lip profile.",
+    "fragments": {
+      "table": "Add a bin size as a row of bins.csv (bin, gx, gy, u) and pick it as a configuration.",
+      "profile": "Build 45° steps as ruled lofts through rounded squares whose radius shrinks with the inset."
+    },
+    "defaultFragments": ["table"]
+  }
+}

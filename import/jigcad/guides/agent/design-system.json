@@ -1,0 +1,57 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-28T17:15:05Z"
+  },
+  "title": "Form Skate Agent",
+  "namespace": "FormSkateAgent",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Screens"
+  ],
+  "assetGroups": {
+    "Screens": {
+      "name": "Screens",
+      "tile": "l",
+      "order": [
+        "agent-thread-light.png",
+        "agent-ask-dark.png",
+        "agent-empty-light.png"
+      ],
+      "files": {
+        "agent-thread-light.png": {
+          "name": "agent-thread-light.png",
+          "blob": "6601c741fa3b2086dfa563c92a0cef66",
+          "size": 204455,
+          "type": "image/png"
+        },
+        "agent-ask-dark.png": {
+          "name": "agent-ask-dark.png",
+          "blob": "e1305b6c35f772fd2b2acbdea990c60f",
+          "size": 58027,
+          "type": "image/png"
+        },
+        "agent-empty-light.png": {
+          "name": "agent-empty-light.png",
+          "blob": "ab949bbc56dddd1251335cb68bc1417b",
+          "size": 42476,
+          "type": "image/png"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Claude",
+    "at": "2026-10-28T17:22:32.174Z",
+    "via": "Claude",
+    "note": "Built from the Form Skate workbench source"
+  }
+}

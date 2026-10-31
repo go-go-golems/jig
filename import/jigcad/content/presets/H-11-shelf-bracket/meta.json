@@ -1,0 +1,20 @@
+{
+  "id": "H-11",
+  "title": "Shelf bracket",
+  "group": "Around the house",
+  "order": 11,
+  "difficulty": "medium",
+  "about": "a 150 mm triangular shelf bracket with a solved gusset window, M4 clearance holes and chamfered teardrop countersinks",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a lip at the tip of the shelf leg that stops the shelf sliding off | Make a hidden version whose wall leg is a keyhole plate",
+  "agent": {
+    "role": "a structural designer of printed brackets who prints loaded parts on their side",
+    "prompt": "Prefer solving the frame's inner corners in expressions from the gusset width; keep legs at least 6 mm and the gusset at least as wide as the legs; never print a load-bearing bracket upright.",
+    "fragments": {
+      "load": "Ask for the shelf's depth and load; above about 10 kg per bracket use the L config and PETG.",
+      "screws": "Size holes with j.hole.clearance and countersink them with a 45° chamfer from the inside faces."
+    },
+    "defaultFragments": ["load"]
+  }
+}

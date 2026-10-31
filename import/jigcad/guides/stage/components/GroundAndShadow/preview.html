@@ -1,0 +1,35 @@
+<!-- @dsCard group="Ground" height=300 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundAndShadow</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="axo" style="height:250px"></canvas><figcaption><b>Looking down</b> the floor grid (0.5 m, 2 m) and the hatched sun shadow of a deck 0.41 m up</figcaption></figure>
+  <figure><canvas id="front" style="height:250px"></canvas><figcaption><b>Elevation</b> no shadows: the ground line, 1.4 px, over an 18 px hatched band</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  var up = S.deckPose([0, 0.5, 0], Q.x(0.5));
+  boot(function () {
+    S.sheet(document.getElementById('axo'), { scale: 200, target: [0.12, 0.28, 0.1] }).draw(function (g) { g.layer = 'floor'; g.grid({ minor: 0.5, major: 2, extent: 6 }); g.layer = 'figure'; S.drawBoard(g, up); }, { scaleBar: true });
+    S.sheet(document.getElementById('front'), { view: 'front', scale: 200, target: [0, 0.35, 0] }).draw(function (g) { S.drawBoard(g, up); }, { scaleBar: true });
+  });
+</script>
+</body>
+</html>

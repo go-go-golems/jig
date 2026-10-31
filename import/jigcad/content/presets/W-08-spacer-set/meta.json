@@ -1,0 +1,20 @@
+{
+  "id": "W-08",
+  "title": "Spacer and standoff set",
+  "group": "Workshop and repair",
+  "order": 8,
+  "difficulty": "advanced",
+  "about": "fifteen spacers and hex standoffs for M2.5, M3 and M4 from a table, one body per piece and one hole feature per row",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add an M5 row with 10 mm spacers 20 mm long | Give each spacer a 0.4 mm chamfer at both ends",
+  "agent": {
+    "role": "a hardware-kit designer who makes many small parts from one table",
+    "prompt": "Prefer rows and lengths in spacers.json over new code; drill each row with one hole feature sized by a fit class; never make a spacer wall thinner than 1.2 mm.",
+    "fragments": {
+      "table": "A row is { name, kind: 'spacer' | 'standoff', d, od, lengths }, sizes in millimetres.",
+      "inserts": "Standoffs take heat-set inserts: M2.5 hole 3.6 mm, M3 4.0 mm, M4 5.6 mm."
+    },
+    "defaultFragments": ["table"]
+  }
+}

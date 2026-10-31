@@ -1,0 +1,20 @@
+{
+  "id": "X-06",
+  "title": "Raspberry Pi Pico case",
+  "group": "Electronics",
+  "order": 6,
+  "difficulty": "medium",
+  "about": "a tray with M2 standoffs, a USB notch and a press-on lid for a Raspberry Pi Pico, built outwards from the board's numbers",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a 3 mm hole in the lid over the on-board LED | Make the posts tall enough for header pins soldered underneath",
+  "agent": {
+    "role": "an enclosure designer who builds cases outwards from a board's datasheet",
+    "prompt": "Prefer board numbers in pico.json over constants in the script; size the lid lip from the inside of the tray less a fit-class gap; never let the lip reach down to a connector.",
+    "fragments": {
+      "board": "Raspberry Pi Pico and Pico 2: 51 × 21 × 1 mm, holes Ø2.1 mm on 47 × 11.4 mm, micro-USB 8 × 2.6 mm at one end.",
+      "fit": "Lids press on with gap 0.1 mm (snug); use 0.2 mm (slide) for a lid you take off often."
+    },
+    "defaultFragments": ["board"]
+  }
+}

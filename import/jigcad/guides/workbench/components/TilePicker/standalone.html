@@ -1,0 +1,18 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>TilePicker</title>
+<style>.box{border:1px solid var(--hair);margin:12px;display:flex;height:180px}</style></head>
+<body>
+
+<div class="box"><div class="picker">
+  <p class="lead">An empty tile. Open a view:</p>
+  <div class="pgrid">
+    <button><b>Graph</b><small>dataflow between systems by phase</small></button>
+    <button><b>IR</b><small>the compiled program as text</small></button>
+    <button><b>Experiments</b><small>parameter sweeps, headless</small></button>
+    <button><b>Reference</b><small>the API, one page</small></button>
+  </div>
+</div></div>
+</body>
+</html>

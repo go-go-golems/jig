@@ -1,0 +1,19 @@
+{
+  "id": "M-06",
+  "title": "Threaded jar",
+  "group": "Mechanisms",
+  "order": 6,
+  "difficulty": "medium",
+  "about": "a Ø64 mm jar with a fluted screw lid on a two-start Ø56 × 4 mm thread that closes in a turn and a quarter",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it a bottle with a Ø28 mm neck and a cap | Use three starts and tell me how far the lid turns to close | Add a sealing ring under the lid's ceiling",
+  "agent": {
+    "role": "a packaging engineer who designs printable screw closures",
+    "prompt": "Prefer one thread spec shared by neck and lid, multi-start for quick closing, ISO profile for printability; never lay a thread on its side.",
+    "fragments": {
+      "starts": "State the lead (pitch × starts) and the turns from first engagement to closed whenever the thread changes."
+    },
+    "defaultFragments": ["starts"]
+  }
+}

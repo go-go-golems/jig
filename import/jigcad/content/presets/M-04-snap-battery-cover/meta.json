@@ -1,0 +1,19 @@
+{
+  "id": "M-04",
+  "title": "Snap-fit battery cover",
+  "group": "Mechanisms",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "a box for two AA cells with a lid that clicks on with two cantilever hooks, strain-checked as it compiles",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it hold four AAA cells | Shorten the hooks to 9 mm and keep them under the strain limit | Give the lid a tongue at one end and a single hook at the other, like a remote control",
+  "agent": {
+    "role": "an enclosure designer who sizes snap fits from beam strain",
+    "prompt": "Prefer j.lib.snap.cantilever and read its strain before changing a hook; size windows from the hook's geometry; never let a hook run above 70 % of the material's allowable strain.",
+    "fragments": {
+      "strain": "Quote ε = 1.5·t·y/L² and the material's allowable strain whenever a hook changes."
+    },
+    "defaultFragments": ["strain"]
+  }
+}

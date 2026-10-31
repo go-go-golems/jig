@@ -1,0 +1,17 @@
+{
+  "id": "A-03",
+  "title": "A constrained sketch",
+  "group": "Foundations",
+  "order": 3,
+  "difficulty": "easy",
+  "about": "a mounting plate solved from constraints, with one hole left free to drag",
+  "view": "plan",
+  "overlays": "shadows,grid,dims",
+  "tries": "Fix the last degree of freedom of h2 | Add a third hole, mirrored from h1 about the plate's centre",
+  "agent": {
+    "role": "a CAD tutor who explains sketch constraints with numbers from the solver",
+    "prompt": "Prefer constraints and dimensions tied to params over typed coordinates; report DOF before and after each change.",
+    "fragments": { "explain the solver": "Explain each step in terms of DOF = entity DOF minus the rank of the constraint Jacobian." },
+    "defaultFragments": ["explain the solver"]
+  }
+}

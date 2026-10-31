@@ -1,0 +1,55 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../fonts/fonts.css"><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../bundle.js"></script>
+<meta charset="utf-8">
+<title>Loft</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+  body { background: var(--st-bg); color: var(--st-ink); }
+  .row { display: grid; gap: 0; }
+  .row > figure { margin: 0; min-width: 0; border-left: 1px solid var(--st-grid); }
+  .row > figure:first-child { border-left: 0; }
+  canvas { display: block; width: 100%; }
+  figcaption, .cap { font: 500 10px/1.45 var(--font-plex); color: var(--st-muted); padding: 2px 10px 8px; }
+  figcaption b, .cap b { color: var(--st-ink); font-weight: 600; }
+  .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+</style>
+</head>
+<body>
+<div class="row">
+  <figure><canvas id="cone" style="height:250px"></canvas><figcaption><b>A prop</b> D-02's cone: 9 stations, rings at the bands, a meridian, tone amber</figcaption></figure>
+  <figure><canvas id="deck" style="height:250px"></canvas><figcaption><b>The deck</b> 18 stations from sectionsOfDeck; rings where the kicks start and over the trucks</figcaption></figure>
+</div>
+<script>
+  var S = window.FormSkateStage, Q = S.Q, V = S.V;
+  function boot(paint) { paint(); S.onTheme(paint); addEventListener('resize', paint); if (document.fonts) document.fonts.ready.then(paint); }
+
+  // coneStations, copied from content/presets/D-02/lab/cones.js: a base plate, then a cone with rings at its bands
+  function coneStations(at, h, r0, r1) {
+    h = h || 0.46; r0 = r0 || 0.13; r1 = r1 || 0.018; var st = [];
+    st.push({ c: [at[0], 0.001, at[2]], A: [1, 0, 0], B: [0, 0, 1], a: r0 + 0.07, b: r0 + 0.07, ring: 0 });
+    st.push({ c: [at[0], 0.03, at[2]], A: [1, 0, 0], B: [0, 0, 1], a: r0 + 0.07, b: r0 + 0.07, ring: 1 });
+    [0.07, 0.3, 0.42, 0.62, 0.74, 0.97, 1].forEach(function (t) { var y = 0.03 + t * (h - 0.03), r = r0 + (r1 - r0) * t; st.push({ c: [at[0], y, at[2]], A: [1, 0, 0], B: [0, 0, 1], a: r, b: r, ring: (t === 0.3 || t === 0.42 || t === 0.62 || t === 0.74) ? 1 : 0 }); });
+    return st;
+  }
+  boot(function () {
+    var a = S.sheet(document.getElementById('cone'), { scale: 330, target: [0, 0.21, 0], overlays: ['shadows'] });
+    a.draw(function (g) {
+      var st = coneStations([0, 0, 0]);
+      g.loft(st.slice(0, 2), { name: 'cone base', bias: -0.02 });
+      g.loft(st.slice(2), { name: 'cone', meridian: true, tone: 'amber' });
+      g.label('silhouette 2 px', [0.2, 0.02, 0.2], { dx: 10, dy: 10, size: 8, tone: 'muted' });
+      g.label('rings 0.55 px · 70%', [0.09, 0.2, 0], { dx: 22, size: 8, tone: 'muted' });
+    });
+    var b = S.sheet(document.getElementById('deck'), { scale: 520, target: [0, 0.09, 0], overlays: [] });
+    b.draw(function (g) {
+      var d = S.board.DECK, S0 = S.board.sectionsOfDeck(d), p = S.deckPose();
+      var W = S0.map(function (s) { return { c: V.add(p.p, s.c), A: s.A, B: s.B, a: s.a, b: s.b, ring: s.ring }; });
+      g.loft(W, { name: 'deck', meridian: false });
+      g.dimension([-d.length / 2, 0.09, 0], [d.length / 2, 0.09, 0], '0.81 m', { offset: -0.17, tone: 'muted' });
+    });
+  });
+</script>
+</body>
+</html>

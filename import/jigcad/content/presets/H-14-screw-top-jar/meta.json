@@ -1,0 +1,20 @@
+{
+  "id": "H-14",
+  "title": "Screw-top jar",
+  "group": "Around the house",
+  "order": 14,
+  "difficulty": "medium",
+  "about": "a 300 ml jar and lid on a two-start Ø64 × 4 trapezoidal thread from the library, sized as a pair by the slide fit",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a silicone-seal groove under the lid's top | Make a set of three jar heights that share one lid",
+  "agent": {
+    "role": "a container designer who prints threaded jars and lids as matched pairs",
+    "prompt": "Prefer one nominal thread size shared by both parts and fit classes for clearance; keep the neck's wall at least 2.5 mm under the thread root; never change the pitch or starts of one half alone.",
+    "fragments": {
+      "fit": "If the lid binds, change the thread's fit from slide to free on both parts rather than editing diameters.",
+      "speed": "Threads take a few seconds to compile the first time; change body params freely, since the threads are cached."
+    },
+    "defaultFragments": ["fit"]
+  }
+}

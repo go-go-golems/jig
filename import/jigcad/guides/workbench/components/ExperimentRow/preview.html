@@ -1,0 +1,27 @@
+<!-- @dsCard group="Panels" height=560 width=760 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>ExperimentRow</title>
+<style>.box{margin:12px;border:1px solid var(--hair)}</style></head>
+<body>
+
+<div class="box">
+  <div class="toolbar"><span class="lbl">Experiments are exported from <button class="link">experiments.js</button>: many headless runs, each a fresh world.</span></div>
+  <div class="explist">
+    <div class="exprow on"><button class="linkhd"><b>Pop height vs take-off speed</b></button><span class="sub">7 runs</span><span class="sp"></span><button class="btn sm primary" disabled>Run</button></div>
+    <div class="exprow"><button class="linkhd"><b>Flip turns vs flick rate</b></button><span class="sub">10 runs</span><span class="sp"></span><button class="btn sm primary" disabled>Run</button></div>
+    <div class="exprow"><button class="linkhd"><b>Landing assistance against gusts</b></button><span class="sub">120 runs</span><span class="sp"></span><span class="meter expmeter"><i style="width:40%"></i></span><button class="btn sm">Stop</button></div>
+  </div>
+  <div class="reshd"><b>Pop height vs take-off speed</b><span class="sub">7 runs</span></div>
+  <div class="expres"><div class="chartbox"><div class="toolbar"><span class="lbl">x</span><select aria-label="x"><option>jump</option></select><span class="lbl">y</span><select aria-label="y"><option>height</option></select><span class="lbl">series</span><select aria-label="series"><option>—</option></select><label class="chk"><input type="checkbox"> mean by x</label></div>
+  <svg class="roof scatter" viewBox="0 0 520 260" width="100%" style="max-width:520px"><g><line class="gl" x1="48" x2="508" y1="223.1" y2="223.1"/><text class="ax" x="42" y="226.1" text-anchor="end">0.2</text></g><g><line class="gl" x1="48" x2="508" y1="165.3" y2="165.3"/><text class="ax" x="42" y="168.3" text-anchor="end">0.4</text></g><g><line class="gl" x1="48" x2="508" y1="107.4" y2="107.4"/><text class="ax" x="42" y="110.4" text-anchor="end">0.6</text></g><g><line class="gl" x1="48" x2="508" y1="49.6" y2="49.6"/><text class="ax" x="42" y="52.6" text-anchor="end">0.8</text></g><text class="ax" x="48.0" y="240" text-anchor="middle">1.5</text><text class="ax" x="124.7" y="240" text-anchor="middle">2</text><text class="ax" x="201.3" y="240" text-anchor="middle">2.5</text><text class="ax" x="278.0" y="240" text-anchor="middle">3</text><text class="ax" x="354.7" y="240" text-anchor="middle">3.5</text><text class="ax" x="431.3" y="240" text-anchor="middle">4</text><text class="ax" x="508.0" y="240" text-anchor="middle">4.5</text><text class="ax" x="278.0" y="256" text-anchor="middle">jump</text><text class="ax" x="12" y="16" text-anchor="start">height</text><g class="series s0"><g class="pt"><circle cx="48.0" cy="211.2" r="3.6"/><title>jump 1.5
+height 0.241</title></g><g class="pt"><circle cx="124.7" cy="208.3" r="3.6"/><title>jump 2
+height 0.251</title></g><g class="pt"><circle cx="201.3" cy="199.4" r="3.6"/><title>jump 2.5
+height 0.282</title></g><g class="pt"><circle cx="278.0" cy="168.2" r="3.6"/><title>jump 3
+height 0.39</title></g><g class="pt"><circle cx="354.7" cy="128.3" r="3.6"/><title>jump 3.5
+height 0.528</title></g><g class="pt"><circle cx="431.3" cy="81.1" r="3.6"/><title>jump 4
+height 0.691</title></g><g class="pt"><circle cx="508.0" cy="26.8" r="3.6"/><title>jump 4.5
+height 0.879</title></g></g></svg></div></div>
+</div>
+</body>
+</html>

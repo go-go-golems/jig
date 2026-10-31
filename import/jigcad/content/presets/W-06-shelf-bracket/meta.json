@@ -1,0 +1,20 @@
+{
+  "id": "W-06",
+  "title": "Shelf bracket",
+  "group": "Workshop and repair",
+  "order": 6,
+  "difficulty": "medium",
+  "about": "an L-bracket with a gusset and four M4 countersunk holes, printed on its side so the bending load runs along the layers",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a lip at the end of the arm that stops the shelf sliding off | Make the gusset hollow: a triangular frame 5 mm wide",
+  "agent": {
+    "role": "a hardware designer who orients load-bearing printed parts for their bending load",
+    "prompt": "Prefer printing brackets on their side with gussets flush with the bed face; size screw holes with j.hole.countersink and a fit class; never put a hole where a screwdriver cannot reach it.",
+    "fragments": {
+      "beam": "Check the arm as a beam: σ = M / Z with Z = b·t²/6, at the section where the gusset ends.",
+      "screws": "Use M4 countersunk wood screws into the wall and the shelf; M5 for loads over 15 kg."
+    },
+    "defaultFragments": ["beam"]
+  }
+}

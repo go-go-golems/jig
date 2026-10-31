@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form Skate Stage</title>
+<script>(function(){var m='system';try{m=localStorage.getItem('ds-theme')||'system';}catch(e){}var t=m==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):m;document.documentElement.setAttribute('data-theme',t);window.__dsMode=m;})();</script>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="tokens.css">
+<style>
+  :root { --x-ui: var(--font-ui, var(--font-display, Arial, "Helvetica Neue", Helvetica, sans-serif)); --x-code: var(--font-code, var(--font-plex, ui-monospace, Menlo, Consolas, monospace)); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 400 14px/1.55 var(--x-ui); }
+  .x-wrap { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; }
+  .x-nav { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; border-right: 1px solid var(--hair); padding: 20px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .x-nav b { font: 700 15px/1.2 var(--x-ui); margin-bottom: 12px; }
+  .x-nav a { color: var(--ink-2); text-decoration: none; padding: 3px 0; font-size: 13px; }
+  .x-nav a:hover { color: var(--ink); }
+  .x-nav .x-sub { padding-left: 10px; font-size: 12px; }
+  .x-nav button { margin-top: 16px; background: none; color: var(--ink); border: 1px solid var(--hair); padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; text-align: left; }
+  .x-nav button:hover { border-color: var(--ink); }
+  main { min-width: 0; padding: 24px max(16px, 3vw) 80px; }
+  section { border-top: 1px solid var(--ink); padding-top: 12px; margin-top: 48px; }
+  section:first-child { border-top: 0; margin-top: 0; }
+  h1, h2, h3, h4 { text-wrap: balance; line-height: 1.2; }
+  h2.x-h { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-2); margin: 0 0 8px; }
+  .x-md { max-width: 74ch; }
+  .x-md h1 { font-size: 26px; margin: 8px 0 12px; }
+  .x-md h2 { font-size: 18px; margin: 28px 0 8px; }
+  .x-md h3 { font-size: 15px; margin: 20px 0 6px; }
+  .x-md code, .x-tab code, .x-meta code, .x-files code { font: 400 0.9em var(--x-code); background: var(--fill); padding: 0 3px; }
+  .x-md pre { background: var(--fill); padding: 10px 12px; overflow: auto; border: 1px solid var(--hair); }
+  .x-md pre code { background: none; padding: 0; font-size: 12px; }
+  .x-md table, .x-tab { border-collapse: collapse; font-size: 13px; }
+  .x-md th, .x-md td, .x-tab th, .x-tab td { border-bottom: 1px solid var(--hair); padding: 5px 10px 5px 0; text-align: left; vertical-align: top; }
+  .x-md a { color: var(--ink); }
+  .x-md blockquote { margin: 0; padding-left: 12px; border-left: 2px solid var(--hair); color: var(--ink-2); }
+  .x-scroll { overflow-x: auto; max-width: 100%; }
+  .x-sw span { display: inline-block; width: 18px; height: 18px; border: 1px solid var(--hair); vertical-align: middle; margin-right: 6px; }
+  .x-sw code { white-space: nowrap; }
+  .x-note { color: var(--ink-2); font-size: 13px; max-width: 74ch; }
+  .x-styles { display: flex; flex-direction: column; gap: 10px; }
+  .x-style { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; border-bottom: 1px solid var(--hair); padding-bottom: 8px; }
+  .x-sample { overflow-wrap: anywhere; }
+  .x-meta { color: var(--ink-2); font-size: 12px; }
+  .x-comp { margin: 20px 0 36px; }
+  .x-comp h4 { font-size: 16px; margin: 0 0 8px; }
+  .x-frame iframe { display: block; border: 1px solid var(--hair); background: var(--bg); max-width: none; }
+  .x-cover iframe { width: 960px; border: 1px solid var(--hair); display: block; }
+  .x-cover { overflow-x: auto; margin-bottom: 24px; }
+  .x-files { color: var(--ink-2); font-size: 12px; }
+  .x-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .x-shots figure { margin: 0; }
+  .x-shots img { width: 100%; border: 1px solid var(--hair); display: block; }
+  .x-shots figcaption { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  @media (max-width: 760px) { .x-wrap { grid-template-columns: 1fr; } .x-nav { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--hair); } .x-style { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="x-wrap">
+<nav class="x-nav"><b>Form Skate Stage</b>
+<a href="#overview">Overview</a>
+<a href="#sec-book-figures">Book figures in the stage's look</a>
+<a href="#sec-depth-order">Depth order</a>
+<a href="#sec-drawing-bodies">Drawing bodies</a>
+<a href="#sec-labels-and-dimensions">Labels and dimensions</a>
+<a href="#sec-motion">Motion</a>
+<a href="#sec-overlays">Overlays</a>
+<a href="#sec-projection-and-views">Projection and views</a>
+<a href="#sec-shadows-and-ground">Shadows and ground</a>
+<a href="#tokens">Tokens</a>
+<a href="#components">Components</a><a class="x-sub" href="#comp-Chip">Stage parts</a><a class="x-sub" href="#comp-Chronophotograph">Motion</a><a class="x-sub" href="#comp-DepthOrder">Depth order</a><a class="x-sub" href="#comp-DimensionLine">Annotations</a><a class="x-sub" href="#comp-Figure">Bodies</a><a class="x-sub" href="#comp-GroundAndShadow">Ground</a><a class="x-sub" href="#comp-Overlays">Overlays</a><a class="x-sub" href="#comp-SheetFurniture">Sheet</a><a class="x-sub" href="#comp-Views">Projection</a>
+<a href="#assets">Assets</a>
+<a href="#export">About this export</a>
+<button id="x-theme" type="button">Theme: system</button>
+</nav>
+<main>
+<section id="overview"><h2 class="x-h">Overview</h2>
+<div class="x-cover"><iframe data-src="components/Cover/standalone.html" src="components/Cover/standalone.html" title="Cover" style="height:288px"></iframe></div>
+<div class="x-md"><p>The stage is a drafting sheet. Bodies are ink hairlines on white paper, seen in orthographic projection, with hatched sun shadows and small monospaced labels; colour appears only in overlays and signals, never in the drawing itself.</p>
+<p>This system covers the Form Skate stage: the 2.5D view, its drawing conventions, the code that draws it, and the few HTML parts laid over it. The workbench around the stage (panels, editor, menus, the book) is <strong>Form Skate Workbench</strong> (<a href="https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG">https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG</a>); the coding agent is <strong>Form Skate Agent</strong> (<a href="https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM">https://claude.ai/artifact/4KJ4g867ubqBbVszAeqXWM</a>).</p>
+<h2>What is here</h2>
+<ul>
+<li><strong>Tokens.</strong> The sheet&#39;s colours are the <code>st-*</code> tokens, in a light and a dark theme. The drawing&#39;s numbers (line widths, hatch pitch, opacities, dashes, dot sizes, the four views, the sheet furniture) are token families of their own: <code>stroke</code>, <code>hatch</code>, <code>opacity</code>, <code>dash</code>, <code>marks</code>, <code>camera</code>, <code>sheet</code>. Six workbench colours (<code>bg</code>, <code>ink</code>, <code>ink-2</code>, <code>fill</code>, <code>hair</code>, <code>accent</code>) and <code>on-accent</code> are repeated here, with the same names and values, for the hint line, the overlay menu and the fail banner.</li>
+<li><strong><code>window.FormSkateStage</code></strong> (<code>components/bundle.js</code>): the stage&#39;s own drafting code, unchanged, plus <code>sheet()</code>, which builds a camera and draws a frame the way the stage does. <code>components/index.d.ts</code> lists every call. Use it; do not redraw the look by hand.</li>
+<li><strong><code>components/bundle.css</code></strong>: the chips, trick toast, fail banner, hint line and overlay menu.</li>
+<li><strong>Sections</strong>: projection and views, drawing bodies, shadows and ground, depth order, labels and dimensions, overlays, motion, and book figures.</li>
+</ul>
+<h2>The rules</h2>
+<ol>
+<li><strong>Orthographic only.</strong> Every view is a parallel projection: <code>x = W/2 + s (p − T)·r</code>, <code>y = Y0 − s (p − T)·u</code>. There are four named views: <code>axo</code> (yaw <code>view-axo-yaw</code> 38°, pitch <code>view-axo-pitch</code> 27°), <code>front</code>, <code>side</code> and <code>plan</code>. Orbiting adds to a view&#39;s yaw and pitch; it never adds perspective. Lengths parallel to the sheet share one scale, so the scale bar is valid anywhere on it.</li>
+<li><strong>Lines, paper, hatch.</strong> A solid is an outline stroked at <code>stroke-silhouette</code> (2 px) in <code>st-ink</code> and then filled with paper (<code>st-bg</code>), so it hides what is behind it. On its surface only thin lines: rings and meridians at <code>stroke-ring</code> (0.55 px), opacity <code>opacity-ring</code>. Tone is hatching, never grey fill: sun shadows, the ground band of an elevation, the lot&#39;s edge and the faces of props are 45° lines in <code>st-shadow</code> at <code>stroke-hatch</code> (0.6 px), <code>hatch-tile</code> (6 px) apart.</li>
+<li><strong>Ink draws; hues annotate.</strong> The rider, the board and the props are <code>st-ink</code> (a prop may take one overlay hue as its tone, as D-02&#39;s amber cones do). Each overlay has one hue and keeps it: <code>st-violet</code> the rig, <code>st-amber</code> forces, <code>st-rec</code> contacts, the centre of mass and anything that went wrong, <code>st-green</code> sites, <code>st-blue</code> paths, the course and landed dimensions, <code>st-teal</code> the nose path, <code>st-ghost</code> onion skins. Pick a hue by meaning from this list. Do not add hues.</li>
+<li><strong>Labels.</strong> Canvas text is IBM Plex Mono (<code>canvas-label</code>, 9.5 px, weight 500). Labels beside marks are 8 px in the mark&#39;s hue (<code>canvas-label-sm</code>). Dimension values are 8.5 px on a paper patch (<code>canvas-dim</code>). Trick names on the floor are in capitals; numbers carry units and two decimals (<code>1.62 m · 0.42 s</code>); parts of a label are joined by <code>·</code>.</li>
+<li><strong>Depth.</strong> Solids are painted back to front. The order comes from a strategy in <code>depth-order.js</code> (<code>deck plane</code> by default) with chain outlines on, so each limb is one outline. A new solid gives itself a <code>name</code>; a flat part that others stand on gives its <code>plane</code>; parts under it say <code>under</code>; parts of one limb share a <code>chain</code>. Use <code>bias</code> (metres) only for a judgment no geometry can make, such as keeping the face in front of the neck.</li>
+<li><strong>Layers.</strong> Marks are flushed in a fixed order: <code>floor</code> (grid, boundary, floor marks), shadows, <code>ghost</code> (outlines only, never sorted), <code>figure</code> (solids, depth-sorted), <code>overlay</code> (lines, arrows, dots, labels). Put a mark on the lowest layer it belongs to.</li>
+<li><strong>Motion is sampled time.</strong> The past is drawn from the history (one sample every 1/60 s for 8 s), as ghosts every fifth sample, paths with a tick every 50 ms, or stick figures every 0.08 s, older ones fainter. The trail covers the last jump: take-off to landing plus 0.1 s.</li>
+<li><strong>Square and quiet DOM.</strong> Chips, the toast and the banner are square (<code>radius-none</code>), 1 px borders, inset <code>stage-inset</code> (12 px) from the stage&#39;s corners. The toast lives 2.6 s. Nothing else floats over the sheet.</li>
+<li><strong>Dark theme.</strong> Every colour is read from the <code>st-*</code> tokens at draw time (<code>readColors</code>), and the stage re-reads them 30 ms after the theme changes. Never hard-code a colour in a view: name a tone (<code>tone: &#39;blue&#39;</code>) and the theme decides.</li>
+<li><strong>Sheet furniture.</strong> Every sheet has a scale bar bottom left. A sheet at least 640 × 460 px also has a title block bottom right: FORM SKATE, the sheet number, and one row per fact.</li>
+</ol>
+<h2>Drawing a new body or overlay</h2>
+<ol>
+<li>Write a view in a library file: <code>$.view(&#39;cones&#39;, v =&gt; v.layer(&#39;figure&#39;).draw((g, ctx) =&gt; { … }))</code>. <code>ctx</code> has <code>world read param time frameDt local history events</code>.</li>
+<li>Describe the body as stations, ellipses in space <code>{ c, A, B, a, b, ring }</code> (centre, two unit axes, two radii, ring flag), from its base up. Put <code>ring: 1</code> where the girth should read.</li>
+<li>Draw it with <code>g.loft(stations, { name, tone, meridian, bias, chain, plane, under, ghost, after })</code>; a flat face is <code>g.poly(points, { fill: &#39;stage&#39; | &#39;hatch&#39; | &#39;soft&#39; | &#39;none&#39;, name })</code>. Shadows, paper fill and depth order follow by themselves.</li>
+<li>Annotate on the <code>overlay</code> layer behind a switch: <code>if (!g.on(&#39;forces&#39;)) return;</code> then <code>g.arrow(p, vector, { tone: &#39;amber&#39; })</code>, <code>g.dot(p, 2, { tone })</code>, <code>g.label(&#39;667 N&#39;, p, { tone, dx: 6, size: 8 })</code>. Scale forces in metres per newton and say the scale in the label or the caption.</li>
+<li>Press Run in the workbench and look at all four views and both themes. Turn on Order ▸ Truth to see any cells the depth order gets wrong.</li>
+</ol>
+<p>Outside the workbench, the same marks go through <code>FormSkateStage.sheet(canvas, { view: &#39;axo&#39;, scale: 150 }).draw(g =&gt; { … }, { scaleBar: true })</code>: it sizes the canvas, reads the tokens, builds the stage&#39;s camera and flushes the layers.</p>
+<h2>Content</h2>
+<ul>
+<li>Trick names: lower case in data (<code>kickflip</code>), capitals on the sheet (<code>KICKFLIP · 1.62 m · 0.42 s</code>) and in the toast. A bail adds <code> · bail</code> (<code>HEELFLIP · BAIL</code>) and turns <code>st-rec</code>.</li>
+<li>Chips are terse capitals (<code>AUTOPILOT</code>, <code>YOU</code>, <code>● REC 12 s</code>, <code>REPLAY</code>). Ghost chips are hints in lower case (<code>click the stage, then ↑ to push</code>).</li>
+<li>The hint line opens with a bold state (<code>Click the stage</code>, <code>Riding</code>, <code>Replay</code>) followed by keys and gestures joined by <code>·</code>.</li>
+<li>Measurements show two decimals with their unit: <code>flip 0.99 · shove 0.00 · air 0.42 s · +850</code>.</li>
+</ul>
+<h2>Iconography</h2>
+<p>The stage uses no icon set and no logo. Glyphs are text: <code>↑ ← →</code> for keys, <code>●</code> for recording, <code>▾</code> for menus, <code>·</code> as a separator. The title block&#39;s mark is the words FORM SKATE in bold Arial.</p>
+</div></section>
+<section id="sec-book-figures"><h2 class="x-h">book-figures.md</h2><div class="x-md"><h1>Book figures in the stage&#39;s look</h1>
+<p>The book&#39;s figures are drawn &quot;in the style of the stage&quot;: technical drawing, hairlines, ink, grey and one red accent, on the reader&#39;s theme. They are inline SVG, so they cannot use the canvas code; they reproduce its conventions by hand from computed coordinates. The rest of the book&#39;s rules (structure, captions, checking) are in <strong>Form Skate Workbench</strong> (<a href="https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG">https://claude.ai/artifact/5aW5wCqpBBTFm6rtezFLaG</a>), under writing a book section.</p>
+<h2>The block</h2>
+<p>A figure is a fenced block with the language <code>svg</code>, then a caption paragraph that starts <code>**Figure N.k.**</code>. The SVG has a <code>viewBox</code> at most 720 wide, no <code>&lt;style&gt;</code>, <code>&lt;script&gt;</code>, <code>&lt;image&gt;</code> or <code>&lt;foreignObject&gt;</code>, and no literal colours. The page renders it with the workbench&#39;s colours, not the stage&#39;s: the classes below map to <code>ink</code>, <code>ink-2</code>, <code>accent</code>, <code>hair</code>, <code>fill</code>, <code>fill-2</code>, <code>bg</code> and <code>sel</code>.</p>
+<table>
+<thead>
+<tr>
+<th>stroke class</th>
+<th>fill class</th>
+<th>colour</th>
+<th>use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>stroke=&quot;currentColor&quot;</code> or <code>ink</code></td>
+<td><code>f-ink</code></td>
+<td>ink</td>
+<td>the subject, outlines, text</td>
+</tr>
+<tr>
+<td><code>mut</code></td>
+<td><code>f-mut</code></td>
+<td>ink-2</td>
+<td>hatching, construction lines, axes, secondary text</td>
+</tr>
+<tr>
+<td><code>acc</code></td>
+<td><code>f-acc</code></td>
+<td>accent red</td>
+<td>the one thing the figure is about; a failure</td>
+</tr>
+<tr>
+<td><code>hair</code></td>
+<td><code>f-fill</code>, <code>f-fill2</code></td>
+<td>hair; light and darker grey</td>
+<td>rules; quiet areas</td>
+</tr>
+<tr>
+<td></td>
+<td><code>f-paper</code></td>
+<td>the page</td>
+<td>knock out lines behind a label; paper inside a solid</td>
+</tr>
+<tr>
+<td></td>
+<td><code>f-sel</code></td>
+<td>faint red wash</td>
+<td>a highlighted region</td>
+</tr>
+</tbody></table>
+<p>Text classes: <code>lbl</code> (small capitals, tracked), <code>it</code> (italic, for variables), <code>b</code> (bold). Line classes: <code>dash</code>, <code>dot</code>. Text sizes 9 to 13.</p>
+<p>There are no blue, green, violet, amber or teal classes. A figure that shows an overlay draws it in ink or <code>mut</code> and puts the one thing that matters in <code>acc</code>; the caption names what each line is.</p>
+<h2>Stage conventions in SVG</h2>
+<table>
+<thead>
+<tr>
+<th>stage</th>
+<th>in a figure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>loft silhouette, 2 px stroked then paper-filled</td>
+<td>the outline at <code>stroke-width=&quot;1&quot;</code> (1.6 for the subject), with <code>class=&quot;f-paper&quot;</code> inside when it must hide what is behind</td>
+</tr>
+<tr>
+<td>rings and meridians, 0.55 px at 0.7</td>
+<td><code>class=&quot;mut&quot;</code> at <code>stroke-width=&quot;0.6&quot;</code></td>
+</tr>
+<tr>
+<td>hatching, 0.6 px lines 6 px apart at 45°</td>
+<td>the pattern below, <code>fill=&quot;url(#hatch)&quot;</code></td>
+</tr>
+<tr>
+<td>ground line of an elevation</td>
+<td>a 1.4 px line over an 18 px band of 0.6 px <code>mut</code> lines 7 px apart, clipped to the band</td>
+</tr>
+<tr>
+<td>dimension line</td>
+<td>0.7 px extension lines, a 1 px line, 1.4 px 45° ticks 8 px across, the value centred on an <code>f-paper</code> patch</td>
+</tr>
+<tr>
+<td>labels, Plex 9.5 px</td>
+<td><code>font-size=&quot;9&quot;</code> to <code>&quot;11&quot;</code>; small capitals with <code>lbl</code></td>
+</tr>
+<tr>
+<td>scale bar</td>
+<td>quarters, first and third filled 2 px high, <code>0</code> and the length at 9 px</td>
+</tr>
+</tbody></table>
+<p>The hatch pattern, exactly as Figure 46.2 defines it:</p>
+<pre><code class="language-svg">&lt;defs&gt;&lt;pattern id=&quot;hatch&quot; patternUnits=&quot;userSpaceOnUse&quot; width=&quot;6&quot; height=&quot;6&quot;&gt;&lt;path d=&quot;M-1,7 L7,-1 M-1,1 L1,-1 M5,7 L7,5&quot; fill=&quot;none&quot; class=&quot;mut&quot; stroke-width=&quot;0.6&quot;/&gt;&lt;/pattern&gt;&lt;/defs&gt;
+</code></pre>
+<p>Ids are made unique per figure when the page renders it, so every figure may call its pattern <code>hatch</code> and its arrowhead <code>arrow</code>.</p>
+<h2>Compute, do not guess</h2>
+<p>Use the stage&#39;s own camera for the coordinates. In a page that loads this system&#39;s bundle:</p>
+<pre><code class="language-js">const S = window.FormSkateStage, v = S.VIEWS.axo;
+const cam = S.makeCam(v.yaw, v.pitch, 120, [0, 0, 0], 640, 260);   // 120 px/m, centred on the origin
+const p = S.proj(cam, [1, 0, 0]);                                    // a world point on the 640 × 260 sheet
+const g = new S.Draft(); g.cam = cam;
+const { E } = g.loftPath(S.board.sectionsOfDeck(S.board.DECK));      // each section&#39;s 20 projected points
+const outline = S.hull2(E[8].concat(E[9]));                          // one hull between neighbouring sections
+</code></pre>
+<p>Write the numbers into the SVG rounded to 0.1 px. A figure that claims to show data (a path, a pose, a force) plots real numbers from the book&#39;s FACTS.md or a recorded run; a schematic looks like one and says so in its caption.</p>
+<h2>Figure checklist</h2>
+<ul>
+<li>One subject in ink at 1.6, the rest at 1 or 0.6.</li>
+<li>One accent, used for the point of the figure.</li>
+<li>Real scale stated in the caption (<code>at 120 px/m</code>) when lengths can be read off the figure.</li>
+<li>Every label names a thing the prose names, in the same words, with units.</li>
+<li>The caption says which view (axonometric, front, side, plan) and which moment (<code>t = 2.783 s</code>).</li>
+</ul>
+</div></section>
+<section id="sec-depth-order"><h2 class="x-h">depth-order.md</h2><div class="x-md"><h1>Depth order</h1>
+<p>The stage hides surfaces with the painter&#39;s algorithm: solids are drawn back to front, each stroked and then filled with paper, so whatever comes later hides what came before. Choosing the order is the whole of hidden-surface removal in a hairline drawing. A wrong order puts a foot under the deck it stands on.</p>
+<h2>The pipeline</h2>
+<ol>
+<li>Every solid mark (<code>loft</code> or <code>poly</code>, not on the floor or ghost layers) becomes an <strong>item</strong> (draft.js:88-99): <code>{ uid, name, k, S | pts, o, cen, key }</code>. <code>uid</code> numbers repeated names per frame (<code>wheel#3</code>); <code>key</code> is the depth of the centroid along <code>cam.c</code> plus <code>o.bias</code>. Larger is nearer.</li>
+<li>A <strong>strategy</strong> from <code>src/lib/depth-order.js</code> returns the items back to front. A strategy that throws, or returns anything but a reordering of its items, is ignored for that frame and the stage sorts by key (draft.js:129-136).</li>
+<li>With <strong>chain outlines</strong> on (the default), the parts of each limb are ordered and drawn as one unit (<code>unitOrder</code>, truth.js:115-125): all their outlines, then all their fills, so the seams at knees, elbows and waist vanish. A chain sits at the mean place of its parts and keeps last frame&#39;s place unless that moves by more than three places.</li>
+</ol>
+<pre><code class="language-js">// src/lib/depth-order.js:100-109
+exports.strategies = {
+  &#39;centroid&#39;: (items) =&gt; byKey(items),
+  &#39;coherent&#39;: (items, cam, mem) =&gt; coherent(items, mem, 0.02),
+  &#39;deck plane&#39;: (items, cam, mem, kit) =&gt; anchored(items, cam, mem, kit, 0),
+  &#39;deck plane + coherent&#39;: (items, cam, mem, kit) =&gt; anchored(items, cam, mem, kit, 0.02),
+  &#39;deck plane + coherent + smoothed keys&#39;: (items, cam, mem, kit) =&gt; anchored(items, cam, mem, kit, 0.02, smoothKeys(items, mem)),
+};
+exports.current = &#39;deck plane&#39;;
+</code></pre>
+<h2>Why one key per part fails</h2>
+<ul>
+<li><strong>A long part with a small one on it.</strong> The deck is 81 cm long and the front foot stands near one end. Whenever the nose points slightly away from the viewer, the deck&#39;s centroid sorts in front of the foot standing on it; in the tracked side view by 12.1 cm. With one key per part the front foot was drawn under the deck in 51% of frames in the axonometric view and 76% in the tracked side view.</li>
+<li><strong>Parts that pass through each other.</strong> At every joint two lofts overlap in space. No whole-part order is right there.</li>
+<li><strong>Near-ties flicker.</strong> Two keys within a centimetre swap as contact noise moves the parts by millimetres.</li>
+</ul>
+<h2>The deck as a plane</h2>
+<p>A flat part orders exactly anything wholly on one side of its plane (Newell, Newell and Sancha, 1972). <code>planeVerdict(f, q, cam)</code> (depth-order.js:42-55) measures a part&#39;s extent along the plane&#39;s normal from its sections&#39; surfaces, not their centres; counts a part 75% on one side as that side; and leans edge-on cases toward the rider (<code>lean: 0.1</code>). <code>anchored</code> (depth-order.js:61-89) then moves the deck&#39;s key just behind the nearest part standing on it and its undercarriage just behind the deck.</p>
+<p>So, when you draw:</p>
+<ul>
+<li>give a flat part that others stand on <code>plane: { n, p0, tol, lean }</code>, with <code>n</code> its up normal and <code>p0</code> a point on the standing surface (the deck uses <code>tol: d.thick</code>, <code>lean: 0.1</code>; board.js:150);</li>
+<li>give the parts under it <code>under: &#39;&lt;its name&gt;&#39;</code>;</li>
+<li>give the parts of one limb the same <code>chain</code>;</li>
+<li>use <code>bias</code> only where geometry cannot decide (the head is biased 6 cm forward so the face is never hidden by the neck).</li>
+</ul>
+<h2>Measuring an order</h2>
+<p>The <strong>Truth</strong> tool (Order menu, or <code>overlays: [&#39;truth&#39;]</code> in <code>sheet()</code>) samples every solid&#39;s surface into 3 px cells (<code>truth-cell</code>), keeps the nearest part per cell, and paints in <code>st-rec</code> at <code>opacity-truth</code> (0.5) every contested cell the order draws wrong (truth.js:8-91). It is recomputed a few times a second while playing. <strong>Order changes</strong> outlines in <code>st-rec</code> at <code>stroke-changes</code> (2.4 px), fading over 18 frames, every overlapping pair whose order just flipped.</p>
+<p>On 45 s of the autopilot, the deck plane with chain outlines brought the axonometric view from 468 to 182 cm² drawn wrong per frame, and the foot under the deck from 51% to 1.9% of frames. What is left is mostly at joints.</p>
+<h2>Writing a strategy</h2>
+<p>A strategy is <code>(items, cam, mem, kit) → items back to front</code>. <code>cam</code> gives <code>c</code>, <code>r</code>, <code>u</code>; <code>mem</code> persists between frames for this stage; <code>kit.overlaps(a, b)</code> says whether two silhouettes overlap on the sheet (a box test, then hulls of neighbouring sections) and <code>kit.depth(p)</code> gives a depth. Add it to <code>exports.strategies</code>, press Run, pick it in the Order menu, and score it on a clip in Experiments.</p>
+</div></section>
+<section id="sec-drawing-bodies"><h2 class="x-h">drawing-bodies.md</h2><div class="x-md"><h1>Drawing bodies</h1>
+<p>Every body on the stage is a <strong>loft</strong>: a list of elliptical sections (stations) swept along it, drawn in a few hairlines. The rider, the deck, the trucks, the wheels and D-02&#39;s cones are all lofts. Flat faces (a funbox, a kicker) are polygons.</p>
+<h2>Stations</h2>
+<p>A station is an ellipse in space, <code>c + a cos θ A + b sin θ B</code>:</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>c</code></td>
+<td>centre, a world point in metres</td>
+</tr>
+<tr>
+<td><code>A</code>, <code>B</code></td>
+<td>unit axes of the section&#39;s plane, perpendicular</td>
+</tr>
+<tr>
+<td><code>a</code>, <code>b</code></td>
+<td>radii along <code>A</code> and <code>B</code>, metres</td>
+</tr>
+<tr>
+<td><code>ring</code></td>
+<td>1 to draw this section as a visible ring</td>
+</tr>
+</tbody></table>
+<p>List stations from one end of the body to the other. Use more of them where the outline bends: the deck has 18, dense at the nose and tail (<code>sectionsOfDeck</code>, board.js:131-137); D-02&#39;s cone has a two-station base plate and seven stations up its body.</p>
+<h2>How a loft is drawn</h2>
+<pre><code class="language-js">// app/draft.js:308-322
+drawLoft(ctx, S, o, ghost) {
+  const cam = this.cam, C = this.C, { path, E } = this.loftPath(S);
+  ctx.lineJoin = &#39;round&#39;;
+  if (ghost) { /* 0.8 px outline in the ghost tone, faint paper wash: see motion */ return; }
+  const tone = toneOf(C, o.tone, C.ink);
+  ctx.strokeStyle = tone; ctx.lineWidth = 2; ctx.stroke(path); ctx.fillStyle = o.fill === &#39;soft&#39; ? C.soft : C.stage; ctx.fill(path);
+  ctx.lineWidth = 0.55; ctx.globalAlpha = 0.7;
+  S.forEach((s, i) =&gt; { if (s.ring) visibleArc(ctx, cam, s, E[i]); });
+  if (o.meridian) meridian(ctx, cam, S, [0, 1]);
+  ctx.globalAlpha = 1;
+}
+</code></pre>
+<ol>
+<li><strong>Silhouette.</strong> Each section is projected to 20 points. Each pair of neighbouring sections gives one convex hull on the sheet (Andrew&#39;s monotone chain, <code>hull2</code>). The union of the hulls is the outline. Pairs, not the whole stack, so a bent body stays bent.</li>
+<li><strong>Stroke, then fill.</strong> The union is stroked at <code>stroke-silhouette</code> (2 px) and filled with paper (<code>st-bg</code>, or <code>st-soft</code> with <code>fill: &#39;soft&#39;</code>). The fill covers the inner half of the stroke and every seam between hulls, leaving one 1 px outline that hides what is behind it.</li>
+<li><strong>Rings.</strong> A station with <code>ring: 1</code> draws the half of its ellipse whose outward normal faces the viewer, at <code>stroke-ring</code> (0.55 px) and <code>opacity-ring</code> (0.7). Rings are where girth reads: a waist, a band.</li>
+<li><strong>Meridian.</strong> With <code>meridian: true</code>, a line joins the end of every station&#39;s <code>B</code> axis along the body, drawn only where it faces the viewer: the torso&#39;s spine, a cone&#39;s seam.</li>
+</ol>
+<h2>The options</h2>
+<p><code>g.loft(stations, o)</code>:</p>
+<table>
+<thead>
+<tr>
+<th>option</th>
+<th>use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>the part&#39;s name; numbered per frame for the depth order (<code>wheel#3</code>)</td>
+</tr>
+<tr>
+<td><code>tone</code></td>
+<td>a palette name (<code>&#39;amber&#39;</code>) or a CSS colour for the outline; default <code>st-ink</code></td>
+</tr>
+<tr>
+<td><code>fill</code></td>
+<td><code>&#39;soft&#39;</code> for <code>st-soft</code> instead of paper</td>
+</tr>
+<tr>
+<td><code>meridian</code></td>
+<td>draw the meridian</td>
+</tr>
+<tr>
+<td><code>bias</code></td>
+<td>metres added to the depth key; a judgment, used sparingly (head +0.06, deck +0.02, wheels −0.015)</td>
+</tr>
+<tr>
+<td><code>plane</code></td>
+<td><code>{ n, p0, tol, lean }</code>: a flat part that orders what stands on it (the deck)</td>
+</tr>
+<tr>
+<td><code>under</code></td>
+<td>the name of the flat part this one sits under (<code>&#39;deck&#39;</code> for trucks, hangers, wheels)</td>
+</tr>
+<tr>
+<td><code>chain</code></td>
+<td>a limb name; with chain outlines on, a chain is stroked and filled as one outline</td>
+</tr>
+<tr>
+<td><code>ghost</code></td>
+<td>a number from 0 to 1: draw as an onion-skin outline at that strength</td>
+</tr>
+<tr>
+<td><code>noShadow</code></td>
+<td>cast no shadow</td>
+</tr>
+<tr>
+<td><code>after</code></td>
+<td><code>d =&gt; …</code>, draws decals once the loft is painted</td>
+</tr>
+</tbody></table>
+<p><code>g.poly(points, { fill, tone, width, stroke, name, bias })</code> draws a flat polygon, depth-sorted with the lofts. <code>fill: &#39;stage&#39;</code> (default) is paper, <code>&#39;hatch&#39;</code> is paper and then the hatch, <code>&#39;soft&#39;</code> is <code>st-soft</code>, <code>&#39;none&#39;</code> leaves it open; <code>stroke: false</code> drops the 1 px edge.</p>
+<h2>The figure</h2>
+<p>The rider is 19 lofts on a 22-joint skeleton (figure.js:7-15, 75-101). Each station is fixed to a joint: an offset in the joint&#39;s frame, the joint&#39;s <code>x</code> axis as <code>A</code> and its <code>z</code> axis (or <code>y</code>, for the feet and toes) as <code>B</code>. Pose the skeleton and the stations follow:</p>
+<pre><code class="language-js">// src/lib/skate/figure.js:134-137
+for (const part of PARTS) {
+  const st = part.st.map(([j, o, a, b, ring]) =&gt; { const W = F.W[j]; return { c: toW(F, j, o), A: Q.rot(W, [1, 0, 0]), B: Q.rot(W, part.ax === &#39;xy&#39; ? [0, 1, 0] : [0, 0, 1]), a, b, ring: ring || 0 }; });
+  g.loft(st, { bias: part.bias, meridian: part.meridian, name: part.key, chain: part.chain, after: part.key === &#39;head&#39; ? d =&gt; drawFace(d, F, s) : null });
+}
+</code></pre>
+<p>Parts belong to six chains: <code>legL</code>, <code>legR</code>, <code>armL</code>, <code>armR</code>, <code>head</code> and <code>torso</code> (figure.js:78). Upper arms, forearms, thighs and shins end in capped stations (three shrinking sections), so their ends are round. The figure is a view: it reads the simulation and never pushes on it. Its pose is closed-form each frame: posture springs, forward kinematics, two-bone IK onto the feet, forward kinematics again.</p>
+<h2>The board</h2>
+<p><code>drawBoard(g, pose, dims, { ghost, roll })</code> (board.js:138-168) lofts the deck from its 18 sections (rings where the kicks start and over the trucks), then per truck a baseplate, a hanger and two wheels, and four bolts as 0.9 px dots that hide when the grip faces away. The deck carries its <code>plane</code> so riders stand in front of it; trucks, hangers and wheels are <code>under: &#39;deck&#39;</code>. With <code>ghost</code> set, only the deck is drawn.</p>
+<h2>Decals</h2>
+<p>Features on a surface (the face) are drawn in its tangent plane with one canvas transform, exact under an orthographic camera: in a loft&#39;s <code>after</code>, <code>d.decal({ p, q }, local, normal, size, mirror, ctx2d =&gt; …)</code> maps a unit square at <code>local</code> in the frame <code>{ p, q }</code> onto the sheet, and returns false when the normal faces away. Draw inside it with ordinary 2D calls and <code>d.color(&#39;ink&#39;)</code>. The face uses 0.17 to 0.42 unit strokes in that square (figure.js:186-199).</p>
+<h2>A new prop, start to finish</h2>
+<pre><code class="language-js">// content/presets/D-02/lab/cones.js:17-25: a cone is a two-station base and a seven-station body
+$.view(&#39;cones&#39;, v =&gt; v.layer(&#39;figure&#39;).draw((g, ctx) =&gt; {
+  for (const at of spots) {
+    const st = coneStations(at);
+    g.loft(st.slice(0, 2), { name: &#39;cone base&#39;, bias: -0.02 });
+    g.loft(st.slice(2), { name: &#39;cone&#39;, meridian: true, tone: &#39;amber&#39; });
+  }
+}));
+</code></pre>
+<p>It gets a hatched shadow, a place in the depth order and both themes with no further work.</p>
+</div></section>
+<section id="sec-labels-and-dimensions"><h2 class="x-h">labels-and-dimensions.md</h2><div class="x-md"><h1>Labels and dimensions</h1>
+<p>Text on the sheet is small, monospaced and placed by the world point it describes. It states a fact with its unit; it never decorates.</p>
+<h2>Labels</h2>
+<pre><code class="language-js">// app/draft.js:357-358 and 374-379
+const p = proj(cam, m.p); this.text(ctx, m.text, p[0] + (o.dx || 0), p[1] + (o.dy || 0), { size: o.size || 9.5, col, align: o.align, bg: o.bg ? C.stage : null, w: o.weight });
+text(ctx, s, x, y, o = {}) {
+  ctx.font = `${o.w || 500} ${o.size || 10}px ${o.mono === false ? &#39;Arial, Helvetica, sans-serif&#39; : MONO}`;
+  ctx.textAlign = o.align || &#39;left&#39;; ctx.textBaseline = o.base || &#39;middle&#39;;
+  if (o.bg) { const w = ctx.measureText(s).width, h = (o.size || 10) + 4, x0 = o.align === &#39;center&#39; ? x - w / 2 : o.align === &#39;right&#39; ? x - w : x; ctx.fillStyle = o.bg; ctx.fillRect(x0 - 3, y - h / 2, w + 6, h); }
+  ctx.fillStyle = o.col || this.C.ink; ctx.fillText(s, x, y);
+}
+</code></pre>
+<p><code>g.label(text, p, { dx, dy, size, align, bg, weight, tone })</code>:</p>
+<ul>
+<li>The face is IBM Plex Mono at weight 500, vertically centred on the point. Sizes are CSS pixels and do not change with zoom.</li>
+<li><strong>9.5 px</strong> (<code>canvas-label</code>) is the default: a free label, a title-block value.</li>
+<li><strong>8 px</strong> (<code>canvas-label-sm</code>) is a label beside its own mark, in the mark&#39;s hue, offset a few pixels: <code>COM</code> at <code>dx: 7, dy: -7</code>; a force <code>667 N</code> at <code>dx: 6</code> past the arrow&#39;s tip; a site name at <code>dx: 6, dy: -6</code>.</li>
+<li><strong>8.5 px</strong> (<code>canvas-dim</code>) is a dimension value.</li>
+<li><code>bg: true</code> puts a paper patch 3 px wider on each side and 4 px taller than the text behind it, so the label breaks a line instead of crossing it. Use it whenever a label sits on a line or a hatch.</li>
+<li><code>weight: 700</code> is for a heading on the sheet (a compare sheet&#39;s name), not for emphasis inside a label.</li>
+</ul>
+<p>The only text not in Plex is the title block&#39;s <code>FORM SKATE</code>, bold Arial at 9.5 px (<code>canvas-title</code>).</p>
+<h3>Writing labels</h3>
+<ul>
+<li>Name things as the code and the book name them: <code>COM</code>, <code>frontBolts</code>, <code>centre around the foot</code>.</li>
+<li>Numbers carry units and fixed decimals: <code>0.42 s</code>, <code>1.62 m</code>, <code>667 N</code>; a count of turns has two decimals (<code>flip 0.99</code>).</li>
+<li>Join parts with <code>·</code>: <code>KICKFLIP · 1.62 m · 0.42 s</code>.</li>
+<li>Trick names on the floor are in capitals; everything else keeps its case.</li>
+<li>Keep a label to one line. If it needs a sentence, it belongs in the panel beside the stage or in the book.</li>
+</ul>
+<h2>Dimension lines</h2>
+<p><code>g.dimension(a, b, text, { offset, tone, alpha })</code> measures the horizontal distance between two floor points:</p>
+<pre><code class="language-js">// app/draft.js:362-373
+const a = m.a, b = m.b, d = V.sub(b, a), L = Math.hypot(d[0], d[2]); if (L &lt; 0.05) return;
+const n = [-d[2] / L * off, 0, d[0] / L * off];
+const A = V.add(a, n), B = V.add(b, n), pa = proj(cam, a), pb = proj(cam, b), qa = proj(cam, A), qb = proj(cam, B);
+ctx.lineWidth = 0.7; /* extension lines from a and b to 12% past the dimension line */
+ctx.lineWidth = 1;   /* the dimension line from A to B */
+for (const q of [qa, qb]) { ctx.beginPath(); ctx.moveTo(q[0] - 4, q[1] + 4); ctx.lineTo(q[0] + 4, q[1] - 4); ctx.lineWidth = 1.4; ctx.stroke(); }
+this.text(ctx, m.text, mid[0], mid[1], { size: 8.5, col, align: &#39;center&#39;, bg: C.stage });
+</code></pre>
+<ul>
+<li>The line is offset sideways by <code>offset</code> metres (default 0.4; the trick dimensions use 0.45), to the left of the direction from <code>a</code> to <code>b</code>.</li>
+<li>Extension lines are <code>stroke-dim-ext</code> (0.7 px) and overshoot by <code>dim-overshoot</code> (12%); the line is <code>stroke-overlay</code> (1 px); the end ticks are <code>stroke-dim-tick</code> (1.4 px) diagonals <code>dim-tick</code> (8 × 8 px) in screen space, so they keep their size at any zoom.</li>
+<li>The value sits centred on the line, on a paper patch.</li>
+<li>It measures horizontal distances only: points closer than 5 cm in plan draw nothing, so a height needs <code>g.line</code> and <code>g.label</code> instead. It is at true length in plan and foreshortened in the other views.</li>
+</ul>
+<p>The Dims overlay (<code>annotations</code>) draws one for each of the last four tricks, take-off to landing: <code>st-blue</code> when landed, <code>st-rec</code> for a bail, with opacity <code>0.35 + 0.65 (i + 1)/n</code> so the newest is solid (recognizer.js:149-158).</p>
+<h2>Sheet furniture</h2>
+<ul>
+<li><strong>Scale bar</strong> (draft.js:407-414), always, bottom left: 14 px from the left, 18 px from the bottom (<code>scale-bar-inset</code>). One metre, or 25 cm if a metre would pass 30% of the width, or 5 m if a metre is under 40 px. Quarters, the first and third filled 2 px high; <code>0</code> and the length at 9 px. It is exact for lengths parallel to the sheet; in the axonometric view a metre along <code>x</code> is 0.836 of it and a metre up 0.891.</li>
+<li><strong>Title block</strong> (draft.js:399-406), bottom right, only on a sheet at least 640 × 460 px (<code>title-block-min</code>): a 250 px box (<code>title-block-width</code>), 10 px from the edges, a 17 px header with <code>FORM SKATE</code> and <code>SHEET &lt;id&gt;</code> (the preset&#39;s id, <code>R-01</code> in replay), then 15 px rows (<code>title-block-row</code>) of key (9 px, <code>st-muted</code>) and value (9.5 px; a value over 25 characters is cut to 24 and an ellipsis). The live stage shows PRESET, LAST TRICK, SPEED and VIEW.</li>
+</ul>
+</div></section>
+<section id="sec-motion"><h2 class="x-h">motion.md</h2><div class="x-md"><h1>Motion</h1>
+<p>A still sheet shows several moments at once by sampling time evenly: equal times apart, so spacing shows speed. The stage keeps the past in a history, draws it under the solids, and fades it with age.</p>
+<h2>The history and the trail window</h2>
+<p>The runtime keeps every body&#39;s pose <code>{ p, q }</code> every second step for 8 s: 480 samples, one per 1/60 s. Views read it with <code>ctx.history.between(t0, t1)</code>. The window a view should draw is <code>g.trailSpan()</code>:</p>
+<pre><code class="language-js">// app/ui/stage.jsx:32-42
+export function trailSpan(host) {
+  const rt = host.rt; if (!rt || !host.stage.overlays.has(&#39;trail&#39;)) return null;
+  const h = rt.history.buf; if (!h.length) return null;
+  const last = type =&gt; rt.events.list({ type, last: 1 })[0];
+  const to = last(&#39;takeoff&#39;); if (!to || to.t &lt; h[0].t) return null;
+  if (rt.ir.states.has(&#39;skater/phase&#39;) &amp;&amp; rt.read(&#39;skater/phase&#39;) === &#39;air&#39;) return [to.t, rt.time];
+  const ends = [last(&#39;land&#39;), last(&#39;bail&#39;)].filter(e =&gt; e &amp;&amp; e.t &gt;= to.t).map(e =&gt; e.t);
+  if (!ends.length) return null;
+  const t1 = Math.min(...ends) + 0.1;
+  return rt.time - t1 &lt; 6 ? [to.t, t1] : null;
+}
+</code></pre>
+<p>It is the last jump: from its take-off to now while in the air, then to its landing or bail plus 0.1 s, kept for 6 s. Both ends come from the stance controller&#39;s own events, which arrive in the step they happen. Key any new motion view to this window, not to the trick recognizer&#39;s event, which arrives 0.233 s after the landing.</p>
+<h2>Onion skins</h2>
+<pre><code class="language-js">// src/lib/skate/board.js:115-116
+let step = 5; while (samples.length &gt; 18 * step) step *= 2;
+for (let i = 0; i &lt; samples.length; i += step) { const p = samples[i].bodies[deck.id]; if (p) drawBoard(g, p, d, { ghost: (i + 1) / samples.length }); }
+</code></pre>
+<ul>
+<li>A ghost every fifth sample (1/12 s), counted from the window&#39;s start, so ghosts already drawn stay put while the window grows. A flight over 1.5 s doubles the stride, so there are never more than 18.</li>
+<li>Ghosts are on the <code>ghost</code> layer, flushed after the shadows and before every solid: <code>stroke-ghost</code> (0.8 px) outlines in <code>st-ghost</code> at opacity <code>0.18 + 0.5 a</code>, with a paper wash at 0.3 of that. <code>a = (i + 1)/n</code> runs from near 0 for the oldest to 1, so the image has a direction.</li>
+<li>Ghosts are never depth-sorted: every solid covers them and they cover nothing. A ghost deck has no trucks, wheels or plane.</li>
+</ul>
+<h2>Flight paths</h2>
+<pre><code class="language-js">// src/lib/skate/board.js:120-123
+g.polyline(centre.map(p =&gt; p.p), { tone: &#39;blue&#39;, width: 1.2, alpha: 0.85 });
+g.polyline(centre.map(p =&gt; V.add(p.p, Q.rot(p.q, [d.length / 2, kickY(d.length / 2, d), 0]))), { tone: &#39;teal&#39;, width: 0.8, alpha: 0.6, dash: [3, 3] });
+const every = Math.max(1, Math.round(0.05 / (samples[1].t - samples[0].t || 0.05)));
+for (let i = 0; i &lt; centre.length; i += every) g.dot(centre[i].p, 1.6, { tone: &#39;blue&#39; });
+</code></pre>
+<p>The centre&#39;s path is solid blue with a 1.6 px tick every 50 ms; the nose&#39;s path is dashed teal. Ticks are <code>|v| Δt</code> apart, so they record speed. A path that is not a parabola shows a force besides gravity.</p>
+<h2>Chronophotographs</h2>
+<p>D-03&#39;s view (<code>lab/chrono.js</code>) draws a Marey stick figure every 0.08 s requested (a stride of 5 samples, 0.083 s) from bodies the physics moves: a trunk 0.62 m up from the hips, a hollow 2.5 px head dot, two legs from hips to feet, all <code>st-violet</code>; the deck as a 1.6 px <code>st-blue</code> line 0.4 m either side of its centre; opacity <code>0.25 + 0.75 i/n</code>; the hips&#39; path dashed <code>2 3</code> at 0.6. Its window is widened by 0.3 s before and 0.2 s after the trail&#39;s. Draw new chronophotographs from the history, never from the figure&#39;s posed joints, which are not stored.</p>
+<h2>Drawing between steps</h2>
+<p>The world steps every 1/120 s; the screen draws at its own rate. The stage draws a blend of the last two steps, <code>alpha</code> of the way from the previous to the current one, alpha being how far the clock has run into the next step (host.js:201-230). Positions and velocities are interpolated linearly and orientations by slerp; the bodies are put back exactly after the frame, so nothing measured ever sees the blend. A teleport (more than 0.5 m, or <code>|q·q′| &lt; 0.7</code>) is drawn where the body is now. The blend is skipped after a single step, a reset or a hot reload. Without it, a frame that gets one step more or fewer than the last puts the board up to one step of travel (3.3 cm at 4 m/s) off the smoothly gliding camera, which reads as blur at speed.</p>
+<pre><code class="language-js">// app/ui/stage.jsx:124
+const off = host.onFrame(dt =&gt; host.replay ? draw(dt) : host.withRenderState(() =&gt; draw(dt)));
+</code></pre>
+<p>Any live view of the simulation should draw inside <code>withRenderState</code>. A replay draws recorded frames as they are.</p>
+<h2>Gestures</h2>
+<table>
+<thead>
+<tr>
+<th>gesture</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>drag</td>
+<td>orbit: yaw 0.008 rad and pitch 0.006 rad per pixel</td>
+</tr>
+<tr>
+<td>Shift-drag, right-drag, middle-drag</td>
+<td>pan, in metres along the sheet&#39;s right and up</td>
+</tr>
+<tr>
+<td>wheel</td>
+<td>zoom, 0.25 to 5</td>
+</tr>
+<tr>
+<td>double-click</td>
+<td>square up: orbit and pan back to zero</td>
+</tr>
+<tr>
+<td>click, then keys</td>
+<td>ride: ↑ push · ←→ carve · Space pop · J/L flick · I/K scoop · U wrap</td>
+</tr>
+<tr>
+<td>in replay</td>
+<td>Space play/pause · ← → step (Shift: 10) · Esc back to live</td>
+</tr>
+</tbody></table>
+<p>A drag starts after 4 px, so a click still focuses the stage. The context menu is suppressed over the stage so right-drag can pan.</p>
+<h2>The trick toast</h2>
+<p>When the recognizer scores a trick, a toast shows its name and measurements for 2.6 s in the stage&#39;s top-right corner (see TrickToast). It fades in over the first 8% of that time and out over the last 18%.</p>
+</div></section>
+<section id="sec-overlays"><h2 class="x-h">overlays.md</h2><div class="x-md"><h1>Overlays</h1>
+<p>Overlays are what the stage adds to the drawing to explain it. Each one is a named switch, has one hue, and draws only while it is on. The drawing itself stays ink.</p>
+<h2>The switches</h2>
+<p>The <strong>Show ▾</strong> menu in the stage toolbar lists them (stage.jsx:10-14); the Order menu adds the two depth-order tools. On by default: Shadows, Trail, Dims, Grid (host.js:34).</p>
+<table>
+<thead>
+<tr>
+<th>switch</th>
+<th>key</th>
+<th>what it draws</th>
+<th>hue</th>
+<th>marks</th>
+<th>source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shadows</td>
+<td><code>shadows</code></td>
+<td>hatched sun shadows of every solid loft</td>
+<td><code>st-shadow</code></td>
+<td>hatch, 0.6 px</td>
+<td>draft.js</td>
+</tr>
+<tr>
+<td>Trail</td>
+<td><code>trail</code></td>
+<td>the last jump: ghost decks, the centre&#39;s and the nose&#39;s paths</td>
+<td><code>st-ghost</code>, <code>st-blue</code>, <code>st-teal</code></td>
+<td>0.8 px ghosts; 1.2 px path, 1.6 px ticks every 50 ms; 0.8 px dashed <code>3 3</code> nose path</td>
+<td>board.js</td>
+</tr>
+<tr>
+<td>Dims</td>
+<td><code>annotations</code></td>
+<td>a floor dimension from take-off to landing for the last four tricks</td>
+<td><code>st-blue</code>, bails <code>st-rec</code></td>
+<td>dimension line, fading with age</td>
+<td>recognizer.js</td>
+</tr>
+<tr>
+<td>Grid</td>
+<td><code>grid</code></td>
+<td>the floor grid, 0.5 m and 2 m</td>
+<td><code>st-grid</code>, <code>st-major</code></td>
+<td>0.6 px</td>
+<td>terrain.js</td>
+</tr>
+<tr>
+<td>Forces</td>
+<td><code>forces</code></td>
+<td>the leg force as an arrow up from the hips, 1 m per 2,500 N, with its value; each engaged foot guide as a dashed line to the point of the deck it pulls</td>
+<td><code>st-amber</code></td>
+<td>1 px arrow; 8 px label; dash <code>3 2</code>, 2 px end dot</td>
+<td>figure.js, motors.js</td>
+</tr>
+<tr>
+<td>Contacts</td>
+<td><code>contacts</code></td>
+<td>every active contact of the deck as a dot, and its force along the ground normal, 1 m per 1,200 N</td>
+<td><code>st-rec</code></td>
+<td>2.6 px dot, 1 px arrow</td>
+<td>board.js</td>
+</tr>
+<tr>
+<td>Rig</td>
+<td><code>rig</code></td>
+<td>the skeleton&#39;s sticks and joints; the centre of mass</td>
+<td><code>st-violet</code>; <code>st-rec</code></td>
+<td>1 px sticks, 2.2 px hollow joints; 3.5 px dot and <code>COM</code></td>
+<td>figure.js</td>
+</tr>
+<tr>
+<td>Sites</td>
+<td><code>sites</code></td>
+<td>the deck&#39;s named sites</td>
+<td><code>st-green</code></td>
+<td>12 mm ring, 8 px name</td>
+<td>board.js</td>
+</tr>
+<tr>
+<td>Course</td>
+<td><code>course</code></td>
+<td>the autopilot&#39;s waypoints and where it is heading</td>
+<td><code>st-blue</code></td>
+<td>dashed <code>2 4</code> legs at 0.7, 0.12 m rings; dashed <code>1 3</code> line to a 3 px target dot</td>
+<td>controls.js</td>
+</tr>
+<tr>
+<td>Order changes</td>
+<td><code>changes</code></td>
+<td>parts whose drawing order just flipped</td>
+<td><code>st-rec</code></td>
+<td>2.4 px outline, fading over 18 frames</td>
+<td>draft.js</td>
+</tr>
+<tr>
+<td>Truth</td>
+<td><code>truth</code></td>
+<td>the cells the drawing order gets wrong</td>
+<td><code>st-rec</code></td>
+<td>3 px cells at 0.5</td>
+<td>draft.js, truth.js</td>
+</tr>
+</tbody></table>
+<h2>Marks</h2>
+<pre><code class="language-js">g.line(a, b, { tone, width, alpha, dash })      // world points; 1 px by default
+g.polyline(points, { tone, width, alpha, dash, closed })
+g.arrow(p, v, { tone, width })                   // from p along the world vector v; head min(7 px, half the length), 0.45 as wide
+g.dot(p, px, { tone, hollow, normal })           // radius in px; hollow = paper inside; hidden when normal faces away
+g.ring(p, metres, { tone })                      // a horizontal circle; a 3 px circle when under 6 px across
+g.label(text, p, { tone, size, dx, dy, align, bg })
+</code></pre>
+<p>A <code>tone</code> is a palette name (<code>ink</code>, <code>muted</code>, <code>accent</code> or <code>red</code> for <code>st-rec</code>, <code>warn</code>, <code>soft</code>, <code>blue</code>, <code>green</code>, <code>violet</code>, <code>amber</code>, <code>teal</code>, <code>ghost</code>) or a CSS colour. Prefer names: they follow the theme.</p>
+<h2>Rules for a new overlay</h2>
+<ul>
+<li>Gate it: <code>if (!g.on(&#39;&lt;name&gt;&#39;)) return;</code> at the top of the view, so it costs nothing when off.</li>
+<li>Draw it on the <code>overlay</code> layer (over the solids) unless it lies on the ground (<code>floor</code>, under them, as the course and the dimensions do) or is a past state (<code>ghost</code>).</li>
+<li>Take one hue from the table by meaning. Forces are amber, contacts and failures <code>st-rec</code>, kinematics violet, positions and paths blue, names of places green. A view that needs a second series uses <code>st-teal</code>.</li>
+<li>Draw vectors to a stated scale in metres per unit and write the scale into the label or the caption. Scales differ between overlays (Forces 1 m per 2,500 N, Contacts 1 m per 1,200 N), so arrows from two overlays cannot be compared by eye.</li>
+<li>An arrow is a projected world vector: it is foreshortened like any line, true length only parallel to the sheet. Look along the vector&#39;s plane to read it.</li>
+<li>Impulses and angular nudges have no lasting force or point; no overlay draws them.</li>
+</ul>
+</div></section>
+<section id="sec-projection-and-views"><h2 class="x-h">projection-and-views.md</h2><div class="x-md"><h1>Projection and views</h1>
+<p>The stage projects the world with two dot products. A view is an orthonormal basis: <code>c</code> points from the scene toward the viewer, <code>r</code> is the sheet&#39;s right and is always horizontal, and <code>u = c × r</code> is the sheet&#39;s up. World units are metres; <code>+y</code> is up.</p>
+<h2>The camera</h2>
+<pre><code class="language-js">// app/draft.js:16-22
+export function makeCam(yaw, pitch, scale, target, W, H) {
+  const cp = Math.cos(pitch), c = [cp * Math.sin(yaw), Math.sin(pitch), cp * Math.cos(yaw)];
+  const r = [Math.cos(yaw), 0, -Math.sin(yaw)], u = V.cross(c, r);
+  return { c, r, u, s: scale, T: target, W, H, yaw, pitch, Y0: H * (pitch &gt; 1.2 ? 0.5 : 0.5) };
+}
+export const proj = (cam, p) =&gt; { const d = V.sub(p, cam.T); return [cam.W / 2 + V.dot(d, cam.r) * cam.s, cam.Y0 - V.dot(d, cam.u) * cam.s]; };
+export const depth = (cam, p) =&gt; V.dot(V.sub(p, cam.T), cam.c);
+</code></pre>
+<ul>
+<li><code>s</code> is pixels per metre. <code>T</code> is the world point drawn at the sheet&#39;s centre, <code>(W/2, Y0)</code>; <code>Y0</code> is half the height in every view.</li>
+<li><code>depth(cam, p)</code> grows toward the viewer. It is what the depth order sorts on.</li>
+<li><code>unprojectFloor(cam, x, y, h = 0)</code> (draft.js:23-28) turns a sheet point back into the floor point under it. It returns <code>null</code> when the camera looks at the floor edge-on (<code>|c.y| &lt; 0.05</code>).</li>
+</ul>
+<p>Because <code>r</code> has no vertical part, a vertical world line is drawn vertical in every view except the plan. Parallel lines stay parallel, an ellipse projects to an ellipse, and a drawing in a body&#39;s tangent plane is one affine transform. A perspective camera would break all three; do not add one.</p>
+<h2>The named views</h2>
+<table>
+<thead>
+<tr>
+<th>view</th>
+<th>key</th>
+<th>yaw</th>
+<th>pitch</th>
+<th>true lengths</th>
+<th>token</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Axonometric</td>
+<td><code>axo</code></td>
+<td>38°</td>
+<td>27°</td>
+<td>none: x, y, z drawn at 0.836, 0.891, 0.712</td>
+<td><code>view-axo-yaw</code>, <code>view-axo-pitch</code></td>
+</tr>
+<tr>
+<td>Front elevation</td>
+<td><code>front</code></td>
+<td>0°</td>
+<td>0°</td>
+<td>x and y</td>
+<td><code>view-front-yaw</code></td>
+</tr>
+<tr>
+<td>Side elevation</td>
+<td><code>side</code></td>
+<td>−90°</td>
+<td>0°</td>
+<td>z and y</td>
+<td><code>view-side-yaw</code></td>
+</tr>
+<tr>
+<td>Plan</td>
+<td><code>plan</code></td>
+<td>0°</td>
+<td>90°</td>
+<td>x and z</td>
+<td><code>view-plan-pitch</code></td>
+</tr>
+</tbody></table>
+<p>The axonometric angles are a trimetric chosen to read people and boards. The isometric angles (45°, 35.26°) put a cube&#39;s near and far corners on one point, which is why the stage does not use them. With the rider facing <code>+z</code> and the nose at <code>+x</code>, the front elevation sees the rider from the toe side and the side elevation looks along the board from behind its tail.</p>
+<h2>Scale and centre</h2>
+<pre><code class="language-js">// app/ui/stage.jsx:94-96
+const base = st.view === &#39;plan&#39; ? Math.min(Wh, H) / 7.5 : Math.min(Wh / 5.5, H / 3.1);
+const k = base * st.zoom, pitch = Math.max(-0.05, Math.min(Math.PI / 2, view.pitch + st.orbit.dp));
+let cm = makeCam(view.yaw + c.yaw.x + st.orbit.dy, pitch, k, [c.p[0], st.view === &#39;plan&#39; ? 0 : 0.9 + c.gy, c.p[1]], Wh, H);
+</code></pre>
+<ul>
+<li>At zoom 1 an elevation or the axonometric view fits 5.5 m across or 3.1 m up, whichever is smaller (<code>scale-elevation</code>); the plan fits 7.5 m across its shorter side (<code>scale-plan</code>).</li>
+<li>Zoom runs from <code>zoom-min</code> 0.25 to <code>zoom-max</code> 5 with the wheel (<code>zoom × exp(−deltaY × 0.0015)</code>); the toolbar slider stops at 4.</li>
+<li>The sheet centres <code>target-height</code> (0.9 m) above the ground under the board, so the rider sits in the middle; the plan centres on the ground.</li>
+<li>The pitch is clamped to [−0.05, π/2]: the camera may dip 2.9° below the horizon, never further, and never past straight down.</li>
+</ul>
+<p><code>FormSkateStage.baseScale(view, W, H)</code> returns the same base scale, and <code>FormSkateStage.sheet(canvas, { view, zoom })</code> builds the whole camera.</p>
+<h2>Orbit, pan and square-up</h2>
+<ul>
+<li><strong>Orbit</strong>: drag. Yaw changes by <code>orbit-rate</code> (0.008 rad) per pixel across, pitch by 0.006 rad per pixel down, with the pitch offset kept within −1 to 1.6 rad (stage.jsx:139). A drag starts after <code>drag-threshold</code> (4 px).</li>
+<li><strong>Pan</strong>: Shift-drag, or drag with the right or middle button. The pan is an offset of the target along the camera&#39;s own <code>r</code> and <code>u</code>, in metres, so the drawing stays put on the screen while the camera follows, tracks or orbits:</li>
+</ul>
+<pre><code class="language-js">// app/ui/stage.jsx:99-100 (pan) and 138 (the gesture: the drawing moves with the pointer)
+if (pan.x || pan.y) cm = makeCam(cm.yaw, cm.pitch, k, V.add(cm.T, V.add(V.mul(cm.r, pan.x), V.mul(cm.u, pan.y))), Wh, H);
+if (panning) host.stage.pan = { x: p0.x - dx / pxPerM, y: p0.y + dy / pxPerM };
+</code></pre>
+<ul>
+<li><strong>Square up</strong>: double-click the stage, press Square up, or pick a view. Orbit and pan go back to zero (<code>host.squareUp()</code>, host.js:234); Square up also resets the zoom to 1.</li>
+</ul>
+<h2>Follow and track</h2>
+<p>The camera follows the board with critically damped springs on wall-clock time (stage.jsx:80-89): the target eases toward the board plus <code>follow-lead</code> (0.4 s) of its velocity with half-life <code>follow-half-life</code> (0.32 s; 0.6 s with Follow off), and with Track on the yaw eases toward the rider&#39;s heading with half-life <code>track-half-life</code> (0.5 s). A paused or scrubbed replay snaps the camera instead of easing it.</p>
+</div></section>
+<section id="sec-shadows-and-ground"><h2 class="x-h">shadows-and-ground.md</h2><div class="x-md"><h1>Shadows and ground</h1>
+<p>Height is the one thing an orthographic sheet hides. The plan projects it away, the axonometric view confuses it with distance, and the elevations show it but lose depth. The stage puts it back with two conventions: a hatched sun shadow when the camera looks down, and a cut ground line when it does not.</p>
+<h2>The sun</h2>
+<pre><code class="language-js">// app/draft.js:138
+export const SUN = V.norm([-0.5, -1, -0.38]);
+</code></pre>
+<p><code>SUN</code> is the direction the light travels (token <code>sun</code>). The sun stands 57.9° high in the <code>+x</code>, <code>+z</code> quarter of the sky, behind the viewer&#39;s right shoulder in the default axonometric view, so shadows fall away from the viewer and a little to the left. A point at height <code>h</code> above the ground casts its shadow 0.628 h away.</p>
+<h2>Drawing shadows</h2>
+<p>A shadow is a second, oblique projection: each point is pushed along <code>SUN</code> down to the ground (the terrain&#39;s height there, <code>heightAt(x, z)</code>, or 0), then projected with the camera.</p>
+<pre><code class="language-js">// app/draft.js:239-244 (shadowOf) and 183-187 (in flush)
+const sp = p =&gt; { const gy = hAt ? hAt(p[0], p[2]) : 0, k = Math.max(0, p[1] - gy) / -SUN[1]; return proj(cam, [p[0] + SUN[0] * k, gy, p[2] + SUN[2] * k]); };
+if (planar &amp;&amp; this.on(&#39;shadows&#39;)) {
+  const path = new Path2D(); let any = false;
+  for (const m of M) if (m.k === &#39;loft&#39; &amp;&amp; m.layer !== &#39;ghost&#39; &amp;&amp; !m.o.ghost &amp;&amp; !m.o.noShadow) { this.shadowOf(path, m.S); any = true; }
+  if (any) { ctx.fillStyle = hatchPattern(ctx, C, this._hatch) || C.major; ctx.fill(path); }
+}
+</code></pre>
+<ul>
+<li>Every solid loft adds its hulls to <strong>one path</strong>, filled <strong>once</strong> with the hatch. Overlapping shadows are therefore one tone: a point on the ground is lit or not.</li>
+<li>Shadows are drawn after the floor and before everything that casts them.</li>
+<li>Only lofts cast shadows. Polygons (props), ghosts and lofts marked <code>noShadow</code> do not.</li>
+<li>Shadows appear only when the camera looks down by more than 0.05 rad (2.9°, <code>planar</code>). In the elevations they would collapse onto the ground line.</li>
+<li>The Shadows overlay switches them; it is on by default.</li>
+</ul>
+<h2>The hatch</h2>
+<pre><code class="language-js">// app/draft.js:78-84
+const s = 6, c = document.createElement(&#39;canvas&#39;); c.width = c.height = s * 2; const x = c.getContext(&#39;2d&#39;); x.scale(2, 2);
+x.strokeStyle = C.shadow; x.lineWidth = 0.6; x.beginPath(); x.moveTo(-1, s + 1); x.lineTo(s + 1, -1); x.moveTo(-1, 1); x.lineTo(1, -1); x.moveTo(s - 1, s + 1); x.lineTo(s + 1, s - 1); x.stroke();
+const p = ctx.createPattern(c, &#39;repeat&#39;); if (p &amp;&amp; p.setTransform) p.setTransform(new DOMMatrix().scale(0.5));
+</code></pre>
+<p>The tile is <code>hatch-tile</code> (6 px) square: one line corner to corner rising to the right at 45°, overshooting a pixel at each end, plus the two corner strokes that join it to its neighbours. Repeated, it gives <code>stroke-hatch</code> (0.6 px) lines 6 px apart along a row and 4.2 px apart across them, in <code>st-shadow</code>. It is drawn at twice the size and scaled by half, so it stays sharp on dense screens, and cached per canvas and colour. The hatch keeps the drawing to lines: the floor grid shows between the hatch lines, and a dark sheet gets light hatching from the same token.</p>
+<h2>The floor</h2>
+<ul>
+<li><strong>Grid</strong> (<code>g.grid({ minor, major, extent })</code>, draft.js:223-230): lines at <code>stroke-grid</code> (0.6 px), <code>st-grid</code> every <code>minor</code> metres and <code>st-major</code> every <code>major</code>. The flat ground uses 0.5 m and 2 m (terrain.js:8). Only the part the camera sees is drawn. The Grid overlay switches it, and it is drawn only when the camera looks down.</li>
+<li><strong>Ground line</strong> (draft.js:210-215): in an elevation the ground is a section cut. A <code>stroke-ground</code> (1.4 px) <code>st-ink</code> line at the ground&#39;s height, over a <code>hatch-ground-band</code> (18 px) band of 0.6 px <code>st-muted</code> lines <code>hatch-ground-pitch</code> (7 px) apart. It replaces shadows in exactly the views that cannot have them.</li>
+<li><strong>Boundary</strong> (<code>g.boundary({ size, band })</code>, draft.js:231-238): the lot&#39;s edge, a hatched band <code>boundary-band</code> (0.35 m on the flat ground) between an outer and an inner square, filled with the even-odd rule and outlined at 1 px on both sides.</li>
+</ul>
+<h2>Poché on props</h2>
+<p>Props are polygons. Faces you ride (a funbox&#39;s top, a kicker&#39;s ramp) are paper (<code>fill: &#39;stage&#39;</code>); faces that are slopes, sides or backs are hatched (<code>fill: &#39;hatch&#39;</code>: paper first, so they hide what is behind them, then the pattern):</p>
+<pre><code class="language-js">// src/lib/skate/terrain.js:27-30
+$.view(&#39;drawing&#39;, v =&gt; v.layer(&#39;figure&#39;).draw(g =&gt; {
+  for (let i = 0; i &lt; 4; i++) { const j = (i + 1) % 4; g.poly([top[i], top[j], foot[j], foot[i]], { fill: &#39;hatch&#39;, name: &#39;slope&#39; }); }
+  g.poly(top, { fill: &#39;stage&#39;, name: &#39;top&#39;, bias: 0.01 });
+}));
+</code></pre>
+<p>In plan this reads at once: the top is a surface, the slopes are tone. Give every new obstacle the same split.</p>
+</div></section>
+<section id="tokens"><h2 class="x-h">Tokens</h2><h3>Colour</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>light</th><th>dark</th><th>usage</th></tr></thead><tbody><tr><td><code>st-bg</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#101010"></span><code>#101010</code></td><td>The sheet [stage]: the canvas ground, the paper fill inside every solid loft and polygon, the knock-out patch behind dimension values and bg labels, chip and toast grounds, text on an st-ink or st-rec chip.</td></tr><tr><td><code>st-grid</code></td><td class="x-sw"><span style="background:#efefef"></span><code>#efefef</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>Minor floor grid lines [grid], every 0.5 m, 0.6 px. Deliberately faint on st-bg: never text, never a mark that must be seen.</td></tr><tr><td><code>st-major</code></td><td class="x-sw"><span style="background:#dcdcdc"></span><code>#dcdcdc</code></td><td class="x-sw"><span style="background:#262626"></span><code>#262626</code></td><td>Major floor grid lines [major], every 2 m, 0.6 px; the fill used if the hatch pattern cannot be made; the border of a ghost chip.</td></tr><tr><td><code>st-shadow</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td class="x-sw"><span style="background:#5e5e5e"></span><code>#5e5e5e</code></td><td>Hatch lines [shadow]: sun shadows, the lot boundary band, hatched polygon faces (funbox slopes, kicker sides). A tone on st-bg, never text.</td></tr><tr><td><code>st-ink</code></td><td class="x-sw"><span style="background:#111111"></span><code>#111111</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>The drawing [ink]: loft silhouettes and rings, polygon edges, the ground line, bolts, the face, default lines and labels, the scale bar and title block; chip and toast text and borders. On st-bg and st-soft.</td></tr><tr><td><code>st-muted</code></td><td class="x-sw"><span style="background:#6e6e6e"></span><code>#6e6e6e</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td>Secondary ink [muted]: the hatched band under an elevation ground line, title-block keys and sheet number, trick-toast detail, axes of small diagrams. Text on st-bg.</td></tr><tr><td><code>st-rec</code></td><td class="x-sw"><span style="background:#d23a2a"></span><code>#d23a2a</code></td><td class="x-sw"><span style="background:#ff5a48"></span><code>#ff5a48</code></td><td>Signal red [accent and red]: contact dots and arrows, the centre of mass, bailed tricks (dimension lines, toast name), Order-changes outlines, Truth cells, the REC and REPLAY chips. Text and marks on st-bg; st-bg text on it.</td></tr><tr><td><code>st-warn</code></td><td class="x-sw"><span style="background:#b0650a"></span><code>#b0650a</code></td><td class="x-sw"><span style="background:#f0a83c"></span><code>#f0a83c</code></td><td>The warn tone [warn] (tone: 'warn'): a caution that is not a failure. No shipped view uses it yet. Marks on st-bg; as text the light value is 4.46:1, just under 4.5:1 (a source value, kept exact).</td></tr><tr><td><code>st-soft</code></td><td class="x-sw"><span style="background:#f0f0f0"></span><code>#f0f0f0</code></td><td class="x-sw"><span style="background:#222222"></span><code>#222222</code></td><td>The soft fill [soft]: a loft or polygon drawn with fill: 'soft' instead of paper. No shipped view uses it yet. st-ink reads on it.</td></tr><tr><td><code>st-blue</code></td><td class="x-sw"><span style="background:#1f6fc4"></span><code>#1f6fc4</code></td><td class="x-sw"><span style="background:#4da3ff"></span><code>#4da3ff</code></td><td>Overlay hue [blue]: the autopilot's course (Course), the deck centre's flight path and its 50 ms ticks (Trail), landed-trick dimension lines (Dims), the chronophotograph's deck. Marks and 8–8.5 px labels on st-bg.</td></tr><tr><td><code>st-green</code></td><td class="x-sw"><span style="background:#1e8a5a"></span><code>#1e8a5a</code></td><td class="x-sw"><span style="background:#3ecf8e"></span><code>#3ecf8e</code></td><td>Overlay hue [green]: named sites on the deck (Sites), rings and 8 px labels. Marks on st-bg; its labels are 4.34:1 in the light theme, just under 4.5:1 (a source value, kept exact).</td></tr><tr><td><code>st-violet</code></td><td class="x-sw"><span style="background:#7b45c9"></span><code>#7b45c9</code></td><td class="x-sw"><span style="background:#a77bff"></span><code>#a77bff</code></td><td>Overlay hue [violet]: the skeleton's sticks and hollow joints (Rig), the chronophotograph's stick figures. Marks on st-bg.</td></tr><tr><td><code>st-amber</code></td><td class="x-sw"><span style="background:#d98e04"></span><code>#d98e04</code></td><td class="x-sw"><span style="background:#ffb627"></span><code>#ffb627</code></td><td>Overlay hue [amber]: forces (Forces: the leg-force arrow and its newton label, foot-guide dashes) and the default tone of new force views. In the light theme it is 2.68:1 on st-bg, under 3:1 for marks and 4.5:1 for its 8 px labels: a source value, kept exact. Pair an amber label with bg: true or keep the number in st-ink.</td></tr><tr><td><code>st-teal</code></td><td class="x-sw"><span style="background:#12868f"></span><code>#12868f</code></td><td class="x-sw"><span style="background:#2fc4cf"></span><code>#2fc4cf</code></td><td>Overlay hue [teal]: the deck nose's dashed flight path (Trail), the long-axis plot of the winding view. Marks on st-bg; its 8 px labels are 4.35:1 in the light theme, just under 4.5:1 (a source value, kept exact).</td></tr><tr><td><code>st-ghost</code></td><td class="x-sw"><span style="background:#4a86c8"></span><code>#4a86c8</code></td><td class="x-sw"><span style="background:#6aa8f0"></span><code>#6aa8f0</code></td><td>Onion-skin outlines [ghost]: 0.8 px, drawn at opacity 0.18 to 0.68 so the oldest ghost fades. Marks on st-bg.</td></tr><tr><td><code>bg</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td>Workbench ground behind the stage toolbar and the hint line (kiln.css --bg).</td></tr><tr><td><code>ink</code></td><td class="x-sw"><span style="background:#1a1a1a"></span><code>#1a1a1a</code></td><td class="x-sw"><span style="background:#f2f2f2"></span><code>#f2f2f2</code></td><td>Workbench text: the hint line's bold state word, menu text (kiln.css --ink). On bg and fill.</td></tr><tr><td><code>ink-2</code></td><td class="x-sw"><span style="background:#737373"></span><code>#737373</code></td><td class="x-sw"><span style="background:#9a9a9a"></span><code>#9a9a9a</code></td><td>Workbench secondary text: the hint line's key list, menu descriptions, the box of an unticked overlay (kiln.css --ink-2). On bg.</td></tr><tr><td><code>fill</code></td><td class="x-sw"><span style="background:#f6f6f6"></span><code>#f6f6f6</code></td><td class="x-sw"><span style="background:#222222"></span><code>#222222</code></td><td>Workbench hover fill of a menu row (kiln.css --fill). ink reads on it; ink-2 descriptions are 4.39:1 on it in the light theme (a source pair, kept exact).</td></tr><tr><td><code>hair</code></td><td class="x-sw"><span style="background:#d6d6d6"></span><code>#d6d6d6</code></td><td class="x-sw"><span style="background:#3d3d3d"></span><code>#3d3d3d</code></td><td>Workbench 1 px rules: the line above the hint line, menu dividers (kiln.css --hair).</td></tr><tr><td><code>accent</code></td><td class="x-sw"><span style="background:#e2001a"></span><code>#e2001a</code></td><td class="x-sw"><span style="background:#ff3b4a"></span><code>#ff3b4a</code></td><td>Workbench red: the fail banner's fill, the recording dot in the Clip menu (kiln.css --accent). Errors and recording only.</td></tr><tr><td><code>on-accent</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td class="x-sw"><span style="background:#ffffff"></span><code>#ffffff</code></td><td>Text on the fail banner (skate.css writes #fff). Dark theme: 3.51:1 on accent, under 4.5:1 for 12 px text: a source value, kept exact.</td></tr></tbody></table></div><h3>Type</h3><div class="x-scroll"><table class="x-tab"><thead><tr><th>family</th><th>stack</th></tr></thead><tbody><tr><td><code>--font-plex</code></td><td><code>&quot;IBM Plex Mono&quot;, ui-monospace, Menlo, Consolas, monospace</code></td></tr><tr><td><code>--font-display</code></td><td><code>Arial, &quot;Helvetica Neue&quot;, Helvetica, sans-serif</code></td></tr></tbody></table></div><h4>Canvas</h4><p class="x-note">Text the drafting context paints (app/draft.js text(): weight 500 unless asked, baseline middle). Sizes are CSS px at any zoom.</p><div class="x-styles"><div class="x-style"><div class="canvas-label x-sample">KICKFLIP · 0.42 s</div><div class="x-meta"><code>.canvas-label</code> 9.5px 500<br>g.label default (draft.js:358); title-block values; the label of a bg label sits on an st-bg patch 4 px taller than the text.</div></div><div class="x-style"><div class="canvas-label-sm x-sample">COM   812 N   frontBolts</div><div class="x-meta"><code>.canvas-label-sm</code> 8px 500<br>Overlay labels beside their marks: COM, the leg force in N, site names, winding captions (size: 8).</div></div><div class="x-style"><div class="canvas-dim x-sample">KICKFLIP · 1.62 m · 0.42 s</div><div class="x-meta"><code>.canvas-dim</code> 8.5px 500<br>Dimension values, centred on the dimension line on an st-bg patch (draft.js:372).</div></div><div class="x-style"><div class="canvas-key x-sample">LAST TRICK</div><div class="x-meta"><code>.canvas-key</code> 9px 500<br>Title-block keys and sheet number (st-muted), scale-bar figures (st-ink) (draft.js:403-413).</div></div><div class="x-style"><div class="canvas-sheet-label x-sample">A  deck plane</div><div class="x-meta"><code>.canvas-sheet-label</code> 10px 700<br>The first line of a compare sheet's label in replay (stage.jsx:51); its further lines are canvas-label at weight 400 in st-muted.</div></div><div class="x-style"><div class="canvas-default x-sample">text()</div><div class="x-meta"><code>.canvas-default</code> 10px 500<br>What draft.text() sets when a call gives no size.</div></div></div><h4>Canvas title</h4><div class="x-styles"><div class="x-style"><div class="canvas-title x-sample">FORM SKATE</div><div class="x-meta"><code>.canvas-title</code> 9.5px 700<br>The title block header, the one canvas text not in Plex (text(…, { mono: false }), draft.js:403).</div></div></div><h4>Stage chips</h4><div class="x-styles"><div class="x-style"><div class="chip x-sample">AUTOPILOT</div><div class="x-meta"><code>.chip</code> 10px / 1 600 · 0.08em<br>Chips in the stage's top-left corner (skate.css .chip), set in capitals (text-transform: uppercase) and tracked.</div></div><div class="x-style"><div class="chip-ghost x-sample">click the stage, then ↑ to push</div><div class="x-meta"><code>.chip-ghost</code> 10px / 1 400<br>A ghost chip: a hint in sentence case, untracked (.chip.ghost).</div></div><div class="x-style"><div class="toast-detail x-sample">flip 1.01 · shove 0.02 · air 0.42 s · +683</div><div class="x-meta"><code>.toast-detail</code> 10.5px / 1.3 400<br>The trick toast's measurement line, st-muted (.tricktoast span).</div></div></div><h4>Stage display</h4><div class="x-styles"><div class="x-style"><div class="toast-name x-sample">KICKFLIP</div><div class="x-meta"><code>.toast-name</code> 22px / 1 700 · -0.01em<br>The trick toast's name (.tricktoast b), in capitals (text-transform: uppercase); 18px when the stage is 600px wide or less. st-rec with &quot; · bail&quot; for a bail.</div></div><div class="x-style"><div class="hint x-sample">↑ push · ←→ carve · Space pop · drag to orbit</div><div class="x-meta"><code>.hint</code> 12px / 1.45 400<br>The hint line under the stage (kiln.css .hint): ink-2, its first word bold in ink.</div></div><div class="x-style"><div class="banner x-sample">board/trucks stopped at 2.53 s:</div><div class="x-meta"><code>.banner</code> 12px / 1.45 400<br>The fail banner (skate.css .failbanner), its lead in bold.</div></div></div><h3>spacing</h3><p class="x-note">The DOM parts laid over the canvas (app/skate.css, app/kiln.css).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--stage-inset</code></td><td><code>12px</code></td><td>Chip row and trick toast from the stage's top corners; the fail banner from its bottom-left corner.</td></tr><tr><td><code>--chip-gap</code></td><td><code>6px</code></td><td>Between chips in the chip row.</td></tr><tr><td><code>--chip-pad-y</code></td><td><code>5px</code></td><td>Chip padding, top and bottom.</td></tr><tr><td><code>--chip-pad-x</code></td><td><code>8px</code></td><td>Chip padding, left and right.</td></tr><tr><td><code>--toast-pad-top</code></td><td><code>8px</code></td><td>Trick toast padding above the name.</td></tr><tr><td><code>--toast-pad-x</code></td><td><code>12px</code></td><td>Trick toast padding left and right.</td></tr><tr><td><code>--toast-pad-bottom</code></td><td><code>7px</code></td><td>Trick toast padding under the detail line.</td></tr><tr><td><code>--toast-gap</code></td><td><code>3px</code></td><td>Between the toast's name and detail.</td></tr><tr><td><code>--toast-top-narrow</code></td><td><code>46px</code></td><td>The toast's top offset when the stage is 600px wide or less, clear of the chip row.</td></tr><tr><td><code>--banner-pad-y</code></td><td><code>7px</code></td><td>Fail banner padding, top and bottom.</td></tr><tr><td><code>--banner-pad-x</code></td><td><code>12px</code></td><td>Fail banner padding, left and right.</td></tr><tr><td><code>--hint-height</code></td><td><code>30px</code></td><td>Height of the hint line under the stage.</td></tr><tr><td><code>--hint-pad-x</code></td><td><code>14px</code></td><td>Hint line padding left and right.</td></tr><tr><td><code>--hint-gap</code></td><td><code>12px</code></td><td>Between the hint's state word and its key list.</td></tr></tbody></table></div><h3>radius</h3><p class="x-note">Square everywhere.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--radius-none</code></td><td><code>0px</code></td><td>Chips, toasts, the fail banner, the title block, menus: every stage part is square-cornered.</td></tr></tbody></table></div><h3>fontSize</h3><p class="x-note">The workbench's type steps the stage's DOM parts use (kiln.css).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--fs-xs</code></td><td><code>10.5px</code></td><td>Overlay menu descriptions; the trick toast detail matches it.</td></tr><tr><td><code>--fs-s</code></td><td><code>12px</code></td><td>The hint line, the fail banner, menu rows.</td></tr></tbody></table></div><h3>stroke</h3><p class="x-note">Canvas line widths in CSS px at any zoom (app/draft.js unless named).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--stroke-silhouette</code></td><td><code>2px</code></td><td>A loft's outline: the union of its hulls stroked, then filled with st-bg, so 1 px shows (drawLoft, drawChains).</td></tr><tr><td><code>--stroke-ring</code></td><td><code>0.55px</code></td><td>Rings and meridians on a loft, at opacity-ring.</td></tr><tr><td><code>--stroke-ghost</code></td><td><code>0.8px</code></td><td>Onion-skin outlines in st-ghost.</td></tr><tr><td><code>--stroke-ground</code></td><td><code>1.4px</code></td><td>The ground line of an elevation, in st-ink.</td></tr><tr><td><code>--stroke-grid</code></td><td><code>0.6px</code></td><td>Floor grid lines, minor and major.</td></tr><tr><td><code>--stroke-hatch</code></td><td><code>0.6px</code></td><td>Hatch lines in the shadow tile and the ground band.</td></tr><tr><td><code>--stroke-poly</code></td><td><code>1px</code></td><td>Polygon edges and the lot boundary, unless the mark sets width.</td></tr><tr><td><code>--stroke-overlay</code></td><td><code>1px</code></td><td>Default for lines, polylines, arrows, rings and dimension lines.</td></tr><tr><td><code>--stroke-dim-ext</code></td><td><code>0.7px</code></td><td>Dimension extension lines.</td></tr><tr><td><code>--stroke-dim-tick</code></td><td><code>1.4px</code></td><td>The 45° ticks at a dimension line's ends.</td></tr><tr><td><code>--stroke-changes</code></td><td><code>2.4px</code></td><td>Order-changes outline of a part whose order just flipped, in st-rec.</td></tr><tr><td><code>--stroke-trail-centre</code></td><td><code>1.2px</code></td><td>The deck centre's flight path (board.js:120).</td></tr><tr><td><code>--stroke-trail-nose</code></td><td><code>0.8px</code></td><td>The deck nose's dashed flight path (board.js:121).</td></tr><tr><td><code>--stroke-chrono-deck</code></td><td><code>1.6px</code></td><td>The deck as a line in the chronophotograph (D-03 chrono.js).</td></tr><tr><td><code>--stroke-winding</code></td><td><code>1.3px</code></td><td>The two curves of the winding view (R-02 windingView.js).</td></tr><tr><td><code>--stroke-fbd</code></td><td><code>1.5px</code></td><td>Leg-force arrows in the free-body diagram (D-04 fbd.js); contact arrows there are 1.2px.</td></tr></tbody></table></div><h3>hatch</h3><p class="x-note">Hatching and poché (app/draft.js hatchPattern, groundLine, drawBoundary).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--hatch-tile</code></td><td><code>6px</code></td><td>The shadow hatch tile: one 45° line rising to the right per tile, so lines 6 px apart along a row and 4.2 px apart across.</td></tr><tr><td><code>--hatch-angle</code></td><td><code>45deg</code></td><td>Every hatch line rises to the right at 45°.</td></tr><tr><td><code>--hatch-ground-pitch</code></td><td><code>7px</code></td><td>Spacing of the hatch lines in an elevation's ground band, in st-muted.</td></tr><tr><td><code>--hatch-ground-band</code></td><td><code>18px</code></td><td>Depth of the hatched band under an elevation's ground line.</td></tr><tr><td><code>--boundary-band</code></td><td><code>0.35m</code></td><td>Width of the hatched boundary band round the lot (terrain.js flatground; drawBoundary's default is 0.3 m).</td></tr></tbody></table></div><h3>opacity</h3><p class="x-note">Alphas the drafting context applies.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--opacity-ring</code></td><td><code>0.7</code></td><td>Rings and meridians on a solid.</td></tr><tr><td><code>--opacity-ghost-base</code></td><td><code>0.18</code></td><td>A ghost outline is drawn at 0.18 + 0.5 a, a from (i + 1)/n: the oldest faintest.</td></tr><tr><td><code>--opacity-ghost-span</code></td><td><code>0.5</code></td><td>How much a ghost's opacity grows from oldest to newest.</td></tr><tr><td><code>--opacity-ghost-fill</code></td><td><code>0.3</code></td><td>The paper wash inside a ghost, as a fraction of its outline's opacity.</td></tr><tr><td><code>--opacity-trail-centre</code></td><td><code>0.85</code></td><td>The deck centre's flight path.</td></tr><tr><td><code>--opacity-trail-nose</code></td><td><code>0.6</code></td><td>The deck nose's flight path.</td></tr><tr><td><code>--opacity-truth</code></td><td><code>0.5</code></td><td>Truth cells painted in st-rec.</td></tr><tr><td><code>--opacity-course</code></td><td><code>0.7</code></td><td>The autopilot course's dashed legs.</td></tr><tr><td><code>--opacity-dim-oldest</code></td><td><code>0.35</code></td><td>Floor dimension lines fade by age: 0.35 + 0.65 (i + 1)/n over the last four tricks.</td></tr><tr><td><code>--opacity-chrono-oldest</code></td><td><code>0.25</code></td><td>Chronophotograph figures: 0.25 + 0.75 i/n.</td></tr></tbody></table></div><h3>dash</h3><p class="x-note">Canvas setLineDash patterns in px.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--dash-course</code></td><td><code>2 4</code></td><td>The autopilot course between waypoints (controls.js).</td></tr><tr><td><code>--dash-course-target</code></td><td><code>1 3</code></td><td>From the board to the waypoint it is heading for.</td></tr><tr><td><code>--dash-guide</code></td><td><code>3 2</code></td><td>A foot guide: from the foot to the point of the deck it pulls (motors.js, Forces).</td></tr><tr><td><code>--dash-trail-nose</code></td><td><code>3 3</code></td><td>The deck nose's flight path.</td></tr><tr><td><code>--dash-chrono-hips</code></td><td><code>2 3</code></td><td>The hips' path in the chronophotograph.</td></tr></tbody></table></div><h3>marks</h3><p class="x-note">Dot and arrow sizes in CSS px.</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--dot-default</code></td><td><code>2px</code></td><td>g.dot radius when none is given; foot-guide ends.</td></tr><tr><td><code>--dot-contact</code></td><td><code>2.6px</code></td><td>An active contact of the deck (Contacts), st-rec.</td></tr><tr><td><code>--dot-joint</code></td><td><code>2.2px</code></td><td>A skeleton joint, hollow (Rig), st-violet.</td></tr><tr><td><code>--dot-com</code></td><td><code>3.5px</code></td><td>The centre of mass (Rig), st-rec.</td></tr><tr><td><code>--dot-bolt</code></td><td><code>0.9px</code></td><td>The four bolts per truck on the grip tape, st-ink, hidden when the grip faces away.</td></tr><tr><td><code>--dot-trail-tick</code></td><td><code>1.6px</code></td><td>A tick on the deck centre's path every 50 ms.</td></tr><tr><td><code>--dot-target</code></td><td><code>3px</code></td><td>The waypoint the autopilot is heading for.</td></tr><tr><td><code>--ring-min-span</code></td><td><code>6px</code></td><td>A g.ring narrower than this on the sheet is drawn as a 3 px circle.</td></tr><tr><td><code>--arrowhead-max</code></td><td><code>7px</code></td><td>Arrowhead length: min(7 px, half the arrow); its half-width is 0.45 of that.</td></tr><tr><td><code>--dim-tick</code></td><td><code>8px</code></td><td>A dimension tick spans 8 px by 8 px (±4 px) at 45°, at any zoom.</td></tr><tr><td><code>--dim-overshoot</code></td><td><code>12%</code></td><td>Extension lines run 12% of the offset past the dimension line.</td></tr><tr><td><code>--truth-cell</code></td><td><code>3px</code></td><td>Side of a Truth cell on the sheet.</td></tr></tbody></table></div><h3>camera</h3><p class="x-note">The four named views (app/draft.js VIEWS) and the stage camera (app/ui/stage.jsx, app/host.js).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--view-axo-yaw</code></td><td><code>38deg</code></td><td>Axonometric: yaw. A trimetric chosen to read people and boards (from Loom Playtime).</td></tr><tr><td><code>--view-axo-pitch</code></td><td><code>27deg</code></td><td>Axonometric: pitch. Foreshortens x, y, z by 0.836, 0.891, 0.712.</td></tr><tr><td><code>--view-front-yaw</code></td><td><code>0deg</code></td><td>Front elevation (pitch 0): true lengths in x and y.</td></tr><tr><td><code>--view-side-yaw</code></td><td><code>-90deg</code></td><td>Side elevation (pitch 0): true lengths in z and y.</td></tr><tr><td><code>--view-plan-pitch</code></td><td><code>90deg</code></td><td>Plan (yaw 0): true lengths in x and z.</td></tr><tr><td><code>--sun</code></td><td><code>-0.5 -1 -0.38</code></td><td>The sun direction (normalised; the way light travels): 57.9° high, 0.628 m of shadow offset per metre of height.</td></tr><tr><td><code>--scale-elevation</code></td><td><code>min(W / 5.5, H / 3.1)</code></td><td>Pixels per metre at zoom 1 in axo, front and side: 5.5 m across or 3.1 m up.</td></tr><tr><td><code>--scale-plan</code></td><td><code>min(W, H) / 7.5</code></td><td>Pixels per metre at zoom 1 in plan: 7.5 m across the shorter side.</td></tr><tr><td><code>--target-height</code></td><td><code>0.9m</code></td><td>The sheet centres 0.9 m above the ground under the board (0 in plan).</td></tr><tr><td><code>--zoom-min</code></td><td><code>0.25</code></td><td>Smallest zoom (wheel and slider).</td></tr><tr><td><code>--zoom-max</code></td><td><code>5</code></td><td>Largest zoom by the wheel; the slider stops at 4.</td></tr><tr><td><code>--follow-half-life</code></td><td><code>0.32s</code></td><td>The camera spring's half-life while following the board; 0.6 s when Follow is off.</td></tr><tr><td><code>--follow-lead</code></td><td><code>0.4s</code></td><td>The camera aims this far ahead along the board's velocity.</td></tr><tr><td><code>--track-half-life</code></td><td><code>0.5s</code></td><td>The yaw spring's half-life when Track turns the sheet with the rider.</td></tr><tr><td><code>--orbit-rate</code></td><td><code>0.008</code></td><td>Radians of yaw per px of drag; pitch moves 0.006 rad per px, within -1 to 1.6 rad of the view's own.</td></tr><tr><td><code>--drag-threshold</code></td><td><code>4px</code></td><td>A drag starts orbiting or panning after 4 px.</td></tr></tbody></table></div><h3>sheet</h3><p class="x-note">Sheet furniture (app/draft.js titleBlock, scaleBar).</p><div class="x-scroll"><table class="x-tab"><thead><tr><th>token</th><th>value</th><th>usage</th></tr></thead><tbody><tr><td><code>--title-block-width</code></td><td><code>250px</code></td><td>The title block, bottom right, 10 px from the edges.</td></tr><tr><td><code>--title-block-row</code></td><td><code>15px</code></td><td>One row per fact under a 17 px header (FORM SKATE and the sheet number).</td></tr><tr><td><code>--title-block-min</code></td><td><code>640px 460px</code></td><td>The title block is drawn only on a sheet at least this wide and high.</td></tr><tr><td><code>--scale-bar-inset</code></td><td><code>14px 18px</code></td><td>The scale bar's left end: 14 px from the left, 18 px from the bottom.</td></tr><tr><td><code>--scale-bar-rule</code></td><td><code>1 m</code></td><td>1 m long; 25 cm if 1 m would pass 30% of the sheet's width; 5 m if 1 m is under 40 px. Quarters, the first and third filled 2 px high.</td></tr></tbody></table></div></section>
+<section id="components"><h2 class="x-h">Components</h2><h3>Stage parts</h3><article class="x-comp" id="comp-Chip"><h4>Chip</h4><div class="x-frame"><iframe data-src="components/Chip/standalone.html" src="components/Chip/standalone.html" title="Chip preview" style="height:120px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>Small square tags in the stage&#39;s top-left corner: who is riding, recording, replay, and a lower-case hint.</p>
+<p><strong>Provide</strong> markup inside <code>.skate-stage</code>: <code>&lt;div class=&quot;chip-row&quot;&gt;&lt;button class=&quot;chip on&quot;&gt;Autopilot&lt;/button&gt;&lt;span class=&quot;chip rec&quot;&gt;● REC 12 s&lt;/span&gt;&lt;span class=&quot;chip ghost&quot;&gt;click the stage, then ↑ to push&lt;/span&gt;&lt;/div&gt;</code>.</p>
+<ul>
+<li><code>.chip</code>: Plex 10 px, weight 600, capitals tracked 0.08em, 1 px <code>st-ink</code> border, 5 × 8 px padding.</li>
+<li><code>.on</code> fills it with <code>st-ink</code>; <code>.rec</code> turns it <code>st-rec</code>; <code>.on.rec</code> fills it <code>st-rec</code> (REPLAY); <code>.ghost</code> is a quiet hint in <code>st-muted</code> with an <code>st-major</code> border.</li>
+<li>The row sits 12 px from the corner, 6 px gaps, and ignores the pointer except on the chips themselves.</li>
+<li>Do use a button chip only when clicking does something (AUTOPILOT / YOU toggles the autopilot).</li>
+</ul>
+</div><p class="x-files"><code>components/Chip/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-FailBanner"><h4>FailBanner</h4><div class="x-frame"><iframe data-src="components/FailBanner/standalone.html" src="components/FailBanner/standalone.html" title="FailBanner preview" style="height:110px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A red button bottom left of the stage when a system throws: what stopped, when, the message and the file and line; clicking opens that line.</p>
+<p><strong>Provide</strong> <code>&lt;button class=&quot;ovl-box failbanner&quot;&gt;&lt;b&gt;board/trucks stopped at 2.53 s:&lt;/b&gt; message — skate/board.js:92. Fix it and press Run (the world resumes), or Reset.&lt;/button&gt;</code>.</p>
+<ul>
+<li>Fill <code>accent</code>, text <code>on-accent</code> at 12 px, bold lead, 7 × 12 px padding, at most 560 px wide.</li>
+<li>The dark theme&#39;s pair is 3.51:1, under 4.5:1: keep the message short and the lead bold.</li>
+<li>Do say what to do next in the banner&#39;s last sentence.</li>
+<li>Don&#39;t use it for anything but a stopped runtime.</li>
+</ul>
+</div><p class="x-files"><code>components/FailBanner/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-OverlayMenu"><h4>OverlayMenu</h4><div class="x-frame"><iframe data-src="components/OverlayMenu/standalone.html" src="components/OverlayMenu/standalone.html" title="OverlayMenu preview" style="height:380px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The stage toolbar&#39;s <strong>Show ▾</strong> menu: one row per overlay with a square tick box, its name and a one-line description.</p>
+<p><strong>Provide</strong> the workbench menu markup with the <code>overlays</code> class: <code>&lt;div class=&quot;menu overlays&quot;&gt;&lt;button class=&quot;on&quot;&gt;&lt;span class=&quot;box on&quot;&gt;&lt;/span&gt;&lt;span class=&quot;t&quot;&gt;Shadows&lt;/span&gt;&lt;small&gt;hatched sun shadows&lt;/small&gt;&lt;/button&gt;…&lt;/div&gt;</code>. <code>FormSkateStage.OVERLAYS</code> lists <code>[key, label, description]</code> in menu order.</p>
+<ul>
+<li>Box 9 px square: <code>ink-2</code> border when off, filled <code>ink</code> when on; the row&#39;s label bolds when on.</li>
+<li>The menu stays open while boxes are ticked (<code>data-keep</code> in the workbench).</li>
+<li>The button&#39;s count shows how many overlays are on (<code>Show 4 ▾</code>).</li>
+</ul>
+</div><p class="x-files"><code>components/OverlayMenu/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-StageHint"><h4>StageHint</h4><div class="x-frame"><iframe data-src="components/StageHint/standalone.html" src="components/StageHint/standalone.html" title="StageHint preview" style="height:80px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The 30 px line under the stage: a bold state word, then the keys and gestures that work now.</p>
+<p><strong>Provide</strong> <code>&lt;div class=&quot;hint&quot;&gt;&lt;b&gt;Click the stage&lt;/b&gt;&lt;span&gt;↑ push · ←→ carve · Space pop · … · double-click to square up&lt;/span&gt;&lt;/div&gt;</code>.</p>
+<ul>
+<li>States: <code>Click the stage</code> (not focused), <code>Riding</code> (focused), <code>Replay</code> (with the clip&#39;s name first).</li>
+<li>Text <code>ink-2</code> at 12 px, the state in bold <code>ink</code>, 1 px <code>hair</code> rule above; overflow ends in an ellipsis.</li>
+<li>Do list gestures in the order a new user needs them; join with <code>·</code>.</li>
+</ul>
+</div><p class="x-files"><code>components/StageHint/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-TrickToast"><h4>TrickToast</h4><div class="x-frame"><iframe data-src="components/TrickToast/standalone.html" src="components/TrickToast/standalone.html" title="TrickToast preview" style="height:150px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The scored trick, top right for 2.6 s: its name in large bold capitals and its measurements in Plex below.</p>
+<p><strong>Provide</strong> <code>&lt;div class=&quot;tricktoast&quot;&gt;&lt;b&gt;kickflip&lt;/b&gt;&lt;span&gt;flip 0.99 · shove 0.00 · air 0.42 s · +850&lt;/span&gt;&lt;/div&gt;</code> inside <code>.skate-stage</code>; add <code>bad</code> and <code> · bail</code> for a bail, and no score. Re-mount it (a new React key) for each trick so the animation restarts, and remove it after 2.6 s.</p>
+<ul>
+<li>Name: Arial 22 px bold, −0.01em, capitals; 18 px and 46 px from the top when the stage is 600 px wide or less.</li>
+<li>Detail: Plex 10.5 px in <code>st-muted</code>; wrap only appears when it is over 0.3 turns.</li>
+<li>Fades in over the first 8% and out over the last 18%; the preview pins it.</li>
+<li>Don&#39;t stack toasts: a new trick replaces the last one.</li>
+</ul>
+</div><p class="x-files"><code>components/TrickToast/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Motion</h3><article class="x-comp" id="comp-Chronophotograph"><h4>Chronophotograph</h4><div class="x-frame"><iframe data-src="components/Chronophotograph/standalone.html" src="components/Chronophotograph/standalone.html" title="Chronophotograph preview" style="height:310px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A Marey chronophotograph of the last jump: a violet stick figure every 0.083 s from the hips, feet and deck, older figures fainter.</p>
+<p><strong>Provide</strong> <code>FormSkateStage.drawChrono(g, samples, every = 0.08)</code> with <code>samples = [{ t, hip, ff, rf, deck: { p, q } }]</code> one every 1/60 s, on the <code>overlay</code> layer (as D-03&#39;s <code>lab/chrono.js</code> does with the history).</p>
+<ul>
+<li>Each figure: a trunk 0.62 m up from the hips, a 2.5 px hollow head, legs from hips to feet, the deck as a 1.6 px <code>st-blue</code> line 0.4 m either side of its centre; opacity 0.25 + 0.75 i/n; the hips&#39; path dashed 2 3 at 0.6.</li>
+<li>It reads best in front elevation, where the motion runs across the sheet; in side elevation the figures pile up.</li>
+<li>Don&#39;t draw knees or arms: only bodies the physics moves are in the history.</li>
+</ul>
+</div><p class="x-files"><code>components/Chronophotograph/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Trail"><h4>Trail</h4><div class="x-frame"><iframe data-src="components/Trail/standalone.html" src="components/Trail/standalone.html" title="Trail preview" style="height:405px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The last jump drawn as onion skins: a ghost deck every 1/12 s fading in, the centre&#39;s path with 50 ms ticks, and the nose&#39;s dashed path.</p>
+<p><strong>Provide</strong> nothing in the workbench (the Trail overlay; <code>g.trailSpan()</code> gives the window). Outside it, <code>FormSkateStage.drawTrail(g, samples)</code> with <code>samples = [{ t, p, q }]</code> one every 1/60 s, on the <code>ghost</code> layer.</p>
+<ul>
+<li>Window: take-off to landing (or bail) plus 0.1 s, kept for 6 s.</li>
+<li>Ghosts: every fifth sample from the window&#39;s start; at most 18; 0.8 px <code>st-ghost</code> at opacity 0.18 + 0.5 (i + 1)/n.</li>
+<li>Paths: centre 1.2 px <code>st-blue</code> at 0.85 with 1.6 px ticks; nose 0.8 px <code>st-teal</code> at 0.6, dashed 3 3.</li>
+<li>The preview&#39;s motion is example data shaped on the book&#39;s running kickflip.</li>
+<li>Don&#39;t depth-sort ghosts or give them trucks and wheels: they lie under every solid.</li>
+</ul>
+</div><p class="x-files"><code>components/Trail/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Depth order</h3><article class="x-comp" id="comp-DepthOrder"><h4>DepthOrder</h4><div class="x-frame"><iframe data-src="components/DepthOrder/standalone.html" src="components/DepthOrder/standalone.html" title="DepthOrder preview" style="height:380px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>What is in front: solids painted back to front in an order chosen by a strategy, with the deck ordered by its plane and each limb drawn as one outline.</p>
+<p><strong>Provide</strong> tags on your solids: a unique <code>name</code>; <code>plane: { n, p0, tol, lean }</code> on a flat part others stand on; <code>under: &#39;&lt;name&gt;&#39;</code> on the parts beneath it; <code>chain</code> on the parts of one limb; <code>bias</code> (metres) only where geometry cannot decide. Choose a strategy with <code>sheet(canvas, { order: &#39;deck plane&#39;, chains: true })</code> (the stage&#39;s defaults) or in the Order menu.</p>
+<ul>
+<li>Strategies: <code>centroid</code>, <code>coherent</code>, <code>deck plane</code> (default), <code>deck plane + coherent</code>, <code>deck plane + coherent + smoothed keys</code>.</li>
+<li>The preview draws one frame both ways with the Truth overlay on: red cells are surface drawn in the wrong order.</li>
+<li>Don&#39;t fix an ordering problem with a large <code>bias</code>: a bias that is right from one side is wrong from the other.</li>
+</ul>
+</div><p class="x-files"><code>components/DepthOrder/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Annotations</h3><article class="x-comp" id="comp-DimensionLine"><h4>DimensionLine</h4><div class="x-frame"><iframe data-src="components/DimensionLine/standalone.html" src="components/DimensionLine/standalone.html" title="DimensionLine preview" style="height:310px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A drafting dimension on the floor: extension lines, an offset line with 45° ticks, and the value on a paper patch.</p>
+<p><strong>Provide</strong> two floor points and a label: <code>g.dimension(a, b, &#39;KICKFLIP · 1.62 m · 0.42 s&#39;, { offset: 0.45, tone: &#39;blue&#39;, alpha })</code> on the <code>floor</code> layer.</p>
+<ul>
+<li>Line 1 px, extension lines 0.7 px overshooting 12%, ticks 1.4 px across 8 px at any zoom, value 8.5 px Plex.</li>
+<li>The Dims overlay draws the last four tricks, landed in <code>st-blue</code> and bails in <code>st-rec</code>, at opacity 0.35 + 0.65 (i + 1)/n.</li>
+<li>It measures horizontal distance only (points under 5 cm apart draw nothing) and is true length only in plan.</li>
+<li>Don&#39;t use it for heights; draw a vertical <code>g.line</code> with a <code>g.label</code> instead.</li>
+</ul>
+</div><p class="x-files"><code>components/DimensionLine/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Labels"><h4>Labels</h4><div class="x-frame"><iframe data-src="components/Labels/standalone.html" src="components/Labels/standalone.html" title="Labels preview" style="height:210px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>Text on the sheet: IBM Plex Mono at weight 500, centred on a world point, a fixed pixel size at any zoom.</p>
+<p><strong>Provide</strong> <code>g.label(text, p, { size, tone, dx, dy, align, bg, weight })</code>.</p>
+<ul>
+<li>9.5 px default; 8 px beside a mark in the mark&#39;s hue; 8.5 px for dimension values; <code>bg: true</code> for a paper patch that breaks a line.</li>
+<li>Units always, two decimals, parts joined by <code>·</code>; trick names in capitals on the floor.</li>
+<li>Some light-theme hues sit just under 4.5:1 as 8 px text (<code>st-green</code> 4.34, <code>st-teal</code> 4.35, <code>st-warn</code> 4.46, <code>st-amber</code> 2.68): use <code>bg: true</code> or ink for a value that must be read.</li>
+<li>Don&#39;t use bold for emphasis or set a sentence on the sheet.</li>
+</ul>
+</div><p class="x-files"><code>components/Labels/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Bodies</h3><article class="x-comp" id="comp-Figure"><h4>Figure</h4><div class="x-frame"><iframe data-src="components/Figure/standalone.html" src="components/Figure/standalone.html" title="Figure preview" style="height:380px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The rider: a 22-joint skeleton carrying 19 lofts in six chains, posed from the simulation every frame and drawn in hairlines.</p>
+<p><strong>Provide</strong>, in the workbench, nothing: <code>figure({ rider, board, intent, push })</code> adds the view. Outside it, <code>FormSkateStage.figurePose({ crouch, lean, pushing, phase, deck })</code> poses a regular-stance rider on a deck at rest with the figure&#39;s own code, and <code>FormSkateStage.drawFigure(g, pose)</code> draws it.</p>
+<ul>
+<li>Chains: <code>legL</code>, <code>legR</code>, <code>armL</code>, <code>armR</code>, <code>head</code>, <code>torso</code>. With chain outlines on (the default) each chain is one outline, so knees, elbows and the waist show no seams.</li>
+<li>The head is biased 6 cm toward the viewer so the face is not hidden by the neck; the face is a decal (eyes and mouth change in the air and in a bail).</li>
+<li>The Rig overlay adds violet sticks, 2.2 px hollow joints and the centre of mass as a 3.5 px <code>st-rec</code> dot labelled <code>COM</code>.</li>
+<li>Don&#39;t move the figure to change the physics: it is a view, and reads the simulation without pushing on it.</li>
+</ul>
+</div><p class="x-files"><code>components/Figure/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Loft"><h4>Loft</h4><div class="x-frame"><iframe data-src="components/Loft/standalone.html" src="components/Loft/standalone.html" title="Loft preview" style="height:300px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>A solid drawn as a stack of elliptical sections: a 2 px outline filled with paper, thin rings and an optional meridian on its surface.</p>
+<p><strong>Provide</strong> stations <code>{ c, A, B, a, b, ring }</code> from one end to the other (centre, two unit axes, two radii in metres, ring flag) and call <code>g.loft(stations, { name, tone, meridian, bias, chain, plane, under, ghost, fill, noShadow, after })</code> in a <code>figure</code>-layer view.</p>
+<ul>
+<li>The outline is the union of the convex hulls of neighbouring sections, stroked at 2 px and filled with <code>st-bg</code> (<code>fill: &#39;soft&#39;</code>: <code>st-soft</code>).</li>
+<li><code>ring: 1</code> draws the near half of that section at 0.55 px and 70%; <code>meridian: true</code> joins the sections&#39; <code>B</code> ends along the body.</li>
+<li><code>tone</code> recolours the outline only; the fill stays paper.</li>
+<li>Do add sections where the outline bends and where the girth should read.</li>
+<li>Don&#39;t fill a loft with a colour or draw it without its paper fill: the fill is what hides the parts behind it.</li>
+</ul>
+</div><p class="x-files"><code>components/Loft/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Ground</h3><article class="x-comp" id="comp-GroundAndShadow"><h4>GroundAndShadow</h4><div class="x-frame"><iframe data-src="components/GroundAndShadow/standalone.html" src="components/GroundAndShadow/standalone.html" title="GroundAndShadow preview" style="height:300px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>How the ground is drawn: a 0.5 m / 2 m grid and hatched sun shadows when the camera looks down; a cut ground line over an 18 px hatched band in the elevations.</p>
+<p><strong>Provide</strong> nothing for shadows: every solid loft casts one while the Shadows overlay is on. For the floor, a <code>floor</code>-layer view calls <code>g.grid({ minor: 0.5, major: 2, extent })</code>; pass <code>heightAt</code> to <code>sheet()</code> when the ground is not flat.</p>
+<ul>
+<li>The sun is <code>normalize(-0.5, -1, -0.38)</code>: 57.9° high, shadows offset 0.628 m per metre of height, falling away from the viewer in the default view.</li>
+<li>All shadows are one path filled once, so overlaps are not darker.</li>
+<li>Shadows and the grid need the camera to look down more than 2.9°; below that the ground line takes over.</li>
+<li>Don&#39;t shade a shadow with a translucent grey: hatch it, so the grid stays readable and the dark theme follows the token.</li>
+</ul>
+</div><p class="x-files"><code>components/GroundAndShadow/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><article class="x-comp" id="comp-Hatching"><h4>Hatching</h4><div class="x-frame"><iframe data-src="components/Hatching/standalone.html" src="components/Hatching/standalone.html" title="Hatching preview" style="height:270px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>Poché: 45° hatch lines for what is solid or cut. Prop faces that are slopes, sides or backs, and the lot&#39;s boundary band.</p>
+<p><strong>Provide</strong> <code>g.poly(points, { fill: &#39;hatch&#39;, name })</code> for a hatched face (paper first, then the pattern), <code>fill: &#39;stage&#39;</code> for a riding surface, and <code>g.boundary({ size, band })</code> for the lot&#39;s edge.</p>
+<ul>
+<li>The tile is 6 px with a 0.6 px <code>st-shadow</code> line, drawn at double resolution; lines are 4.2 px apart across.</li>
+<li>The boundary band is filled with the even-odd rule and outlined at 1 px on both sides.</li>
+<li>Do give every new obstacle the same split: the faces you ride in paper, the rest hatched.</li>
+<li>Don&#39;t hatch at another angle or pitch, or in another colour.</li>
+</ul>
+</div><p class="x-files"><code>components/Hatching/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Overlays</h3><article class="x-comp" id="comp-Overlays"><h4>Overlays</h4><div class="x-frame"><iframe data-src="components/Overlays/standalone.html" src="components/Overlays/standalone.html" title="Overlays preview" style="height:360px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The debug drawings over the sheet, one hue each: forces amber, contacts and the centre of mass <code>st-rec</code>, the rig violet, sites green, the course blue.</p>
+<p><strong>Provide</strong>, in a view, a gate and marks: <code>if (!g.on(&#39;forces&#39;)) return;</code> then <code>g.arrow(p, vector, { tone: &#39;amber&#39; })</code>, <code>g.dot(p, 2.6, { tone: &#39;accent&#39; })</code>, <code>g.label(&#39;667 N&#39;, p, { tone: &#39;amber&#39;, dx: 6, size: 8 })</code>. Outside the workbench, pass <code>overlays: [...]</code> to <code>sheet()</code>.</p>
+<ul>
+<li>Switches: shadows, trail, annotations (Dims), grid, forces, contacts, rig, sites, course; in the Order menu, changes and truth.</li>
+<li>Scales: the leg force at 1 m per 2,500 N; contact forces at 1 m per 1,200 N. Say the scale wherever an arrow can be read.</li>
+<li>The light theme&#39;s amber is 2.68:1 on the sheet: keep amber marks bold enough and labels short, or put the value in ink.</li>
+<li>Don&#39;t add a hue. Choose from the table in the Overlays section by meaning.</li>
+</ul>
+</div><p class="x-files"><code>components/Overlays/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Sheet</h3><article class="x-comp" id="comp-SheetFurniture"><h4>SheetFurniture</h4><div class="x-frame" style="max-width:100%;overflow-x:auto"><iframe data-src="components/SheetFurniture/standalone.html" src="components/SheetFurniture/standalone.html" title="SheetFurniture preview" style="height:480px;width:760px" loading="lazy"></iframe></div><div class="x-md"><p>The scale bar, bottom left on every sheet, and the title block, bottom right on any sheet at least 640 × 460 px.</p>
+<p><strong>Provide</strong> <code>draw(fn, { scaleBar: true, titleBlock: { sheet: &#39;D-01&#39;, rows: [[&#39;PRESET&#39;, &#39;…&#39;], [&#39;LAST TRICK&#39;, &#39;…&#39;], [&#39;SPEED&#39;, &#39;…&#39;], [&#39;VIEW&#39;, &#39;…&#39;]] } })</code> to <code>sheet()</code>, or call <code>titleBlock(ctx, g, cam, rows, sheet)</code> and <code>scaleBar(ctx, g, cam)</code> after <code>g.flush(ctx)</code>.</p>
+<ul>
+<li>Scale bar: 1 m (25 cm when 1 m passes 30% of the width, 5 m when 1 m is under 40 px), quarters with the first and third filled.</li>
+<li>Title block: 250 px wide, 10 px from the corner; <code>FORM SKATE</code> in bold Arial and <code>SHEET &lt;id&gt;</code> in the header; keys in <code>st-muted</code> at 9 px, values at 9.5 px.</li>
+<li>Rows the stage uses: PRESET, LAST TRICK, SPEED, VIEW live; CLIP, FRAME, LAST TRICK, ORDER, TRUTH in replay (sheet R-01).</li>
+<li>Don&#39;t drop the scale bar: it is the only thing that gives the sheet a size.</li>
+</ul>
+</div><p class="x-files"><code>components/SheetFurniture/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article><h3>Projection</h3><article class="x-comp" id="comp-Views"><h4>Views</h4><div class="x-frame"><iframe data-src="components/Views/standalone.html" src="components/Views/standalone.html" title="Views preview" style="height:300px;width:100%" loading="lazy"></iframe></div><div class="x-md"><p>The four named views of the sheet: axonometric, front elevation, side elevation and plan, all orthographic.</p>
+<p><strong>Provide</strong> a view key and a scale or zoom: <code>FormSkateStage.sheet(canvas, { view: &#39;side&#39;, zoom: 1 })</code>, or in a library view nothing at all (the stage chooses). <code>VIEWS[key]</code> gives <code>{ name, short, yaw, pitch }</code>.</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>name</th>
+<th>yaw</th>
+<th>pitch</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>axo</code></td>
+<td>Axonometric</td>
+<td>38°</td>
+<td>27°</td>
+</tr>
+<tr>
+<td><code>front</code></td>
+<td>Front elevation</td>
+<td>0°</td>
+<td>0°</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td>Side elevation</td>
+<td>−90°</td>
+<td>0°</td>
+</tr>
+<tr>
+<td><code>plan</code></td>
+<td>Plan</td>
+<td>0°</td>
+<td>90°</td>
+</tr>
+</tbody></table>
+<ul>
+<li>Do check a new view or prop in all four. The elevations have no shadows and show a ground line; the plan shows no height.</li>
+<li>Do keep the views orthographic. Orbit adds to yaw and pitch; it never adds perspective.</li>
+<li>Don&#39;t invent other named views. Track and orbit already turn any of the four.</li>
+</ul>
+</div><p class="x-files"><code>components/Views/README.md</code> · <code>preview.html</code> · <code>standalone.html</code></p></article></section>
+<section id="assets"><h2 class="x-h">Assets</h2><div class="x-md"><p>Screenshots of the real stage in B-01 (Flatground) with the autopilot riding, cropped to the stage, 940 × 664 px. Use them to check a new view or a re-implementation of the look against the original; they are references, not artwork for a page.</p>
+<ul>
+<li><code>stage-axo.png</code>: the default axonometric view after a kickflip: trail ghosts and paths, the floor dimension, hatched shadow, chips, the trick toast, the scale bar and the title block. Light theme.</li>
+<li><code>stage-side-track-kickflip.png</code>: side elevation with Track on, just after a kickflip lands: the ground line and its hatched band, the trail seen end-on, B-01&#39;s funbox in hatch. Light theme.</li>
+<li><code>stage-plan.png</code>: the plan, looking straight down: the rider from above, the shadow, the grid, the trail and its dimension at the edge. Light theme.</li>
+<li><code>stage-overlays.png</code>: axonometric at zoom 1.9 with Forces, Contacts, Rig, Sites and Course on: every overlay hue at once. Light theme.</li>
+<li><code>stage-trail-dark.png</code>: front elevation in the dark theme just after a kickflip: the seven ghost decks, the blue centre path and the dashed teal nose path, light ink on the dark sheet.</li>
+</ul>
+</div><div class="x-shots"><figure><a href="assets/Screens/stage-axo.png"><img src="assets/Screens/stage-axo.png" alt="stage-axo.png" loading="lazy"></a><figcaption><code>assets/Screens/stage-axo.png</code></figcaption></figure><figure><a href="assets/Screens/stage-side-track-kickflip.png"><img src="assets/Screens/stage-side-track-kickflip.png" alt="stage-side-track-kickflip.png" loading="lazy"></a><figcaption><code>assets/Screens/stage-side-track-kickflip.png</code></figcaption></figure><figure><a href="assets/Screens/stage-plan.png"><img src="assets/Screens/stage-plan.png" alt="stage-plan.png" loading="lazy"></a><figcaption><code>assets/Screens/stage-plan.png</code></figcaption></figure><figure><a href="assets/Screens/stage-overlays.png"><img src="assets/Screens/stage-overlays.png" alt="stage-overlays.png" loading="lazy"></a><figcaption><code>assets/Screens/stage-overlays.png</code></figcaption></figure><figure><a href="assets/Screens/stage-trail-dark.png"><img src="assets/Screens/stage-trail-dark.png" alt="stage-trail-dark.png" loading="lazy"></a><figcaption><code>assets/Screens/stage-trail-dark.png</code></figcaption></figure></div></section>
+<section id="export"><h2 class="x-h">EXPORT.md</h2><div class="x-md"><h1>About this export</h1>
+<p>This folder is a complete copy of the <strong>Form Skate Stage</strong> design system, exported on 2026-10-29 from <a href="https://claude.ai/artifact/J3P5XmY4B7uyZJZzgLaZYy">https://claude.ai/artifact/J3P5XmY4B7uyZJZzgLaZYy</a> (version 1793208517-06d5).</p>
+<p>Open <code>index.html</code> in a browser to read it offline: the brand book, every section, the tokens in both themes, each component&#39;s live preview beside its guidelines, and the screenshots. The theme button cycles system, light and dark.</p>
+<h2>What is here</h2>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>what</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>README.md</code></td>
+<td>the brand book: start here</td>
+</tr>
+<tr>
+<td><code>*.md</code></td>
+<td>further sections</td>
+</tr>
+<tr>
+<td><code>tokens.json</code></td>
+<td>the tokens (colours in 2 themes, type, spacing and other families)</td>
+</tr>
+<tr>
+<td><code>tokens.css</code></td>
+<td>the same tokens as CSS custom properties, compiled the way the design system page compiles them: <code>:root, [data-theme=&quot;light&quot;]</code> then <code>[data-theme=&quot;…&quot;]</code> per further theme, one class per text style</td>
+</tr>
+<tr>
+<td><code>components/bundle.css</code></td>
+<td>the components&#39; stylesheet; it expects <code>tokens.css</code> before it</td>
+</tr>
+<tr>
+<td><code>components/bundle.js</code></td>
+<td>one classic script that sets <code>window.FormSkateStage</code>; <code>components/index.d.ts</code> documents it</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/README.md</code></td>
+<td>the component&#39;s guidelines</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/preview.html</code></td>
+<td>its preview exactly as published (it relies on the page preloading tokens.css, bundle.css and bundle.js)</td>
+</tr>
+<tr>
+<td><code>components/&lt;Name&gt;/standalone.html</code></td>
+<td>the same preview with those files linked, so it opens on its own; add <code>#light</code> or <code>#dark</code> to the address to pick a theme</td>
+</tr>
+<tr>
+<td><code>assets/</code></td>
+<td>5 screenshots of the real app, with a README per group</td>
+</tr>
+<tr>
+<td><code>fonts/</code></td>
+<td>IBM Plex Mono (400 to 700, latin) as woff2 with <code>fonts.css</code> and its licence (SIL OFL 1.1), so the stage labels render without Google Fonts</td>
+</tr>
+<tr>
+<td><code>design-system.json</code></td>
+<td>the system&#39;s index (title, namespace, asset records; the <code>blob</code> ids refer to the online copy)</td>
+</tr>
+<tr>
+<td><code>index.html</code></td>
+<td>the offline browser</td>
+</tr>
+</tbody></table>
+<h2>Using it elsewhere</h2>
+<p>Load <code>tokens.css</code>, then <code>components/bundle.css</code>, then <code>components/bundle.js</code>, and set <code>data-theme=&quot;light&quot;</code> or <code>data-theme=&quot;dark&quot;</code> on the root element. Use the class names and markup each component&#39;s README gives. Link <code>fonts/fonts.css</code> first if the page cannot reach Google Fonts.</p>
+<p>The files under <code>components/</code> and the Markdown are unchanged from the published system. <code>tokens.css</code>, the <code>standalone.html</code> files, <code>index.html</code>, <code>fonts/</code> and this file were added by the export.</p>
+</div></section>
+</main>
+</div>
+<script>
+(function () {
+  var mode = window.__dsMode || 'system', btn = document.getElementById('x-theme'), mq = matchMedia('(prefers-color-scheme: dark)');
+  function theme() { return mode === 'system' ? (mq.matches ? 'dark' : 'light') : mode; }
+  function apply() {
+    var t = theme(); document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = 'Theme: ' + mode;
+    document.querySelectorAll('iframe[data-src]').forEach(function (f) { f.src = f.getAttribute('data-src') + '#' + t; });
+  }
+  btn.addEventListener('click', function () { mode = mode === 'system' ? 'light' : mode === 'light' ? 'dark' : 'system'; try { localStorage.setItem('ds-theme', mode); } catch (e) {} apply(); });
+  mq.addEventListener && mq.addEventListener('change', function () { if (mode === 'system') apply(); });
+  addEventListener('message', function (e) {
+    if (!e.data || typeof e.data.dsHeight !== 'number') return;
+    document.querySelectorAll('iframe').forEach(function (f) { if (f.contentWindow === e.source && !f.closest('.x-cover')) f.style.height = Math.min(Math.max(e.data.dsHeight, 40), 4000) + 'px'; });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

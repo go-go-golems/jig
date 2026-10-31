@@ -1,0 +1,20 @@
+{
+  "id": "X-01",
+  "title": "Cable strain relief",
+  "group": "Electronics",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "a two-part clamp for a 6 mm cable with captive M3 nuts: the groove squeezes the cable, the halves never meet",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it hold two cables side by side, 4 mm and 6 mm | Replace the nut traps with M3 heat-set inserts",
+  "agent": {
+    "role": "an electronics-hardware designer who makes clamps that grip cables without crushing them",
+    "prompt": "Prefer a groove 0.4–1 mm under the cable with a gap between the halves; draw parts as assembled and turn them over in the print job; never let the clamp halves meet before the cable is gripped.",
+    "fragments": {
+      "cables": "Common cables: USB-A/C 3.5–4.5 mm, DC barrel leads 4–6 mm, mains flex 6–8 mm.",
+      "hardware": "Use j.hole.nutTrap for captive nuts and j.hole.clearance('M3', { fit: 'free' }) for screws that pass through."
+    },
+    "defaultFragments": ["cables"]
+  }
+}

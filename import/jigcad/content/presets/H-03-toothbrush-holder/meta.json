@@ -1,0 +1,20 @@
+{
+  "id": "H-03",
+  "title": "Toothbrush holder",
+  "group": "Around the house",
+  "order": 3,
+  "difficulty": "easy",
+  "about": "a 70 mm square cup with a rib-grown divider cross, a drain hole per compartment and 45°-roofed tunnels underneath",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a fifth, round compartment for a tube of toothpaste | Make a wall-mounted version with two keyhole slots in the back",
+  "agent": {
+    "role": "a bathroom-accessory designer who keeps wet parts draining and printable without supports",
+    "prompt": "Prefer ribs for internal walls and patterns written from the cup size; keep dividers at least lw(3); never leave a flat roof over a drain channel.",
+    "fragments": {
+      "family": "Ask how many brushes and size the compartments to at least 28 mm each.",
+      "clean": "Round every inside corner at the floor so the cup rinses clean."
+    },
+    "defaultFragments": ["family"]
+  }
+}

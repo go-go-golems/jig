@@ -1,0 +1,577 @@
+// solved.js · a solved sketch: DOF, status, diagnostics, entities, profiles, drags, SketchData and the L3 dump.
+import { solveSketch, analyseCluster, dragCluster } from './solver.js';
+import { buildProfiles } from './profiles.js';
+import { polar, sampleSpline, sampleEllipse, sweepCCW, sub, len, dot, norm, TAU } from './geom2d.js';
+import { fmtNum, mm } from '../units.js';
+
+const NICE = { ax: 'start.x', ay: 'start.y', bx: 'end.x', by: 'end.y', cx: 'center.x', cy: 'center.y', r: 'r', a0: 'start angle', a1: 'end angle',
+  x: 'x', y: 'y', rx: 'rx', ry: 'ry', phi: 'angle', tx: 'x', ty: 'y', th: 'rotation' };
+const DIMLESS = new Set(['parallel', 'perpendicular', 'tangent', 'equal', 'coincident', 'horizontal', 'vertical', 'symmetric', 'midpoint', 'concentric', 'collinear', 'on']);
+
+export class SolvedSketch {
+  constructor(sketch, sys, X, run, env = {}, extra = {}) {
+    this.sketch = sketch; this.sys = sys; this.X = X; this.run = run; this.env = env;
+    this.id = sketch.id;
+    this.moved = extra.moved ?? null; this.fixed = extra.fixed ?? null; this.dragInfo = extra.drag ?? null;
+    this._profiles = null;
+  }
+  static solve(sketch, sys, env) {
+    const run = solveSketch(sys, { slot: sketch.solverSlot, sketchId: sketch.id });
+    return new SolvedSketch(sketch, sys, run.X, run, env);
+  }
+  get n() { return this.run.clusters.reduce((s, c) => s + c.n, 0); }
+  get rank() { return this.run.results.reduce((s, r) => s + (r.rank ?? 0), 0); }
+  get dof() { return this.run.results.reduce((s, r) => s + (r.dof ?? 0), 0); }
+  get conflicts() { return this.run.results.flatMap(r => r.conflicts); }
+  get redundant() { return this.sys.cons.filter(c => c.status === 'redundant').map(c => c.id); }
+  get unsolved() { return this.run.results.some(r => !r.converged); }
+  get status() { return this.conflicts.length || this.unsolved ? 'over' : this.dof === 0 ? 'fully' : 'under'; }
+  get decisions() { return [...this.sys.decisions, ...this.run.decisions]; }
+  point(ref) { return this.sys.handle(ref).get(this.X); }
+
+  // ── diagnostics ────────────────────────────────────────────────────────────
+  get diagnostics() {
+    const out = this.sys.diags.map(d => ({ ...d }));
+    const at = this.id;
+    for (const r of this.run.results) {
+      for (const set of r.conflicts) {
+        const cons = set.map(id => this.sys.cons.find(c => c.id === id));
+        const dropped = cons.find(c => c.dropped) ?? cons[cons.length - 1];
+        const measured = dropped && !DIMLESS.has(dropped.type) ? this.sys.measure(dropped, this.X) : null;
+        out.push({ level: 'error', kind: 'sketch.overConstrained', at, conflict: set,
+          message: `no solution; minimal conflicting set: ${cons.map(c => this.labelOf(c)).join(' · ')}`,
+          fix: `drop one of the ${cons.length}; e.g. ${dropped && measured != null ? `make ${dropped.id} driven (it measures ${this.fmtValue(dropped, measured)})` : `remove ${dropped?.id}`}` });
+      }
+      if (!r.converged && !r.conflicts.length) out.push({ level: 'error', kind: 'sketch.unsolved', at, message: `the solver did not converge (residual ${r.residual.toExponential(1)})`, fix: "try .solver('lm') or better initial positions" });
+    }
+    for (const c of this.sys.cons) if (c.status === 'redundant') {
+      const by = c.impliedBy?.length ? summarise(c.impliedBy) : null;
+      out.push({ level: 'warning', kind: 'sketch.redundant', at, constraint: c.id,
+        message: `${this.labelOf(c)} is ${c.partial ? 'partly ' : ''}implied by ${by ?? 'the other constraints'}${c.partial ? '' : '; dropped'}`,
+        fix: 'remove it, or keep it as a driven (reference) constraint' });
+    }
+    if (this.status === 'under') {
+      const free = this.freeSummary();
+      out.push({ level: this.sketch.strictFlag ? 'error' : 'warning', kind: 'sketch.underConstrained', at,
+        message: `${this.dof} DOF remain`, fix: `free: ${free.join(', ')}${this.sketch.strictFlag ? ' (strict sketch)' : ''}` });
+    }
+    return out;
+  }
+  freeSummary() {
+    const out = [];
+    for (const r of this.run.results) for (const [id, d] of r.entityDof ?? []) {
+      if (!d) continue;
+      const e = this.sys.entities.get(id);
+      const names = Object.entries(e.p).filter(([, i]) => r.dofFree.has(i)).map(([k]) => NICE[k] ?? k);
+      out.push(`${id} (${d}${names.length ? ': ' + compactNames(names) : ''})`);
+    }
+    return out.slice(0, 12);
+  }
+  labelOf(c) {
+    const base = c.label && !/=/.test(c.label) ? c.label : c.label?.split(' = ')[0] ?? c.id;
+    if (c.v == null || DIMLESS.has(c.type) || c.type === 'fix' || c.type === 'mapPoint' || c.type === 'scalarRel') return c.label ?? c.id;
+    return `${c.type === 'radius' || c.type === 'diameter' || c.type === 'length' ? base.replace(/^dim/, c.type) : base} = ${this.fmtValue(c, c.v)}`;
+  }
+  fmtValue(c, v) {
+    if (v == null) return '?';
+    if (c.type === 'angle' || c.valueKind === 'angle') return `${fmtNum((v * 180) / Math.PI)}°`;
+    return `${fmtNum(v)} mm`;
+  }
+
+  // ── entities and constraints as data ───────────────────────────────────────
+  entityData() {
+    const X = this.X, out = [];
+    const free = new Map(), edof = new Map();
+    for (const r of this.run.results) { for (const k of r.dofFree?.keys() ?? []) free.set(k, true); for (const [id, d] of r.entityDof ?? []) edof.set(id, d); }
+    for (const id of this.sys.order) {
+      const e = this.sys.entities.get(id), P = e.p, g = k => X[P[k]];
+      const base = { id, kind: e.kind, construction: !!e.construction, external: !!e.external, group: e.group ?? null,
+        dofFree: Object.entries(P).filter(([, i]) => free.has(i)).map(([k]) => NICE[k] ?? k), dof: edof.get(id) ?? 0 };
+      if (e.kind === 'point') out.push({ ...base, p: [g('x'), g('y')] });
+      else if (e.kind === 'line') out.push({ ...base, a: [g('ax'), g('ay')], b: [g('bx'), g('by')] });
+      else if (e.kind === 'circle') out.push({ ...base, c: [g('cx'), g('cy')], r: g('r') });
+      else if (e.kind === 'arc') {
+        const c = [g('cx'), g('cy')], r = g('r'), a0 = g('a0'), a1 = a0 + sweepCCW(a0, g('a1'));
+        out.push({ ...base, c, r, a0, a1, ccw: true, start: polar(c, r, a0), end: polar(c, r, a1) });
+      } else if (e.kind === 'ellipse') {
+        const c = [g('cx'), g('cy')];
+        out.push({ ...base, kind: 'spline', shape: 'ellipse', c, rx: g('rx'), ry: g('ry'), angle: g('phi'), closed: true, pts: sampleEllipse(c, g('rx'), g('ry'), g('phi')) });
+      } else if (e.kind === 'spline') {
+        const ctrl = Array.from({ length: e.meta.n }, (_, k) => [g(`x${k}`), g(`y${k}`)]);
+        out.push({ ...base, ctrl, fit: e.meta.fit, degree: e.meta.degree, closed: e.meta.closed, pts: sampleSpline(ctrl, e.meta) });
+      } else if (e.kind === 'rigid') {
+        const loops = this.rigidLoops(e);
+        out.push({ ...base, kind: 'spline', shape: 'import', c: [g('tx'), g('ty')], angle: g('th'), closed: true, pts: loops[0] ?? [], loops });
+      }
+    }
+    return out;
+  }
+  rigidLoops(e) {
+    const X = this.X, tx = X[e.p.tx], ty = X[e.p.ty], th = X[e.p.th], c = Math.cos(th), s = Math.sin(th);
+    return e.meta.loops.map(L => L.map(([u, v]) => [tx + u * c - v * s, ty + u * s + v * c]));
+  }
+  constraintData() {
+    return this.sys.cons.map(c => {
+      const measured = c.driven ? this.sys.measure(c, this.X) : null;
+      const v = c.driven ? measured : c.v;
+      const isAng = c.type === 'angle';
+      return {
+        id: c.id, kind: c.type, refs: c.refs.map(r => (typeof r === 'string' ? r : Array.isArray(r) ? r.map(Number) : String(r))),
+        value: v == null || Array.isArray(v) || DIMLESS.has(c.type) ? null : isAng ? (v * 180) / Math.PI : v,
+        unit: v == null || DIMLESS.has(c.type) ? null : isAng ? 'deg' : 'mm',
+        text: c.driven && v != null ? `${c.id} = ${this.fmtValue(c, v)}` : this.labelOf(c),
+        driven: !!c.driven, status: c.status === 'invalid' ? 'conflict' : c.status, src: c.src, impliedBy: c.impliedBy ?? null,
+      };
+    });
+  }
+  // measure a driven dimension by id (for prog.sketch(id) and why())
+  driven(id) { const c = this.sys.cons.find(k => k.id === id); return c ? this.sys.measure(c, this.X) : null; }
+
+  // ── profiles ────────────────────────────────────────────────────────────────
+  curves() {
+    const X = this.X, out = [];
+    for (const id of this.sys.order) {
+      const e = this.sys.entities.get(id);
+      if (e.construction) continue;
+      const P = e.p, g = k => X[P[k]], group = e.group ?? id;
+      if (e.kind === 'line') out.push({ kind: 'line', a: [g('ax'), g('ay')], b: [g('bx'), g('by')], src: id, group });
+      else if (e.kind === 'circle') out.push({ kind: 'circle', c: [g('cx'), g('cy')], r: g('r'), src: id, group });
+      else if (e.kind === 'arc') out.push({ kind: 'arc', c: [g('cx'), g('cy')], r: g('r'), a0: g('a0'), a1: g('a1'), src: id, group });
+      else if (e.kind === 'ellipse') {
+        const c = [g('cx'), g('cy')], pts = sampleEllipse(c, g('rx'), g('ry'), g('phi'), 128);
+        out.push({ kind: 'poly', pts: pts.slice(0, -1), closed: true, src: id, group, exact: { kind: 'ellipse', c, rx: g('rx'), ry: g('ry'), angle: g('phi') } });
+      } else if (e.kind === 'spline') {
+        const ctrl = Array.from({ length: e.meta.n }, (_, k) => [g(`x${k}`), g(`y${k}`)]);
+        const pts = sampleSpline(ctrl, { ...e.meta, per: 24 });
+        out.push({ kind: 'poly', pts: e.meta.closed ? pts.slice(0, -1) : pts, closed: e.meta.closed, src: id, group,
+          exact: e.meta.closed ? { kind: 'spline', pts: ctrl, fit: e.meta.fit, degree: e.meta.degree, closed: true } : null });
+      } else if (e.kind === 'rigid') for (const L of this.rigidLoops(e)) out.push({ kind: 'poly', pts: L, closed: true, lines: true, src: id, group });
+    }
+    return out;
+  }
+  get arrangement() {
+    if (!this._profiles) this._profiles = buildProfiles(this.curves());
+    return this._profiles;
+  }
+  profiles() { return this.arrangement.profiles.map(p => regionOf(p)); }
+  profile(pick) {
+    const all = this.profiles();
+    if (pick == null) return all;
+    if (typeof pick === 'function') return all.filter((r, i) => pick(r, { index: i, all, default: all, sketch: this }));
+    if (Array.isArray(pick) && typeof pick[0] === 'number') return all.filter(r => r.contains(pick));
+    const ids = [].concat(pick);
+    const hit = r => ids.some(id => r.outerSrcs.some(s => s === id || s.startsWith(id + '.')) || r.id === id);
+    const out = all.filter(hit);
+    return out.length ? out : all.filter(r => ids.some(id => r.srcs.some(s => s === id || s.startsWith(id + '.'))));
+  }
+  // an open or closed path through the given entities (in order), for sweeps and ribs
+  wire(ids) {
+    const list = this.sys.expandIds(ids), data = new Map(this.entityData().map(e => [e.id, e]));
+    const segs = list.map(id => data.get(id)).map(e => {
+      if (e.kind === 'line') return { kind: 'line', a: e.a, b: e.b, src: e.id };
+      if (e.kind === 'arc') return { kind: 'arc', c: e.c, r: e.r, a0: e.a0, a1: e.a1, ccw: true, a: e.start, b: e.end, src: e.id };
+      if (e.kind === 'circle') return { kind: 'circle', c: e.c, r: e.r, src: e.id };
+      return { kind: 'spline', pts: e.ctrl ?? e.pts, fit: e.fit, degree: e.degree, closed: e.closed, src: e.id };
+    });
+    // orient: each piece starts where the previous one ended
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i];
+      if (!s.a && s.kind !== 'spline') continue;
+      const start = x => (x.kind === 'spline' ? x.pts[0] : x.a), end = x => (x.kind === 'spline' ? x.pts[x.pts.length - 1] : x.b);
+      const prevEnd = i ? end(segs[i - 1]) : null, next = segs[i + 1];
+      const flip = prevEnd ? len(sub(end(s), prevEnd)) < len(sub(start(s), prevEnd)) : next && next.kind !== 'circle' && Math.min(len(sub(start(s), start(next))), len(sub(start(s), end(next)))) < Math.min(len(sub(end(s), start(next))), len(sub(end(s), end(next))));
+      if (flip) segs[i] = reverseSeg(s);
+    }
+    const pts = [];
+    for (const s of segs) {
+      const p = s.kind === 'line' ? [s.a, s.b] : s.kind === 'arc' ? sampleArcSeg(s) : s.kind === 'circle' ? sampleArcSeg({ ...s, a0: 0, a1: TAU, ccw: true }) : sampleSpline(s.pts, s);
+      pts.push(...(pts.length ? p.slice(1) : p));
+    }
+    const closed = pts.length > 2 && len(sub(pts[0], pts[pts.length - 1])) < 1e-6;
+    let length = 0;
+    for (let i = 1; i < pts.length; i++) length += len(sub(pts[i], pts[i - 1]));
+    return { kind: 'wire', segments: segs, pts, closed, length };
+  }
+
+  // ── drag (runtime residual solve) ──────────────────────────────────────────
+  drag(ref, to) {
+    const H = this.sys.handle(ref);
+    const target = Array.isArray(to) ? to.map(Number) : [to.x, to.y];
+    const k = this.run.clusters.findIndex(c => H.vars.some(v => c.cols.includes(v)));
+    if (k < 0) return new SolvedSketch(this.sketch, this.sys, this.X, this.run, this.env, { moved: [], fixed: this.sys.order.slice(), drag: { ref, iterations: 0, note: `${ref} is fixed` } });
+    const X = Float64Array.from(this.X), cl = this.run.clusters[k], r0 = this.run.results[k];
+    const cons = r0.activeCons.filter(c => !(c.status === 'redundant' && !c.partial));
+    const t0 = performance.now();
+    const info = dragCluster(this.sys, X, cl, cons, H, target);
+    const analysis = analyseCluster(this.sys, X, cl, r0.activeCons);
+    const results = this.run.results.slice();
+    results[k] = { ...r0, ...analysis, iters: info.iterations, residual: info.residual, converged: info.converged };
+    const moved = [], fixed = [];
+    for (const id of this.sys.order) {
+      const e = this.sys.entities.get(id);
+      (Object.values(e.p).some(i => Math.abs(X[i] - this.X[i]) > 1e-9) ? moved : fixed).push(id);
+    }
+    return new SolvedSketch(this.sketch, this.sys, X, { ...this.run, results }, this.env,
+      { moved, fixed, drag: { ref, to: target, cluster: k, iterations: info.iterations, ms: performance.now() - t0, residual: info.residual } });
+  }
+
+  toSketchData() {
+    return {
+      id: this.id, plane: this.plane(), dof: this.dof, status: this.status, rank: this.rank, n: this.n,
+      entities: this.entityData(), constraints: this.constraintData(),
+      conflicts: this.conflicts, redundant: this.redundant,
+      clusters: this.run.clusters.map((c, k) => ({ index: k, entities: c.entities, dof: this.run.results[k].dof, solver: this.run.results[k].used, iterations: this.run.results[k].iters })),
+      profiles: this.arrangement.profiles.map(p => ({ id: p.id, loops: p.loops, segments: p.segments, area: p.area, outer: 0 })),
+      diagnostics: this.diagnostics,
+      ...(this.moved ? { moved: this.moved, fixed: this.fixed, drag: this.dragInfo } : {}),
+    };
+  }
+  plane() {
+    const pl = this.env.plane ?? this.sketch.on;
+    if (pl && typeof pl.toPlaneData === 'function') return pl.toPlaneData();
+    return { origin: [0, 0, 0], x: [1, 0, 0], y: [0, 1, 0], normal: [0, 0, 1], deferred: !!pl };
+  }
+  ir() {
+    const ents = this.sys.order.map(id => { const e = this.sys.entities.get(id); return `${id} ${e.kind} ${Object.values(e.p).filter(i => !this.sys.fixed[i]).length}`; });
+    const counts = new Map();
+    for (const c of this.sys.cons) if (c.eqs?.length && !c.driven) { const k = c.type; const v = counts.get(k) ?? [0, 0]; counts.set(k, [v[0] + 1, v[1] + c.eqs.length]); }
+    const eqs = [...counts].map(([k, [n, m]]) => `${k}${n > 1 ? '×' + n : ''} (${m})`);
+    const m = [...counts.values()].reduce((s, v) => s + v[1], 0);
+    const solved = this.entityData().slice(0, 16).map(e => e.kind === 'line' ? `${e.id} (${e.a.map(fmtNum)})→(${e.b.map(fmtNum)})` : e.kind === 'arc' || e.kind === 'circle' ? `${e.id} c(${e.c.map(fmtNum)}) r${fmtNum(e.r)}` : e.kind === 'point' ? `${e.id} (${e.p.map(fmtNum)})` : `${e.id} ${e.kind}`);
+    const its = this.run.results.reduce((s, r) => s + r.iters, 0), res = Math.max(0, ...this.run.results.map(r => r.residual));
+    const solverName = [...new Set(this.run.results.filter(r => r.used).map(r => r.used))].join('/') || 'none';
+    return [
+      `sketch ${this.id} (L3) on ${this.sketch.on?.name ?? 'plane'} · solver ${solverName} · ${this.run.clusters.length} cluster${this.run.clusters.length === 1 ? '' : 's'} · ${its} iterations · residual ${res.toExponential(0)}`,
+      `  entities   ${ents.join(' · ')}   Σ ${this.n}`,
+      `  equations  ${eqs.join(' · ')}   Σ ${m}`,
+      `  rank ${this.rank} · dof ${this.dof} · status ${this.status}${this.conflicts.length ? ` · conflicts ${this.conflicts.map(s => '{' + s.join(', ') + '}').join(' ')}` : ''}${this.redundant.length ? ` · redundant ${this.redundant.join(', ')}` : ''}`,
+      `  solved     ${solved.join(' · ')}`,
+      `  profiles   ${this.arrangement.profiles.map(p => `${p.id} ${fmtNum(p.area)} mm²`).join(' · ') || 'none'}`,
+    ].join('\n');
+  }
+}
+
+function regionOf(p) {
+  return Object.freeze({
+    kind: 'region', id: p.id, area: mm(1).mul(mm(p.area)), areaValue: p.area, loops: p.loops, segments: p.segments, holes: p.loops.length - 1,
+    srcs: p.srcs, outerSrcs: [...new Set(p.segments[0].map(s => s.src))], contains: p.contains, depth: p.depth,
+    toJSON() { return { id: p.id, area: p.area, loops: p.loops.length }; },
+  });
+}
+function summarise(ids) {
+  const byType = new Map();
+  for (const id of ids) { const t = id.split('(')[0]; if (!byType.has(t)) byType.set(t, []); byType.get(t).push(id); }
+  return [...byType].map(([t, l]) => (l.length > 1 ? `${t}×${l.length}` : l[0])).join(' + ');
+}
+function compactNames(names) {
+  const s = new Set(names);
+  const out = [];
+  for (const p of ['start', 'end', 'center']) if (s.has(`${p}.x`) && s.has(`${p}.y`)) { out.push(p); s.delete(`${p}.x`); s.delete(`${p}.y`); }
+  return [...out, ...s].join(', ');
+}
+function reverseSeg(s) {
+  if (s.kind === 'line') return { ...s, a: s.b, b: s.a };
+  if (s.kind === 'arc') return { ...s, a0: s.a1, a1: s.a0, ccw: !s.ccw, a: s.b, b: s.a };
+  if (s.kind === 'spline') return { ...s, pts: s.pts.slice().reverse() };
+  return s;
+}
+function sampleArcSeg(s) {
+  const sw = s.ccw ? sweepCCW(s.a0, s.a1) : -sweepCCW(s.a1, s.a0);
+  const n = Math.max(8, Math.ceil(Math.abs(sw) / (Math.PI / 90)));
+  return Array.from({ length: n + 1 }, (_, i) => polar(s.c, s.r, s.a0 + (sw * i) / n));
+}
+// constraints.js · j.c.* constructors and the equations each constraint contributes (README §4.5).
+// Every equation is { vars, f(x) } over the sketch's parameter vector; residuals are in mm or radians.
+import { sub, dot, cross, len, wrapPi, TAU } from './geom2d.js';
+
+const C = (type, refs, value = null, opts = {}) => Object.freeze({ kind: 'constraint', type, refs: Object.freeze(refs), value, opts: Object.freeze({ ...opts }) });
+export const c = {
+  coincident: (a, b, o) => C('coincident', [a, b], null, o),
+  horizontal: (a, b, o) => C('horizontal', b == null || typeof b === 'object' ? [a] : [a, b], null, typeof b === 'object' ? b : o),
+  vertical: (a, b, o) => C('vertical', b == null || typeof b === 'object' ? [a] : [a, b], null, typeof b === 'object' ? b : o),
+  parallel: (a, b, o) => C('parallel', [a, b], null, o),
+  perpendicular: (a, b, o) => C('perpendicular', [a, b], null, o),
+  tangent: (a, b, o = {}) => C('tangent', [a, b], null, o),
+  equal: (a, b, o) => C('equal', [a, b], null, o),
+  symmetric: (a, b, axis, o) => C('symmetric', [a, b, axis], null, o),
+  midpoint: (p, l, o) => C('midpoint', [p, l], null, o),
+  concentric: (a, b, o) => C('concentric', [a, b], null, o),
+  collinear: (a, b, o) => C('collinear', [a, b], null, o),
+  on: (p, curve, o) => C('on', [p, curve], null, o),
+  fix: (a, at = null, o) => C('fix', [a], at, o),
+  distance: (a, b, d, o) => C('distance', [a, b], d, o),
+  distanceX: (a, b, d, o) => C('distanceX', [a, b], d, o),
+  distanceY: (a, b, d, o) => C('distanceY', [a, b], d, o),
+  angle: (a, b, th, o) => C('angle', [a, b], th, o),
+  radius: (a, r, o) => C('radius', [a], r, o),
+  diameter: (a, d, o) => C('diameter', [a], d, o),
+  length: (l, d, o) => C('length', [l], d, o),
+};
+export const VALUE_KIND = { distance: 'length', distanceX: 'length', distanceY: 'length', angle: 'angle', radius: 'length', diameter: 'length', length: 'length', fix: 'point' };
+
+const uni = (...lists) => [...new Set(lists.flat())];
+const eq = (vars, f) => ({ vars, f });
+const P = h => h.get;                         // point getter
+const dirOf = L => x => sub(L.b.get(x), L.a.get(x));
+const isLine = h => h.kind === 'line';
+const isCirc = h => h.kind === 'circle' || h.kind === 'arc';
+const isPoint = h => h.kind === 'point';
+const centerOf = h => (h.kind === 'point' ? h : h.c);
+
+export class ConstraintError extends Error { constructor(m) { super(m); this.name = 'ConstraintError'; } }
+const bad = (type, hs) => { throw new ConstraintError(`${type} does not apply to ${hs.map(h => h.kind).join(' and ')}`); };
+
+// signed distance from point p to line (a → b), positive on the left
+const sdist = (p, a, b) => { const d = sub(b, a); return cross(d, sub(p, a)) / (len(d) || 1e-300); };
+const initSign = (v) => (v < -1e-12 ? -1 : 1);
+
+// equations(type, handles, value, x0, opts) → [{ vars, f }]; x0 = initial guess for side choices
+export function equations(type, hs, value, x0, opts = {}) {
+  const [A, B, X] = hs;
+  switch (type) {
+    case 'coincident': {
+      if (isPoint(A) && isPoint(B)) return pointEq(A, B);
+      if (isPoint(A)) return equations('on', [A, B], null, x0);
+      if (isPoint(B)) return equations('on', [B, A], null, x0);
+      if (isCirc(A) && isCirc(B)) return [...pointEq(A.c, B.c), eq(uni(A.r.vars, B.r.vars), x => A.r.get(x) - B.r.get(x))];
+      return bad(type, hs);
+    }
+    case 'horizontal': case 'vertical': {
+      const k = type === 'horizontal' ? 1 : 0;
+      if (hs.length === 1 && isLine(A)) return [eq(A.vars, x => A.b.get(x)[k] - A.a.get(x)[k])];
+      if (hs.length === 2 && isPoint(A) && isPoint(B)) return [eq(uni(A.vars, B.vars), x => B.get(x)[k] - A.get(x)[k])];
+      return bad(type, hs);
+    }
+    case 'parallel': case 'perpendicular': {
+      if (!isLine(A) || !isLine(B)) return bad(type, hs);
+      const dA = dirOf(A), dB = dirOf(B), op = type === 'parallel' ? cross : dot;
+      return [eq(uni(A.vars, B.vars), x => { const u = dA(x), v = dB(x); return op(u, v) / ((len(u) * len(v)) || 1e-300); })];
+    }
+    case 'tangent': {
+      if (opts.shared) return tangentAtEnd(A, B, opts.shared);
+      if (isLine(A) && isCirc(B)) return tangentLC(A, B, x0);
+      if (isCirc(A) && isLine(B)) return tangentLC(B, A, x0);
+      if (isCirc(A) && isCirc(B)) {
+        const d0 = len(sub(A.c.get(x0), B.c.get(x0))), r1 = A.r.get(x0), r2 = B.r.get(x0);
+        const external = Math.abs(d0 - (r1 + r2)) <= Math.abs(d0 - Math.abs(r1 - r2));
+        const s = initSign(r1 - r2);
+        return [eq(uni(A.vars, B.vars), x => {
+          const d = len(sub(A.c.get(x), B.c.get(x)));
+          return external ? d - (A.r.get(x) + B.r.get(x)) : d - s * (A.r.get(x) - B.r.get(x));
+        })];
+      }
+      if (isLine(A) && isLine(B)) return equations('parallel', [A, B], null, x0);
+      if (A.kind === 'spline' || B.kind === 'spline') return tangentSpline(A.kind === 'spline' ? A : B, A.kind === 'spline' ? B : A, x0);
+      return bad(type, hs);
+    }
+    case 'equal': {
+      if (isLine(A) && isLine(B)) { const dA = dirOf(A), dB = dirOf(B); return [eq(uni(A.vars, B.vars), x => len(dA(x)) - len(dB(x)))]; }
+      if (isCirc(A) && isCirc(B)) return [eq(uni(A.r.vars, B.r.vars), x => A.r.get(x) - B.r.get(x))];
+      if (A.kind === 'ellipse' && B.kind === 'ellipse') return [eq(uni(A.rx.vars, B.rx.vars), x => A.rx.get(x) - B.rx.get(x)), eq(uni(A.ry.vars, B.ry.vars), x => A.ry.get(x) - B.ry.get(x))];
+      return bad(type, hs);
+    }
+    case 'symmetric': {
+      if (isPoint(A) && isPoint(B)) return symPoints(A, B, X);
+      if (isLine(A) && isLine(B)) return [...symPoints(A.a, B.a, X), ...symPoints(A.b, B.b, X)];
+      if (isCirc(A) && isCirc(B)) return [...symPoints(A.c, B.c, X), eq(uni(A.r.vars, B.r.vars), x => A.r.get(x) - B.r.get(x))];
+      return bad(type, hs);
+    }
+    case 'symMid': {   // midpoint of A, B on the axis line X (one equation)
+      return [eq(uni(A.vars, B.vars, X.vars), x => { const m = A.get(x), n = B.get(x); return sdist([(m[0] + n[0]) / 2, (m[1] + n[1]) / 2], X.a.get(x), X.b.get(x)); })];
+    }
+    case 'midpoint': {
+      let p = A, l = B;
+      if (!isPoint(p)) [p, l] = [B, A];
+      if (!isPoint(p)) return bad(type, hs);
+      if (isLine(l)) return [0, 1].map(k => eq(uni(p.vars, l.vars), x => p.get(x)[k] - (l.a.get(x)[k] + l.b.get(x)[k]) / 2));
+      if (l.kind === 'arc') return pointEq(p, l.mid);
+      return bad(type, hs);
+    }
+    case 'concentric': {
+      const a = A.kind === 'line' ? null : centerOf(A), b = B.kind === 'line' ? null : centerOf(B);
+      if (!a || !b) return bad(type, hs);
+      return pointEq(a, b);
+    }
+    case 'collinear': {
+      if (!isLine(A) || !isLine(B)) return bad(type, hs);
+      return [B.a, B.b].map(q => eq(uni(A.vars, q.vars), x => sdist(q.get(x), A.a.get(x), A.b.get(x))));
+    }
+    case 'on': {
+      let p = A, cv = B;
+      if (!isPoint(p)) [p, cv] = [B, A];
+      if (!isPoint(p)) return bad(type, hs);
+      if (isPoint(cv)) return pointEq(p, cv);
+      if (isLine(cv)) return [eq(uni(p.vars, cv.vars), x => sdist(p.get(x), cv.a.get(x), cv.b.get(x)))];
+      if (isCirc(cv)) return [eq(uni(p.vars, cv.c.vars, cv.r.vars), x => len(sub(p.get(x), cv.c.get(x))) - cv.r.get(x))];
+      if (cv.kind === 'ellipse') return [eq(uni(p.vars, cv.vars), x => {
+        const q = sub(p.get(x), cv.c.get(x)), ph = cv.phi.get(x), cp = Math.cos(ph), sp = Math.sin(ph);
+        const u = q[0] * cp + q[1] * sp, v = -q[0] * sp + q[1] * cp, rx = cv.rx.get(x), ry = cv.ry.get(x);
+        return (Math.hypot(u / rx, v / ry) - 1) * (rx + ry) / 2;
+      })];
+      return bad(type, hs);
+    }
+    case 'fix': {
+      const out = [];
+      const fixScalar = s => { const v0 = s.get(x0); out.push(eq(s.vars, x => s.get(x) - v0)); };
+      const fixPoint = (p, at = null) => { const v0 = at ?? p.get(x0); out.push(eq(p.vars, x => p.get(x)[0] - v0[0]), eq(p.vars, x => p.get(x)[1] - v0[1])); };
+      if (isPoint(A)) fixPoint(A, value);
+      else if (isLine(A)) { fixPoint(A.a); fixPoint(A.b); }
+      else if (A.kind === 'circle') { fixPoint(A.c); fixScalar(A.r); }
+      else if (A.kind === 'arc') { fixPoint(A.c); fixScalar(A.r); fixScalar(A.a0); fixScalar(A.a1); }
+      else if (A.kind === 'ellipse') { fixPoint(A.c); fixScalar(A.rx); fixScalar(A.ry); fixScalar(A.phi); }
+      else if (A.kind === 'spline') A.pts.forEach(p => fixPoint(p));
+      else if (A.kind === 'rigid') { fixPoint(A.c); fixScalar(A.th); }
+      else return bad(type, hs);
+      return out;
+    }
+    case 'distance': return distanceEq(A, B, value, x0);
+    case 'distanceX': case 'distanceY': {
+      const k = type === 'distanceX' ? 0 : 1;
+      const pa = isPoint(A) ? A : isLine(A) ? A.a : centerOf(A), pb = B ? (isPoint(B) ? B : isLine(B) ? B.a : centerOf(B)) : A.b;
+      const s = value >= 0 ? initSign(pb.get(x0)[k] - pa.get(x0)[k]) : 1;
+      return [eq(uni(pa.vars, pb.vars), x => s * (pb.get(x)[k] - pa.get(x)[k]) - value)];
+    }
+    case 'angle': {
+      const lineDir = h => (isLine(h) ? dirOf(h) : null);
+      const dA = lineDir(A), dB = lineDir(B);
+      if (!dA || !dB) return bad(type, hs);
+      const phi = x => { const u = dA(x), v = dB(x); return Math.atan2(cross(u, v), dot(u, v)); };
+      const p0 = phi(x0);
+      const cands = [value, -value, Math.PI - value, value - Math.PI];
+      let target = cands[0], best = Infinity;
+      for (const t of cands) { const e = Math.abs(wrapPi(p0 - t)); if (e < best - 1e-12) { best = e; target = t; } }
+      return [eq(uni(A.vars, B.vars), x => wrapPi(phi(x) - target))];
+    }
+    case 'radius': case 'diameter': {
+      if (!isCirc(A)) return bad(type, hs);
+      const k = type === 'radius' ? 1 : 2;
+      return [eq(A.r.vars, x => k * A.r.get(x) - value)];
+    }
+    case 'length': {
+      if (isLine(A)) { const d = dirOf(A); return [eq(A.vars, x => len(d(x)) - value)]; }
+      if (A.kind === 'arc') return [eq(A.vars, x => A.r.get(x) * sweep(A.a0.get(x), A.a1.get(x)) - value)];
+      return bad(type, hs);
+    }
+    // internal kinds used by helpers, mirror, pattern and offset
+    case 'mapPoint': {   // A = T·B  (value = 2D affine part of T: [m0, m1, m4, m5, m12, m13])
+      const [a, b, c2, d, e, f] = value;
+      return [eq(uni(A.vars, B.vars), x => { const p = B.get(x); return A.get(x)[0] - (a * p[0] + c2 * p[1] + e); }),
+        eq(uni(A.vars, B.vars), x => { const p = B.get(x); return A.get(x)[1] - (b * p[0] + d * p[1] + f); })];
+    }
+    case 'scalarRel': {  // A' = k·B + c (mod 2π when opts.angle)
+      const [k, c0] = value;
+      return [eq(uni(A.vars, B.vars), x => { const r = A.get(x) - (k * B.get(x) + c0); return opts.angle ? wrapPi(r) : r; })];
+    }
+    case 'mirrorAngle': { // A' + B = 2ψ(X) (mod 2π, or mod π when opts.half)
+      return [eq(uni(A.vars, B.vars, X.vars), x => {
+        const d = sub(X.b.get(x), X.a.get(x)), psi = Math.atan2(d[1], d[0]);
+        const r = A.get(x) + B.get(x) - 2 * psi;
+        return opts.half ? wrapPi(2 * r) / 2 : wrapPi(r);
+      })];
+    }
+    case 'perpEnd': {    // offset chain end: A on the normal through B's point S (value: 'line' | 'arc')
+      const S = X;       // the source endpoint
+      if (isLine(B)) return [eq(uni(A.vars, B.vars, S.vars), x => { const d = dirOf(B)(x); return dot(sub(A.get(x), S.get(x)), d) / (len(d) || 1e-300); })];
+      if (isCirc(B)) return [eq(uni(A.vars, B.vars, S.vars), x => { const c0 = B.c.get(x), u = sub(S.get(x), c0); return cross(sub(A.get(x), c0), u) / (len(u) || 1e-300); })];
+      return bad(type, hs);
+    }
+    case 'offsetLine': { // A ∥ B and signed distance of A to B = value
+      const dB = dirOf(B);
+      return [eq(uni(A.vars, B.vars), x => { const u = dirOf(A)(x), v = dB(x); return cross(u, v) / ((len(u) * len(v)) || 1e-300); }),
+        eq(uni(A.vars, B.vars), x => sdist(A.a.get(x), B.a.get(x), B.b.get(x)) - value)];
+    }
+    case 'offsetCirc': { // A concentric with B, rA = rB + value
+      return [...pointEq(A.c, B.c), eq(uni(A.r.vars, B.r.vars), x => A.r.get(x) - B.r.get(x) - value)];
+    }
+  }
+  throw new ConstraintError(`unknown constraint '${type}'`);
+}
+const sweep = (a0, a1) => { const s = ((a1 - a0) % TAU + TAU) % TAU; return s < 1e-12 ? TAU : s; };
+
+function pointEq(A, B) {
+  const v = uni(A.vars, B.vars);
+  return [eq(v, x => A.get(x)[0] - B.get(x)[0]), eq(v, x => A.get(x)[1] - B.get(x)[1])];
+}
+function symPoints(A, B, X) {
+  if (isPoint(X)) return [0, 1].map(k => eq(uni(A.vars, B.vars, X.vars), x => A.get(x)[k] + B.get(x)[k] - 2 * X.get(x)[k]));
+  if (!isLine(X)) throw new ConstraintError('symmetric needs a line or a point as the axis');
+  const v = uni(A.vars, B.vars, X.vars);
+  return [
+    eq(v, x => { const d = sub(X.b.get(x), X.a.get(x)); return dot(sub(B.get(x), A.get(x)), d) / (len(d) || 1e-300); }),
+    eq(v, x => { const m = A.get(x), n = B.get(x); return sdist([(m[0] + n[0]) / 2, (m[1] + n[1]) / 2], X.a.get(x), X.b.get(x)); }),
+  ];
+}
+function tangentLC(L, Cc, x0) {
+  const s = initSign(sdist(Cc.c.get(x0), L.a.get(x0), L.b.get(x0)));
+  return [eq(uni(L.vars, Cc.c.vars, Cc.r.vars), x => s * sdist(Cc.c.get(x), L.a.get(x), L.b.get(x)) - Cc.r.get(x))];
+}
+// tangency where the two curves share an endpoint: an angle condition (the distance form is singular there)
+function tangentAtEnd(A, B, shared) {
+  const endOf = (h, w) => (isLine(h) ? (w === 'start' ? h.a : h.b) : h[w]);
+  if (isLine(A) && isLine(B)) return equations('parallel', [A, B], null, null);
+  if (isLine(A) !== isLine(B)) {
+    const L = isLine(A) ? A : B, Cc = isLine(A) ? B : A, w = isLine(A) ? shared.b : shared.a;
+    const Pp = endOf(Cc, w), dL = dirOf(L);
+    return [eq(uni(L.vars, Cc.vars), x => { const d = dL(x), q = sub(Pp.get(x), Cc.c.get(x)); return dot(d, q) / ((len(d) * len(q)) || 1e-300); })];
+  }
+  const Pp = endOf(A, shared.a);
+  return [eq(uni(A.vars, B.vars), x => { const p = Pp.get(x), u = sub(p, A.c.get(x)), v = sub(p, B.c.get(x)); return cross(u, v) / ((len(u) * len(v)) || 1e-300); })];
+}
+function tangentSpline(S, O, x0) {
+  const n = S.pts.length;
+  const ends = [{ p: S.pts[0], q: S.pts[1] }, { p: S.pts[n - 1], q: S.pts[n - 2] }];
+  const near = h => { const pts = isLine(h) ? [h.a.get(x0), h.b.get(x0)] : isCirc(h) ? [h.start?.get(x0) ?? h.c.get(x0), h.end?.get(x0) ?? h.c.get(x0)] : [];
+    return e => Math.min(...pts.map(t => len(sub(t, e.p.get(x0))))); };
+  const score = near(O);
+  const e = score(ends[0]) <= score(ends[1]) ? ends[0] : ends[1];
+  const vars = uni(e.p.vars, e.q.vars, O.vars ?? []);
+  if (isLine(O)) return [eq(vars, x => { const t = sub(e.q.get(x), e.p.get(x)), d = dirOf(O)(x); return cross(t, d) / ((len(t) * len(d)) || 1e-300); })];
+  if (isCirc(O)) return [eq(uni(vars, O.c.vars), x => { const t = sub(e.q.get(x), e.p.get(x)), rr = sub(e.p.get(x), O.c.get(x)); return dot(t, rr) / ((len(t) * len(rr)) || 1e-300); })];
+  throw new ConstraintError('tangent to a spline needs a line or an arc');
+}
+function distanceEq(A, B, d, x0) {
+  if (isPoint(A) && isPoint(B)) return [eq(uni(A.vars, B.vars), x => len(sub(A.get(x), B.get(x))) - d)];
+  if (isPoint(A) && isLine(B) || isLine(A) && isPoint(B)) {
+    const p = isPoint(A) ? A : B, l = isLine(A) ? A : B;
+    const s = initSign(sdist(p.get(x0), l.a.get(x0), l.b.get(x0)));
+    return [eq(uni(p.vars, l.vars), x => s * sdist(p.get(x), l.a.get(x), l.b.get(x)) - d)];
+  }
+  if (isLine(A) && isLine(B)) {
+    const mid = x => { const a = B.a.get(x), b = B.b.get(x); return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; };
+    const s = initSign(sdist(mid(x0), A.a.get(x0), A.b.get(x0)));
+    return [eq(uni(A.vars, B.vars), x => s * sdist(mid(x), A.a.get(x), A.b.get(x)) - d)];
+  }
+  if ((isPoint(A) && isCirc(B)) || (isCirc(A) && isPoint(B))) {
+    const p = isPoint(A) ? A : B, cc = isCirc(A) ? A : B;
+    const s = initSign(len(sub(p.get(x0), cc.c.get(x0))) - cc.r.get(x0));
+    return [eq(uni(p.vars, cc.c.vars, cc.r.vars), x => s * (len(sub(p.get(x), cc.c.get(x))) - cc.r.get(x)) - d)];
+  }
+  if (isCirc(A) && isCirc(B)) return [eq(uni(A.c.vars, B.c.vars), x => len(sub(A.c.get(x), B.c.get(x))) - d)];
+  if ((isLine(A) && isCirc(B)) || (isCirc(A) && isLine(B))) {
+    const l = isLine(A) ? A : B, cc = isCirc(A) ? A : B;
+    const s = initSign(sdist(cc.c.get(x0), l.a.get(x0), l.b.get(x0)));
+    return [eq(uni(l.vars, cc.c.vars), x => s * sdist(cc.c.get(x), l.a.get(x), l.b.get(x)) - d)];
+  }
+  return bad('distance', [A, B]);
+}
+
+// measure the current value of a dimension (for driven dims and messages)
+export function measure(type, hs, x) {
+  const [A, B] = hs;
+  switch (type) {
+    case 'length': return isLine(A) ? len(sub(A.b.get(x), A.a.get(x))) : A.r.get(x) * sweep(A.a0.get(x), A.a1.get(x));
+    case 'radius': return A.r.get(x);
+    case 'diameter': return 2 * A.r.get(x);
+    case 'distanceX': case 'distanceY': {
+      const k = type === 'distanceX' ? 0 : 1;
+      const pa = isPoint(A) ? A : isLine(A) ? A.a : centerOf(A), pb = B ? (isPoint(B) ? B : isLine(B) ? B.a : centerOf(B)) : A.b;
+      return Math.abs(pb.get(x)[k] - pa.get(x)[k]);
+    }
+    case 'angle': { const u = sub(A.b.get(x), A.a.get(x)), v = sub(B.b.get(x), B.a.get(x)); return Math.abs(Math.atan2(cross(u, v), dot(u, v))); }
+    case 'distance': {
+      const eqs = distanceEq(A, B, 0, x);
+      return Math.abs(eqs[0].f(x));
+    }
+  }
+  return null;
+}

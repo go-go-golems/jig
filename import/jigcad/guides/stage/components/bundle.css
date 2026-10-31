@@ -1,0 +1,50 @@
+/* Form Skate Stage: the stage's DOM parts, as app/skate.css and app/kiln.css write them. Colours, type steps and
+   families come from tokens.css (st-* for the sheet, the workbench names for the hint line, menu and fail banner). */
+
+/* the preview frame's ground: the workbench body (kiln.css body) */
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--fs-s)/1.45 var(--font-display); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* the stage box: the canvas fills it; DOM parts float over it (skate.css) */
+.skate-stage { container: skstage / inline-size; position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--st-bg); outline: none; touch-action: none; cursor: grab; }
+.skate-stage:focus-visible { box-shadow: inset 0 0 0 2px var(--st-ink); }
+.skate-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* chips, top left (skate.css) */
+.chip-row { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; max-width: calc(100% - 24px); }
+.chip { pointer-events: auto; font: 600 10px/1 var(--font-plex); letter-spacing: 0.08em; border: 1px solid var(--st-ink); background: var(--st-bg); color: var(--st-ink); padding: 5px 8px; border-radius: 0; text-transform: uppercase; }
+.chip.on { background: var(--st-ink); color: var(--st-bg); }
+.chip.ghost { border-color: var(--st-major); color: var(--st-muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.chip.rec { border-color: var(--st-rec); color: var(--st-rec); }
+.chip.on.rec { background: var(--st-rec); border-color: var(--st-rec); color: var(--st-bg); }
+
+/* the trick toast, top right (skate.css) */
+.tricktoast { position: absolute; right: 12px; top: 12px; background: var(--st-bg); border: 1px solid var(--st-ink); padding: 8px 12px 7px; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; pointer-events: none; animation: tt 2.6s ease forwards; max-width: calc(100% - 24px); }
+.tricktoast b { font: 700 22px/1 var(--font-display); letter-spacing: -0.01em; text-transform: uppercase; color: var(--st-ink); white-space: nowrap; }
+.tricktoast span { font: 400 10.5px/1.3 var(--font-plex); color: var(--st-muted); white-space: nowrap; }
+.tricktoast.bad b { color: var(--st-rec); }
+@container skstage (max-width: 600px) { .tricktoast { top: 46px; } .tricktoast b { font-size: 18px; } }
+@keyframes tt { 0% { opacity: 0; transform: translateY(-6px); } 8% { opacity: 1; transform: none; } 82% { opacity: 1; } 100% { opacity: 0; } }
+
+/* the fail banner, bottom left: a button that opens the failing line (kiln.css .ovl-box, skate.css .failbanner) */
+.ovl-box { position: absolute; z-index: 2; background: var(--bg); border: 1px solid var(--hair); }
+.failbanner { top: auto; bottom: 12px; left: 12px; right: auto; max-width: min(560px, calc(100% - 24px)); background: var(--accent); color: var(--on-accent); border: 0; padding: 7px 12px; text-align: left; font-size: var(--fs-s); cursor: pointer; z-index: 3; }
+.failbanner b { font-weight: 700; }
+
+/* the hint line under the stage (kiln.css, skate.css) */
+.hint { flex: none; height: 30px; border-top: 1px solid var(--hair); display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: var(--fs-s); color: var(--ink-2); white-space: nowrap; overflow: hidden; }
+.hint b { color: var(--ink); font-weight: 700; }
+.hint span { overflow: hidden; text-overflow: ellipsis; }
+
+/* the overlay menu, "Show ▾" in the stage toolbar: the workbench menu (kiln.css .menu) with tick boxes (skate.css) */
+.menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 320px; max-height: 70vh; overflow: auto; background: var(--bg); border: 1px solid var(--ink); display: flex; flex-direction: column; padding: 4px 0; }
+.menu button { background: none; border: 0; text-align: left; padding: 7px 14px; display: flex; gap: 10px; align-items: baseline; font-size: var(--fs-s); border-radius: 0; }
+.menu button:hover { background: var(--fill); }
+.menu button.on { font-weight: 700; }
+.menu small { color: var(--ink-2); font-size: var(--fs-xs); }
+.menu.overlays { min-width: 280px; }
+.menu.overlays button { align-items: center; }
+.menu.overlays .box { width: 9px; height: 9px; border: 1px solid var(--ink-2); flex: none; }
+.menu.overlays .box.on { background: var(--ink); border-color: var(--ink); }
+.menu.overlays .t { min-width: 64px; }

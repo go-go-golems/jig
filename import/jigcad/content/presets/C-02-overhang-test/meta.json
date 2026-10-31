@@ -1,0 +1,19 @@
+{
+  "id": "C-02",
+  "title": "Overhang test",
+  "group": "Calibration",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "six ledges leaning 20° to 70° from vertical: print without supports and find the angle where your printer starts to droop",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Test 45° to 70° in 5° steps instead | Give my printer a 55° overhang limit and show what changes in the job | Explain why the 50° underside is reported and the 40° one is not",
+  "agent": {
+    "role": "a print-process engineer who designs test pieces that isolate one printer limit",
+    "prompt": "Prefer changing the angles list and h over new geometry; keep every ledge the same height so only the angle varies; never add supports or chamfers to the test faces.",
+    "fragments": {
+      "angles": "Keep angles in degrees from vertical, the convention of print.overhang and the printer's maxOverhang."
+    },
+    "defaultFragments": ["angles"]
+  }
+}

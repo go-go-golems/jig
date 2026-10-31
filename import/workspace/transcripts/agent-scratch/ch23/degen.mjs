@@ -1,0 +1,22 @@
+import { register } from 'node:module';
+register(new URL('file:///home/claude/jigcad/test/engine/loader.mjs').href);
+const { loadOC } = await import('/home/claude/jigcad/src/engine/oc.js');
+const K = await import('/home/claude/jigcad/src/engine/kernel.js');
+const { Body } = await import('/home/claude/jigcad/src/engine/body.js');
+const oc = await loadOC();
+const count = (name, shape) => {
+  const es = K.subShapes(shape, 'EDGE');
+  const deg = es.list.filter(e => oc.BRep_Tool.Degenerated(oc.TopoDS.Edge(e))).length;
+  const b = new Body('x', shape, K.subShapes(shape, 'FACE').list.map((_, i) => 'f' + i));
+  const t = b.topology();
+  const E2 = t.E - deg;
+  const chi = t.V - E2 + t.F - (t.L - t.F);
+  console.log(`${name}: reported ${JSON.stringify(t)}; degenerate edges ${deg}; without them E=${E2}, G=${t.S - chi / 2}`);
+};
+count('sphere r10', new oc.BRepPrimAPI_MakeSphere(10).Shape());
+const S = await import('/home/claude/jigcad/src/engine/shapes.js'); count('cone 10/0/20', S.cone(10, 0, 20).shape);
+const C = new oc.BRepPrimAPI_MakeBox(20, 20, 10).Shape();
+const mf = new oc.BRepFilletAPI_MakeFillet(C, oc.ChFi3d_FilletShape.ChFi3d_Rational);
+K.subShapes(C, 'EDGE').list.forEach(e => mf.Add(2, e));
+mf.Build(new oc.Message_ProgressRange());
+count('box 20x20x10, all edges r2', mf.Shape());

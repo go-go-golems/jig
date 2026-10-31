@@ -1,0 +1,6 @@
+[
+  { "name": "M2.5", "kind": "spacer", "d": 2.5, "od": 5, "lengths": [3, 5, 8, 10] },
+  { "name": "M3", "kind": "spacer", "d": 3, "od": 6, "lengths": [3, 5, 8, 10, 15] },
+  { "name": "M4", "kind": "spacer", "d": 4, "od": 8, "lengths": [5, 10, 15] },
+  { "name": "M3-hex", "kind": "standoff", "d": 3, "od": 7, "lengths": [10, 15, 20] }
+]

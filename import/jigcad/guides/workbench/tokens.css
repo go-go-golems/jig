@@ -1,0 +1,116 @@
+/* Form Skate Workbench — generated from tokens.json */
+:root, [data-theme="light"] {
+  --bg: #ffffff;
+  --fill: #f6f6f6;
+  --fill-2: #e6e6e6;
+  --ink: #1a1a1a;
+  --ink-2: #737373;
+  --grid: #f2f2f2;
+  --grid-major: #e4e4e4;
+  --accent: #e2001a;
+  --good: #1a1a1a;
+  --warn: #8c8c8c;
+  --stage: #ffffff;
+  --panel: #ffffff;
+  --hair: #d6d6d6;
+  --rule: #ededed;
+  --code-bg: #fbfbfb;
+  --sel: rgba(226, 0, 26, 0.10);
+  --tok-key: #1a1a1a;
+  --tok-str: #6b6b6b;
+  --tok-num: #1a1a1a;
+  --tok-expr: #e2001a;
+  --tok-com: #a3a3a3;
+  --tok-punc: #a3a3a3;
+  --on-accent: #ffffff;
+}
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --fill: #222222;
+  --fill-2: #3a3a3a;
+  --ink: #f2f2f2;
+  --ink-2: #9a9a9a;
+  --grid: #222222;
+  --grid-major: #2d2d2d;
+  --accent: #ff3b4a;
+  --good: #f2f2f2;
+  --warn: #9a9a9a;
+  --stage: #1a1a1a;
+  --panel: #1a1a1a;
+  --hair: #3d3d3d;
+  --rule: #2a2a2a;
+  --code-bg: #1d1d1d;
+  --sel: rgba(255, 59, 74, 0.16);
+  --tok-key: #f2f2f2;
+  --tok-str: #a6a6a6;
+  --tok-num: #f2f2f2;
+  --tok-expr: #ff3b4a;
+  --tok-com: #6e6e6e;
+  --tok-punc: #6e6e6e;
+  --on-accent: #ffffff;
+}
+:root {
+  --fs-xs: 10.5px;
+  --fs-s: 12px;
+  --fs-m: 13px;
+  --fs-l: 18px;
+  --fs-xl: 30px;
+  --space-2: 2px;
+  --space-3: 3px;
+  --space-4: 4px;
+  --space-5: 5px;
+  --space-6: 6px;
+  --space-7: 7px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-22: 22px;
+  --radius-0: 0;
+  --bar-h: 52px;
+  --strip-h: 40px;
+  --toolbar-min-h: 46px;
+  --control-h: 30px;
+  --control-h-sm: 24px;
+  --icon-btn: 32px;
+  --hint-h: 30px;
+  --row-min-h: 30px;
+  --editor-gutter: 54px;
+  --side-w: 288px;
+  --shelf-w: 230px;
+  --contents-w: 250px;
+  --doc-measure: 76ch;
+  --book-measure: 74ch;
+  --line: 1px;
+  --line-mark: 2px;
+  --line-part: 3px;
+  --font-ui: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  --font-code: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+.ui-body { font-family: var(--font-ui); font-size: 12px; line-height: 1.45; font-weight: 400; }
+.ui-small { font-family: var(--font-ui); font-size: 10.5px; line-height: 1.45; font-weight: 400; }
+.ui-tab { font-family: var(--font-ui); font-size: 13px; line-height: 1.2; font-weight: 400; }
+.block-title { font-family: var(--font-display); font-size: 13px; line-height: 1.2; font-weight: 700; }
+.brand { font-family: var(--font-display); font-size: 15px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; }
+.project-title { font-family: var(--font-ui); font-size: 14px; line-height: 1.2; font-weight: 700; }
+.pill-value { font-family: var(--font-ui); font-size: 14px; line-height: 1.2; font-weight: 700; }
+.bignum { font-family: var(--font-display); font-size: 26px; line-height: 1; font-weight: 700; letter-spacing: -0.01em; }
+.chapter-label { font-family: var(--font-display); font-size: 10.5px; line-height: 1; font-weight: 700; letter-spacing: 0.14em; }
+.group-label { font-family: var(--font-ui); font-size: 10.5px; line-height: 1.45; font-weight: 400; letter-spacing: 0.06em; }
+.doc-body { font-family: var(--font-ui); font-size: 13.5px; line-height: 1.65; font-weight: 400; }
+.book-body { font-family: var(--font-ui); font-size: 14px; line-height: 1.68; font-weight: 400; }
+.doc-h1 { font-family: var(--font-display); font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+.book-h1 { font-family: var(--font-display); font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+.doc-h2 { font-family: var(--font-display); font-size: 16px; line-height: 1.3; font-weight: 700; }
+.doc-h3 { font-family: var(--font-display); font-size: 13.5px; line-height: 1.35; font-weight: 700; }
+.doc-h4 { font-family: var(--font-display); font-size: 12px; line-height: 1.35; font-weight: 700; letter-spacing: 0.05em; }
+.caption { font-family: var(--font-ui); font-size: 12px; line-height: 1.5; font-weight: 400; }
+.code-editor { font-family: var(--font-code); font-size: 12px; line-height: 18px; font-weight: 400; }
+.code-block { font-family: var(--font-code); font-size: 11.5px; line-height: 1.5; font-weight: 400; }
+.code-inline { font-family: var(--font-code); font-size: 11px; line-height: 1.4; font-weight: 400; }
+.code-name { font-family: var(--font-code); font-size: 12px; line-height: 1.3; font-weight: 700; }
+.code-small { font-family: var(--font-code); font-size: 10.5px; line-height: 1.5; font-weight: 400; }

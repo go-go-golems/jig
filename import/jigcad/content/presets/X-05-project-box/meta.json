@@ -1,0 +1,20 @@
+{
+  "id": "X-05",
+  "title": "Project box",
+  "group": "Electronics",
+  "order": 5,
+  "difficulty": "medium",
+  "about": "a 90 × 60 × 35 mm box with insert bosses, a screw-on lid and a cable-gland hole: two bodies of one part on one plate",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add four M3 standoffs on the floor for a 50 × 40 mm board | Add a row of vent slots along both long sides",
+  "agent": {
+    "role": "an enclosure designer who keeps the parts of a box consistent by sharing their params",
+    "prompt": "Prefer one params object and one corner list for every part of an enclosure; use j.lib.insert(...).boss for screw bosses; never put a hole for a gland or connector where it meets a boss.",
+    "fragments": {
+      "glands": "Cable glands: PG7 12.5 mm, PG9 15.2 mm, PG11 18.6 mm, M12 12 mm, M16 16 mm holes.",
+      "inserts": "M3 heat-set inserts: 4.0 mm hole, 5.7 mm long; M2.5: 3.6 mm; M4: 5.6 mm."
+    },
+    "defaultFragments": ["inserts"]
+  }
+}

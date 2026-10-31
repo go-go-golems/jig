@@ -1,0 +1,19 @@
+{
+  "id": "C-05",
+  "title": "Hole sizes",
+  "group": "Calibration",
+  "order": 5,
+  "difficulty": "easy",
+  "about": "Ø2 to Ø10 mm holes drilled down through a plate and sideways through a wall: how small your printer makes holes, round and as teardrops",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add 2.5 and 3.5 mm for M2.5 and M3 screws | Print it on its back and explain what happens to the teardrops | Turn my measurements into a calibrate row and tell me the hole compensation",
+  "agent": {
+    "role": "a calibration engineer who measures how a printer reproduces holes",
+    "prompt": "Prefer editing the sizes list; keep test holes as j.hole.simple with nominal sizes; never apply a fit profile to the test itself.",
+    "fragments": {
+      "measure": "Measure sideways holes across their width; the teardrop tip is not part of the diameter."
+    },
+    "defaultFragments": ["measure"]
+  }
+}

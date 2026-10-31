@@ -1,0 +1,10 @@
+p='/home/claude/jigcad/content/book/22-brep-to-triangles.md'
+s=open(p).read()
+a="a 2 × 2 mm pin pushed straight through the web of a 30-tooth gear has every vertex of either mesh at least 7 mm from the other, and it is found by its long edges crossing the gear's side faces."
+b="a 2 × 2 mm pin pushed straight through the web of a 30-tooth gear has no vertex within 1.8 mm of the other mesh (its own are 7 mm from the gear's faces), and it is found by its long edges crossing the gear's side faces."
+assert a in s; s=s.replace(a,b); open(p,'w').write(s)
+p='/home/claude/jigcad/content/book/21-blends-offsets-shells.md'
+s=open(p).read()
+a="The kernel measures the plate and peg at 2,896.349541 mm³ without the fillet and 2,900.021684 mm³ with it, a difference of 3.672143322 mm³, equal to the closed form in all ten printed digits. The same formula holds at every radius the peg accepts:"
+b="The kernel measures 2,896.349541 mm³ without the fillet and 2,900.021684 mm³ with it, a difference of 3.672143322 mm³, equal to the closed form in all ten digits, and the same holds at every radius the peg accepts:"
+assert a in s; s=s.replace(a,b); open(p,'w').write(s); print(len(s.encode()))

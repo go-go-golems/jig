@@ -1,0 +1,20 @@
+{
+  "id": "X-04",
+  "title": "18650 cell holder",
+  "group": "Electronics",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "a tray for 18650 cells lying side by side with contact slots and tab holes; cell sizes from a table, bays from a count",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a channel under the floor for the wire that links the tabs in series | Add a lid that clips over the cells for a 2S pack",
+  "agent": {
+    "role": "a battery-pack designer who makes holders that keep cells and contacts in place",
+    "prompt": "Prefer cell sizes from cells.csv and bays patterned by a count; keep the rim 0.13–0.2 d above the cells' axis so it holds the cell; never let a contact slot meet a screw hole.",
+    "fragments": {
+      "cells": "Lithium-ion cells: 14500 Ø14.5 × 50.5, 18650 Ø18.6 × 65.2 (69 protected), 21700 Ø21.7 × 70.6 mm.",
+      "safety": "Mention that cells in parallel must be at the same voltage before they are connected."
+    },
+    "defaultFragments": ["cells"]
+  }
+}

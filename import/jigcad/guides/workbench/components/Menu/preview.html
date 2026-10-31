@@ -1,0 +1,48 @@
+<!-- @dsCard group="Navigation" height=500 width=1100 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Menu</title>
+<style>.demo{display:flex;gap:24px;padding:16px;align-items:flex-start}.demo .menu{position:static;margin-top:6px;max-height:none}.col{display:flex;flex-direction:column;align-items:flex-start}</style></head>
+<body>
+
+<div class="demo">
+  <div class="col">
+    <button class="projbtn" aria-expanded="true"><span class="pcode">B-01</span><span class="ptitle">Flatground</span><span class="caret">▾</span></button>
+    <div class="menu presets" style="min-width:360px">
+      <div class="grp">Basics</div>
+      <button class="on"><span class="code">B-01</span><span class="t">Flatground</span><small>The whole game, as the library ships it: a lot, a funbox, a board, a rider, fifteen tricks.</small></button>
+      <button><span class="code">B-02</span><span class="t">Push and carve</span><small>No tricks: pushing, rolling resistance, and how leaning a board makes it turn.</small></button>
+      <button><span class="code">B-03</span><span class="t">One step, phase by phase</span><small>What happens in 1/120 of a second: phases, the schedule, and reads that see the previous step.</small></button>
+      <div class="grp">Drafting</div>
+      <button><span class="code">D-03</span><span class="t">Onion skins and chronophotographs</span><small>Drawing motion in a still image: the history buffer, ghost decks, flight paths, dimension lines, and Marey.</small></button>
+      <hr>
+      <div class="mh">This project</div>
+      <button><span class="t">Export project</span><small>files, notes and settings as .json</small></button>
+      <button><span class="t">Import project…</span><small>a .json exported from here</small></button>
+    </div>
+  </div>
+  <div class="col">
+    <button class="btn sm" aria-expanded="true">Show <span class="dim">4</span> ▾</button>
+    <div class="menu overlays">
+      <button class="on"><span class="box on"></span><span class="t">Shadows</span><small>hatched sun shadows</small></button>
+      <button class="on"><span class="box on"></span><span class="t">Trail</span><small>onion skin of the last trick</small></button>
+      <button class="on"><span class="box on"></span><span class="t">Dims</span><small>dimension lines from take-off to landing</small></button>
+      <button class="on"><span class="box on"></span><span class="t">Grid</span><small>the floor grid</small></button>
+      <button><span class="box"></span><span class="t">Forces</span><small>leg force, foot guides</small></button>
+      <button><span class="box"></span><span class="t">Contacts</span><small>contact points and forces on the deck</small></button>
+    </div>
+  </div>
+  <div class="col">
+    <button class="btn sm" aria-expanded="true">Export <span class="caret">▾</span></button>
+    <div class="menu bexport">
+      <button><span class="t">The whole book as one web page</span><small>.html with maths, figures and contents; open it in a browser and print it for a PDF</small></button>
+      <button><span class="t">The whole book as an e-book</span><small>.epub for Apple Books, Kobo, Calibre and other readers</small></button>
+      <button><span class="t">The whole book as Markdown</span><small>one .md file; figures as inline SVG</small></button>
+      <hr>
+      <button><span class="t">This chapter as Markdown</span><small>Chapter 47: Drawing motion</small></button>
+      <p class="note">Links that drive the workbench become plain text outside it. Exported 2026-10-28.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

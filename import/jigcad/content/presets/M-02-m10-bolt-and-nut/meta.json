@@ -1,0 +1,19 @@
+{
+  "id": "M-02",
+  "title": "M10 bolt and nut",
+  "group": "Mechanisms",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "a fully threaded M10 × 25 hex bolt and its nut, both from j.lib.thread with a slide fit",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make an M12 version with a 1.75 mm pitch | Turn the bolt head into a star knob for a clamp | Explain how much clearance the thread fit leaves on each flank",
+  "agent": {
+    "role": "a fastener engineer who prints threads that turn by hand",
+    "prompt": "Prefer ISO sizes and j.lib.thread with a fit class; stand external threads upright; never lay a thread on its side.",
+    "fragments": {
+      "iso": "Take across-flats, head and nut heights from ISO 4017 and ISO 4032 and cite them in a comment."
+    },
+    "defaultFragments": ["iso"]
+  }
+}

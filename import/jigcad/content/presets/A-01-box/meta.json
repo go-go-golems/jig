@@ -1,0 +1,9 @@
+{
+  "id": "A-01",
+  "title": "A box with walls",
+  "group": "Foundations",
+  "about": "One sketch, one extrude, one shell: the shared 60 × 40 × 30 mm box with 2 mm walls.",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Explain where the name shell/inner[body/side[base.outline.bottom]] comes from | Add a 3 mm fillet to the vertical outside edges"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "H-09",
+  "title": "Measuring scoop",
+  "group": "Around the house",
+  "order": 9,
+  "difficulty": "medium",
+  "about": "a 30 ml scoop whose bowl radius is solved from its capacity, checked by compiling the inside as a solid; engraved handle",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make a set of 15, 30 and 60 ml scoops in one print job | Move the handle up to the rim with a 45° brace underneath",
+  "agent": {
+    "role": "a kitchen-tool designer who sizes vessels from their capacity and checks it",
+    "prompt": "Prefer solving sizes from the target volume in expressions; check every capacity change by compiling the inside as a solid; never round the rim, since the scoop is levelled there.",
+    "fragments": {
+      "check": "After a change, set SHOW to 'capacity', report the volume metric in ml, then set it back.",
+      "units": "Use 15 ml for a tablespoon, 5 ml for a teaspoon and 59 ml for a quarter US cup."
+    },
+    "defaultFragments": ["check"]
+  }
+}

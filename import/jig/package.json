@@ -1,0 +1,11 @@
+{
+  "name": "jig-design-sketch",
+  "version": "0.0.0",
+  "private": true,
+  "description": "jig: a composable grammar for parametric CAD. API design sketch (examples only, no kernel).",
+  "type": "module",
+  "scripts": {
+    "check": "for f in examples/*.js; do node --check \"$f\" || exit 1; done && echo \"all examples parse\"",
+    "verify": "python3 tools/verify-numbers.py"
+  }
+}

@@ -1,0 +1,11 @@
+// Tiny holes: a 100 × 60 × 3 mm plate with a grid of Ø1 mm holes and four Ø3.4 mm clearance holes.
+const g = j.sketch('g', { on: j.plane.offset(j.plane.XY, mm(3)) })
+  .circle('c', 0.5, { at: [-30, -15] })
+  .pattern(['c'], j.pattern.grid(j.dir('+X'), j.dir('+Y'), { count: [13, 7], step: [5, 5] }))
+const mnt = j.sketch('m', { on: j.plane.offset(j.plane.XY, mm(3)) })
+  .circle('c', 1.7, { at: [-45, -25] })
+  .pattern(['c'], j.pattern.mirror(j.axis.X).times(j.pattern.mirror(j.axis.Y)))
+return j.part('perf')
+  .extrude(j.sketch('p', { on: j.plane.XY }).rect('r', 100, 60, { center: true, r: 3 }).profiles(), mm(3), { id: 'plate' })
+  .cut(g.profiles(), mm(3), { id: 'perf' })
+  .cut(mnt.profiles(), mm(3), { id: 'mount' })

@@ -1,0 +1,20 @@
+{
+  "id": "H-01",
+  "title": "Plant pot and saucer",
+  "group": "Around the house",
+  "order": 1,
+  "difficulty": "medium",
+  "about": "a 115 mm revolved pot with drainage holes and a ribbed saucer sized from it: two parts, one plate, S/M/L configs",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a rolled lip to the pot's rim that still prints without support | Make a square pot with the same saucer logic",
+  "agent": {
+    "role": "a designer of printed planters who keeps pots and saucers sized from one set of params",
+    "prompt": "Prefer deriving the saucer from the pot's params over setting it; keep walls whole numbers of line widths and every side within 45°; never put a drainage hole over a saucer rib.",
+    "fragments": {
+      "plate": "After a size change, report the plate count and suggest a smaller saucer flare if the pair no longer fits one plate.",
+      "outdoor": "For pots that stay outside, use PETG or ASA and a 2.25 mm wall."
+    },
+    "defaultFragments": ["plate"]
+  }
+}

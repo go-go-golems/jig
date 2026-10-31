@@ -1,0 +1,20 @@
+{
+  "id": "S-10",
+  "title": "Phone stand",
+  "group": "First prints",
+  "order": 10,
+  "difficulty": "easy",
+  "about": "a 65° desk stand with a cable notch under the seat, its leaning back written in sin and cos of one angle",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Cut a window in the back to save filament without weakening the root | Add a config for a Nintendo Switch at 60°",
+  "agent": {
+    "role": "a designer of desk stands who keeps every profile driven by the tilt angle",
+    "prompt": "Prefer expressions in sin and cos of angle over fixed coordinates; keep the back within 45° of vertical when printed upright; never let the phone's centre of mass fall behind the base.",
+    "fragments": {
+      "device": "Ask for the device's thickness with its case and its height, and set phone and S from them.",
+      "cable": "Keep the notch at least 12 mm wide for USB-C and 9 mm for Lightning plugs."
+    },
+    "defaultFragments": ["device"]
+  }
+}

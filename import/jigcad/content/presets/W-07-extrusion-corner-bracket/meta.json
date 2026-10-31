@@ -1,0 +1,20 @@
+{
+  "id": "W-07",
+  "title": "Corner bracket for aluminium extrusion",
+  "group": "Workshop and repair",
+  "order": 7,
+  "difficulty": "medium",
+  "about": "an inside corner bracket for 2020, 3030 or 4040 extrusion from a table, with slot keys sized by a fit class",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a second screw to each leg for 4040 | Make a flat T-plate that joins three extrusions with the same keys",
+  "agent": {
+    "role": "a machine-frame designer who builds printed parts for T-slot extrusion",
+    "prompt": "Prefer rows in profiles.csv over new params; size keys as slot − 2 · gap; never leave a key face that looks down flatter than 45° in the print orientation.",
+    "fragments": {
+      "slots": "2020: 6.2 mm slot, M5; 3030 and 4040 (B-type): 8.2 mm slot, M6 and M8; V-slot 2020: 6.2 mm, M5.",
+      "orient": "Print brackets on their side with the web on the bed."
+    },
+    "defaultFragments": ["slots"]
+  }
+}

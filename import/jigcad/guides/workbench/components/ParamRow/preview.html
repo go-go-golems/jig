@@ -1,0 +1,17 @@
+<!-- @dsCard group="Inputs" height=200 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>ParamRow</title>
+<style>.wrap{border:1px solid var(--rule);margin:16px}</style></head>
+<body>
+
+<div class="wrap"><div class="paramlist">
+  <div class="psub">brake</div>
+  <div class="prow"><span class="pn" title="brake/force">foot brake <i>force</i></span><span class="pc"><input type="range" min="0" max="500" step="2.5" value="160" aria-label="foot brake"></span><span class="pv">160 N</span><button class="tabact" disabled title="default 160"></button></div>
+  <div class="psub">pop</div>
+  <div class="prow hl"><span class="pn" title="pop/snap">tail snap (nose-up spin the slam starts) <i>snap</i></span><span class="pc"><input type="range" min="0" max="30" step="0.1" value="20" aria-label="tail snap"></span><span class="pv">20 rad/s</span><button class="tabact" title="default 15">↺</button></div>
+  <div class="prow"><span class="pn" title="pop/jump">rider take-off speed <i>jump</i></span><span class="pc"><input type="range" min="0" max="4.5" step="0.05" value="3" aria-label="rider take-off speed"></span><span class="pv">3 m/s</span><button class="tabact" disabled title="default 3"></button></div>
+  <div class="prow"><span class="pn" title="pop/slide">front foot slide <i>slide</i></span><span class="pc"><input type="range" min="0" max="0.3" step="0.005" value="0.11" aria-label="front foot slide"></span><span class="pv">0.11 m</span><button class="tabact" disabled title="default 0.11"></button></div>
+</div></div>
+</body>
+</html>

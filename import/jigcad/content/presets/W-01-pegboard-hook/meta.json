@@ -1,0 +1,20 @@
+{
+  "id": "W-01",
+  "title": "Pegboard hook",
+  "group": "Workshop and repair",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "a hook for 1/4\" pegboard on 1\" centres: one side profile, chamfered so its square pegs pass a round hole",
+  "view": "front",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make it a double hook with two arms 30 mm apart | Add a third peg one hole to the side so the hook cannot swing",
+  "agent": {
+    "role": "a workshop-storage designer who builds pegboard fittings from one side profile",
+    "prompt": "Prefer changing the profile's expressions over adding features; keep the peg diagonal at least 0.3 mm under the hole; never print a hook standing up.",
+    "fragments": {
+      "standard": "Pegboard is 1/4 in (6.35 mm) holes on 1 in (25.4 mm) centres in 1/4 in or 1/8 in board; metric boards use 5 mm holes on 25 mm or 38 mm centres.",
+      "orient": "Print hooks on their side so the load runs along the layers."
+    },
+    "defaultFragments": ["standard"]
+  }
+}

@@ -1,0 +1,569 @@
+// ops.js · sketch operations that create entities and constraints: helpers (rect, polygon, slot), polyline,
+// spline, ellipse, fillet, chamfer, trim, offset, mirror, pattern, import and external (project/intersect/text).
+import { addPoint, addLine, addCircle, addArc, setPoint, coordExprs } from './system.js';
+import { ConstraintError } from './constraints.js';
+import { sub, add, scale, dot, cross, len, norm, perp, polar, angleOf, sweepCCW, TAU, wrap2Pi, polyArea } from './geom2d.js';
+import { Pattern } from '../pattern.js';
+
+const PRIMITIVE_OPS = new Set(['point', 'line', 'polyline', 'arc', 'circle', 'ellipse', 'spline', 'text', 'import', 'trim']);
+export function runOp(sys, op) {
+  if (!PRIMITIVE_OPS.has(op.op)) return runOp_(sys, op);
+  const before = new Set(sys.order);
+  const out = runOp_(sys, op);
+  for (const id of sys.order) if (!before.has(id)) sys.entities.get(id).primitive = true;
+  return out;
+}
+function runOp_(sys, op) {
+  switch (op.op) {
+    case 'point': return addPoint(sys, op.id, op.at, { construction: !!op.construction });
+    case 'line': return addLine(sys, op.id, op.a, op.b);
+    case 'polyline': return polyline(sys, op.id, op.pts, op.closed);
+    case 'arc': return addArc(sys, op.id, op.spec);
+    case 'circle': return addCircle(sys, op.id, op.r, op.at);
+    case 'ellipse': {
+      const c = sys.posOf(op.at ?? [0, 0]);
+      sys.addEntity(op.id, 'ellipse', { cx: c[0], cy: c[1], rx: sys.numLen(op.rx), ry: sys.numLen(op.ry), phi: op.angle != null ? sys.numAng(op.angle) : 0 });
+      if (typeof op.at === 'string') sys.addCons({ type: 'coincident', refs: [`${op.id}.center`, op.at], src: 'implicit' });
+      return;
+    }
+    case 'spline': {
+      const pts = op.pts.map(p => sys.posOf(p)), params = {};
+      pts.forEach((p, k) => { params[`x${k}`] = p[0]; params[`y${k}`] = p[1]; });
+      sys.addEntity(op.id, 'spline', params, { meta: { n: pts.length, degree: op.degree ?? 3, fit: op.fit ?? 'interp', closed: !!op.closed } });
+      op.pts.forEach((p, k) => { if (typeof p === 'string') sys.addCons({ type: 'coincident', refs: [`${op.id}.p${k}`, p], src: 'implicit' }); });
+      return;
+    }
+    case 'rect': return rect(sys, op);
+    case 'polygon': return polygon(sys, op);
+    case 'slot': return slot(sys, op);
+    case 'fillet': return corner(sys, op, 'fillet');
+    case 'chamfer': return corner(sys, op, 'chamfer');
+    case 'trim': return trim(sys, op);
+    case 'offset': return offset(sys, op);
+    case 'mirror': return mirror(sys, op);
+    case 'pattern': return patternOp(sys, op);
+    case 'construction': for (const id of sys.expandIds(op.ids)) sys.entities.get(id).construction = op.value !== false; return;
+    case 'import': return importRegion(sys, op.id, op.region, {});
+    case 'project': case 'intersect': case 'text': return external(sys, op);
+    case 'constrain': op.cs.forEach((c, k) => { sys.consK = k; try { addUserConstraint(sys, c); } finally { sys.consK = null; } }); return;
+    case 'dim': return addDim(sys, op);
+  }
+  throw new ConstraintError(`unknown sketch op '${op.op}'`);
+}
+
+function polyline(sys, id, pts, closed) {
+  const n = pts.length, segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = i === 0 ? pts[0] : `${id}.${i}.end`;
+    const b = closed && i === segs - 1 ? `${id}.1.start` : pts[i + 1];
+    addLine(sys, `${id}.${i + 1}`, a, b, { group: id });
+  }
+}
+
+// ── helpers: entities plus the constraints for every dimension given ─────────
+function rect(sys, { id, w, h, at = null, center = false, r = null }) {
+  const W = sys.numLen(w, 20), H = sys.numLen(h, 10);
+  const A = at == null ? [0, 0] : sys.posOf(at);
+  const [x0, y0] = center ? [A[0] - W / 2, A[1] - H / 2] : A;
+  const x1 = x0 + W, y1 = y0 + H;
+  const g = { group: id };
+  const R = r == null ? 0 : sys.numLen(r);
+  if (!R) {
+    addLine(sys, `${id}.bottom`, [x0, y0], [x1, y0], g);
+    addLine(sys, `${id}.right`, `${id}.bottom.end`, [x1, y1], g);
+    addLine(sys, `${id}.top`, `${id}.right.end`, [x0, y1], g);
+    addLine(sys, `${id}.left`, `${id}.top.end`, `${id}.bottom.start`, g);
+    sys.aliases.set(`${id}.bl`, `${id}.bottom.start`); sys.aliases.set(`${id}.br`, `${id}.bottom.end`);
+    sys.aliases.set(`${id}.tr`, `${id}.right.end`); sys.aliases.set(`${id}.tl`, `${id}.top.end`);
+  } else {
+    addLine(sys, `${id}.bottom`, [x0 + R, y0], [x1 - R, y0], g);
+    addArc(sys, `${id}.br`, { center: [x1 - R, y0 + R], start: `${id}.bottom.end`, end: [x1, y0 + R] }, g);
+    addLine(sys, `${id}.right`, `${id}.br.end`, [x1, y1 - R], g);
+    addArc(sys, `${id}.tr`, { center: [x1 - R, y1 - R], start: `${id}.right.end`, end: [x1 - R, y1] }, g);
+    addLine(sys, `${id}.top`, `${id}.tr.end`, [x0 + R, y1], g);
+    addArc(sys, `${id}.tl`, { center: [x0 + R, y1 - R], start: `${id}.top.end`, end: [x0, y1 - R] }, g);
+    addLine(sys, `${id}.left`, `${id}.tl.end`, [x0, y0 + R], g);
+    addArc(sys, `${id}.bl`, { center: [x0 + R, y0 + R], start: `${id}.left.end`, end: `${id}.bottom.start` }, g);
+    for (const [l, a] of [['bottom', 'br'], ['right', 'br'], ['right', 'tr'], ['top', 'tr'], ['top', 'tl'], ['left', 'tl'], ['left', 'bl'], ['bottom', 'bl']])
+      sys.addCons({ type: 'tangent', refs: [`${id}.${l}`, `${id}.${a}`], src: 'implicit' });
+    for (const a of ['br', 'tr', 'tl']) sys.addCons({ type: 'equal', refs: [`${id}.bl`, `${id}.${a}`], src: 'implicit' });
+    sys.addCons({ type: 'radius', refs: [`${id}.bl`], value: r, src: 'helper', label: `radius(${id}) = ${r}` });
+  }
+  sys.addCons({ type: 'horizontal', refs: [`${id}.bottom`], src: 'implicit' });
+  sys.addCons({ type: 'horizontal', refs: [`${id}.top`], src: 'implicit' });
+  sys.addCons({ type: 'vertical', refs: [`${id}.left`], src: 'implicit' });
+  sys.addCons({ type: 'vertical', refs: [`${id}.right`], src: 'implicit' });
+  // centre point: midpoint of the diagonal (corner points, or corner-arc centres when rounded)
+  addPoint(sys, `${id}.center`, [(x0 + x1) / 2, (y0 + y1) / 2], { construction: true, group: id });
+  const d1 = R ? `${id}.bl.center` : `${id}.bottom.start`, d2 = R ? `${id}.tr.center` : `${id}.right.end`;
+  sys.addCons({ type: 'symmetric', refs: [d1, d2, `${id}.center`], src: 'implicit', id: `center(${id})` });
+  if (w != null) {
+    if (R) sys.addCons({ type: 'distance', refs: [`${id}.left`, `${id}.right`], value: w, src: 'helper', id: `dim(${id}.w)`, label: `width(${id}) = ${w}` });
+    else sys.addCons({ type: 'length', refs: [`${id}.bottom`], value: w, src: 'helper', id: `dim(${id}.w)`, label: `width(${id}) = ${w}` });
+  }
+  if (h != null) {
+    if (R) sys.addCons({ type: 'distance', refs: [`${id}.bottom`, `${id}.top`], value: h, src: 'helper', id: `dim(${id}.h)`, label: `height(${id}) = ${h}` });
+    else sys.addCons({ type: 'length', refs: [`${id}.left`], value: h, src: 'helper', id: `dim(${id}.h)`, label: `height(${id}) = ${h}` });
+  }
+  if (center) placeAt(sys, `${id}.center`, at ?? [0, 0], id);
+  else if (!R) placeAt(sys, `${id}.bottom.start`, at ?? [0, 0], id);
+  else placeAt(sys, null, null, id, at == null ? [0, 0] : typeof at === 'string' ? sys.posOf(at) : at);
+}
+// pin a helper's anchor: a ref target → coincidence; coordinates → coordinate constraints
+function placeAt(sys, ref, at, id, cornerAt = null) {
+  if (cornerAt != null) {
+    // rounded rect placed by its (virtual) corner: the arc centre sits at corner + (r, r); use the left/bottom lines instead
+    sys.addCons({ type: 'coord', refs: [`${id}.left.start`], value: Array.isArray(cornerAt) ? cornerAt[0] : 0, opts: { k: 0 }, src: 'helper', label: `x(${id}) = ${Array.isArray(cornerAt) ? cornerAt[0] : 0}` });
+    sys.addCons({ type: 'coord', refs: [`${id}.bottom.start`], value: Array.isArray(cornerAt) ? cornerAt[1] : 0, opts: { k: 1 }, src: 'helper', label: `y(${id}) = ${Array.isArray(cornerAt) ? cornerAt[1] : 0}` });
+    return;
+  }
+  if (typeof at === 'string') { sys.addCons({ type: 'coincident', refs: [ref, at], src: 'helper', id: `at(${id})` }); return; }
+  const p = at ?? [0, 0];
+  sys.addCons({ type: 'coord', refs: [ref], value: p[0], opts: { k: 0 }, src: 'helper', id: `x(${id})`, label: `x(${id}) = ${p[0]}` });
+  sys.addCons({ type: 'coord', refs: [ref], value: p[1], opts: { k: 1 }, src: 'helper', id: `y(${id})`, label: `y(${id}) = ${p[1]}` });
+}
+
+function polygon(sys, { id, n, r, at = null, inscribed = true }) {
+  n = Math.round(typeof n === 'number' ? n : sys.numLen(n));
+  if (n < 3) throw new ConstraintError(`polygon ${id}: needs at least 3 sides`);
+  const k = inscribed === false ? 1 / Math.cos(Math.PI / n) : 1;
+  const R = sys.numLen(r, 10) * k, C = at == null ? [0, 0] : sys.posOf(at);
+  const verts = Array.from({ length: n }, (_, i) => polar(C, R, -Math.PI / 2 - Math.PI / n + (i * TAU) / n));
+  const g = { group: id };
+  addPoint(sys, `${id}.center`, C, { construction: true, group: id });
+  addCircle(sys, `${id}.circle`, R, `${id}.center`, { construction: true, group: id });
+  for (let i = 0; i < n; i++) addLine(sys, `${id}.${i + 1}`, i ? `${id}.${i}.end` : verts[0], i === n - 1 ? `${id}.1.start` : verts[i + 1], g);
+  for (let i = 0; i < n; i++) sys.addCons({ type: 'on', refs: [`${id}.${i + 1}.start`, `${id}.circle`], src: 'implicit' });
+  for (let i = 1; i < n; i++) sys.addCons({ type: 'equal', refs: [`${id}.1`, `${id}.${i + 1}`], src: 'implicit' });
+  sys.addCons({ type: 'horizontal', refs: [`${id}.1`], src: 'implicit' });
+  if (r != null) {
+    const val = typeof r === 'number' ? r * k : (s) => s.numLen(r) * k;
+    sys.addCons({ type: 'radius', refs: [`${id}.circle`], value: val, src: 'helper', id: `dim(${id}.r)`, label: `${inscribed === false ? 'apothem' : 'radius'}(${id}) = ${r}`, opts: { canonical: typeof r === 'number', expr: typeof r === 'string' ? r : null } });
+  }
+  placeAt(sys, `${id}.center`, at ?? [0, 0], id);
+}
+
+function slot(sys, { id, a, b, width }) {
+  const A = sys.posOf(a), B = sys.posOf(b), Wd = sys.numLen(width, 4), r = Wd / 2;
+  const u = norm(sub(B, A)), nrm = perp(u);
+  const g = { group: id };
+  addLine(sys, `${id}.l1`, sub(A, scale(nrm, r)), sub(B, scale(nrm, r)), g);
+  addLine(sys, `${id}.l2`, add(B, scale(nrm, r)), add(A, scale(nrm, r)), g);
+  addArc(sys, `${id}.a1`, { center: B, start: `${id}.l1.end`, end: `${id}.l2.start` }, g);
+  addArc(sys, `${id}.a2`, { center: A, start: `${id}.l2.end`, end: `${id}.l1.start` }, g);
+  for (const [l, k] of [['l1', 'a1'], ['l1', 'a2'], ['l2', 'a1'], ['l2', 'a2']]) sys.addCons({ type: 'tangent', refs: [`${id}.${l}`, `${id}.${k}`], src: 'implicit' });
+  sys.addCons({ type: 'equal', refs: [`${id}.a1`, `${id}.a2`], src: 'implicit' });
+  sys.aliases.set(`${id}.a`, `${id}.a2.center`); sys.aliases.set(`${id}.b`, `${id}.a1.center`);
+  for (const [ref, v, nm] of [[`${id}.a2.center`, a, 'a'], [`${id}.a1.center`, b, 'b']]) {
+    if (typeof v === 'string') sys.addCons({ type: 'coincident', refs: [ref, v], src: 'helper', id: `${nm}(${id})` });
+    else { sys.addCons({ type: 'coord', refs: [ref], value: v[0], opts: { k: 0 }, src: 'helper', id: `${nm}.x(${id})` }); sys.addCons({ type: 'coord', refs: [ref], value: v[1], opts: { k: 1 }, src: 'helper', id: `${nm}.y(${id})` }); }
+  }
+  if (width != null) sys.addCons({ type: 'radius', refs: [`${id}.a1`], value: typeof width === 'number' ? width / 2 : s => s.numLen(width) / 2, opts: { canonical: typeof width === 'number', expr: typeof width === 'string' ? `${width} / 2` : null }, src: 'helper', id: `dim(${id}.width)`, label: `width(${id}) = ${width}` });
+}
+
+// ── corners: fillet and chamfer ─────────────────────────────────────────────
+function coincidentGroup(sys, ref) {
+  const parent = new Map();
+  const find = a => { while (parent.has(a) && parent.get(a) !== a) a = parent.get(a); return a; };
+  const unite = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); if (!parent.has(rb)) parent.set(rb, rb); };
+  for (const c of sys.cons) if (c.type === 'coincident' && c.refs.every(r => typeof r === 'string')) unite(sys.canon(c.refs[0]), sys.canon(c.refs[1]));
+  const root = find(sys.canon(ref));
+  const out = new Set([sys.canon(ref)]);
+  for (const k of parent.keys()) if (find(k) === root) out.add(k);
+  return out;
+}
+function corner(sys, { id, corner: cref, r, d }, kind) {
+  const group = coincidentGroup(sys, cref);
+  const ends = [...group].filter(rf => /\.(start|end)$/.test(rf) && sys.entityOf(rf)?.e.kind === 'line');
+  if (ends.length !== 2) { sys.diag('error', 'sketch.unsupported', `${kind} ${id}: '${cref}' must join exactly two lines (found ${ends.length})`); return; }
+  ends.sort((a, b) => sys.order.indexOf(sys.entityOf(a).e.id) - sys.order.indexOf(sys.entityOf(b).e.id));
+  const Cp = sys.posOf(ends[0]);
+  const other = rf => { const { e, sub: s } = sys.entityOf(rf); return `${e.id}.${s === 'start' ? 'end' : 'start'}`; };
+  const u = ends.map(rf => norm(sub(sys.posOf(other(rf)), Cp)));
+  const cosT = Math.max(-1, Math.min(1, dot(u[0], u[1]))), theta = Math.acos(cosT);
+  if (theta < 1e-6 || Math.PI - theta < 1e-6) { sys.diag('error', 'sketch.unsupported', `${kind} ${id}: the lines at '${cref}' are parallel`); return; }
+  const size = sys.numLen(kind === 'fillet' ? r : d, 1);
+  const t = kind === 'fillet' ? size / Math.tan(theta / 2) : size;
+  const T = u.map(v => add(Cp, scale(v, t)));
+  // drop the corner coincidences, re-target everything else at the virtual corner point
+  const cornerId = `${id}.corner`;
+  sys.cons = sys.cons.filter(c => !(c.type === 'coincident' && c.refs.every(rf => typeof rf === 'string' && group.has(sys.canon(rf)))));
+  addPoint(sys, cornerId, Cp, { construction: true, group: id });
+  for (const c of sys.cons) c.refs = c.refs.map(rf => (typeof rf === 'string' && group.has(sys.canon(rf)) ? cornerId : rf));
+  for (const [k, al] of [...sys.aliases]) if (group.has(sys.canon(al)) && !k.startsWith(id)) sys.aliases.set(k, cornerId);
+  ends.forEach((rf, k) => setPoint(sys, rf, T[k]));
+  for (const rf of ends) sys.addCons({ type: 'on', refs: [cornerId, sys.entityOf(rf).e.id], src: 'implicit' });
+  if (kind === 'fillet') {
+    const bis = norm(add(u[0], u[1])), O = add(Cp, scale(bis, size / Math.sin(theta / 2)));
+    const a0 = angleOf(O, T[0]), a1 = angleOf(O, T[1]);
+    const first = sweepCCW(a0, a1) < Math.PI ? 0 : 1;
+    addArc(sys, id, { center: O, start: ends[first], end: ends[1 - first] });
+    for (const rf of ends) sys.addCons({ type: 'tangent', refs: [sys.entityOf(rf).e.id, id], src: 'implicit' });
+    sys.addCons({ type: 'radius', refs: [id], value: r, src: 'helper', id: `dim(${id})`, label: `radius(${id}) = ${r}` });
+  } else {
+    addLine(sys, id, ends[0], ends[1]);
+    sys.addCons({ type: 'distance', refs: [cornerId, `${id}.start`], value: d, src: 'helper', id: `dim(${id}.a)` });
+    sys.addCons({ type: 'distance', refs: [cornerId, `${id}.end`], value: d, src: 'helper', id: `dim(${id}.b)` });
+  }
+}
+
+// ── trim: remove the piece of a line, arc or circle around `at`, between its neighbouring intersections ──
+function curveGeom(sys, e) {
+  const X = sys.x, P = e.p;
+  if (e.kind === 'line') return { kind: 'line', a: [X[P.ax], X[P.ay]], b: [X[P.bx], X[P.by]] };
+  if (e.kind === 'circle') return { kind: 'circle', c: [X[P.cx], X[P.cy]], r: X[P.r] };
+  if (e.kind === 'arc') return { kind: 'arc', c: [X[P.cx], X[P.cy]], r: X[P.r], a0: X[P.a0], a1: X[P.a1] };
+  return null;
+}
+function lineCircleT(a, b, c, r) {
+  const d = sub(b, a), f = sub(a, c);
+  const A = dot(d, d), B = 2 * dot(f, d), Cc = dot(f, f) - r * r, disc = B * B - 4 * A * Cc;
+  if (disc < 0) return [];
+  const s = Math.sqrt(disc);
+  return [(-B - s) / (2 * A), (-B + s) / (2 * A)];
+}
+function onArc(g, p) { if (g.kind !== 'arc') return true; return wrap2Pi(angleOf(g.c, p) - g.a0) <= sweepCCW(g.a0, g.a1) + 1e-9; }
+function trim(sys, { id, at }) {
+  const e = sys.entities.get(sys.canon(id));
+  if (!e || !['line', 'circle', 'arc'].includes(e.kind)) { sys.diag('error', 'sketch.unsupported', `trim ${id}: only lines, arcs and circles can be trimmed`); return; }
+  const G = curveGeom(sys, e), pick = sys.posOf(at);
+  const hits = [];      // { s (param), p, by }
+  for (const oid of sys.order) {
+    const o = sys.entities.get(oid);
+    if (oid === e.id || o.construction) continue;
+    const H = curveGeom(sys, o);
+    if (!H) continue;
+    for (const p of intersect2(G, H)) if (onArc(H, p) && (H.kind !== 'line' || segParam(H, p) >= -1e-9 && segParam(H, p) <= 1 + 1e-9)) hits.push({ p, by: oid });
+  }
+  const param = p => (G.kind === 'line' ? segParam(G, p) : G.kind === 'arc' ? wrap2Pi(angleOf(G.c, p) - G.a0) : wrap2Pi(angleOf(G.c, p)));
+  const span = G.kind === 'line' ? 1 : G.kind === 'arc' ? sweepCCW(G.a0, G.a1) : TAU;
+  const inside = hits.map(h => ({ ...h, s: param(h.p) })).filter(h => h.s > 1e-9 && h.s < span - 1e-9).sort((a, b) => a.s - b.s);
+  const s0 = param(pick);
+  if (!inside.length) { sys.removeEntity(e.id); sys.diag('info', 'sketch.trim', `trim ${id}: no intersections, the whole curve was removed`); return; }
+  if (G.kind === 'circle') {
+    if (inside.length < 2) { sys.diag('error', 'sketch.unsupported', `trim ${id}: a circle needs two intersections`); return; }
+    let lo = inside[inside.length - 1], hi = inside[0];
+    for (let i = 0; i + 1 < inside.length; i++) if (s0 > inside[i].s && s0 < inside[i + 1].s) { lo = inside[i]; hi = inside[i + 1]; }
+    // the kept arc runs ccw from hi to lo
+    e.kind = 'arc';
+    e.p.a0 = sys.param(e.id, 'a0', hi.s); e.p.a1 = sys.param(e.id, 'a1', hi.s + sweepCCW(hi.s, lo.s));
+    sys.addCons({ type: 'on', refs: [`${e.id}.start`, hi.by], src: 'implicit' });
+    sys.addCons({ type: 'on', refs: [`${e.id}.end`, lo.by], src: 'implicit' });
+    return;
+  }
+  const before = inside.filter(h => h.s < s0), after = inside.filter(h => h.s > s0);
+  const lo = before[before.length - 1], hi = after[0];
+  const dropRefs = r => sys.cons = sys.cons.filter(c => !c.refs.includes(r));
+  if (!lo && hi) { dropRefs(`${e.id}.start`); setPoint(sys, `${e.id}.start`, hi.p); sys.addCons({ type: 'on', refs: [`${e.id}.start`, hi.by], src: 'implicit' }); }
+  else if (lo && !hi) { dropRefs(`${e.id}.end`); setPoint(sys, `${e.id}.end`, lo.p); sys.addCons({ type: 'on', refs: [`${e.id}.end`, lo.by], src: 'implicit' }); }
+  else {
+    const nid = `${e.id}.2`, endRef = `${e.id}.end`;
+    const endPos = sys.posOf(endRef);
+    if (e.kind === 'line') addLine(sys, nid, hi.p, endPos);
+    else addArc(sys, nid, { center: G.c, start: hi.p, end: endPos });
+    for (const c of sys.cons) c.refs = c.refs.map(r => (r === endRef ? `${nid}.end` : r));
+    setPoint(sys, endRef, lo.p);
+    sys.addCons({ type: 'on', refs: [endRef, lo.by], src: 'implicit' });
+    sys.addCons({ type: 'on', refs: [`${nid}.start`, hi.by], src: 'implicit' });
+    sys.addCons({ type: e.kind === 'line' ? 'collinear' : 'coincident', refs: e.kind === 'line' ? [e.id, nid] : [`${e.id}.center`, `${nid}.center`], src: 'implicit' });
+    if (e.kind === 'arc') sys.addCons({ type: 'equal', refs: [e.id, nid], src: 'implicit' });
+  }
+}
+const segParam = (L, p) => { const d = sub(L.b, L.a); return dot(sub(p, L.a), d) / (dot(d, d) || 1e-300); };
+export function intersect2(G, H) {
+  if (G.kind === 'line' && H.kind === 'line') {
+    const d1 = sub(G.b, G.a), d2 = sub(H.b, H.a), den = cross(d1, d2);
+    if (Math.abs(den) < 1e-12) return [];
+    const t = cross(sub(H.a, G.a), d2) / den;
+    return [add(G.a, scale(d1, t))];
+  }
+  if (G.kind === 'line') return lineCircleT(G.a, G.b, H.c, H.r).map(t => add(G.a, scale(sub(G.b, G.a), t)));
+  if (H.kind === 'line') return intersect2(H, G);
+  const d = len(sub(H.c, G.c));
+  if (d < 1e-12 || d > G.r + H.r + 1e-9 || d < Math.abs(G.r - H.r) - 1e-9) return [];
+  const a = (G.r * G.r - H.r * H.r + d * d) / (2 * d), h = Math.sqrt(Math.max(0, G.r * G.r - a * a));
+  const u = norm(sub(H.c, G.c)), m = add(G.c, scale(u, a));
+  return h < 1e-12 ? [m] : [add(m, scale(perp(u), h)), sub(m, scale(perp(u), h))];
+}
+
+// ── offset: parametric, mitred joins (lines, arcs, circles) ───────────────────
+function offset(sys, { id, src, d }) {
+  const ids = sys.expandIds(src);
+  const D = sys.numLen(d, 1);
+  const ents = ids.map(i => sys.entities.get(i)).filter(e => {
+    if (e.construction || e.kind === 'point') return false;
+    if (['line', 'arc', 'circle'].includes(e.kind)) return true;
+    sys.diag('warning', 'sketch.unsupported', `offset ${id}: ${e.kind} ${e.id} is not offset (lines, arcs and circles only)`);
+    return false;
+  });
+  const st = { k: 0 };
+  for (const e of ents.filter(x => x.kind === 'circle')) {
+    const nid = `${id}.${++st.k}`, G = curveGeom(sys, e);
+    addCircle(sys, nid, Math.max(1e-6, G.r + D), G.c);
+    sys.addCons({ type: 'offsetCirc', refs: [nid, e.id], value: d, valueKind: 'length', src: 'helper', id: `offset(${nid})` });
+  }
+  const curves = ents.filter(e => e.kind !== 'circle');
+  for (const ch of orderChains(sys, curves, id)) offsetChain(sys, id, ch.chain, ch.fwd, ch.closed, D, st);
+}
+const endsOf = (sys, e) => { const G = curveGeom(sys, e); return G.kind === 'line' ? [G.a, G.b] : [polar(G.c, G.r, G.a0), polar(G.c, G.r, G.a1)]; };
+// order curves into paths by shared endpoints; each path gets a traversal direction per element
+function orderChains(sys, curves, id) {
+  if (!curves.length) return [];
+  const E = curves.map(e => endsOf(sys, e));
+  const scaleLen = Math.max(1, ...E.flat(2).map(Math.abs)), tol = 1e-6 * scaleLen;
+  const links = curves.map(() => [[], []]);        // links[i][end] = [{ j, end }]
+  for (let i = 0; i < curves.length; i++) for (let j = i + 1; j < curves.length; j++)
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) if (len(sub(E[i][a], E[j][b])) < tol) { links[i][a].push({ j, end: b }); links[j][b].push({ j: i, end: a }); }
+  if (links.some(L => L[0].length > 1 || L[1].length > 1)) { sys.diag('error', 'sketch.unsupported', `offset ${id}: the curves branch; offset one path at a time`); return []; }
+  const used = new Set(), out = [];
+  const walk = (s, fwd0) => {
+    const chain = [], fwd = [];
+    let i = s, f = fwd0;
+    while (i != null && !used.has(i)) {
+      used.add(i); chain.push(curves[i]); fwd.push(f);
+      const nx = links[i][f ? 1 : 0][0];
+      if (!nx) break;
+      i = nx.j; f = nx.end === 0;
+    }
+    const closed = chain.length > 1 && len(sub(endsOf(sys, chain[chain.length - 1])[fwd[fwd.length - 1] ? 1 : 0], endsOf(sys, chain[0])[fwd[0] ? 0 : 1])) < tol;
+    return { chain, fwd, closed };
+  };
+  // open paths start at a free end; then closed loops
+  for (let i = 0; i < curves.length; i++) if (!used.has(i) && (!links[i][0].length || !links[i][1].length)) out.push(walk(i, !links[i][0].length));
+  for (let i = 0; i < curves.length; i++) if (!used.has(i)) out.push(walk(i, true));
+  return out;
+}
+function offsetChain(sys, id, chain, fwd, closed, D, st) {
+  const ends = e => endsOf(sys, e);
+  const tEnd = i => ends(chain[i])[fwd[i] ? 1 : 0], tStart = i => ends(chain[i])[fwd[i] ? 0 : 1];
+  let left = D;
+  if (closed) {
+    const poly = [];
+    chain.forEach((e, i) => { poly.push(tStart(i)); const G = curveGeom(sys, e); if (G.kind === 'arc') poly.push(polar(G.c, G.r, G.a0 + sweepCCW(G.a0, G.a1) / 2)); });
+    left = polyArea(poly) > 0 ? -D : D;     // positive d grows a closed loop outwards
+  }
+  // offset geometry for initial guesses
+  const offs = chain.map((e, i) => {
+    const G = curveGeom(sys, e);
+    if (G.kind === 'line') { const dir = norm(sub(G.b, G.a)), n = scale(perp(dir), fwd[i] ? left : -left); return { kind: 'line', a: add(G.a, n), b: add(G.b, n) }; }
+    const rNew = fwd[i] ? G.r - left : G.r + left;
+    return { kind: 'arc', c: G.c, r: rNew, a0: G.a0, a1: G.a1 };
+  });
+  const startPt = (o, i) => (o.kind === 'line' ? (fwd[i] ? o.a : o.b) : polar(o.c, o.r, fwd[i] ? o.a0 : o.a1));
+  const endPt = (o, i) => (o.kind === 'line' ? (fwd[i] ? o.b : o.a) : polar(o.c, o.r, fwd[i] ? o.a1 : o.a0));
+  const n = chain.length, joints = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    if (j === 0 && !closed) break;
+    const A = offs[i], B = offs[j];
+    let p = null;
+    if (A.kind === 'line' && B.kind === 'line') p = intersect2(A, B)[0] ?? null;
+    joints[i] = p ?? scale(add(endPt(A, i), startPt(B, j)), 0.5);
+  }
+  const newIds = [];
+  chain.forEach((e, i) => {
+    const nid = `${id}.${++st.k}`, o = offs[i];
+    const s0 = i > 0 || closed ? joints[(i - 1 + n) % n] : startPt(o, i), t0 = i < n - 1 || closed ? joints[i] : endPt(o, i);
+    const [ps, pe] = fwd[i] ? [s0, t0] : [t0, s0];
+    if (o.kind === 'line') addLine(sys, nid, ps, pe);
+    else addArc(sys, nid, { center: o.c, start: ps, end: pe });
+    if (o.kind === 'line') sys.addCons({ type: 'offsetLine', refs: [nid, e.id], value: (fwd[i] ? 1 : -1) * left, valueKind: 'length', opts: { canonical: true }, src: 'helper', id: `offset(${nid})` });
+    else sys.addCons({ type: 'offsetCirc', refs: [nid, e.id], value: fwd[i] ? -left : left, valueKind: 'length', opts: { canonical: true }, src: 'helper', id: `offset(${nid})` });
+    newIds.push(nid);
+  });
+  const tRef = (i, which) => `${newIds[i]}.${(which === 'end') === fwd[i] ? 'end' : 'start'}`;
+  const sRef = (i, which) => `${chain[i].id}.${(which === 'end') === fwd[i] ? 'end' : 'start'}`;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    if (j === 0 && !closed) break;
+    sys.addCons({ type: 'coincident', refs: [tRef(i, 'end'), tRef(j, 'start')], src: 'implicit' });
+  }
+  if (!closed) {
+    sys.addCons({ type: 'perpEnd', refs: [tRef(0, 'start'), chain[0].id, sRef(0, 'start')], src: 'implicit' });
+    sys.addCons({ type: 'perpEnd', refs: [tRef(n - 1, 'end'), chain[n - 1].id, sRef(n - 1, 'end')], src: 'implicit' });
+    // end caps close the stroke, so an offset open path is a profile (a thickened wire)
+    addLine(sys, `${id}.cap${st.k}a`, sRef(0, 'start'), tRef(0, 'start'));
+    addLine(sys, `${id}.cap${st.k}b`, sRef(n - 1, 'end'), tRef(n - 1, 'end'));
+  }
+  if (n > 1) sys.decisions.push({ at: `${sys.id}/${id}`, kind: 'sketch.offset', chose: 'mitre', alternatives: ['round'], reason: `offset joins are mitred (offset curves meet)${closed ? '' : '; the open path is closed with end caps'}` });
+}
+
+// ── mirror and pattern: parametric copies ────────────────────────────────────
+function copyEntity(sys, e, nid, mapPt, mapAng, mapPhi) {
+  const X = sys.x, P = e.p, opts = { construction: e.construction, group: e.group ? `${e.group}` : null };
+  switch (e.kind) {
+    case 'point': { const p = mapPt([X[P.x], X[P.y]]); sys.addEntity(nid, 'point', { x: p[0], y: p[1] }, opts); break; }
+    case 'line': { const a = mapPt([X[P.ax], X[P.ay]]), b = mapPt([X[P.bx], X[P.by]]); sys.addEntity(nid, 'line', { ax: a[0], ay: a[1], bx: b[0], by: b[1] }, opts); break; }
+    case 'circle': { const c = mapPt([X[P.cx], X[P.cy]]); sys.addEntity(nid, 'circle', { cx: c[0], cy: c[1], r: X[P.r] }, opts); break; }
+    case 'arc': {
+      const c = mapPt([X[P.cx], X[P.cy]]), [a0, a1] = mapAng(X[P.a0], X[P.a1]);
+      sys.addEntity(nid, 'arc', { cx: c[0], cy: c[1], r: X[P.r], a0, a1: a1 <= a0 ? a1 + TAU : a1 }, opts); break;
+    }
+    case 'ellipse': { const c = mapPt([X[P.cx], X[P.cy]]); sys.addEntity(nid, 'ellipse', { cx: c[0], cy: c[1], rx: X[P.rx], ry: X[P.ry], phi: mapPhi(X[P.phi]) }, opts); break; }
+    case 'spline': {
+      const params = {};
+      for (let k = 0; k < e.meta.n; k++) { const p = mapPt([X[P[`x${k}`]], X[P[`y${k}`]]]); params[`x${k}`] = p[0]; params[`y${k}`] = p[1]; }
+      sys.addEntity(nid, 'spline', params, { ...opts, meta: e.meta }); break;
+    }
+    default: throw new ConstraintError(`cannot copy ${e.kind} ${e.id}`);
+  }
+}
+function definingPoints(e) {
+  if (e.kind === 'point') return [''];
+  if (e.kind === 'line') return ['.start', '.end'];
+  if (e.kind === 'circle' || e.kind === 'arc' || e.kind === 'ellipse') return ['.center'];
+  if (e.kind === 'spline') return Array.from({ length: e.meta.n }, (_, k) => `.p${k}`);
+  return [];
+}
+function mirror(sys, { src, axis }) {
+  const ids = sys.expandIds(src);
+  const AX = sys.handle(axis);
+  const isPt = AX.kind === 'point';
+  const x = Float64Array.from(sys.x);
+  let mapPt, psi = 0;
+  if (isPt) { const o = AX.get(x); mapPt = p => [2 * o[0] - p[0], 2 * o[1] - p[1]]; }
+  else if (AX.kind === 'line') {
+    const a = AX.a.get(x), b = AX.b.get(x), u = norm(sub(b, a)); psi = Math.atan2(u[1], u[0]);
+    mapPt = p => { const q = sub(p, a), t = dot(q, u); return add(a, sub(scale(u, 2 * t), q)); };
+  } else { sys.diag('error', 'sketch.ref', `mirror: axis '${axis}' must be a line or a point`); return; }
+  const mapAng = isPt ? (a0, a1) => [a0 + Math.PI, a1 + Math.PI] : (a0, a1) => [2 * psi - a1, 2 * psi - a0];
+  const mapPhi = isPt ? p => p : p => 2 * psi - p;
+  for (const sid of ids) {
+    const e = sys.entities.get(sid), nid = `${sid}.m`;
+    copyEntity(sys, e, nid, mapPt, mapAng, mapPhi);
+    for (const s of definingPoints(e)) sys.addCons({ type: 'symmetric', refs: [`${sid}${s}`, `${nid}${s}`, axis], src: 'implicit', id: `mirror(${nid}${s})` });
+    if (e.kind === 'circle' || e.kind === 'arc') sys.addCons({ type: 'equal', refs: [sid, nid], src: 'implicit' });
+    if (e.kind === 'ellipse') sys.addCons({ type: 'equal', refs: [sid, nid], src: 'implicit' });
+    if (e.kind === 'arc') {
+      if (isPt) for (const k of ['a0', 'a1']) sys.addCons({ type: 'scalarRel', refs: [`${nid}#${k}`, `${sid}#${k}`], value: [1, Math.PI], opts: { angle: true }, src: 'implicit' });
+      else { sys.addCons({ type: 'mirrorAngle', refs: [`${nid}#a0`, `${sid}#a1`, axis], src: 'implicit' }); sys.addCons({ type: 'mirrorAngle', refs: [`${nid}#a1`, `${sid}#a0`, axis], src: 'implicit' }); }
+    }
+    if (e.kind === 'ellipse' && !isPt) sys.addCons({ type: 'mirrorAngle', refs: [`${nid}#phi`, `${sid}#phi`, axis], opts: { half: true }, src: 'implicit' });
+  }
+}
+function patternOp(sys, { src, pattern }) {
+  if (!(pattern instanceof Pattern)) { sys.diag('error', 'sketch.ref', 'pattern: expected a j.pattern value'); return; }
+  const ids = sys.expandIds(src);
+  const ex = pattern.expand({ scope: sys.scope, dedupe: true });
+  if (ex.deferred) { sys.diag('warning', 'sketch.unsupported', 'path patterns are not supported inside sketches'); return; }
+  for (const inst of ex.instances) {
+    if (inst.tx.isIdentity) continue;
+    const m = inst.tx.m, T = [m[0], m[1], m[4], m[5], m[12], m[13]];
+    const det = m[0] * m[5] - m[4] * m[1], rot = Math.atan2(m[1], m[0]);
+    const mapPt = p => [T[0] * p[0] + T[2] * p[1] + T[4], T[1] * p[0] + T[3] * p[1] + T[5]];
+    const mapAng = det > 0 ? (a0, a1) => [a0 + rot, a1 + rot] : (a0, a1) => [rot - a1, rot - a0];
+    const mapPhi = det > 0 ? p => p + rot : p => rot - p;
+    for (const sid of ids) {
+      const e = sys.entities.get(sid), nid = `${sid}.p${inst.index}`;
+      if (sys.entities.has(nid)) continue;
+      copyEntity(sys, e, nid, mapPt, mapAng, mapPhi);
+      for (const s of definingPoints(e)) sys.addCons({ type: 'mapPoint', refs: [`${nid}${s}`, `${sid}${s}`], value: T, src: 'implicit', id: `pattern(${nid}${s})` });
+      if (e.kind === 'circle' || e.kind === 'arc' || e.kind === 'ellipse') sys.addCons({ type: 'equal', refs: [sid, nid], src: 'implicit' });
+      if (e.kind === 'arc') {
+        if (det > 0) for (const k of ['a0', 'a1']) sys.addCons({ type: 'scalarRel', refs: [`${nid}#${k}`, `${sid}#${k}`], value: [1, rot], opts: { angle: true }, src: 'implicit' });
+        else { sys.addCons({ type: 'scalarRel', refs: [`${nid}#a0`, `${sid}#a1`], value: [-1, rot], opts: { angle: true }, src: 'implicit' }); sys.addCons({ type: 'scalarRel', refs: [`${nid}#a1`, `${sid}#a0`], value: [-1, rot], opts: { angle: true }, src: 'implicit' }); }
+      }
+    }
+  }
+  if (ex.decisions.length) sys.decisions.push(...ex.decisions.map(dd => ({ ...dd, at: `${sys.id}/pattern` })));
+}
+
+// ── imported regions (rigid, 3 DOF) and external geometry (fixed) ────────────
+export function importRegion(sys, id, region, { fixed = false } = {}) {
+  const loops = regionLoops(region);
+  if (!loops.length) { sys.diag('error', 'sketch.unsupported', `import ${id}: the region has no loops`); return; }
+  let cx = 0, cy = 0, A = 0;
+  for (const L of loops) { const a = polyArea(L); const c = centroid(L); cx += c[0] * a; cy += c[1] * a; A += a; }
+  const C = Math.abs(A) > 1e-12 ? [cx / A, cy / A] : loops[0][0];
+  const local = loops.map(L => L.map(p => sub(p, C)));
+  sys.addEntity(id, 'rigid', { tx: C[0], ty: C[1], th: 0 }, { external: fixed, meta: { loops: local } });
+}
+function centroid(L) {
+  let a = 0, x = 0, y = 0;
+  for (let i = 0; i < L.length; i++) { const p = L[i], q = L[(i + 1) % L.length], c = p[0] * q[1] - q[0] * p[1]; a += c; x += (p[0] + q[0]) * c; y += (p[1] + q[1]) * c; }
+  return Math.abs(a) < 1e-12 ? L[0] : [x / (3 * a), y / (3 * a)];
+}
+function regionLoops(region) {
+  if (!region) return [];
+  if (Array.isArray(region)) return Array.isArray(region[0]?.[0]) ? region : [region];
+  if (typeof region.toLoops === 'function') return region.toLoops();
+  // a j.region (rect, circle, slot, polygon, text, booleans): its profile's loops of lines and arcs, as points
+  if (typeof region.toProfile === 'function') return region.toProfile().regions.flatMap(r => r.loops.map(loopPoints)).filter(L => L.length >= 3);
+  if (Array.isArray(region.loops)) return region.loops.flatMap(l => (Array.isArray(l[0]?.[0]) ? l : [l]));
+  if (Array.isArray(region.profiles)) return region.profiles.flatMap(p => p.loops);
+  return [];
+}
+function loopPoints(loop) {
+  const out = [];
+  for (const s of loop) {
+    if (s.kind === 'line') out.push(s.a);
+    else if (s.kind === 'circle' || s.kind === 'arc') {
+      const a0 = s.kind === 'circle' ? 0 : s.a0, a1 = s.kind === 'circle' ? 2 * Math.PI : s.a1;
+      let sw = a1 - a0; if (s.kind === 'arc') { if (s.ccw === false) { while (sw > 0) sw -= 2 * Math.PI; } else { while (sw < 0) sw += 2 * Math.PI; } }
+      const n = Math.max(4, Math.ceil(Math.abs(sw) / (Math.PI / 32)));
+      for (let k = 0; k < n; k++) { const t = a0 + sw * k / n; out.push([s.c[0] + s.r * Math.cos(t), s.c[1] + s.r * Math.sin(t)]); }
+    } else if (s.kind === 'bezier' && Array.isArray(s.pts)) {
+      // font outlines: sample the curve (de Casteljau), not its control polygon
+      for (let k = 0; k < 8; k++) { let q = s.pts.map(p => [...p]); const t = k / 8; while (q.length > 1) q = q.slice(1).map((p, i) => [q[i][0] + (p[0] - q[i][0]) * t, q[i][1] + (p[1] - q[i][1]) * t]); out.push(q[0]); }
+    } else if (Array.isArray(s.pts)) out.push(...s.pts.slice(0, -1));
+    else if (s.a) out.push(s.a);
+  }
+  return out;
+}
+function external(sys, op) {
+  const fn = sys.env.external;
+  if (!fn) {
+    sys.diag(op.op === 'text' ? 'warning' : 'info', 'sketch.unsupported', `${op.op} ${op.id}: needs the kernel (${op.op === 'text' ? 'fonts' : 'model topology'}); left empty`);
+    return;
+  }
+  const curves = fn(op.id, op.op, op.op === 'text' ? { str: op.str, ...op.opts } : { sel: op.sel }) ?? [];
+  if (op.op === 'text') { importRegion(sys, op.id, curves, { fixed: true }); return; }
+  const list = Array.isArray(curves) ? curves : [curves];
+  list.forEach((cv, i) => {
+    const nid = list.length === 1 ? op.id : `${op.id}.${i + 1}`, o = { external: true, construction: !!op.construction };
+    if (cv.kind === 'line') sys.addEntity(nid, 'line', { ax: cv.a[0], ay: cv.a[1], bx: cv.b[0], by: cv.b[1] }, o);
+    else if (cv.kind === 'circle') sys.addEntity(nid, 'circle', { cx: cv.c[0], cy: cv.c[1], r: cv.r }, o);
+    else if (cv.kind === 'arc') sys.addEntity(nid, 'arc', { cx: cv.c[0], cy: cv.c[1], r: cv.r, a0: cv.a0, a1: cv.a1 <= cv.a0 ? cv.a1 + TAU : cv.a1 }, o);
+    else if (cv.kind === 'point') sys.addEntity(nid, 'point', { x: cv.p[0], y: cv.p[1] }, o);
+    else if (cv.kind === 'spline') {
+      const params = {};
+      cv.pts.forEach((p, k) => { params[`x${k}`] = p[0]; params[`y${k}`] = p[1]; });
+      sys.addEntity(nid, 'spline', params, { ...o, meta: { n: cv.pts.length, degree: cv.degree ?? 3, fit: cv.fit ?? 'interp', closed: !!cv.closed } });
+    }
+  });
+}
+
+// ── user constraints and dimensions ─────────────────────────────────────────
+function addUserConstraint(sys, c) {
+  if (!c || c.kind !== 'constraint') { sys.diag('error', 'sketch.ref', `constrain: expected j.c.* values, got ${typeof c}`); return; }
+  sys.addCons({ type: c.type, refs: [...c.refs], value: c.value, src: 'user', id: c.opts?.id ?? null, opts: { ...c.opts }, driven: !!c.opts?.driven });
+}
+function addDim(sys, { target, value, driven }) {
+  let type, refs;
+  if (target && typeof target === 'object' && !Array.isArray(target)) {
+    if (target.h) { type = 'distanceX'; refs = target.h; }
+    else if (target.v) { type = 'distanceY'; refs = target.v; }
+    else { sys.diag('error', 'sketch.ref', `dim: bad target ${JSON.stringify(target)}`); return; }
+  } else if (Array.isArray(target)) {
+    refs = target;
+    const kinds = refs.map(r => sys.kindOf(r));
+    const isAngleVal = v => v && typeof v === 'object' && v.isQuantity && v.dims && v.dims.angle === 1;
+    if (kinds[0] === 'line' && kinds[1] === 'line') {
+      if (isAngleVal(value)) type = 'angle';
+      else if (value && typeof value === 'object' && value.isQuantity) type = 'distance';
+      else if (refs.some(r => r === 'X' || r === 'Y')) type = 'angle';
+      else {
+        const H = refs.map(r => sys.handle(r)), u = sub(H[0].b.get(sys.x), H[0].a.get(sys.x)), v = sub(H[1].b.get(sys.x), H[1].a.get(sys.x));
+        type = Math.abs(cross(u, v)) / ((len(u) * len(v)) || 1) < 1e-6 ? 'distance' : 'angle';
+      }
+    } else type = 'distance';
+  } else {
+    const k = sys.kindOf(target);
+    type = k === 'line' ? 'length' : k === 'circle' ? 'diameter' : k === 'arc' ? 'radius' : null;
+    refs = [target];
+    if (!type) { sys.diag('error', 'sketch.ref', `dim('${target}'): a single target must be a line, circle or arc`); return; }
+  }
+  const id = `dim(${refs.join(', ')})`;
+  const name = { length: 'length', diameter: 'diameter', radius: 'radius', distance: 'distance', distanceX: 'horizontal distance', distanceY: 'vertical distance', angle: 'angle' }[type];
+  sys.addCons({ type, refs: [...refs], value, driven: !!driven || value == null, src: 'user', id, label: `${type === 'radius' || type === 'diameter' || type === 'length' ? `${type}(${refs.join(', ')})` : `dim(${refs.join(', ')})`}`, opts: { dim: true, name } });
+}

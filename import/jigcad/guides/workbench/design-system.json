@@ -1,0 +1,71 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Screens": {
+      "files": {
+        "workbench-book.png": {
+          "blob": "77c277afc4fe2c5e843f5a90c0f7f0c5",
+          "name": "workbench-book.png",
+          "size": 242655,
+          "type": "image/png"
+        },
+        "workbench-code-params.png": {
+          "blob": "039fb2780bb32a0d59196c6151152d99",
+          "name": "workbench-code-params.png",
+          "size": 266722,
+          "type": "image/png"
+        },
+        "workbench-default-dark.png": {
+          "blob": "4b49d2f3f133319a879149e196492bfc",
+          "name": "workbench-default-dark.png",
+          "size": 228355,
+          "type": "image/png"
+        },
+        "workbench-default.png": {
+          "blob": "585230a68bf151482448336883f40e17",
+          "name": "workbench-default.png",
+          "size": 236615,
+          "type": "image/png"
+        },
+        "workbench-graph.png": {
+          "blob": "92ff5cd1492dd7cdd9c0d71e9dbf98d1",
+          "name": "workbench-graph.png",
+          "size": 302029,
+          "type": "image/png"
+        }
+      },
+      "name": "Screens",
+      "order": [
+        "workbench-default.png",
+        "workbench-book.png",
+        "workbench-code-params.png",
+        "workbench-graph.png",
+        "workbench-default-dark.png"
+      ],
+      "tile": "l"
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-10-28T17:24:10Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "groups": [
+    "Screens"
+  ],
+  "lastChange": {
+    "at": "2026-10-28T17:29:15.661Z",
+    "by": "Claude",
+    "note": "Built from the Form Skate workbench source",
+    "via": "Claude"
+  },
+  "layout": "files",
+  "libraries": [],
+  "namespace": "FormSkate",
+  "sections": {},
+  "title": "Form Skate Workbench"
+}

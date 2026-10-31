@@ -1,0 +1,20 @@
+{
+  "id": "X-03",
+  "title": "DIN-rail clip",
+  "group": "Electronics",
+  "order": 3,
+  "difficulty": "medium",
+  "about": "a snap-on clip for 35 mm DIN rail with a fixed hook, a springy catch and M3 inserts, its arm strain kept as a param",
+  "view": "side",
+  "overlays": "shadows,grid,dims",
+  "tries": "Make the clip 60 mm wide with four inserts on a 50 × 20 mm pattern | Add a pull tab under the catch so it releases without a screwdriver",
+  "agent": {
+    "role": "a control-panel designer who makes printed snap fits that survive many cycles",
+    "prompt": "Prefer checking a snap arm by its strain 1.5·t·δ/L² against the material (PETG 0.04, PLA 0.02); print springy parts so they bend within their layers; never let a hook reach more than 2.5 mm behind a DIN flange.",
+    "fragments": {
+      "rail": "TS35 × 7.5 rail: edges 35 mm apart, flanges 1 mm thick, 7.5 mm off the panel; TS35 × 15 is deeper but the same at the flanges.",
+      "strain": "Keep strain as a param and read it after every change to the arm."
+    },
+    "defaultFragments": ["strain"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "D-09",
+  "title": "Gridfinity baseplate",
+  "group": "Desk and storage",
+  "order": 9,
+  "difficulty": "advanced",
+  "about": "a light 3 × 2 Gridfinity baseplate: one loft through four rounded squares makes the 45° socket, a grid pattern repeats it",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a 6.5 × 2.4 mm magnet pocket at each corner of every cell, on a thicker plate | Fill a 300 × 200 mm drawer: compute nx and ny from the drawer and centre the grid",
+  "agent": {
+    "role": "a Gridfinity designer who keeps every size to the published grid",
+    "prompt": "Prefer the standard numbers (42 mm pitch, 7 mm units, 2.15 / 1.8 / 0.7 mm socket steps) over invented ones; keep corner radii as offsets of each other so slopes stay at 45°; never change the pitch.",
+    "fragments": {
+      "loft": "Build stepped profiles as one ruled loft through rounded squares, inset by the step and with the radius shrunk by the same inset.",
+      "bed": "Keep a baseplate within the bed: 5 × 4 cells on a 250 × 210 mm bed."
+    },
+    "defaultFragments": ["loft"]
+  }
+}

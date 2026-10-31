@@ -1,0 +1,192 @@
+/* jig additions to the Kiln rules in kiln.css: the one-screen app shell and the few parts a CAD workbench has that
+   the skate app did not. Tokens only; no radius, no shadow, 1 px rules, accent for trouble and selection. */
+html, body { height: 100%; }
+body { overflow: hidden; }
+#root, .app { height: 100%; }
+.app { display: flex; flex-direction: column; min-height: 0; }
+@media (max-width: 640px) { .bar .long { display: none; } }
+.pill.metrics b { font-variant-numeric: tabular-nums; }
+
+/* editor */
+.ed .egutter .gutter-in div.cur { color: var(--ink); }
+.codeview .findfield { width: 130px; }
+.codeview .filebar .lbl { white-space: nowrap; }
+
+/* stage */
+.tabbody.stage .sheet { flex: 1; min-height: 0; position: relative; background: var(--stage); overflow: hidden; }
+.sheethost { position: absolute; inset: 0; }
+.sheethost canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+.sheet .sheetnote { position: absolute; left: 0; top: 0; max-width: 64ch; }
+.hint b.bad { color: var(--accent); }
+/* the fail banner (Form Skate Stage, FailBanner): bottom left over the sheet, which keeps the last good part */
+.sheet .ovl-box { position: absolute; z-index: 2; background: var(--bg); border: 1px solid var(--hair); }
+.sheet .failbanner { top: auto; bottom: 12px; left: 12px; right: auto; max-width: min(560px, calc(100% - 24px)); background: var(--accent); color: var(--on-accent); border: 0; border-radius: 0; padding: 7px 12px; text-align: left; font-size: var(--fs-s); line-height: 1.45; cursor: pointer; z-index: 3; }
+.sheet .failbanner b { font-weight: 700; }
+.sheet .failbanner:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.side .block > header h2 { overflow-wrap: anywhere; }
+.side .refs.facelist { max-height: 300px; overflow: auto; }
+.side .refs .nid { text-align: left; }
+.actions-row { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.side ol.chain { margin: 0; padding-left: 18px; font: 400 var(--fs-xs)/1.7 var(--font-code); }
+.side ol.chain li { margin: 0 0 3px; }
+.side ol.chain .nid { font: 700 var(--fs-xs)/1.5 var(--font-code); margin-right: 0; vertical-align: baseline; }
+.side ol.chain .step { color: var(--ink-2); }
+.side .fail { margin: 0; }
+.note b.ink { color: var(--ink); }
+
+/* graph */
+.graph .ahead-sel { fill: var(--accent); }
+.graph .node:focus-visible { outline: none; }
+.graph .node:focus-visible rect { stroke-width: 2; }
+
+/* params */
+.prow .pn i.solo { color: var(--ink); font-weight: 700; }
+.paramlist .ptable { margin: 4px 16px 24px; width: calc(100% - 32px); }
+.ptable td { vertical-align: baseline; }
+.ptable td:last-child { text-align: left; }
+.ptable th:last-child { text-align: left; }
+.ptable code { background: var(--fill); padding: 0 3px; }
+.ptable .nid { font: 400 var(--fs-s) var(--font-code); margin-right: 8px; }
+.ptable td.nm .nid { font-weight: 700; }
+.ptable .src-o { color: var(--ink); font-weight: 700; }
+.valbtn { background: none; border: 1px solid transparent; padding: 1px 4px; margin: -2px -5px -2px 0; font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; cursor: text; color: var(--ink); }
+.valbtn:hover { border-color: var(--hair); }
+.valedit { width: 96px; height: 22px; border: 1px solid var(--ink); background: var(--code-bg); font: 400 var(--fs-s) var(--font-code); text-align: right; padding: 0 4px; outline: none; }
+
+/* trace */
+.traceview .block { border-bottom: 0; }
+.rt td.code-cell { font: 400 11px/1.4 var(--font-code); white-space: nowrap; }
+.rt td.reason, .rt th.reason { text-align: left; }
+.rt th.sharecol, .rt td.sharecol { width: 92px; }
+.meter.cellmeter { display: block; height: 6px; width: 80px; }
+
+/* experiments */
+.busy-sq { display: inline-block; width: 6px; height: 6px; background: var(--ink); animation: bl 0.8s steps(2) infinite; }
+.scatter .pt { cursor: pointer; }
+.scatter .pt.on circle, .scatter .pt.on rect { fill: var(--accent); stroke: var(--accent); }
+.expres .tablewrap-x { overflow-x: auto; }
+.experiments .toolbar .lbl { white-space: normal; }
+
+/* reading views */
+.doc .al-c { text-align: center; }
+.doc .al-r { text-align: right; }
+.doc figure.fig .figslot { position: relative; background: var(--stage); }
+.doc figure.fig canvas.figsheet { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.doc .figslot.busy::after { content: ""; position: absolute; left: 0; top: 0; width: 6px; height: 6px; background: var(--ink); animation: bl 0.8s steps(2) infinite; }
+.doc .sketchblock { margin: 6px 0 14px; }
+.doc .sketchblock pre.src { margin-bottom: 6px; }
+.doc .sketchact { font-size: var(--fs-s); margin: 0; }
+.doc .math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", "Times New Roman", serif; font-size: 1.08em; white-space: nowrap; }
+.doc .math i { font-style: italic; }
+.doc .math.display { font-size: 1.12em; white-space: pre-wrap; padding: 2px 0; }
+.doc p.fail { margin: 10px 0 14px; }
+/* BookChapter's known issue: keep the label's box on the chapter's measure and set the small type on its span */
+.bookview .bchlabel { font: 400 14px/1 var(--font-ui); letter-spacing: 0; text-transform: none; color: var(--ink); }
+.bookview .bchlabel span { font: 700 var(--fs-xs)/1 var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+.bookview .bpairs > .doc.related { margin: 0 auto; max-width: 74ch; padding-bottom: 8px; }
+.bookview .doc.related { font-size: 13px; }
+
+/* agent */
+.agentview { min-height: 0; }
+/* the preset's agent rules (meta.json agent.fragments) as toggles over the composer */
+.agent-panel .agent-frags { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 6px 16px; border-top: 1px solid var(--rule); flex: none; }
+.agent-panel .agent-frags .tog { height: 24px; padding: 0 8px; font-size: var(--fs-xs); font-family: var(--font-code); }
+@container tile (max-width: 640px) { .agent-panel .agent-frags { padding: 6px 12px; } }
+
+/* Presets shelf (src/ui/views/presets.jsx): groups under sticky small-capital headers (the DocShelf's), rows split by
+   rule lines, each a thumbnail sheet beside its text; two or more columns in a wide tile, one under 640 px with a
+   smaller sheet. The open preset: the 2 px accent bar and a bold title. No cards, no radius, no shadow. */
+.shelfview .pshelf { display: block; padding: 0 0 24px; }
+.shelf-group { border-bottom: 1px solid var(--hair); }
+.shelf-group:last-child { border-bottom: 0; }
+.shelf-head { position: sticky; top: 0; z-index: 1; margin: 0; padding: 10px 16px 4px; background: var(--bg); display: flex; gap: 8px; align-items: baseline;
+  font-size: var(--fs-xs); font-weight: 400; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--rule); }
+.shelf-head .n { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.shelf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+.shelf-entry { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 8px 16px; background: var(--bg); color: var(--ink);
+  border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; min-width: 0; font: inherit; cursor: pointer; }
+.shelf-entry:hover { background: var(--fill); }
+.shelf-entry.sel { box-shadow: inset 2px 0 0 var(--accent); cursor: default; }
+.shelf-entry:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.shelf-thumb { position: relative; flex: none; display: block; width: 168px; height: 118px; border: 1px solid var(--hair); background: var(--stage, var(--bg)); overflow: hidden; }
+.shelf-entry:hover .shelf-thumb { border-color: var(--ink-2); }
+.shelf-thumb canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.shelf-note { position: absolute; left: 6px; bottom: 4px; display: inline-flex; gap: 5px; align-items: center; font-size: var(--fs-xs); color: var(--ink-2); }
+.shelf-note.bad { color: var(--accent); }
+.shelf-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-top: 1px; }
+.shelf-title { font-size: var(--fs-s); line-height: 1.35; }
+.shelf-title b { font-weight: 400; }
+.shelf-entry.sel .shelf-title b { font-weight: 700; }
+.shelf-title .pcode { color: var(--ink-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.shelf-about { color: var(--ink-2); font-size: var(--fs-xs); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.shelf-facts { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.shelf-err { font-size: var(--fs-xs); color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelf-cell { position: relative; display: flex; flex-direction: column; min-width: 0; }
+.shelf-cell .shelf-entry { flex: 1; }
+.shelf-cell.mine .shelf-entry { padding-bottom: 28px; }
+.shelf-acts { position: absolute; left: calc(16px + 168px + 12px); bottom: 8px; display: flex; gap: 12px; font-size: var(--fs-xs); }
+.shelf-acts .bad { color: var(--accent); }
+.shelf-rename { position: absolute; left: calc(16px + 168px + 12px + 3.2em); top: 6px; right: 16px; font: inherit; font-size: var(--fs-s); padding: 1px 4px;
+  border: 1px solid var(--ink); border-radius: 0; background: var(--bg); color: var(--ink); }
+@container tile (max-width: 640px) {
+  .shelf-grid { grid-template-columns: 1fr; }
+  .shelf-entry { padding: 6px 12px; gap: 10px; }
+  .shelf-head { padding: 8px 12px 4px; }
+  .shelf-thumb { width: 120px; height: 84px; }
+  .shelf-about { -webkit-line-clamp: 2; }
+  .shelf-acts { left: calc(12px + 120px + 10px); bottom: 6px; }
+  .shelf-rename { left: calc(12px + 120px + 10px + 3.2em); right: 12px; }
+}
+@container tile (max-width: 360px) { .shelf-thumb { width: 96px; height: 68px; } }
+
+/* the header's preset menu at shelf size (~50 presets): the filter and the count stay on top, the grouped list
+   scrolls under sticky group headers, the commands stay at the bottom; ↑ ↓ (and PgUp PgDn Home End) move the active
+   row, which is filled; the open preset is bold */
+.menu.presets { width: 440px; min-width: 0; max-width: calc(100vw - 24px); max-height: min(78vh, 680px); overflow: hidden; padding: 0 0 2px; }
+.menu.presets .pfilter { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--hair); flex: none; }
+.menu.presets .pfilter .filter { flex: 1; width: auto; }
+.menu.presets .pfilter .dim { color: var(--ink-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.menu.presets .plist { flex: 1 1 auto; min-height: 96px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; padding-bottom: 4px; }
+.menu.presets .plist .grp { position: sticky; top: 0; z-index: 1; background: var(--bg); padding: 7px 14px 3px; display: flex; justify-content: space-between; }
+.menu.presets .plist .grp .n { font-variant-numeric: tabular-nums; }
+.menu.presets .plist button { grid-template-columns: 40px 1fr auto; padding: 4px 14px; gap: 0 8px; scroll-margin-top: 26px; }
+.menu.presets .plist button .code { font-variant-numeric: tabular-nums; }
+.menu.presets .plist button .lvl { color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; }
+.menu.presets .plist button small { grid-column: 2 / 4; max-width: none; }
+.menu.presets .plist button:hover { background: none; }
+.menu.presets .plist button.on small, .menu.presets .plist button.on .lvl, .menu.presets .plist button.on .code { font-weight: 400; }
+.menu.presets .plist button.act { background: var(--fill); }
+.menu.presets .plist .note { padding: 10px 14px; }
+.menu.presets > hr { margin: 0 0 2px; }
+.menu.presets > button { padding: 6px 14px; flex: none; }
+.menu.presets > .note { flex: none; max-width: none; }
+
+/* the Reference: the language reference, then the lab API under a 1 px ink rule, one scroll */
+.refview .doc.refpart { border-top: 1px solid var(--ink); margin-top: 18px; }
+
+/* the sketch inspector's constraint list: groups (Yours, From helpers, Implied) of two-line rows; hover fills, the
+   selected row has the 2 px accent bar and a bold kind; status chips are 1 px boxes, accent only for a conflict */
+.sketchside .cgroups { gap: 4px; }
+.cgroup + .cgroup { margin-top: 6px; }
+.cghead { display: flex; align-items: baseline; gap: 6px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--hair); padding: 4px 0; margin: 0; text-align: left; cursor: pointer; font: inherit; color: var(--ink); border-radius: 0; }
+.cghead:hover .tw, .cghead:hover b { color: var(--ink); }
+.cghead .tw { width: 10px; color: var(--ink-2); font-size: var(--fs-xs); }
+.cghead b { font-size: var(--fs-s); }
+.cghead .n { color: var(--ink-2); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.cghead .about { margin-left: auto; color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.crows { display: flex; flex-direction: column; }
+.crow { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; row-gap: 1px; align-items: baseline; padding: 4px 4px 4px 9px; border-bottom: 1px solid var(--rule); cursor: pointer; font-variant-numeric: tabular-nums; outline-offset: -2px; }
+.crow:hover, .crow.hov { background: var(--fill); }
+.crow.sel { box-shadow: inset 2px 0 0 var(--accent); }
+.crow.sel .ck { font-weight: 700; }
+.crow .ck { font-size: var(--fs-s); min-width: 0; overflow-wrap: anywhere; }
+.crow .cv { text-align: right; font-weight: 700; white-space: nowrap; font-size: var(--fs-s); }
+.crow .cx { font: 400 11px/1.4 var(--font-code); color: var(--ink-2); }
+.crow .con { font: 400 11px/1.45 var(--font-code); color: var(--ink-2); background: none; padding: 0; min-width: 0; overflow-wrap: anywhere; }
+.crow.sel .con { color: var(--ink); }
+.crow .con .impl { font-family: var(--font-ui); font-size: var(--fs-xs); }
+.crow .cln { align-self: end; justify-self: end; white-space: nowrap; font: 400 11px/1.45 var(--font-code); }
+.chip { display: inline-block; margin-left: 6px; padding: 0 4px; border: 1px solid var(--ink); font: 400 var(--fs-xs)/1.35 var(--font-ui); color: var(--ink); vertical-align: 1px; }
+.chip.bad { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.entblock .kv dd.dim { font-weight: 400; }
+.entblock .crows { margin-top: -2px; }

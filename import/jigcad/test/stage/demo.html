@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>jigcad stage · fixtures</title>
+<link rel="stylesheet" href="../../guides/stage/tokens.css">
+<link rel="stylesheet" href="../../guides/stage/fonts/fonts.css">
+<style>
+  html, body { margin: 0; background: var(--st-bg); color: var(--st-ink); font: 12px Arial, sans-serif; }
+  #sheet { display: block; width: 1200px; height: 800px; }
+  #live { position: relative; width: 1200px; height: 800px; }
+  .bar { display: flex; gap: 6px; padding: 6px 12px; align-items: center; border-bottom: 1px solid var(--hair); }
+  .bar button { font: 12px Arial, sans-serif; background: var(--bg); color: var(--ink); border: 1px solid var(--hair); border-radius: 0; padding: 3px 8px; }
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<canvas id="sheet"></canvas>
+<div id="live" hidden></div>
+<script type="module">
+  import * as Stage from '../../src/stage/index.js';
+  import { FIXTURES } from './fixtures.js';
+  window.Stage = Stage; window.FIXTURES = FIXTURES;
+  const canvas = document.getElementById('sheet');
+  const cache = {};
+  const prog = name => cache[name] || (cache[name] = FIXTURES[name]());
+
+  // render one fixture: returns the PNG and the time renderSheet took
+  window.render = (name, view, theme = 'light', o = {}) => {
+    document.documentElement.dataset.theme = theme;
+    const W = o.width || 1200, H = o.height || 800;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    const r = Stage.renderSheet(canvas, prog(name), view, { width: W, height: H, dpr: o.dpr || 1, sheet: o.sheet || 'T-' + String(Object.keys(FIXTURES).indexOf(name) + 1).padStart(2, '0'), ...o });
+    return { ...r, png: o.png === false ? null : canvas.toDataURL('image/png') };
+  };
+  // time a redraw: n frames after a warm-up, at a given size and dpr
+  window.timeRedraw = (name, view, n = 20, o = {}) => {
+    window.render(name, view, 'light', { ...o, png: false });
+    const ms = [];
+    for (let i = 0; i < n; i++) {
+      const v = typeof view === 'string' ? { name: view, yaw: i * 0.01 } : { ...view, yaw: (view.yaw || 0) + i * 0.01 };
+      const t0 = performance.now(); Stage.renderSheet(canvas, prog(name), v, { width: o.width || 1200, height: o.height || 800, dpr: o.dpr || 1 }); ms.push(performance.now() - t0);
+    }
+    const st = Stage.draw(canvas, prog(name), view, { width: o.width || 1200, height: o.height || 800, dpr: o.dpr || 1 });
+    ms.sort((a, b) => a - b);
+    return { median: ms[ms.length >> 1], min: ms[0], max: ms[ms.length - 1], timing: st.timing, tris: prog(name).bodies.reduce((s, b) => s + b.mesh.indices.length / 3, 0) };
+  };
+
+  // the interactive stage with a mock host (BUILD.md §4)
+  window.mountLive = (name) => {
+    const el = document.getElementById('live'); el.hidden = false; canvas.style.display = 'none';
+    const listeners = {};
+    const host = window.host = {
+      program: prog(name), selection: null, preset: { id: 'T-01' }, log: [],
+      on(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); return () => { listeners[ev] = listeners[ev].filter(f => f !== fn); }; },
+      emit(ev, v) { for (const fn of listeners[ev] || []) fn(v); },
+      select(sel) { this.log.push(['select', sel]); this.selection = sel; this.emit('selection', sel); },
+      setView(patch) { this.log.push(['view', { ...patch, overlays: patch.overlays ? [...patch.overlays] : undefined }]); this.view = { ...(this.view || {}), ...patch }; },
+      async solveSketch(id, drag) {
+        // a stand-in solver: moves the dragged point, keeps the slot's ends tangent by moving the hole only
+        this.log.push(['solve', id, drag]);
+        const sk = structuredClone(this.program.sketches.find(s => s.id === id));
+        const [eid, part] = drag.ref.split('.');
+        const e = sk.entities.find(x => x.id === eid);
+        if (e && e.kind === 'circle' && part === 'center') e.c = drag.to;
+        else if (e && e.kind === 'point') e.p = drag.to;
+        else if (e && e.kind === 'line') e[part === 'start' ? 'a' : 'b'] = drag.to;
+        if (sk.profiles && e && e.kind === 'circle') { const n = 32, loop = []; for (let i = n - 1; i >= 0; i--) { const a = Math.PI * 2 * i / n; loop.push([e.c[0] + e.r * Math.cos(a), e.c[1] + e.r * Math.sin(a)]); } sk.profiles[0].loops[1] = loop; }
+        await new Promise(r => setTimeout(r, 5));
+        return { sketch: sk };
+      },
+    };
+    window.stage = Stage.createStage(el, host);
+    return true;
+  };
+  window.ready = Stage.loadFonts('../../guides/stage/fonts/').then(() => document.fonts.ready).then(() => true);
+
+  // buttons, for looking by hand
+  const bar = document.getElementById('bar');
+  let cur = 'box', curView = 'axo';
+  const paint = () => window.render(cur, curView, document.documentElement.dataset.theme, { png: false, overlays: [...Stage.DEFAULT_OVERLAYS, 'hidden'] });
+  for (const k of Object.keys(FIXTURES)) { const b = document.createElement('button'); b.textContent = k; b.onclick = () => { cur = k; paint(); }; bar.append(b); }
+  for (const v of ['axo', 'front', 'side', 'plan', 'sketch']) { const b = document.createElement('button'); b.textContent = v; b.onclick = () => { curView = v; paint(); }; bar.append(b); }
+  const t = document.createElement('button'); t.textContent = 'theme'; t.onclick = () => { document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; setTimeout(paint, 30); }; bar.append(t);
+  if (!location.hash.includes('nobar')) window.ready.then(paint); else bar.hidden = true;
+</script>
+</body>
+</html>

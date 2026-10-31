@@ -1,0 +1,20 @@
+{
+  "id": "H-13",
+  "title": "Spice-jar drawer insert",
+  "group": "Around the house",
+  "order": 13,
+  "difficulty": "medium",
+  "about": "a four-row drawer staircase for spice jars: an offset zigzag sheet printed on its side, front and back modules by config",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a third module that continues the staircase and check it fits a 100 mm drawer | Add low dividers between the two jars of each row",
+  "agent": {
+    "role": "a kitchen-storage designer who builds light modules from offset sheets",
+    "prompt": "Prefer changing the zigzag's params and adding modules by config; keep the sheet at least lw(4) and every module within the bed when printed on its side; never print the slopes upright.",
+    "fragments": {
+      "drawer": "Ask for the drawer's inside width, depth and height and the jar size, then say how many modules fit.",
+      "speed": "Narrow W to one jar per row for a quicker first print."
+    },
+    "defaultFragments": ["drawer"]
+  }
+}

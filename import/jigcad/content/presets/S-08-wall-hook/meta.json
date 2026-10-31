@@ -1,0 +1,20 @@
+{
+  "id": "S-08",
+  "title": "Screw-on wall hook",
+  "group": "First prints",
+  "order": 8,
+  "difficulty": "easy",
+  "about": "a 70 mm coat hook printed on its side, with filleted corners and two countersunk teardrop screw holes",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Add a third screw hole at mid-height and check the countersink follows | Make a double hook with a second, shorter arm above the first",
+  "agent": {
+    "role": "a hardware designer who prints load-bearing hooks and brackets",
+    "prompt": "Prefer selecting edges by shape and by feature over listing them; keep the hook printed on its side; never put a screw hole where its countersink cuts into a fillet.",
+    "fragments": {
+      "load": "Estimate the load in newtons and keep the arm at least 8 mm thick for coats and bags.",
+      "screws": "Size holes with j.hole.clearance and countersink them with a 45° chamfer of (head − bore) / 2."
+    },
+    "defaultFragments": ["screws"]
+  }
+}

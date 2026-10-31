@@ -1,0 +1,10 @@
+<!-- standalone copy of preview.html: opens offline; #light or #dark picks the theme -->
+<!doctype html>
+<html lang="en">
+<head><script>(function(){var d=document.documentElement;function pick(){var h=location.hash.slice(1);return h==='dark'||h==='light'?h:(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');}d.setAttribute('data-theme',pick());addEventListener('hashchange',function(){d.setAttribute('data-theme',pick());});function size(){try{parent.postMessage({dsHeight:Math.ceil(d.scrollHeight)},'*');}catch(e){}}addEventListener('load',function(){size();setTimeout(size,400);if(window.ResizeObserver)new ResizeObserver(size).observe(d);});})();</script><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><meta charset="utf-8"><title>Meter</title>
+<style>.row{display:flex;gap:10px;align-items:center;padding:16px}</style></head>
+<body>
+
+<div class="row"><span class="meter expmeter"><i style="width:40%"></i></span><button class="btn sm">Stop</button><span class="meter expmeter bad"><i style="width:70%"></i></span><span class="note">.bad</span></div>
+</body>
+</html>
