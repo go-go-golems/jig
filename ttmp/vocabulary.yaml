@@ -5,6 +5,14 @@ topics:
       description: Backend services
     - slug: websocket
       description: WebSocket lifecycle & events
+    - slug: wasm
+      description: WebAssembly modules and toolchains
+    - slug: rust
+      description: Rust crates and code
+    - slug: cad
+      description: CAD engine, kernel and geometry
+    - slug: performance
+      description: Profiling and performance work
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
@@ -16,6 +24,8 @@ docTypes:
       description: Ticket landing page
     - slug: skill
       description: Skill documentation (what it's for and when to use it)
+    - slug: diary
+      description: Chronological implementation diary
 intent:
     - slug: long-term
       description: Likely to persist

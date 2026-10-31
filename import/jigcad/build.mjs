@@ -1,6 +1,7 @@
 // Build jigcad into dist/: app.js (main thread), worker.js (engine + OpenCascade), index.html, assets.
 // Usage: node build.mjs [--watch] [--minify]
-import { build, context } from '/opt/npm-tools/node_modules/esbuild/lib/main.js';
+// esbuild is not vendored: ESBUILD=/path/to/esbuild/lib/main.js, else the integrator's /opt/npm-tools copy.
+const { build, context } = await import(process.env.ESBUILD ?? '/opt/npm-tools/node_modules/esbuild/lib/main.js');
 import { cpSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
