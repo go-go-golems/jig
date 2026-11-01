@@ -437,3 +437,103 @@ Then the go side is done, also write a report for the vault."
 - Tape instruction `[op, a, b, v]`; op codes as in `sym.js` `OP`; operands are relative to the equation start.
 - `jc_tape_solve(h, x, nx, cols, ncols, eqs, neq, method, fallback, maxIter, tau)` → `[converged, iters, residual, used, fellBack, x…]`.
 - `jc_tape_analyse(…, groups, ngroups, ents, nwords, nents)` → `[rank, (added, ncoef, coef…)×groups, free×n, dof×ents]`.
+
+## Step 7: The stage renderer in Rust (Phase 5), and why it is not faster
+
+Phase 5 moved the drafting-sheet renderer's two numeric passes into jig-compute. The depth/id frame buffers now
+live in wasm memory, and Rust clears them, projects and rasterises each instance. `lineWork` keeps its edge
+selection and silhouette chaining in JS, but queues every polyline and classifies the whole batch against the
+resident buffers in one Rust call. The module now loads on the main thread as well as in the worker.
+
+The output is bit-identical to the JS renderer: 181 checks over five programs in four views each, covering
+depth, ids, projected vertices, runs, hidden runs and pick segments. The speed is a different story. Line work is
+1.1–1.7× faster, but the raster runs at parity with V8. I tried two optimisations and kept neither: a per-span
+slice loop without bounds checks, then SIMD with a branchless span. The span loop is bound by memory writes into a
+3.8-megapixel buffer, and V8 already compiles the JS loop to comparable code.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 6)
+**Assistant interpretation:** Implement Phase 5 so the Rust ticket can close.
+**Inferred user intent:** The renderer's heavy lifting in Rust too.
+
+### What I did
+
+- Measured first. `test/rs/stage-bench.mjs`, JS, 2400×1600 device px: M-10 (38,810 triangles) raster 28.2 ms, lineWork 25.8 ms, paper 3.9 ms. A profile over 7 frames: `rasterInstance` 142 ms, `classify` 69 ms, `buffers` 52 ms.
+- `rust/jig-compute/src/raster.rs`:
+  - `Frame { depth: Vec<f32>, id: Vec<i32>, bbox }` with `clear()`, which clears only the dirty rectangle;
+  - `project()` (f64 math, f32 output, as the JS `Float32Array`);
+  - `raster()` (the same edge functions and +0.5 pixel centres);
+  - `visible`, `visible_sil` and `classify` (sampling every 1.5 px, despeckle, the 3-px minimum run, runs extended to transition midpoints);
+  - a frame registry.
+- `lib.rs`: `jc_frame_new/free/clear/depth_ptr/id_ptr/bbox/set_bbox`, `jc_stage_mesh_new/free/live/s_ptr`, `jc_frame_raster(frame, mesh, base, cam[15])`, `jc_frame_classify(frame, params[5], pts, npts, offs, npoly, fa, fb, on)`. ABI version 1.4.
+- `src/engine/rs/index.js`:
+  - `RsFrame`: its `depth`/`id` getters re-create views when `memory.buffer` changes;
+  - `stageFrame(key, w, h)`;
+  - `stageMesh` (WeakMap on `inst.P`, freed through a FinalizationRegistry);
+  - `stageRaster` (returns a copy of the projected vertices for the silhouette pass);
+  - `stageClassify`.
+- `src/stage/raster.js`: `buffers()` returns a Rust frame when jig-compute is active. `projectInstance()` returns a deferred marker, and `rasterInstance()` runs the Rust raster (else `projectInstanceJS` + `rasterInstanceJS`).
+- `src/stage/lines.js`: with a Rust frame, `classify()` queues its polyline. `flush(false)` runs after the B-rep edges and `flush(true)` after the silhouettes, invoking the callbacks in the same order as the JS path. If the Rust call fails, the queue falls back to the JS classify.
+- `src/main.jsx` loads jig-compute on the main thread (`globalThis.jigCompute` exposes the status and counters) and redraws once it is loaded. `build.mjs` marks `node:*` external in the app bundle as well.
+- `test/rs/stage-parity.mjs` (new), `test/rs/stage-bench.mjs` (JS vs Rust, with the frame key reused as in the app).
+
+### Why
+
+- Keeping the frame buffers in wasm memory lets the classification test thousands of samples without copying the buffers out.
+- The batched classify keeps the JS structure (paths, picking arrays) and crosses the boundary twice per frame instead of once per edge.
+
+### What worked
+
+- `node test/rs/stage-parity.mjs` → `181 stage checks passed, 0 failed` (59 Rust rasters, 40 Rust classify batches). Depth and id buffers, projected vertices, runs, hidden runs, pick segments and silhouette counts are bit-identical, and a reused frame equals a fresh one.
+- `node test/stage/unit.mjs` → `20/20 passed`.
+- Build: `dist/app.js 1641 KiB · dist/worker.js 1482 KiB · dist/jig_compute.wasm 162 KiB`.
+- Browser (Playwright, 1600×1000):
+  - M-10 main thread: `{ active: true, version: '1.4', counters: { stageRaster: 7, stageClassify: 2 } }`; worker `rustCalls: { tapeSolve: 1, tapeAnalyse: 1, orientationScore: 16 }`.
+  - A-03 sketch view: DOF 1, `under`. A drag of `h2.center` toward (60, 25) gives h2 at (60, 20) with `tapeDrag: 2`.
+  - Screenshots `various/04-m10-planetary-rust-stage.png` and `various/05-a03-constrained-sketch-rust-solver.png`.
+
+### What didn't work
+
+- Speed (median of 9, frame key reused):
+
+  | Preset | JS raster · lines · total | Rust raster · lines · total | raster + lines |
+  |---|---|---|---|
+  | M-10 | 27.6 · 35.9 · 66.8 ms | 28.4 · 21.6 · 53.3 ms | ×1.3 |
+  | M-07 | 11.7 · 11.0 ms | 13.2 · 9.6 ms | ×1.0 |
+  | X-08 | 9.8 · 5.7 ms | 10.8 · 5.2 ms | ×1.0 |
+
+  Splitting the timing: Rust raster through the bridge 7.25 ms against JS 7.79 ms on X-08, and 17.4 against 16.7 ms on M-10. The clear was cheaper in Rust (0.3–0.8 vs 0.8–1.3 ms). (The "raw" column of that measurement was invalid: I passed mesh handle 0.)
+- Optimisation 1, a span loop over zipped row slices with one bounds check per span: no change beyond noise. Kept, because it is simpler.
+- Optimisation 2, `RUSTFLAGS="-C target-feature=+simd128"` with a branchless span computing `z0 + gx·j` in f32: X-08 raster 9.1 vs JS 8.0 ms, M-10 18.4 vs 17.4 ms. No gain, so reverted (the scalar file was saved in the scratchpad first).
+- `esbuild` failed for the app bundle: `Could not resolve "node:fs"` from `src/engine/rs/wasm.js`. The worker bundle already had `external: ['node:*']`; I added it to the app bundle.
+- The first stage-parity run failed every `runs`/`hidRuns` check while buffers, segments and silhouettes passed. It was my test: `lw.runs` is nested instance → edge → run, and the helper compared one level too few. After fixing the helper, everything is equal.
+- First Playwright navigation: `net::ERR_CONNECTION_REFUSED`. The background server had not started yet; a retry worked.
+
+### What I learned
+
+- A memory-bound pixel loop gains nothing from Rust or SIMD over V8's JIT. Rust pays off where the JS allocates per element or builds strings: the mesh analyses (2.6–7.4×), and the line classification with its per-sample closures (up to 1.7×).
+- The value of the Rust renderer here is consolidation: one numeric core shared by both threads, with a byte-identical JS fallback. That is a valid result, and I am reporting it plainly rather than as a speed-up.
+
+### What was tricky to build
+
+- **Views onto growing memory.** The frame's `depth`/`id` arrays are views. Any allocation in between, for example `stageClassify` putting its inputs, can grow memory and detach them. The getters compare `memory.buffer` and rebuild the views, so `lineWork` must read `buf.depth`/`buf.id` again after each Rust call. It does: it only reads them in JS when the frame is not Rust.
+- **Bit-identity.** f64 arithmetic with f32 storage, as in JS. The comparison is `z > depth as f64`, and the edge-function constants and ceilings follow the JS code exactly.
+
+### What warrants a second pair of eyes
+
+- `RsFrame` lifetime: frames are freed through a FinalizationRegistry when their key object is collected. The stage keeps one canvas key, so one frame per canvas.
+- `jc_frame_classify` output size for very large scenes (all runs in one result buffer).
+
+### What should be done in the future
+
+- If redraw time becomes a problem, move silhouette chaining (JS Map-based) into Rust too, or raster only the dirty part of the view. Faster arithmetic will not help.
+
+### Code review instructions
+
+- `rust/jig-compute/src/raster.rs`, `src/engine/rs/index.js` (stage section), `src/stage/raster.js`, `src/stage/lines.js` (queue/flush).
+- Validate: `node test/rs/stage-parity.mjs`, `node test/stage/unit.mjs`, `node test/rs/stage-bench.mjs`.
+
+### Technical details
+
+- cam array: `[T(3), r(3), u(3), c(3), s·k, W/2·k, Y0·k]`. Classify params: `[bias, near, shallow, k, step]`. Classify output per polyline: `[nruns, (state, npts, x, y…)…]` in CSS px.

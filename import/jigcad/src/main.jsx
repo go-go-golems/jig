@@ -29,6 +29,13 @@ try {
 const host = new Host({ forceMock: location.hash === '#mock', forceJsCompute: location.hash === '#js-compute' });
 globalThis.jigHost = host;           // for the console and the UI tests
 
+// jig-compute on this thread too: the stage's depth buffer and line classification run in it once it has loaded
+// (frames drawn before that use the JS rasteriser). The worker loads its own instance for the engine.
+import('./engine/rs/index.js').then(RS => {
+  globalThis.jigCompute = RS;        // status and call counters, for the console and the UI tests
+  return RS.loadCompute({ compute: location.hash === '#js-compute' ? 'js' : undefined });
+}).then(() => host.emit('view', host.view), e => console.warn(`jig-compute unavailable on the main thread: ${e.message}`));
+
 render(<App host={host} />, document.getElementById('root'));
 
 const presets = host.presets();

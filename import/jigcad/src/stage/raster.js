@@ -3,9 +3,14 @@
 // −1 for paper). The id buffer is what hidden lines test against and what picking reads; its covered pixels are the
 // part's paper.
 
+import * as RS from '../engine/rs/index.js';
+
 const scratch = new WeakMap();        // key object → { w, h, depth, id }
 
+// With jig-compute loaded on this thread, the buffers live in wasm memory (a Rust frame: depth and id are views)
+// and projection + raster run in Rust; the JS below stays as the reference and the fallback.
 export function buffers(key, w, h) {
+  if (RS.enabled()) { const f = RS.stageFrame(key, w, h); if (f) return f; }
   let b = scratch.get(key);
   if (!b || b.w !== w || b.h !== h) { b = { w, h, depth: new Float32Array(w * h).fill(-Infinity), id: new Int32Array(w * h).fill(-1) }; scratch.set(key, b); }
   else if (b.x1 >= b.x0) for (let y = b.y0; y <= b.y1; y++) {      // only what the last raster touched
@@ -17,6 +22,10 @@ export function buffers(key, w, h) {
 
 // project an instance's world positions to device pixels (k = device px per CSS px) and depth
 export function projectInstance(inst, cam, k) {
+  if (RS.enabled()) return { deferred: true, inst, cam, k };   // projected inside the Rust raster (rasterInstance)
+  return projectInstanceJS(inst, cam, k);
+}
+export function projectInstanceJS(inst, cam, k) {
   const P = inst.P, n = P.length / 3, S = inst._S && inst._S.length === n * 3 ? inst._S : (inst._S = new Float32Array(n * 3));
   const T = cam.T, r = cam.r, u = cam.u, c = cam.c, s = cam.s * k, X0 = cam.W / 2 * k, Y0 = cam.Y0 * k;
   for (let i = 0; i < n; i++) {
@@ -31,6 +40,13 @@ export function projectInstance(inst, cam, k) {
 // rasterise one instance into the buffers. Spans per row from the three edge functions, depth by the triangle's
 // plane equation, pixel centres at +0.5, a hair of overlap (1e-4 px) so neighbouring triangles leave no cracks.
 export function rasterInstance(buf, inst, S) {
+  if (S && S.deferred) {
+    if (buf.rust) { const out = RS.stageRaster(buf, inst, S.cam, S.k); if (out) { inst._S = out; return; } }
+    S = projectInstanceJS(inst, S.cam, S.k);
+  }
+  return rasterInstanceJS(buf, inst, S);
+}
+export function rasterInstanceJS(buf, inst, S) {
   const I = inst.body.mesh.indices, TF = inst.body.mesh.triFace, base = inst.base, W = buf.w, H = buf.h, D = buf.depth, ID = buf.id;
   const nt = (I.length / 3) | 0, EPS = 1e-4;
   let bx0 = buf.x0, by0 = buf.y0, bx1 = buf.x1, by1 = buf.y1;

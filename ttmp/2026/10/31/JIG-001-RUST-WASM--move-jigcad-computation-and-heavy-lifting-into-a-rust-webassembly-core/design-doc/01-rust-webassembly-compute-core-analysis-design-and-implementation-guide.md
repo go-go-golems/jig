@@ -590,3 +590,33 @@ External:
   JS self time fell from 7.6 s to 4.2 s. End-to-end wall time is dominated by OCCT, whose time varied ±20 % between
   identical runs on this machine, so whole-suite wall clock is not a useful metric here.
 - Module: 92 KiB, no imports, instantiates in 3 ms (Node) / 10 ms (browser worker).
+
+## 13. Results of Phases 4b and 5 (ticket closed)
+
+**Phase 4b: the solver.**
+
+- Constraint equations are data: sym.js expressions, with the JS closures generated from them by codegen.
+- Rust evaluates tapes with exact reverse-mode gradients and runs dog-leg, LM, Newton, the fallback, the rank, redundancy and DOF analysis, and the drag.
+- Solved sketches and the book's 374-line check output are byte-identical to the JS solver.
+- Exact and finite-difference Jacobians agree to 1.07e-8 relative.
+- Whole sketch solves are 2.2–2.5× faster (A-03, M-03).
+- D6 is accepted and implemented.
+
+**Phase 5: the renderer.**
+
+- Frames (depth and id) live in wasm memory, and projection, raster and line classification run in Rust on the main thread.
+- The output is bit-identical: 181 checks.
+- Line work is 1.1–1.7× faster. The raster runs at parity with V8: the span loop is memory-bound, and a SIMD experiment gained nothing, so it was reverted.
+
+**Module:** 162 KiB, ABI 1.4, loaded in the worker and on the main thread.
+
+| Suite | Result |
+|---|---|
+| core | 62/62 in both modes |
+| engine | 42/42 |
+| presets | 72/72 |
+| `test/rs/parity.mjs` | 4,019 checks |
+| `test/rs/stage-parity.mjs` | 181 checks |
+| `test/stage/unit.mjs` | 20/20 |
+| book | 159 blocks, identical output between modes |
+| `cargo test` | 4 binaries, 7 tests |

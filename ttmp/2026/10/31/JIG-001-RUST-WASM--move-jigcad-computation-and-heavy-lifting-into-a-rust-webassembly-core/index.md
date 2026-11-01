@@ -1,7 +1,7 @@
 ---
 Title: Move jigcad computation and heavy lifting into a Rust WebAssembly core
 Ticket: JIG-001-RUST-WASM
-Status: active
+Status: complete
 Topics:
     - wasm
     - rust

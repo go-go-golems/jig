@@ -11,6 +11,7 @@ pub mod linalg;
 pub mod mem;
 pub mod mesh;
 pub mod orient;
+pub mod raster;
 pub mod section;
 pub mod solve;
 pub mod tape;
@@ -20,7 +21,7 @@ use mem::{set_error, set_result, slice};
 use mesh::{FaceGeo, TriMesh, GEO_STRIDE};
 
 /// ABI version: major * 1000 + minor. Bump major on breaking changes; the JS bridge checks it.
-pub const ABI_VERSION: u32 = 1_003;
+pub const ABI_VERSION: u32 = 1_004;
 
 #[no_mangle] pub extern "C" fn jc_version() -> u32 { ABI_VERSION }
 #[no_mangle] pub extern "C" fn jc_alloc(n: u32) -> *mut u8 { mem::alloc_bytes(n as usize) }
@@ -231,4 +232,72 @@ pub unsafe extern "C" fn jc_tape_analyse(h: u32, x: *const f64, nx: u32, cols: *
         let j = p.jac(&xc);
         set_result(analyse::analyse(&j, p.m(), p.n(), &gs, &es))
     }).unwrap_or_else(|| set_error("stale tape handle"))
+}
+
+// ── stage: frames (depth + id buffers in wasm memory), instance meshes, raster, line classification ─────────
+
+struct StageMesh { p: Vec<f32>, idx: Vec<u32>, tf: Vec<u32>, s: Vec<f32> }
+thread_local! { static STAGE: std::cell::RefCell<Vec<Option<StageMesh>>> = const { std::cell::RefCell::new(Vec::new()) }; }
+
+#[no_mangle] pub extern "C" fn jc_frame_new(w: u32, h: u32) -> u32 { raster::frame_new(w as usize, h as usize) }
+#[no_mangle] pub extern "C" fn jc_frame_free(h: u32) { raster::frame_free(h) }
+/// clear what the last raster touched and reset the dirty rectangle (buffers() in raster.js)
+#[no_mangle] pub extern "C" fn jc_frame_clear(h: u32) -> i32 { raster::with_frame(h, |f| { f.clear(); 0 }).unwrap_or_else(|| set_error("bad frame")) }
+#[no_mangle] pub extern "C" fn jc_frame_depth_ptr(h: u32) -> *const f32 { raster::with_frame(h, |f| f.depth.as_ptr()).unwrap_or(std::ptr::null()) }
+#[no_mangle] pub extern "C" fn jc_frame_id_ptr(h: u32) -> *const i32 { raster::with_frame(h, |f| f.id.as_ptr()).unwrap_or(std::ptr::null()) }
+/// dirty rectangle [x0, y0, x1, y1] into the result buffer
+#[no_mangle] pub extern "C" fn jc_frame_bbox(h: u32) -> i32 { raster::with_frame(h, |f| set_result(f.bbox.iter().map(|&v| v as f64).collect())).unwrap_or_else(|| set_error("bad frame")) }
+#[no_mangle] pub extern "C" fn jc_frame_set_bbox(h: u32, x0: i32, y0: i32, x1: i32, y1: i32) { raster::with_frame(h, |f| { f.bbox = [x0, y0, x1, y1]; }); }
+
+/// an instance mesh for the stage: world positions (f32), indices, optional per-triangle face ids
+#[no_mangle]
+pub unsafe extern "C" fn jc_stage_mesh_new(p: *const f32, nverts: u32, idx: *const u32, ntri: u32, tf: *const u32) -> i32 {
+    let idx_v = slice(idx, ntri as usize * 3).to_vec();
+    if idx_v.iter().any(|&i| i >= nverts) { return set_error("jc_stage_mesh_new: index out of range"); }
+    let m = StageMesh { p: slice(p, nverts as usize * 3).to_vec(), idx: idx_v, tf: if tf.is_null() { Vec::new() } else { slice(tf, ntri as usize).to_vec() }, s: Vec::new() };
+    STAGE.with(|r| { let mut r = r.borrow_mut(); match r.iter().position(|s| s.is_none()) { Some(i) => { r[i] = Some(m); i as i32 + 1 } None => { r.push(Some(m)); r.len() as i32 } } })
+}
+#[no_mangle] pub extern "C" fn jc_stage_mesh_free(h: u32) { STAGE.with(|r| { if let Some(s) = r.borrow_mut().get_mut((h as usize).wrapping_sub(1)) { *s = None; } }) }
+#[no_mangle] pub extern "C" fn jc_stage_mesh_live() -> u32 { STAGE.with(|r| r.borrow().iter().filter(|s| s.is_some()).count() as u32) }
+/// projected vertices (device x, y, depth as f32) of the last raster of this mesh
+#[no_mangle] pub extern "C" fn jc_stage_mesh_s_ptr(h: u32) -> *const f32 { STAGE.with(|r| r.borrow().get((h as usize).wrapping_sub(1)).and_then(|s| s.as_ref().map(|m| m.s.as_ptr())).unwrap_or(std::ptr::null())) }
+
+/// project and rasterise one instance: cam = [T(3), r(3), u(3), c(3), s, X0, Y0] (15 f64; s, X0, Y0 in device px)
+#[no_mangle]
+pub unsafe extern "C" fn jc_frame_raster(fh: u32, mh: u32, base: i32, cam: *const f64) -> i32 {
+    let c = slice(cam, 15); // T r u c (12) + s X0 Y0
+    let cam = raster::Cam { t: [c[0], c[1], c[2]], r: [c[3], c[4], c[5]], u: [c[6], c[7], c[8]], c: [c[9], c[10], c[11]], s: c[12], x0: c[13], y0: c[14] };
+    STAGE.with(|r| {
+        let mut r = r.borrow_mut();
+        let Some(Some(m)) = r.get_mut((mh as usize).wrapping_sub(1)) else { return set_error("bad stage mesh") };
+        let mut s = std::mem::take(&mut m.s);
+        raster::project(&m.p, &cam, &mut s);
+        let n = raster::with_frame(fh, |f| { raster::raster(f, &s, &m.idx, &m.tf, base); (s.len() / 3) as i32 }).unwrap_or_else(|| set_error("bad frame"));
+        m.s = s;
+        n
+    })
+}
+
+/// classify many polylines against a frame. params = [bias, near, shallow, k, step]; points: device xyz (f32);
+/// offs: npoly + 1 point offsets; fa, fb: per point (segment i of a polyline at its start point); on: 2 f32 per
+/// point or null (silhouettes). Result: for each polyline [nruns, (state, npts, x, y, …)…].
+#[no_mangle]
+pub unsafe extern "C" fn jc_frame_classify(fh: u32, params: *const f64, pts: *const f32, npts: u32, offs: *const u32, npoly: u32, fa: *const f64, fb: *const f64, on: *const f32) -> i32 {
+    let pr = slice(params, 5);
+    let lp = raster::LineParams { bias: pr[0], near: pr[1], shallow: pr[2], k: pr[3], step: pr[4] };
+    let (pts, offs) = (slice(pts, npts as usize * 3), slice(offs, npoly as usize + 1));
+    let (fa, fb) = (slice(fa, npts as usize), slice(fb, npts as usize));
+    let on = if on.is_null() { &[][..] } else { slice(on, npts as usize * 2) };
+    if offs.windows(2).any(|w| w[0] > w[1]) || offs.last().map_or(false, |&o| o > npts) { return set_error("jc_frame_classify: bad offsets"); }
+    raster::with_frame(fh, |f| {
+        let mut out = Vec::new();
+        for p in 0..npoly as usize {
+            let (a, b) = (offs[p] as usize, offs[p + 1] as usize);
+            let slot = out.len();
+            out.push(0.0);
+            let k = raster::classify(f, &lp, &pts[3 * a..3 * b], &fa[a..b], &fb[a..b], if on.is_empty() { &[] } else { &on[2 * a..2 * b] }, &mut out);
+            out[slot] = k as f64;
+        }
+        set_result(out)
+    }).unwrap_or_else(|| set_error("bad frame"))
 }

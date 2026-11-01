@@ -235,3 +235,86 @@ export function tapeAnalyse(ref, x, cols, tids, groups, ents) {
     } finally { release(X, bg, bw); }
   });
 }
+
+// ── stage (main thread): frames in wasm memory, instance meshes, raster, line classification (Phase 5) ───────
+// A frame's depth and id arrays are views onto wasm memory, re-created when memory has grown (growth detaches
+// the old ArrayBuffer). Its dirty rectangle (x0 y0 x1 y1) is mirrored from Rust after each raster.
+const frames = new WeakMap();                   // key object → RsFrame
+const framesFree = typeof FinalizationRegistry !== 'undefined' ? new FinalizationRegistry(h => compute()?.jc_frame_free(h)) : null;
+class RsFrame {
+  constructor(X, w, h) { this.rust = true; this.w = w; this.h = h; this.fh = X.jc_frame_new(w, h); this._mem = null; this._d = null; this._i = null; this.x0 = w; this.y0 = h; this.x1 = -1; this.y1 = -1; }
+  views() {
+    const X = compute(), buf = X.memory.buffer;
+    if (this._mem !== buf) { this._mem = buf; this._d = new Float32Array(buf, X.jc_frame_depth_ptr(this.fh), this.w * this.h); this._i = new Int32Array(buf, X.jc_frame_id_ptr(this.fh), this.w * this.h); }
+  }
+  get depth() { this.views(); return this._d; }
+  get id() { this.views(); return this._i; }
+  syncBox() { const X = compute(), r = result(X, X.jc_frame_bbox(this.fh)); [this.x0, this.y0, this.x1, this.y1] = r; }
+}
+/** buffers() for Rust: the frame for `key` at w × h, cleared where the last raster drew */
+export function stageFrame(key, w, h) {
+  return rust(X => {
+    let f = frames.get(key);
+    if (!f || f.w !== w || f.h !== h || X.jc_frame_bbox(f.fh) < 0) {
+      if (f) X.jc_frame_free(f.fh);
+      f = new RsFrame(X, w, h); frames.set(key, f); framesFree?.register(f, f.fh);
+    } else X.jc_frame_clear(f.fh);
+    f.syncBox();
+    return f;
+  });
+}
+const stageMeshes = new WeakMap();              // inst.P (world positions) → handle
+const meshFree = typeof FinalizationRegistry !== 'undefined' ? new FinalizationRegistry(h => compute()?.jc_stage_mesh_free(h)) : null;
+function stageMesh(X, inst) {
+  let h = stageMeshes.get(inst.P);
+  if (h) return h;
+  const m = inst.body.mesh, P = put(X, inst.P, Float32Array), I = put(X, m.indices, Uint32Array), T = m.triFace ? put(X, m.triFace, Uint32Array) : null;
+  try { h = X.jc_stage_mesh_new(P.p, inst.P.length / 3, I.p, m.indices.length / 3, T ? T.p : 0); if (h < 0) result(X, h); }
+  finally { release(X, P, I, T); }
+  stageMeshes.set(inst.P, h); meshFree?.register(inst.P, h);
+  return h;
+}
+/** project + rasterise one instance into a Rust frame; returns the projected vertices (Float32Array copy) */
+export function stageRaster(frame, inst, cam, k) {
+  return rust(X => {
+    count('stageRaster');
+    const mh = stageMesh(X, inst);
+    const c = put(X, [...cam.T, ...cam.r, ...cam.u, ...cam.c, cam.s * k, cam.W / 2 * k, cam.Y0 * k], Float64Array);
+    let n;
+    try { n = X.jc_frame_raster(frame.fh, mh, inst.base, c.p); if (n < 0) result(X, n); } finally { release(X, c); }
+    frame.syncBox();
+    return new Float32Array(X.memory.buffer, X.jc_stage_mesh_s_ptr(mh), n * 3).slice();
+  });
+}
+/** classify a batch of polylines: items [{ pts: Float32Array(3n), fa, fb (number | per-segment array), on?: Float32Array(2(n−1)) }]
+ *  → per item an array of runs [state, [x, y, …]] (CSS px) */
+export function stageClassify(frame, items, { bias, near, shallow, k, step }, sil) {
+  return rust(X => {
+    count('stageClassify');
+    let np = 0; for (const it of items) np += it.pts.length / 3;
+    const pts = new Float32Array(np * 3), offs = new Uint32Array(items.length + 1), fa = new Float64Array(np), fb = new Float64Array(np), on = sil ? new Float32Array(np * 2) : null;
+    let o = 0;
+    items.forEach((it, p) => {
+      const n = it.pts.length / 3;
+      offs[p] = o; pts.set(it.pts, o * 3);
+      for (let i = 0; i < n; i++) {
+        fa[o + i] = typeof it.fa === 'number' ? it.fa : (it.fa[i] ?? -1e9);
+        fb[o + i] = typeof it.fb === 'number' ? it.fb : (it.fb[i] ?? -1e9);
+      }
+      if (sil && it.on) on.set(it.on.subarray(0, Math.min(it.on.length, (n - 1) * 2)), o * 2);
+      o += n;
+    });
+    offs[items.length] = o;
+    const B = [put(X, [bias, near, shallow, k, step], Float64Array), put(X, pts, Float32Array), put(X, offs, Uint32Array), put(X, fa, Float64Array), put(X, fb, Float64Array), on ? put(X, on, Float32Array) : null];
+    try {
+      const r = result(X, X.jc_frame_classify(frame.fh, B[0].p, B[1].p, np, B[2].p, items.length, B[3].p, B[4].p, B[5] ? B[5].p : 0));
+      const out = []; let i = 0;
+      for (let p = 0; p < items.length; p++) {
+        const nr = r[i++], runs = [];
+        for (let q = 0; q < nr; q++) { const st = r[i++], n = r[i++]; runs.push([st, Array.from(r.subarray(i, i + 2 * n))]); i += 2 * n; }
+        out.push(runs);
+      }
+      return out;
+    } finally { release(X, ...B); }
+  });
+}

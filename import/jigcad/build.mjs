@@ -85,7 +85,7 @@ async function run() {
   collectContent();
   copyAssets();
   const computeBytes = buildCompute();
-  const app = { ...common, entryPoints: [join(ROOT, 'src/main.jsx')], outfile: join(ROOT, 'dist/app.js') };
+  const app = { ...common, entryPoints: [join(ROOT, 'src/main.jsx')], outfile: join(ROOT, 'dist/app.js'), external: ['node:*'] };   // rs/wasm.js reads files only under Node
   const worker = { ...common, entryPoints: [join(ROOT, 'src/engine/worker.js')], outfile: join(ROOT, 'dist/worker.js'),
     platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'] };
   if (watch) {

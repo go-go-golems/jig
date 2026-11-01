@@ -13,6 +13,7 @@
 // (two corner-cutting passes), so the outline of a fillet, a sphere or a torus shows no mesh facets, while corners
 // stay corners.
 import { isSeam, facePairDots, pairKey } from './scene.js';
+import * as RS from '../engine/rs/index.js';
 
 const STEP = 1.5;           // device px between samples
 const TANGENT = Math.cos(8 * Math.PI / 180);    // faces meeting within 8° of each other meet at a tangent edge
@@ -53,7 +54,18 @@ export function lineWork(scene, cam, buf, k, o = {}) {
 
   // sample a polyline (device xyz triples, flat) with per-segment faces, despeckle, and emit runs to the paths
   const xs = [], ys = [], zs = [], st = [], vx = [];
+  // With a Rust frame the samples are tested in jig-compute: classify() queues the polyline and flush() runs the
+  // whole queue in one call, invoking the callbacks in the same order the JS path would.
+  let queue = buf.rust ? [] : null;
+  function flush(sil) {
+    if (!queue || !queue.length) return;
+    const items = queue; queue = [];
+    const res = RS.stageClassify(buf, items, { bias, near, shallow, k, step: STEP }, sil);
+    if (!res) { const q = items; queue = null; for (const it of q) classify(it.pts, it.fa, it.fb, it.onRun, it.on); queue = buf.rust && RS.enabled() ? [] : null; return; }
+    items.forEach((it, p) => { for (const [stt, run] of res[p]) it.onRun(stt, run); });
+  }
   function classify(pts, faceA, faceB, onRun, outN) {
+    if (queue) { queue.push({ pts, fa: faceA, fb: faceB, onRun, on: outN }); return; }
     xs.length = ys.length = zs.length = st.length = vx.length = 0;
     const n = pts.length / 3;
     for (let i = 0; i + 1 < n; i++) {
@@ -133,6 +145,8 @@ export function lineWork(scene, cam, buf, k, o = {}) {
     }
   });
 
+  flush(false);
+
   // silhouettes: mesh edges between a front-facing and a not-front-facing triangle, chained through welded vertices
   let silCount = 0;
   scene.instances.forEach((inst) => {
@@ -190,6 +204,7 @@ export function lineWork(scene, cam, buf, k, o = {}) {
       }, on);
     }
   });
+  flush(true);
   return { vis, tan, hid, sil, silOuter, silHid, silSoft, runs, hidRuns, segs: Float32Array.from(segs), who: Int32Array.from(who), silCount };
 }
 

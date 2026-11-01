@@ -30,3 +30,11 @@ Phase 4b: sym.js residual expressions (codegen JS closures + Rust tapes); dogleg
 
 - /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/rust/jig-compute/src/solve.rs — solver loops in Rust
 - /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/src/engine/sketch/sym.js — equations as data
+
+## 2026-10-31
+
+Phase 5: stage frames in wasm memory; projection, raster and line classification in Rust on the main thread; bit-identical (181 checks); lines 1.1-1.7x, raster at parity (memory-bound). Ticket complete.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/rust/jig-compute/src/raster.rs — stage raster and line classification
