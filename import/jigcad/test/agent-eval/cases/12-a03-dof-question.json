@@ -1,0 +1,45 @@
+{
+  "id": "a03-dof-question",
+  "preset": "A-03",
+  "mode": "auto",
+  "tags": [
+    "question",
+    "sketch"
+  ],
+  "request": "Is the outline sketch fully constrained? If not, what is still free?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "h2"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "\\bx\\b",
+        "center\\.x",
+        "horizontal",
+        "left.right",
+        "along"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "1\\s*(DOF|degree)",
+        "one (free )?degree",
+        "under"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return sketch('outline').dof;"
+    ],
+    "answer": "No: 1 DOF remains. h2's center x is free, so the hole can slide along the plate."
+  }
+}

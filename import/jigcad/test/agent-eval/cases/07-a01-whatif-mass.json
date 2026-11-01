@@ -1,0 +1,27 @@
+{
+  "id": "a01-whatif-mass",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "what-if",
+    "question"
+  ],
+  "request": "Without changing the files, what would the mass be with 2.8 mm walls?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "25[.,]8|25[.,]9"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "const v = await check(files.read('script.js').replace('wall: mm(2)', 'wall: mm(2.8)'));\nreturn v.metrics;"
+    ],
+    "answer": "With 2.8 mm walls the mass would be 25.88 g; the files are unchanged."
+  }
+}

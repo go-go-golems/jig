@@ -1,0 +1,41 @@
+{
+  "id": "a01-fix-bug",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "repair",
+    "diagnostics"
+  ],
+  "setup": [
+    {
+      "edit": {
+        "path": "script.js",
+        "find": "'h', { id: 'body' }",
+        "replace": "'height', { id: 'body' }"
+      }
+    }
+  ],
+  "request": "The part does not compile. Find the problem and fix it.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 15344.27,
+      "tol": 0.1
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "notMatches": "'height',\\s*\\{\\s*id:\\s*'body'"
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \"'height', { id: 'body' }\", \"'h', { id: 'body' }\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The extrude used an unknown param 'height'; it is 'h' again and the part compiles."
+  }
+}

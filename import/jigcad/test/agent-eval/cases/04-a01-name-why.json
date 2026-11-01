@@ -1,0 +1,41 @@
+{
+  "id": "a01-name-why",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "question",
+    "naming"
+  ],
+  "request": "Explain where the face name shell/inner[body/side[base.outline.bottom]] comes from.",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "shell",
+        "base\\.outline\\.bottom"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "offset",
+        "inner"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "extru",
+        "swept",
+        "sketch"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [],
+    "answer": "shell/inner[body/side[base.outline.bottom]] is the shell's inner offset of body/side[base.outline.bottom], the face the extrude swept from the sketch line base.outline.bottom."
+  }
+}

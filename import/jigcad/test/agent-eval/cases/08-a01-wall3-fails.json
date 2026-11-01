@@ -1,0 +1,40 @@
+{
+  "id": "a01-wall3-fails",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "what-if",
+    "diagnostics"
+  ],
+  "request": "What happens if the walls are made 3 mm thick? Check it without changing the files, and explain the result.",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "fail",
+        "does not (compile|build|work)",
+        "error",
+        "invalid"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "radius",
+        "corner",
+        "fillet",
+        "r\\s*=\\s*3",
+        "\\br\\b"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "const v = await check(files.read('script.js').replace('wall: mm(2)', 'wall: mm(3)'));\nreturn v;"
+    ],
+    "answer": "With 3 mm walls the shell fails: the 3 mm corner radius leaves no room for a 3 mm offset."
+  }
+}

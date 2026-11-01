@@ -1,0 +1,39 @@
+{
+  "id": "a01-height-edit",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "params"
+  ],
+  "request": "Make the box 35 mm tall in the script and report the new volume.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "h:\\s*mm\\(35\\)"
+    },
+    {
+      "kind": "metric",
+      "name": "height",
+      "approx": 35,
+      "tol": 0.001
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "17[ ,.]?2[23]\\d",
+        "17[.,]2\\d*\\s*cm"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', 'h: mm(30)', 'h: mm(35)');\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The box is 35 mm tall; the volume is 17,229.93 mm³."
+  }
+}

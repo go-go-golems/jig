@@ -141,3 +141,28 @@ test('captureUsage keeps error usage; noteCode maps turn notes back to codes', a
   assert.equal(noteCode(null), 'ok');
   assert.equal(noteCode('Stopped.'), 'cancelled');
 });
+
+// ── the case set: every case is well formed, and its oracle (a known-good turn) passes it ─────────────────────
+const { loadCases } = await import('../../tools/agent-eval/runner.mjs');
+const { CHECKS } = await import('../../tools/agent-eval/checks.mjs');
+const CASES = loadCases(new URL('./cases/', import.meta.url).pathname);
+
+test('cases are well formed', () => {
+  assert.ok(CASES.length >= 12, `${CASES.length} cases`);
+  const ids = new Set();
+  for (const c of CASES) {
+    assert.ok(!ids.has(c.id), `duplicate id ${c.id}`); ids.add(c.id);
+    assert.ok(host.findPreset(c.preset), `${c.id}: no preset ${c.preset}`);
+    assert.ok(['auto', 'read', 'ask'].includes(c.mode || 'auto'), `${c.id}: mode`);
+    assert.ok(c.request && c.checks?.length, `${c.id}: request and checks`);
+    for (const ch of c.checks) assert.ok(CHECKS[ch.kind], `${c.id}: unknown check ${ch.kind}`);
+    assert.ok(c.oracle, `${c.id}: oracle`);
+  }
+});
+
+test('every case passes with its oracle turn', async () => {
+  for (const c of CASES) {
+    const r = await runCase(c, { host, sample: scripted(c.oracle.steps, c.oracle.answer) });
+    assert.equal(r.pass, true, `${c.id}: ${r.error || r.checks.filter(x => !x.pass).map(x => `${x.kind}: ${x.detail}`).join(' | ')}`);
+  }
+});

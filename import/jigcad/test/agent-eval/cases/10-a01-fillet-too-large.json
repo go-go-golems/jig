@@ -1,0 +1,34 @@
+{
+  "id": "a01-fillet-too-large",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "diagnostics"
+  ],
+  "request": "Add a 25 mm fillet to the four vertical outside edges.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "too large",
+        "largest",
+        "maximum",
+        "max(imum)? radius",
+        "cannot",
+        "can.t",
+        "does not fit",
+        "fails"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "const v = await check(files.read('script.js').replace(\".shell(\", \".fillet(j.feat('body').edges('|Z'), mm(25), { id: 'round' })\\n  .shell(\"));\nreturn v.errors;"
+    ],
+    "answer": "A 25 mm fillet is too large for these edges (fillet.tooLarge), so I left the script unchanged."
+  }
+}

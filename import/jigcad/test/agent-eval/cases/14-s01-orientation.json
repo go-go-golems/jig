@@ -1,0 +1,31 @@
+{
+  "id": "s01-orientation",
+  "preset": "S-01",
+  "mode": "read",
+  "tags": [
+    "question",
+    "print"
+  ],
+  "request": "Which way will the cable clip be printed, and why?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "[-−–]\\s*Y|minus Y|negative Y"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "support"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [],
+    "answer": "It prints lying on −Y: no support is needed and it has the largest bed contact."
+  }
+}

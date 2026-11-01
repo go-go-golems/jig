@@ -1,0 +1,37 @@
+{
+  "id": "a03-fix-dof",
+  "preset": "A-03",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "sketch"
+  ],
+  "request": "Fully constrain the outline sketch: place hole h2 48 mm to the right of h1 with a dimension, then check the sketch.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "sketchDof",
+      "id": "outline",
+      "dof": 0
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "48"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 12672.77,
+      "tol": 0.1
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \".dim({ v: ['h1.center', 'h2.center'] }, 0)\", \".dim({ v: ['h1.center', 'h2.center'] }, 0)\\n  .dim({ h: ['h1.center', 'h2.center'] }, 48)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "h2 is 48 mm right of h1 now and the sketch has 0 DOF."
+  }
+}

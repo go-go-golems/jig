@@ -1,0 +1,37 @@
+{
+  "id": "a01-footprint",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "params"
+  ],
+  "request": "Change the outside size of the box to 80 × 50 mm in the script. Keep the walls at 2 mm.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "equals": [
+        80,
+        50,
+        30
+      ],
+      "tol": 0.001
+    },
+    {
+      "kind": "param",
+      "name": "wall",
+      "approx": 2,
+      "tol": 1e-09
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', 'w: mm(60), d: mm(40)', 'w: mm(80), d: mm(50)');\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The box is 80 × 50 mm outside with 2 mm walls."
+  }
+}

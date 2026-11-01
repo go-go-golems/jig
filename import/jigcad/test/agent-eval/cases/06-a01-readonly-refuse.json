@@ -1,0 +1,35 @@
+{
+  "id": "a01-readonly-refuse",
+  "preset": "A-01",
+  "mode": "read",
+  "tags": [
+    "read-only",
+    "edit"
+  ],
+  "request": "Make the walls 2.5 mm thick.",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "2[.,]5"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "read[- ]only",
+        "would",
+        "cannot",
+        "can.t",
+        "not allowed"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [],
+    "answer": "This is read-only mode, so I would change wall: mm(2) to wall: mm(2.5) in script.js."
+  }
+}

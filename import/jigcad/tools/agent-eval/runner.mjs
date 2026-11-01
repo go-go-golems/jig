@@ -99,11 +99,12 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
 }
 
 /** Run every case × tier × repeat in order; onRecord(record) after each (e.g. append to results.jsonl). */
-export async function runAll(cases, { host, sample, tiers = ['default'], repeat = 1, deadlineMs, onRecord = () => {}, log = () => {} }) {
+/** sampleFor(case) may give each case its own sample function (the CLI's --oracle mode); else `sample` is used. */
+export async function runAll(cases, { host, sample, sampleFor = null, tiers = ['default'], repeat = 1, deadlineMs, onRecord = () => {}, log = () => {} }) {
   const out = [];
   for (const tier of tiers) for (let r = 1; r <= repeat; r++) for (const c of cases) {
     log(`… ${tier} #${r} ${c.id}`);
-    const rec = await runCase(c, { host, sample, tier, repeat: r, deadlineMs });
+    const rec = await runCase(c, { host, sample: sampleFor ? sampleFor(c) : sample, tier, repeat: r, deadlineMs });
     out.push(rec);
     onRecord(rec);
     const u = rec.usage;

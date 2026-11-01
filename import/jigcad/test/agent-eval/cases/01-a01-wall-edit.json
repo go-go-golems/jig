@@ -1,0 +1,42 @@
+{
+  "id": "a01-wall-edit",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "params"
+  ],
+  "request": "Set the wall thickness to 2.4 mm in the script, recompile, and tell me the new mass.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "wall:\\s*mm\\(2\\.4\\)"
+    },
+    {
+      "kind": "metric",
+      "name": "mass",
+      "approx": 22.505,
+      "tol": 0.01
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "22[.,]5"
+      ]
+    },
+    {
+      "kind": "steps",
+      "max": 12
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', 'wall: mm(2)', 'wall: mm(2.4)');\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The walls are 2.4 mm now; the mass is 22.505 g."
+  }
+}

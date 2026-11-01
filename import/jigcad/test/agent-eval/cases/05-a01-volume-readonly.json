@@ -1,0 +1,34 @@
+{
+  "id": "a01-volume-readonly",
+  "preset": "A-01",
+  "mode": "read",
+  "tags": [
+    "question",
+    "read-only"
+  ],
+  "request": "What are the part's volume and mass?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "15[ ,.]?344",
+        "15[.,]3\\d*\\s*cm"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "19[.,]0\\d*\\s*g"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return program.metrics('volume', 'mass');"
+    ],
+    "answer": "The volume is 15,344.27 mm³ and the mass is 19.03 g."
+  }
+}
