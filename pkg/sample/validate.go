@@ -11,21 +11,37 @@ import (
 
 var toolName = regexp.MustCompile(`^[-A-Za-z0-9_]{1,128}$`)
 
-// ValidateRequest bounds a page-supplied sampling request.
-func ValidateRequest(r Request) error {
-	if len(r.Images) > 4 {
-		return errors.New("At most four images")
+// Image limits: a request carries at most MaxRequestImages (8 MiB together), a tool result at most
+// MaxToolImages (4 MiB together), and one call's conversation at most MaxCallImages.
+const (
+	MaxRequestImages = 4
+	MaxToolImages    = 2
+	MaxCallImages    = 8
+)
+
+// ValidateImages checks prepared images: JPEG, base64, non-empty, at most n of them and limit bytes together.
+func ValidateImages(images []Image, n, limit int) error {
+	if len(images) > n {
+		return errors.Errorf("At most %d images", n)
 	}
 	total := 0
-	for _, image := range r.Images {
+	for _, image := range images {
 		raw, err := base64.StdEncoding.DecodeString(image.Data)
 		if err != nil || image.MimeType != "image/jpeg" || len(raw) == 0 {
 			return errors.New("Invalid prepared image")
 		}
 		total += len(raw)
 	}
-	if total > 8<<20 {
-		return errors.New("Prepared images exceed 8 MiB")
+	if total > limit {
+		return errors.Errorf("Prepared images exceed %d MiB", limit>>20)
+	}
+	return nil
+}
+
+// ValidateRequest bounds a page-supplied sampling request.
+func ValidateRequest(r Request) error {
+	if err := ValidateImages(r.Images, MaxRequestImages, 8<<20); err != nil {
+		return err
 	}
 	var text string
 	if json.Unmarshal(r.Input, &text) != nil {

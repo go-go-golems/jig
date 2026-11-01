@@ -133,3 +133,26 @@ test('the probe needs an available backend', async () => {
     assert.equal(await httpSample('http://127.0.0.1:9/'), null, 'nothing listening');
   } finally { await on.close(); await off.close(); }
 });
+
+test('JIG-006: request images and tool-result images reach the server', async () => {
+  const JPEG = '/9j/4AAQ';
+  let toolBody = null;
+  const b = await backend(async (req, sse, ctx) => {
+    ctx.res.writeHead(200, { 'content-type': 'text/event-stream' });
+    sse('call', { call: 'jc9' });
+    sse('tool', { use: 'u1', name: 'eval', input: { code: 'look()' } });
+    toolBody = await ctx.tool('u1');
+    sse('result', { text: `saw ${req.images.length}`, truncated: false, modelTierApplied: 'default' });
+    ctx.res.end();
+  });
+  try {
+    const looker = { name: 'eval', description: 'x', async execute() { return { [Symbol.for('jigcad.toolImages')]: [{ mimeType: 'image/jpeg', data: JPEG }], value: 'image 1: axo view' }; } };
+    const sample = createHttpSample(b.base);
+    const res = await sample('what is this?', { tools: [looker], images: [{ mimeType: 'image/jpeg', data: JPEG, url: 'data:…', width: 2 }] });
+    assert.equal(res.text, 'saw 1');
+    assert.deepEqual(b.log.find(x => x.url === '/api/sample').body.images, [{ mimeType: 'image/jpeg', data: JPEG }], 'only mimeType and data are sent');
+    assert.deepEqual(toolBody, { value: 'image 1: axo view', isError: false, images: [{ mimeType: 'image/jpeg', data: JPEG }] });
+    await assert.rejects(sample('x', { images: [{ mimeType: 'image/png', data: 'x' }] }), e => e.code === 'invalid_request');
+    await assert.rejects(sample('x', { images: Array(5).fill({ mimeType: 'image/jpeg', data: JPEG }) }), e => e.code === 'invalid_request');
+  } finally { await b.close(); }
+});

@@ -394,3 +394,42 @@ func TestImagesJoinTheLastUserTurn(t *testing.T) {
 	assert.Contains(t, string(raw), "what is this?")
 	assert.Contains(t, string(raw), "data:image/jpeg;base64,/9j/AA==")
 }
+
+func TestToolImagesFollowTheToolResults(t *testing.T) {
+	b, p := setup(t, nil,
+		toolCalls("", [3]string{"call_1", "get_weather", `{"city":"Oslo"}`}),
+		text("A box."))
+	exec := func(ctx context.Context, e sample.Event) (sample.ToolResult, error) {
+		return sample.ToolResult{Value: json.RawMessage(`"image: axo view (attached below)"`),
+			Images: []sample.Image{{MimeType: "image/jpeg", Data: "/9j/AA=="}}}, nil
+	}
+	r := req("what is it?", sample.Options{Model: "lunaroute/small"}, weather)
+	require.NoError(t, b.Sample(context.Background(), r, (&recorder{}).emit, exec))
+	require.Len(t, p.bodies, 2)
+	msgs := p.bodies[1]["messages"].([]any)
+	roles := []string{}
+	for _, m := range msgs {
+		roles = append(roles, m.(map[string]any)["role"].(string))
+	}
+	require.Equal(t, []string{"user", "assistant", "tool", "user"}, roles, "the image message comes after the tool result")
+	assert.Equal(t, "image: axo view (attached below)", msgs[2].(map[string]any)["content"])
+	raw, _ := json.Marshal(msgs[3].(map[string]any)["content"])
+	assert.Contains(t, string(raw), "Images from the tool calls above")
+	assert.Contains(t, string(raw), "from get_weather call call_1")
+	assert.Contains(t, string(raw), "data:image/jpeg;base64,/9j/AA==")
+}
+
+func TestToolImagesAreCappedPerCall(t *testing.T) {
+	c := &call{images: sample.MaxCallImages - 1, vision: true}
+	img := sample.Image{MimeType: "image/jpeg", Data: "/9j/AA=="}
+	blk, ok := c.imageBlock([]toolImages{{id: "a", name: "eval", images: []sample.Image{img, img}}})
+	require.True(t, ok)
+	raw, _ := json.Marshal(blk.Payload)
+	assert.Contains(t, string(raw), "1. from eval call a")
+	assert.Contains(t, string(raw), "not attached (this call already carries 8 images)")
+	assert.Equal(t, sample.MaxCallImages, c.images)
+	blind := &call{}
+	blk, _ = blind.imageBlock([]toolImages{{id: "b", name: "eval", images: []sample.Image{img}}})
+	raw, _ = json.Marshal(blk.Payload)
+	assert.Contains(t, string(raw), "the model does not accept images")
+}

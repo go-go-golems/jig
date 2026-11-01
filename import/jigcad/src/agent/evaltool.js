@@ -58,6 +58,10 @@ export function cut(text, max = RESULT_CUT) {
 // .then/.catch/.finally mark it consumed. What is still unconsumed when the step ends gets a note in the result,
 // with its error if it failed, and shows as a marker wherever it appears in the value or a log line.
 const TRACKED = Symbol('jigcad.trackedPromise');
+// A tool result with images (JIG-006): sample adapters that can carry images send them next to the value (see
+// src/host/sample-http.js); others send the value alone.
+export const TOOL_IMAGES = Symbol.for('jigcad.toolImages');
+export const withImages = (value, images) => ({ [TOOL_IMAGES]: images, value });
 const argText = a => {
   let s;
   // strings in single quotes, as the model writes them (and as YAML quoting leaves them readable)
@@ -133,13 +137,14 @@ export function formatResult(value, logs, error, notes = []) {
 
 /**
  * Run one step's code against a fresh scope.
- * → { text, error: boolean, ms, value }
+ * → { text, error: boolean, ms, value, images: [{ mimeType, data }] (from look()) }
  */
 export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_TIMEOUT_MS, signal } = {}) {
   const logs = [];
   const promises = [];
   const con = makeConsole(logs, markPromises);
-  const scope = trackScope(labScope(host, { readOnly, console: con }), promises);
+  const images = [];
+  const scope = trackScope(labScope(host, { readOnly, console: con, images }), promises);
   delete scope.host;
   const names = Object.keys(scope).filter(k => IDENT.test(k));
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -164,7 +169,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   const ms = Math.round(now() - t0);
   let text;
   try { text = formatResult(value, logs, error, promiseNotes(promises)); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
-  return { text: cut(text), error: !!error, ms, value };
+  return { text: cut(text), error: !!error, ms, value, images };
 }
 
 // ── snapshots ────────────────────────────────────────────────────────────────
@@ -225,8 +230,9 @@ export function createEvalTool(host, { getMode = () => 'auto', onStep = () => {}
       const r = await runEval(host, code, { readOnly: getMode() === 'read', signal: sig, timeoutMs });
       step.running = false; step.result = r.text; step.error = r.error; step.ms = r.ms;
       step.changed = filesChanged(step.snapshot, host);
+      if (r.images.length) step.images = r.images.length;
       onUpdate();
-      return r.text;
+      return r.images.length ? withImages(r.text, r.images) : r.text;
     },
   };
 }

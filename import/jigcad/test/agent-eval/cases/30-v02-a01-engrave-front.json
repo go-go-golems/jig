@@ -1,0 +1,52 @@
+{
+  "id": "v02-a01-engrave-front",
+  "preset": "A-01",
+  "mode": "auto",
+  "needs": [
+    "look"
+  ],
+  "tags": [
+    "visual",
+    "edit",
+    "text",
+    "look"
+  ],
+  "request": "Engrave the text JIG, 10 mm tall and 0.6 mm deep, on the outside of the front face (the −Y side) of the box. Then look at the front view and tell me whether it reads left to right.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "contains": "JIG"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "min": 15200,
+      "max": 15335
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        60,
+        40,
+        30
+      ],
+      "tol": 0.01
+    },
+    {
+      "kind": "stepCode",
+      "matches": "look\\("
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \"{ direction: 'in', id: 'shell' })\", \"{ direction: 'in', id: 'shell' })\\n  .emboss(j.region.text('JIG', { size: 10 }), mm(0.6), { on: j.feat('body').sideFace('outline.bottom'), op: 'cut', id: 'label' })\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };",
+      "return await look('front');"
+    ],
+    "answer": "JIG is cut 0.6 mm into the front face; in the front view it reads left to right."
+  }
+}

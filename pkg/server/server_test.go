@@ -19,7 +19,10 @@ import (
 )
 
 // fake asks the page for one eval tool call, then answers with the tool's result.
-type fake struct{ got chan sample.Request }
+type fake struct {
+	got     chan sample.Request
+	toolRes chan sample.ToolResult
+}
 
 func (f *fake) Models() []sample.Model {
 	return []sample.Model{{Provider: "lunaroute", ID: "glm-5.3-flash", Tier: "default"}}
@@ -38,6 +41,9 @@ func (f *fake) Sample(ctx context.Context, r sample.Request, emit func(sample.Ev
 	if err != nil {
 		emit(sample.Event{Type: "error", Error: &sample.Failure{Code: "cancelled", Message: "cancelled"}})
 		return nil
+	}
+	if f.toolRes != nil {
+		f.toolRes <- res
 	}
 	emit(sample.Event{Type: "usage", Usage: &sample.Usage{Input: 10, Output: 3, Model: "lunaroute/glm-5.3-flash"}})
 	emit(sample.Event{Type: "result", Result: &sample.Result{Text: "The answer is " + string(res.Value), ModelTierApplied: r.Options.ModelTier}})
@@ -234,4 +240,37 @@ func TestTokenAndStatic(t *testing.T) {
 	b, _ := io.ReadAll(r.Body)
 	r.Body.Close()
 	assert.Contains(t, string(b), "jigcad", "static files need no token")
+}
+
+func TestImagesReachTheBackend(t *testing.T) {
+	f := &fake{got: make(chan sample.Request, 1), toolRes: make(chan sample.ToolResult, 1)}
+	ts := httptest.NewServer(New(Config{Sample: f, Log: quiet()}))
+	defer ts.Close()
+	in := `{"input":"what is this?","modelTier":"default","tools":[{"name":"eval","description":"x"}],` +
+		`"images":[{"mimeType":"image/jpeg","data":"/9j/AA=="}]}`
+	resp, err := http.Post(ts.URL+"/api/sample", "application/json", strings.NewReader(in))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	ch := events(t, resp.Body)
+	id := next(t, ch).data["call"].(string)
+	req := <-f.got
+	require.Len(t, req.Images, 1, "request images are passed on (JIG-006: they were dropped)")
+	assert.Equal(t, "image/jpeg", req.Images[0].MimeType)
+	next(t, ch) // text
+	next(t, ch) // tool
+
+	// a tool result with too many images is refused; two are accepted and passed on
+	img := `{"mimeType":"image/jpeg","data":"/9j/AA=="}`
+	r, err := http.Post(ts.URL+"/api/sample/"+id+"/tools/use1", "application/json",
+		strings.NewReader(`{"value":"look","images":[`+img+`,`+img+`,`+img+`]}`))
+	require.NoError(t, err)
+	assert.Equal(t, 400, r.StatusCode)
+	r.Body.Close()
+	r, err = http.Post(ts.URL+"/api/sample/"+id+"/tools/use1", "application/json",
+		strings.NewReader(`{"value":"look","images":[`+img+`,`+img+`]}`))
+	require.NoError(t, err)
+	assert.Equal(t, 200, r.StatusCode)
+	r.Body.Close()
+	assert.Len(t, (<-f.toolRes).Images, 2)
+	assert.Equal(t, "result", next(t, ch).typ)
 }

@@ -4,10 +4,21 @@
 //   sample(turns, { tools, signal, modelTier, model, effort, onText }) → { text, truncated, modelTierApplied, modelApplied?, usage? }
 // rejecting with an Error whose .code is one of the contract codes (and .usage when the server sent it). usage is
 // { input, cacheRead, cacheWrite, output, rounds, toolCalls, model }: jigcad serve's addition, read by tools/agent-eval.
-// Ported from slop-computer web/runtime/src/sample.ts without consent, images and caching.
+// Ported from slop-computer web/runtime/src/sample.ts without consent and caching. Images (JIG-006): o.images go with
+// the request; a tool result may carry images (TOOL_IMAGES), which the server sends after the round's tool results.
 
 export const MAX_PROMPT_BYTES = 256 << 10;
 export const MAX_TOOL_RESULT_BYTES = 32 << 10;
+export const MAX_IMAGES = 4;                 // per call, from the person
+export const MAX_TOOL_IMAGES = 2;            // per tool result
+// a tool's execute() may return { [TOOL_IMAGES]: images, value } (src/agent/evaltool.js withImages)
+const TOOL_IMAGES = Symbol.for('jigcad.toolImages');
+
+function checkImages(images, n) {
+  if (!Array.isArray(images) || images.length > n) throw fail('invalid_request', `at most ${n} images`);
+  for (const im of images) if (!im || im.mimeType !== 'image/jpeg' || typeof im.data !== 'string' || !im.data) throw fail('invalid_request', 'an image is { mimeType: "image/jpeg", data: base64 }');
+  return images.map(im => ({ mimeType: im.mimeType, data: im.data }));
+}
 
 const CODES = new Set(['cancelled', 'prompt_too_large', 'empty_completion', 'rate_limited', 'invalid_request',
   'sampling_disabled', 'authentication_error', 'unauthorized', 'tools_unavailable', 'upstream_error']);
@@ -66,10 +77,11 @@ export function createHttpSample(base = '', fetchImpl = (...a) => fetch(...a)) {
 
   async function runTool(callId, tools, ev, signal) {
     const t = tools.find(x => x.name === ev.name);
-    let value, isError = false;
+    let value, isError = false, images;
     try {
       if (!t) throw new Error('no tool ' + ev.name);
       value = await t.execute(ev.input ?? {}, { signal });
+      if (value && value[TOOL_IMAGES]) { images = checkImages(value[TOOL_IMAGES], MAX_TOOL_IMAGES); value = value.value; }
       if (value === undefined) value = null;
       const s = JSON.stringify(value) ?? 'null';
       if (bytes(s) > MAX_TOOL_RESULT_BYTES) { value = 'The tool result exceeded 32 KB and was dropped.'; isError = true; }
@@ -79,7 +91,7 @@ export function createHttpSample(base = '', fetchImpl = (...a) => fetch(...a)) {
     }
     if (signal.aborted) return;
     await fetchImpl(url(`api/sample/${callId}/tools/${encodeURIComponent(ev.use)}`), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value, isError }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(images && !isError ? { value, isError, images } : { value, isError }),
     }).catch(() => {});
   }
 
@@ -94,6 +106,7 @@ export function createHttpSample(base = '', fetchImpl = (...a) => fetch(...a)) {
       input: prompt, modelTier: tier, model: o.model, effort: o.effort,
       tools: tools.map(t => ({ name: t.name, description: String(t.description ?? ''), inputSchema: t.inputSchema })),
     };
+    if (o.images && o.images.length) body.images = checkImages(o.images, MAX_IMAGES);
     const ctrl = new AbortController();
     let callId = '', text = '', thinking = false;
     const onAbort = () => {

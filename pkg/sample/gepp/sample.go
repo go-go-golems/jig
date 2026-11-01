@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	stdErrors "errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"sync"
@@ -69,6 +70,8 @@ type call struct {
 	mu       sync.Mutex
 	visible  string // the answer so far, across rounds
 	thinking string
+	images   int  // images in the conversation so far (request and tool results)
+	vision   bool // the model accepts images
 }
 
 func (c *call) run(ctx context.Context) error {
@@ -85,6 +88,7 @@ func (c *call) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.images, c.vision = len(c.r.Images), m.Images()
 	registry := tools.NewInMemoryToolRegistry()
 	for _, tool := range c.r.Tools {
 		if err := registry.RegisterTool(tool.Name, tools.ToolDefinition{Name: tool.Name, Description: tool.Description, Parameters: schemaOf(tool.InputSchema)}); err != nil {
@@ -145,11 +149,14 @@ func (c *call) run(ctx context.Context) error {
 			}})
 			return nil
 		}
-		results, err := c.runTools(ctx, calls)
+		results, images, err := c.runTools(ctx, calls)
 		if err != nil {
 			return err
 		}
 		for _, b := range results {
+			turns.AppendBlock(t, b)
+		}
+		if b, ok := c.imageBlock(images); ok {
 			turns.AppendBlock(t, b)
 		}
 	}
@@ -187,17 +194,18 @@ func (c *call) level(ch choice) string {
 
 // runTools sends every tool call of a round to the page at once and waits
 // for all results, in call order.
-func (c *call) runTools(ctx context.Context, calls []toolblocks.ToolCall) ([]turns.Block, error) {
+func (c *call) runTools(ctx context.Context, calls []toolblocks.ToolCall) ([]turns.Block, []toolImages, error) {
 	known := map[string]bool{}
 	for _, t := range c.r.Tools {
 		known[t.Name] = true
 	}
 	for _, tc := range calls {
 		if !known[tc.Name] {
-			return nil, errUnknown
+			return nil, nil, errUnknown
 		}
 	}
 	out := make([]turns.Block, len(calls))
+	imgs := make([]toolImages, len(calls))
 	var g errgroup.Group
 	for i, tc := range calls {
 		g.Go(func() error {
@@ -210,6 +218,7 @@ func (c *call) runTools(ctx context.Context, calls []toolblocks.ToolCall) ([]tur
 				return err
 			}
 			text := resultText(res.Value)
+			imgs[i] = toolImages{id: tc.ID, name: tc.Name, images: res.Images}
 			if res.IsError {
 				out[i] = turns.NewToolUseBlockWithError(tc.ID, nil, text)
 			} else {
@@ -219,9 +228,51 @@ func (c *call) runTools(ctx context.Context, calls []toolblocks.ToolCall) ([]tur
 		})
 	}
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return out, nil
+	return out, imgs, nil
+}
+
+// toolImages are the images one tool call returned.
+type toolImages struct {
+	id, name string
+	images   []sample.Image
+}
+
+// imageBlock turns the images of a round's tool results into one user message that follows the tool results
+// (Chat Completions tool messages carry text only). A caption names the tool call of each image. A call keeps at
+// most sample.MaxCallImages images in its conversation (the request's included); further images are named in the
+// caption as not attached.
+func (c *call) imageBlock(list []toolImages) (turns.Block, bool) {
+	var lines []string
+	var images []map[string]any
+	for _, ti := range list {
+		for _, img := range ti.images {
+			raw, err := base64.StdEncoding.DecodeString(img.Data)
+			if err != nil || len(raw) == 0 {
+				continue
+			}
+			if !c.vision {
+				lines = append(lines, fmt.Sprintf("- from %s call %s: not attached (the model does not accept images)", ti.name, ti.id))
+				continue
+			}
+			if c.images >= sample.MaxCallImages {
+				lines = append(lines, fmt.Sprintf("- from %s call %s: not attached (this call already carries %d images)", ti.name, ti.id, sample.MaxCallImages))
+				continue
+			}
+			c.images++
+			images = append(images, map[string]any{"media_type": img.MimeType, "content": raw})
+			lines = append(lines, fmt.Sprintf("%d. from %s call %s", len(images), ti.name, ti.id))
+		}
+	}
+	if len(lines) == 0 {
+		return turns.Block{}, false
+	}
+	text := "Images from the tool calls above, in order:\n" + strings.Join(lines, "\n")
+	if len(images) == 0 {
+		return turns.NewUserTextBlock(text), true
+	}
+	return turns.NewUserMultimodalBlock(text, images), true
 }
 
 // resultText is a tool result as the model reads it: a JSON string as its

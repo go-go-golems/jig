@@ -11,6 +11,7 @@ import * as workbench from '../ui/markdown.js';
 import { firstLine } from './prompt.js';
 import { followLink } from './links.js';
 import { httpSample } from '../host/sample-http.js';
+import { prepareImage, imageFiles, MAX_ATTACH } from './images.js';
 
 export { reference };
 
@@ -28,7 +29,7 @@ export const DEFAULT_TRIES = [
 const PLACEHOLDER = 'Ask the agent: “make the walls 2.4 mm and check the mass”, “round the top edges”, “why is the sketch under-constrained?”';
 
 // ── module state: threads, the active thread, settings (saved per browser) ────
-const S = { threads: null, active: null, settings: null, busy: false, runningId: null, ctl: null, draft: '', off: null };
+const S = { threads: null, active: null, settings: null, busy: false, runningId: null, ctl: null, draft: '', off: null, images: [] };
 const listeners = new Set();
 const OPEN = new WeakSet();
 const rerender = () => { for (const f of listeners) f(); };
@@ -169,6 +170,7 @@ export function AgentPanel({ host, sample: sampleProp }) {
   ensureCss();
   const [, force] = useReducer(x => x + 1, 0);
   const logRef = useRef(null);
+  const fileRef = useRef(null);         // the hidden file input of the Image… button
   const sampleRef = useRef(undefined);   // undefined: not known yet; null: unavailable; function: Claude
   const re = () => force();
 
@@ -208,12 +210,13 @@ export function AgentPanel({ host, sample: sampleProp }) {
     if (typeof sample !== 'function') { S.off = OFF_AT_SEND; re(); return; }
     const thread = activeThread();
     const ctl = new AbortController();
-    S.busy = true; S.runningId = thread.id; S.ctl = ctl; S.draft = '';
+    const images = S.images.map(({ mimeType, data }) => ({ mimeType, data }));
+    S.busy = true; S.runningId = thread.id; S.ctl = ctl; S.draft = ''; S.images = [];
     persist(); rerender();
     try {
       // shell, round 2: the Reference as the workbench shows it (the language reference, then this lab API)
       const ref = (host && typeof host.reference === 'function' && host.reference()) || reference;
-      const r = await runTurn({ host, sample, thread, text, settings: S.settings, reference: ref, signal: ctl.signal, onUpdate: rerender });
+      const r = await runTurn({ host, sample, thread, text, images, settings: S.settings, reference: ref, signal: ctl.signal, onUpdate: rerender });
       if (r.off) S.off = r.off;
     } finally {
       S.busy = false; S.runningId = null; S.ctl = null;
@@ -239,6 +242,15 @@ export function AgentPanel({ host, sample: sampleProp }) {
     const fail = () => host.toast && host.toast('Copying is not allowed here', 'error');
     try { navigator.clipboard.writeText(code).then(done, fail); } catch { fail(); }
   };
+  // JIG-006: pasted or attached images go with the next message (at most MAX_ATTACH, re-encoded as JPEG)
+  async function attach(files) {
+    for (const f of files) {
+      if (S.images.length >= MAX_ATTACH) { host.toast && host.toast(`At most ${MAX_ATTACH} images per message`, 'error'); break; }
+      try { S.images.push(await prepareImage(f)); } catch { host.toast && host.toast('That image could not be read', 'error'); }
+    }
+    rerender();
+  }
+  const onPaste = e => { const fs = imageFiles(e.clipboardData && e.clipboardData.items); if (fs.length) { e.preventDefault(); attach(fs); } };
   const onKey = e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
   };
@@ -274,7 +286,7 @@ export function AgentPanel({ host, sample: sampleProp }) {
             </div>
           </div>
         ) : th.turns.map((t, i) => t.role === 'user'
-          ? <div class="msg user" key={i}><span class="who">You</span><div class="body">{t.text}</div></div>
+          ? <div class="msg user" key={i}><span class="who">You</span><div class="body">{t.text}{t.images ? <span class="imgs"> · {t.images} image{t.images > 1 ? 's' : ''}</span> : null}</div></div>
           : <AgentTurn key={i} host={host} turn={t} onRevert={onRevert} onCopy={onCopy} />)}
       </div>
       {frNames.length ? (
@@ -291,8 +303,20 @@ export function AgentPanel({ host, sample: sampleProp }) {
       ) : null}
       <div class="composer">
         <textarea placeholder={PLACEHOLDER} aria-label="Message to the agent" value={S.draft}
-          onInput={e => { S.draft = e.currentTarget.value; rerender(); }} onKeyDown={onKey} />
+          onInput={e => { S.draft = e.currentTarget.value; rerender(); }} onKeyDown={onKey} onPaste={onPaste} />
+        {S.images.length ? (
+          <div class="thumbs">
+            {S.images.map((im, i) => (
+              <span class="thumb" key={i}><img src={im.url} alt={`attached image ${i + 1}, ${im.width} × ${im.height}`} />
+                <button class="x" aria-label={`Remove image ${i + 1}`} onClick={() => { S.images.splice(i, 1); rerender(); }}>×</button></span>
+            ))}
+          </div>
+        ) : null}
         <div class="row">
+          <button class="btn" title="Attach images (or paste them into the message)" disabled={S.busy || S.images.length >= MAX_ATTACH}
+            onClick={() => fileRef.current && fileRef.current.click()}>Image…</button>
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+            onChange={e => { const fs = [...(e.currentTarget.files || [])]; e.currentTarget.value = ''; attach(fs); }} />
           <span class="meta">Enter sends · Shift+Enter for a new line · {mode.meta}</span>
           {S.busy
             ? <button class="btn danger" onClick={stop}>Stop</button>

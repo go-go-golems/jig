@@ -49,11 +49,11 @@ export const newThread = () => ({ id: 'a' + Date.now().toString(36) + Math.rando
  *       signal (Stop), onUpdate() after every change, timeoutMs (tests).
  * → { ok, off? } where off is the banner sentence when the agent cannot work here.
  */
-export async function runTurn({ host, sample, thread, text, settings, reference = '', signal, onUpdate = () => {}, timeoutMs }) {
+export async function runTurn({ host, sample, thread, text, images = [], settings, reference = '', signal, onUpdate = () => {}, timeoutMs }) {
   text = String(text || '').trim();
   if (!text) return { ok: false };
   if (!sample) return { ok: false, off: OFF_AT_SEND };
-  thread.turns.push({ role: 'user', text });
+  thread.turns.push(images.length ? { role: 'user', text, images: images.length } : { role: 'user', text });   // the count, not the bytes
   if (thread.title === 'New thread') thread.title = text.slice(0, THREAD_TITLE);
   const turn = { role: 'agent', text: '', steps: [], pending: true };
   thread.turns.push(turn);
@@ -69,6 +69,7 @@ export async function runTurn({ host, sample, thread, text, settings, reference 
   const turns = toTurns(host, { ...thread, turns: thread.turns.slice(0, -1) }, reference);
   const opts = { tools: [tool], signal, modelTier: settings.tier || 'default', cache: false, onText: ({ text: t }) => { turn.text = t; onUpdate(); } };
   if (settings.effort) opts.effort = settings.effort;
+  if (images.length) opts.images = images;
   let off = null;
   try {
     const res = await sample(turns, opts);
@@ -112,7 +113,7 @@ export function save(key, value) {
 export function trimThreads(threads) {
   return threads.map(th => ({
     id: th.id, title: th.title,
-    turns: th.turns.slice(-TURNS_STORED).map(t => t.role === 'user' ? { role: 'user', text: t.text } : {
+    turns: th.turns.slice(-TURNS_STORED).map(t => t.role === 'user' ? { role: 'user', text: t.text, ...(t.images ? { images: t.images } : {}) } : {
       role: 'agent', text: t.text, ...(t.note ? { note: t.note } : {}),
       steps: (t.steps || []).map(s => ({
         code: s.code, ms: s.ms, error: !!s.error, changed: !!s.changed, reverted: !!s.reverted,

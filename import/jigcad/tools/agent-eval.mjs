@@ -2,11 +2,13 @@
 // engine (in this process) and a model backend (jigcad serve), then write results.jsonl and summary.md.
 //
 //   node tools/agent-eval.mjs [--base http://127.0.0.1:8787/] [--tiers default,complex] [--repeat 1]
-//                             [--cases a01-,s01] [--out DIR] [--deadline 300] [--compute rust|js] [--oracle]
+//                             [--cases a01-,s01] [--out DIR] [--deadline 300] [--compute rust|js] [--oracle] [--look chrome]
 //
 // --oracle replaces the model with each case's oracle turn (a known-good scripted turn): no network, checks the
 // harness and the cases. Prerequisites: `node build.mjs` (src/generated/content.json, dist/jig_compute.wasm) and,
-// unless --oracle, a running `jigcad serve` with models.
+// unless --oracle, a running `jigcad serve` with models. --look chrome makes look() work: the sheet is drawn by the
+// workbench in headless Chrome, opened on --base (so `jigcad serve` must serve a current dist/); without it, cases
+// that need look ("needs": ["look"]) are skipped.
 import { register } from 'node:module';
 import { existsSync, mkdirSync, appendFileSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
@@ -16,7 +18,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 register(new URL('./agent-eval/loader.mjs', import.meta.url).href);
 
 function flags(argv) {
-  const o = { base: 'http://127.0.0.1:8787/', tiers: 'default,complex', repeat: '1', cases: '', out: '', deadline: '300', compute: 'rust', oracle: false };
+  const o = { base: 'http://127.0.0.1:8787/', tiers: 'default,complex', repeat: '1', cases: '', out: '', deadline: '300', compute: 'rust', oracle: false, look: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--oracle') o.oracle = true;
@@ -26,7 +28,7 @@ function flags(argv) {
   return o;
 }
 const o = flags(process.argv.slice(2));
-if (o.help) { console.log('usage: node tools/agent-eval.mjs [--base URL] [--tiers default,complex] [--repeat n] [--cases ids] [--out DIR] [--deadline s] [--compute rust|js] [--oracle]'); process.exit(0); }
+if (o.help) { console.log('usage: node tools/agent-eval.mjs [--base URL] [--tiers default,complex] [--repeat n] [--cases ids] [--out DIR] [--deadline s] [--compute rust|js] [--oracle] [--look chrome]'); process.exit(0); }
 
 for (const [path, fix] of [['src/generated/content.json', 'node build.mjs'], ['vendor/occt/replicad_single.wasm', 'gunzip -k vendor/occt/replicad_single.wasm.gz']]) {
   if (!existsSync(join(ROOT, path))) { console.error(`missing ${path}: run \`${fix}\` in import/jigcad`); process.exit(2); }
@@ -38,7 +40,13 @@ const { summarise, markdown } = await import('./agent-eval/report.mjs');
 const { Host } = await import('../src/host/host.js');
 const { httpSample } = await import('../src/host/sample-http.js');
 
-const cases = loadCases(join(ROOT, 'test/agent-eval/cases'), o.cases);
+let cases = loadCases(join(ROOT, 'test/agent-eval/cases'), o.cases);
+if (o.look && o.look !== 'chrome') { console.error(`--look is chrome (got '${o.look}')`); process.exit(2); }
+if (!o.look) {
+  const skipped = cases.filter(c => (c.needs || []).includes('look')).map(c => c.id);
+  if (skipped.length) console.log(`skipping ${skipped.length} cases that need look() (use --look chrome): ${skipped.join(', ')}`);
+  cases = cases.filter(c => !(c.needs || []).includes('look'));
+}
 if (!cases.length) { console.error(`no cases match '${o.cases}'`); process.exit(2); }
 
 let sample = null, info = null;
@@ -50,7 +58,12 @@ if (!o.oracle) {
 }
 
 const engine = await createNodeEngine({ compute: o.compute });
-const host = new Host({ engine });
+let looker = null;
+if (o.look === 'chrome') {
+  const { startChromeLook } = await import('./agent-eval/chrome-look.mjs');
+  looker = await startChromeLook({ base: o.base.endsWith('/') ? o.base : o.base + '/', log: console.log });
+}
+const host = new Host({ engine, renderView: looker ? a => looker.render({ presetId: host.preset?.id, ...a }) : null });
 await engine.ready;
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -60,7 +73,7 @@ const jsonl = join(out, 'results.jsonl');
 writeFileSync(jsonl, '');
 const tiers = o.oracle ? ['oracle'] : o.tiers.split(',').map(s => s.trim()).filter(Boolean);
 const meta = { stamp, base: o.oracle ? 'oracle' : o.base, repeat: +o.repeat, compute: engine.compute?.kind, tiers, cases: cases.map(c => c.id),
-  tierModels: info?.tiers ?? null, maxRounds: info?.maxRounds ?? null, engine: engine.version };
+  tierModels: info?.tiers ?? null, maxRounds: info?.maxRounds ?? null, engine: engine.version, look: o.look || null };
 writeFileSync(join(out, 'meta.json'), JSON.stringify(meta, null, 2));
 console.log(`agent-eval: ${cases.length} cases × ${tiers.join(', ')} × ${o.repeat} → ${out}`);
 if (info) console.log(`backend: ${JSON.stringify(info.tiers)} · max rounds ${info.maxRounds} · engine ${engine.compute?.kind}`);
@@ -77,4 +90,5 @@ const md = markdown(summary, meta);
 writeFileSync(join(out, 'summary.md'), md);
 writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2));
 console.log('\n' + md);
+if (looker) { console.log(`look: ${looker.stats.renders} renders, ${Math.round(looker.stats.ms)} ms`); looker.close(); }
 process.exit(records.some(r => r.outcome === 'setup_error') ? 1 : 0);

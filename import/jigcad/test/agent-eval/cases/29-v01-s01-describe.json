@@ -1,0 +1,46 @@
+{
+  "id": "v01-s01-describe",
+  "preset": "S-01",
+  "mode": "read",
+  "needs": [
+    "look"
+  ],
+  "tags": [
+    "visual",
+    "question",
+    "look"
+  ],
+  "request": "Look at the part from the side and describe its outline: what shape is it, and what does each part of the outline do?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "stepCode",
+      "matches": "look\\("
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "hook",
+        "\\bC\\b",
+        "C-shape",
+        "jaw",
+        "clip"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "cable",
+        "desk"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return await look('side');"
+    ],
+    "answer": "A C-shaped clip: the top jaw and the hook grip the desk edge, and the channel under it holds the cable."
+  }
+}

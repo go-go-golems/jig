@@ -165,3 +165,52 @@ test('the same call written twice gets one note with a count', async () => {
   const r = await runEval(host, "faces('%plane'); faces('%plane'); return 1;");
   assert.match(r.text, /never awaited \(2×\)/);
 });
+
+// ── JIG-006: look() ──────────────────────────────────────────────────────────
+import { TOOL_IMAGES } from '../../src/agent/evaltool.js';
+const JPEG = '/9j/4AAQSkZJRg==';
+const drawingHost = () => {
+  const host = createMockHost(), calls = [];
+  host.renderView = async o => { calls.push(o); return { mimeType: 'image/jpeg', data: JPEG, width: o.width, height: o.height, view: o.view || 'axo' }; };
+  return { host, calls };
+};
+
+test('look() attaches a JPEG to the step and says so; at most two per step', async () => {
+  const { host, calls } = drawingHost();
+  const r = await runEval(host, "const a = await look('front', { width: 800 }); return a;");
+  assert.equal(r.error, false, r.text);
+  assert.match(r.text, /image 1: front view, 800 × 600 px, \d+ KB, attached after the tool results/);
+  assert.deepEqual(r.images, [{ mimeType: 'image/jpeg', data: JPEG }]);
+  assert.deepEqual(calls[0], { view: 'front', width: 800, height: 600, overlays: null });
+  const three = await runEval(host, 'await look(); await look(); await look();');
+  assert.equal(three.error, true);
+  assert.match(three.text, /at most 2 images per step/);
+  assert.equal(three.images.length, 2, 'the two that were drawn still go');
+  const bad = await runEval(host, "await look('iso')");
+  assert.match(bad.text, /the view is axo, front, side or plan/);
+  const tiny = await runEval(host, 'return await look({ width: 10000, height: 5 })');
+  assert.deepEqual([calls.at(-1).width, calls.at(-1).height], [1600, 64]);
+  assert.equal(tiny.error, false);
+});
+
+test('look() works in read mode; without a drawing host it explains', async () => {
+  const { host } = drawingHost();
+  const r = await runEval(host, 'return await look()', { readOnly: true });
+  assert.equal(r.error, false, r.text);
+  const plain = createMockHost();
+  const r2 = await runEval(plain, 'return await look()');
+  assert.match(r2.text, /look: this workbench cannot draw here/);
+});
+
+test('the eval tool returns images with its text so the adapter can send them', async () => {
+  const { host } = drawingHost();
+  const steps = [];
+  const tool = createEvalTool(host, { onStep: s => steps.push(s) });
+  const out = await tool.execute({ code: 'return await look()' });
+  assert.equal(typeof out, 'object');
+  assert.match(out.value, /image 1: axo view/);
+  assert.equal(out[TOOL_IMAGES].length, 1);
+  assert.equal(steps[0].images, 1);
+  const plain = await tool.execute({ code: 'return 1' });
+  assert.equal(plain, '1', 'a step without images returns its text as before');
+});

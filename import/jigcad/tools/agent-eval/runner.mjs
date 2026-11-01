@@ -24,7 +24,7 @@ const cut = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n)
 export function loadCases(dir, filter = '') {
   const parts = String(filter || '').split(',').map(s => s.trim()).filter(Boolean);
   return readdirSync(dir).filter(f => f.endsWith('.json')).sort()
-    .map(f => ({ file: f, ...JSON.parse(readFileSync(join(dir, f), 'utf8')) }))
+    .map(f => ({ file: f, dir, ...JSON.parse(readFileSync(join(dir, f), 'utf8')) }))
     .filter(c => !parts.length || parts.some(p => c.id.includes(p)));
 }
 
@@ -62,6 +62,11 @@ export function noteCode(note) {
   if (!note) return 'ok';
   const hit = Object.entries(NOTES).find(([, sentence]) => sentence === note);
   return hit ? hit[0] : 'interrupted';
+}
+
+/** A case's images (file names in test/agent-eval/images, JPEG) as { mimeType, data }. */
+export function caseImages(c) {
+  return (c.images || []).map(f => ({ mimeType: 'image/jpeg', data: readFileSync(join(c.dir || '.', '..', 'images', f)).toString('base64') }));
 }
 
 /** Usage of several turns added up (the model name of the last). */
@@ -107,12 +112,13 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
   const t0 = performance.now();
   // one request, or a conversation: followUps run as further turns of the same thread, each after the last finished
   const requests = [c.request, ...(c.followUps || [])];
+  const images = caseImages(c);                    // JIG-006: pictures sent with the first request
   const usages = [];
   try {
     for (const text of requests) {
       if (ctl.signal.aborted) break;
       cap.usage = null;
-      await runTurn({ host, sample: cap.fn, thread, text, settings: { mode, tier, effort: c.effort || '' },
+      await runTurn({ host, sample: cap.fn, thread, text, images: text === c.request ? images : [], settings: { mode, tier, effort: c.effort || '' },
         reference: host.reference(), signal: ctl.signal, onUpdate: mode === 'ask' ? approve : () => {} });
       if (cap.usage) usages.push(cap.usage);
     }

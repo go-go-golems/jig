@@ -31,6 +31,7 @@ import (
 const (
 	MaxPromptBytes     = 256 << 10         // the input text of one call
 	MaxToolResultBytes = 32 << 10          // one tool result
+	maxImageBody       = 12 << 20          // base64 of the images a request or tool result may carry
 	MaxTools           = 16                // enforced by sample.ValidateRequest
 	toolWait           = 150 * time.Second // how long a call waits for one tool result
 )
@@ -169,15 +170,16 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 		Model     string          `json:"model"`
 		Effort    string          `json:"effort"`
 		Tools     []sample.Tool   `json:"tools"`
+		Images    []sample.Image  `json:"images"`
 	}
-	if err := readJSON(w, r, &in, MaxPromptBytes+1<<20); err != nil {
+	if err := readJSON(w, r, &in, MaxPromptBytes+1<<20+maxImageBody); err != nil {
 		fail(w, 400, "invalid_request", "Send {input, modelTier, …}")
 		return
 	}
 	if in.ModelTier == "" || in.ModelTier == "inherit" {
 		in.ModelTier = "default"
 	}
-	req := sample.Request{CallID: "jc" + randomID(), Input: in.Input, Tools: in.Tools,
+	req := sample.Request{CallID: "jc" + randomID(), Input: in.Input, Tools: in.Tools, Images: in.Images,
 		Options: sample.Options{ModelTier: in.ModelTier, Model: in.Model, Effort: in.Effort}, MaxRounds: s.rounds()}
 	if err := sample.ValidateRequest(req); err != nil {
 		code := "invalid_request"
@@ -280,9 +282,14 @@ func (s *Server) toolResult(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Value   json.RawMessage `json:"value"`
 		IsError bool            `json:"isError"`
+		Images  []sample.Image  `json:"images"`
 	}
-	if err := readJSON(w, r, &in, MaxToolResultBytes+1<<10); err != nil || len(in.Value) > MaxToolResultBytes {
-		fail(w, 400, "invalid_request", "A tool result is {value, isError} of at most 32 KB")
+	if err := readJSON(w, r, &in, MaxToolResultBytes+1<<10+maxImageBody/2); err != nil || len(in.Value) > MaxToolResultBytes {
+		fail(w, 400, "invalid_request", "A tool result is {value, isError, images?}: a value of at most 32 KB")
+		return
+	}
+	if err := sample.ValidateImages(in.Images, sample.MaxToolImages, 4<<20); err != nil {
+		fail(w, 400, "invalid_request", err.Error())
 		return
 	}
 	var ch chan sample.ToolResult
@@ -296,7 +303,7 @@ func (s *Server) toolResult(w http.ResponseWriter, r *http.Request) {
 	if len(in.Value) == 0 {
 		in.Value = json.RawMessage("null")
 	}
-	ch <- sample.ToolResult{Value: in.Value, IsError: in.IsError}
+	ch <- sample.ToolResult{Value: in.Value, IsError: in.IsError, Images: in.Images}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 

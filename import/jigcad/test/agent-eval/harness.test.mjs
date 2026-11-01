@@ -75,7 +75,8 @@ test('summaries aggregate per tier and per case', () => {
 
 // ── runCase on the real engine with a scripted model ─────────────────────────
 const engine = await createNodeEngine();
-const host = new Host({ engine });
+// look() needs a drawing host; a stand-in JPEG is enough for the runner and the oracles (the CLI's --look chrome draws)
+const host = new Host({ engine, renderView: async a => ({ mimeType: 'image/jpeg', data: '/9j/4AAQ', width: a.width, height: a.height, view: a.view }) });
 await engine.ready;
 
 /** A sample that runs the given eval codes in order, then answers. */
@@ -153,7 +154,7 @@ test('captureUsage keeps error usage; noteCode maps turn notes back to codes', a
 });
 
 // ── the case set: every case is well formed, and its oracle (a known-good turn) passes it ─────────────────────
-const { loadCases, oracleSample } = await import('../../tools/agent-eval/runner.mjs');
+const { loadCases, oracleSample, caseImages } = await import('../../tools/agent-eval/runner.mjs');
 const { CHECKS } = await import('../../tools/agent-eval/checks.mjs');
 const CASES = loadCases(new URL('./cases/', import.meta.url).pathname);
 
@@ -167,6 +168,8 @@ test('cases are well formed', () => {
     assert.ok(c.request && c.checks?.length, `${c.id}: request and checks`);
     for (const ch of c.checks) assert.ok(CHECKS[ch.kind], `${c.id}: unknown check ${ch.kind}`);
     assert.ok(c.oracle, `${c.id}: oracle`);
+    for (const f of c.images || []) assert.ok(caseImages({ ...c, images: [f] })[0].data.length > 100, `${c.id}: image ${f}`);
+    for (const n of c.needs || []) assert.ok(['look'].includes(n), `${c.id}: unknown need ${n}`);
     if (c.followUps) assert.equal(c.oracle.turns?.length, c.followUps.length + 1, `${c.id}: one oracle turn per request`);
   }
 });
@@ -204,3 +207,12 @@ test('followUps run as further turns of one thread; checks see the final state a
   assert.equal(one.pass, false);
 });
 function byIdOr(id) { return CASES.find(c => c.id === id); }
+
+test('JIG-006: a case\'s images go with the first request only', async () => {
+  const c = CASES.find(x => x.id === 'v03-a01-footprint-drawing');
+  const seen = [];
+  const spy = async (turns, opts) => { seen.push(opts.images ? opts.images.length : 0); return oracleSample(c)(turns, opts); };
+  const r = await runCase({ ...c, followUps: ['thanks'], oracle: { turns: [c.oracle, { steps: [], answer: 'ok' }] } }, { host, sample: spy });
+  assert.deepEqual(seen, [1, 0]);
+  assert.equal(r.pass, true, JSON.stringify(r.checks));
+});

@@ -181,3 +181,18 @@ test('the context block shows live state, each line only when it applies', async
   await host.compile();
   assert.match(context(host), /\ncompile: FAILS — .* \(the view shows the last good compile\)\n/);
 });
+
+test('JIG-006: images go to the sample call; the thread keeps their count only', async () => {
+  const { runTurn, newThread, trimThreads } = await import('../../src/agent/turn.js');
+  const { createMockHost } = await import('./mock-host.js');
+  const host = createMockHost(), thread = newThread();
+  let seen = null;
+  const sample = async (turns, opts) => { seen = opts.images; return { text: 'a box' }; };
+  const images = [{ mimeType: 'image/jpeg', data: '/9j/' }];
+  await runTurn({ host, sample, thread, text: 'what is this?', images, settings: { mode: 'auto' } });
+  assert.deepEqual(seen, images);
+  assert.equal(thread.turns[0].images, 1);
+  assert.equal(JSON.stringify(trimThreads([thread])).includes('/9j/'), false, 'no image bytes are stored');
+  await runTurn({ host, sample, thread, text: 'and now?', settings: { mode: 'auto' } });
+  assert.equal(seen, undefined, 'a message without images sends none');
+});

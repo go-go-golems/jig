@@ -425,7 +425,10 @@ function makeLab(host, guard) {
 }
 
 // ── the scope ────────────────────────────────────────────────────────────────
-export function labScope(host, { readOnly = false, console: con } = {}) {
+export const LOOK_MAX = 2;          // images per step
+const LOOK_VIEWS = ['axo', 'front', 'side', 'plan'];
+
+export function labScope(host, { readOnly = false, console: con, images = null } = {}) {
   const off = name => () => { throw new Error(`read-only mode: ${name} is off`); };
   const guard = name => { if (readOnly) throw new Error(`read-only mode: ${name} is off`); };
 
@@ -576,6 +579,22 @@ export function labScope(host, { readOnly = false, console: con } = {}) {
     lab,
   };
   if (con) { scope.console = con; scope.log = con.log; }
+
+  // look(view?, { width, height, overlays }): draw the sheet to a JPEG that reaches the model after this round's
+  // tool results (JIG-006). The step's value says what was attached.
+  scope.look = async function look(name, o = {}) {
+    if (name && typeof name === 'object') { o = name; name = o.view; }
+    if (!images) throw new Error('look: images do not reach the model from here');
+    if (typeof host.renderView !== 'function') throw new Error('look: this workbench cannot draw here');
+    if (images.length >= LOOK_MAX) throw new Error(`look: at most ${LOOK_MAX} images per step`);
+    if (name != null && !LOOK_VIEWS.includes(name)) throw new Error('look: the view is axo, front, side or plan');
+    const px = (v, d) => Math.max(64, Math.min(1600, Math.round(Number(v) || d)));
+    const width = px(o.width, 640), height = px(o.height, width * 3 / 4);
+    const shot = await host.renderView({ view: name || null, width, height, overlays: o.overlays || null });
+    images.push({ mimeType: shot.mimeType, data: shot.data });
+    const kb = Math.round(shot.data.length * 3 / 4 / 1024);
+    return `image ${images.length}: ${shot.view} view, ${shot.width} × ${shot.height} px, ${kb} KB, attached after the tool results`;
+  };
 
   if (readOnly) {
     files.write = off('files.write');

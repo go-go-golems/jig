@@ -96,6 +96,9 @@ type Usage struct {
 type ToolResult struct {
 	Value   json.RawMessage `json:"value"`
 	IsError bool            `json:"isError"`
+	// Images a tool produced (JIG-006: the lab's look()). Tool messages carry text only, so the backend sends them
+	// as a user message after the round's tool results.
+	Images []Image `json:"images,omitempty"`
 }
 type ExecuteTool func(context.Context, Event) (ToolResult, error)
 type Backend interface {

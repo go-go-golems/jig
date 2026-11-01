@@ -52,7 +52,10 @@ const DEBOUNCE_MS = 140;
 export class Host {
   // engine: an engine client to use instead of the worker (Node tools such as tools/agent-eval.mjs pass one built on
   // src/engine/worker.js handle(); it needs ready, request(op, args), compute and initMs).
-  constructor({ forceMock = false, forceJsCompute = false, engine = null } = {}) {
+  // renderView: a function that draws a view to a JPEG where there is no document (the agent-eval harness passes one
+  // that renders in headless Chrome); in a page, renderView() draws with the stage's own draw().
+  constructor({ forceMock = false, forceJsCompute = false, engine = null, renderView = null } = {}) {
+    this.viewRenderer = renderView;
     this.content = content;
     this.files = new Map();
     this.published = {};
@@ -467,6 +470,25 @@ export class Host {
   selectNode(id) {
     this.node = id || null;
     this.emit('node', this.node);
+  }
+  /**
+   * Draw the program (the last good one if the current one failed) to a JPEG without moving the person's view.
+   * view: axo | front | side | plan (default: the current view, orbit and zoom included); width/height in px.
+   * → { mimeType: 'image/jpeg', data: base64, width, height, view }
+   */
+  async renderView({ view = null, width = 640, height = 480, overlays = null, quality = 0.85 } = {}) {
+    const name = view || this.view.name || 'axo';
+    if (this.viewRenderer) return this.viewRenderer({ files: Object.fromEntries(this.files), overrides: { ...(this.overrides || {}) }, view: name, width, height, overlays });
+    if (typeof document === 'undefined') throw new Error('look: this workbench cannot draw here');
+    const prog = this.program?.ok !== false ? this.program : this.lastGood;
+    if (!prog) throw new Error('look: nothing compiled yet');
+    const { draw } = await import('../stage/sheet.js');
+    const v = name === this.view.name ? { ...this.view } : { ...this.view, name, ...squareView() };
+    if (overlays) v.overlays = new Set(overlays);
+    const canvas = document.createElement('canvas');
+    draw(canvas, prog, v, { width, height, dpr: 1, overlays: v.overlays, sheet: this.preset?.id || 'J-01', colorsFrom: document.documentElement });
+    const url = canvas.toDataURL('image/jpeg', quality);
+    return { mimeType: 'image/jpeg', data: url.slice(url.indexOf(',') + 1), width, height, view: name };
   }
   setView(patch = {}) {
     const next = { ...this.view, ...patch };
