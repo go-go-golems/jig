@@ -1,7 +1,7 @@
 ---
 Title: 'Sketches in the 3D view: a Show-in-3D checkbox per sketch, and back to the part means the part'
 Ticket: JIG-010-SKETCH-3D
-Status: active
+Status: complete
 Topics:
     - stage
     - ui
@@ -11,7 +11,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-01T12:36:24.626134698-05:00
+LastUpdated: 2026-11-01T12:36:58.44143816-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
