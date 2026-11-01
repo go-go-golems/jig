@@ -1,7 +1,7 @@
 ---
 Title: 'Warnings the agent can read: run() and check() report warning text, correct noEffect hints, measured'
 Ticket: JIG-009-WARNINGS
-Status: active
+Status: complete
 Topics:
     - agent
     - testing
@@ -11,7 +11,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-01T12:00:52.09539613-05:00
+LastUpdated: 2026-11-01T13:00:50.801046105-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
