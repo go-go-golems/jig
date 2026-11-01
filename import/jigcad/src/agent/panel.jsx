@@ -4,13 +4,15 @@
 import { useEffect, useLayoutEffect, useReducer, useRef } from 'preact/hooks';
 import css from './agent.css';
 import reference from './reference.md';
-import { runTurn, revertStep, newThread, load, save, trimThreads, OFF_TITLE, OFF_AT_LOAD, OFF_AT_SEND } from './turn.js';
+import { runTurn, revertStep, newThread, archiveThread, ARCHIVE_MAX, load, save, trimThreads, OFF_TITLE, OFF_AT_LOAD, OFF_AT_SEND } from './turn.js';
 import { highlight } from './highlight.js';
 import { renderMarkdown } from './markdown.js';
 import * as workbench from '../ui/markdown.js';
 import { firstLine } from './prompt.js';
 import { followLink } from './links.js';
 import { httpSample } from '../host/sample-http.js';
+import { threadMarkdown, transcriptFilename } from './transcript.js';
+import { saveOrCopy } from '../ui/save.js';
 import { prepareImage, imageFiles, MAX_ATTACH } from './images.js';
 
 export { reference };
@@ -29,7 +31,7 @@ export const DEFAULT_TRIES = [
 const PLACEHOLDER = 'Ask the agent: “make the walls 2.4 mm and check the mass”, “round the top edges”, “why is the sketch under-constrained?”';
 
 // ── module state: threads, the active thread, settings (saved per browser) ────
-const S = { threads: null, active: null, settings: null, busy: false, runningId: null, ctl: null, draft: '', off: null, images: [] };
+const S = { threads: null, archive: [], view: 'chat', active: null, settings: null, busy: false, runningId: null, ctl: null, draft: '', off: null, images: [] };
 const listeners = new Set();
 const OPEN = new WeakSet();
 const rerender = () => { for (const f of listeners) f(); };
@@ -38,6 +40,8 @@ function init() {
   if (S.threads) return;
   const th = load('agent.threads', null);
   S.threads = Array.isArray(th) && th.length ? th : [newThread()];
+  const ar = load('agent.archive', null);
+  S.archive = Array.isArray(ar) ? ar : [];
   const a = load('agent.thread', null);
   S.active = S.threads.some(t => t.id === a) ? a : S.threads[0].id;
   const st = load('agent.settings', null) || {};
@@ -49,6 +53,8 @@ function init() {
 }
 function persist() {
   save('agent.threads', trimThreads(S.threads));
+  // the archive gives way when storage is full: the oldest closed threads go first
+  while (!save('agent.archive', trimThreads(S.archive)) && S.archive.length) S.archive = S.archive.slice(0, -1);
   save('agent.thread', S.active);
   save('agent.settings', S.settings);
 }
@@ -192,6 +198,35 @@ function AgentTurn({ host, turn, onRevert, onCopy }) {
   );
 }
 
+// Every thread: the open ones (tabs) and the closed ones (the archive, newest first), to reopen or download.
+const when = ms => { if (!ms) return ''; const d = new Date(ms); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); };
+function History({ open, archive, activeId, busy, onSelect, onReopen, onDownload, onForget, onDownloadAll, onBack }) {
+  const row = (t, isOpen) => {
+    const n = t.turns.filter(x => x.role === 'user').length;
+    return (
+      <div class={'hrow' + (t.id === activeId ? ' on' : '')} key={t.id}>
+        <button class="ht" title={t.title} onClick={() => (isOpen ? onSelect(t.id) : onReopen(t.id))}>{t.title}</button>
+        <span class="hm">{[t.preset, `${n} message${n === 1 ? '' : 's'}`, when(t.updated || t.closed || t.created)].filter(Boolean).join(' · ')}</span>
+        <span class="ha">
+          <button class="link" onClick={() => (isOpen ? onSelect(t.id) : onReopen(t.id))}>open</button>
+          <button class="link" disabled={!t.turns.length} onClick={() => onDownload(t)}>download</button>
+          {isOpen ? null : <button class="link" onClick={() => onForget(t.id)}>delete</button>}
+        </span>
+      </div>
+    );
+  };
+  return (
+    <div class="agent-history">
+      <div class="hh"><b>History</b><span class="dim">closed threads stay here (the last {ARCHIVE_MAX}), in this browser</span>
+        <button class="link" onClick={onDownloadAll}>download all</button><button class="link" onClick={onBack}>back</button></div>
+      <div class="hs">Open</div>
+      {open.map(t => row(t, true))}
+      <div class="hs">Closed</div>
+      {archive.length ? archive.map(t => row(t, false)) : <p class="dim">No closed threads yet. Closing a thread (×) keeps it here.</p>}
+    </div>
+  );
+}
+
 // ── the panel ────────────────────────────────────────────────────────────────
 export function AgentPanel({ host, sample: sampleProp }) {
   init();
@@ -259,11 +294,37 @@ export function AgentPanel({ host, sample: sampleProp }) {
     if (S.busy && S.runningId === id) return;
     const i = S.threads.findIndex(t => t.id === id);
     if (i < 0) return;
+    S.archive = archiveThread(S.archive, S.threads[i]);
     S.threads.splice(i, 1);
     if (!S.threads.length) S.threads.push(newThread());
     if (S.active === id) S.active = S.threads[Math.min(i, S.threads.length - 1)].id;
     persist(); rerender();
   };
+  // a thread records its preset at its first message; one saved before that was recorded can only borrow the open preset when it is the open thread
+  const presetOf = t => t.preset ? { id: t.preset } : t === activeThread() && host.preset ? { id: host.preset.id, title: host.preset.title } : null;
+  const download = (t = activeThread()) => {
+    if (!t.turns.length) { host.toast && host.toast('This thread is empty'); return; }
+    const preset = presetOf(t);
+    saveOrCopy(host, transcriptFilename(t, preset), threadMarkdown(t, { preset, settings: t === activeThread() ? S.settings : undefined }), '', 'text/markdown');
+  };
+  const downloadAll = () => {
+    const all = [...S.threads, ...S.archive].filter(t => t.turns.length);
+    if (!all.length) { host.toast && host.toast('No threads with messages'); return; }
+    const md = all.map(t => threadMarkdown(t, { preset: presetOf(t) })).join('\n---\n\n');
+    saveOrCopy(host, `jigcad-agent-threads-${new Date().toISOString().slice(0, 10)}.md`, md, ` (${all.length} threads)`, 'text/markdown');
+  };
+  const reopen = id => {
+    const i = S.archive.findIndex(t => t.id === id);
+    if (i < 0) return;
+    const [t] = S.archive.splice(i, 1);
+    delete t.closed;
+    const cur = activeThread();
+    if (cur && !cur.turns.length) S.threads.splice(S.threads.indexOf(cur), 1);   // an empty thread gives its place
+    S.threads.push(t); S.active = t.id; S.view = 'chat';
+    persist(); rerender();
+  };
+  const forget = id => { S.archive = S.archive.filter(t => t.id !== id); persist(); rerender(); };
+  const showView = v => { S.view = v; rerender(); };
   const onRevert = async (turn, i) => { await revertStep(host, turn, i); persist(); rerender(); };
   const onCopy = code => {
     const done = () => host.toast && host.toast('Copied');
@@ -292,7 +353,11 @@ export function AgentPanel({ host, sample: sampleProp }) {
             <button class="x" aria-label="close thread" disabled={S.busy && S.runningId === t.id} onClick={() => closeThread(t.id)}>×</button>
           </span>
         ))}
-        <button class="new" disabled={S.busy} onClick={addThread}>+ New</button>
+        <span class="acts">
+          <button class="new" disabled={S.busy} onClick={() => { showView('chat'); addThread(); }}>+ New</button>
+          <button class={'hist' + (S.view === 'history' ? ' on' : '')} title="Open and closed threads: open, download or delete them" onClick={() => showView(S.view === 'history' ? 'chat' : 'history')}>History</button>
+          <button class="dl" title="Download this thread as Markdown: messages, thinking, steps and answers" onClick={() => download()}>Download</button>
+        </span>
       </div>
       <div class="agent-set">
         <span class="ctl-l">Mode</span>
@@ -304,7 +369,9 @@ export function AgentPanel({ host, sample: sampleProp }) {
         <Seg label="Thinking" value={S.settings.effort} options={THINKING} onChange={v => setSetting('effort', v)} />
       </div>
       {S.off ? <div class="agent-off" role="status"><b>{OFF_TITLE}</b>{S.off}</div> : null}
-      <div class="agent-log" ref={logRef}>
+      {S.view === 'history' ? <History open={S.threads} archive={S.archive} activeId={th.id} busy={S.busy}
+        onSelect={id => { selectThread(id); showView('chat'); }} onReopen={reopen} onDownload={download} onForget={forget} onDownloadAll={downloadAll} onBack={() => showView('chat')} /> : null}
+      <div class="agent-log" ref={logRef} style={S.view === 'history' ? 'display:none' : undefined}>
         {th.turns.length === 0 ? (
           <div class="agent-empty">
             <p>Ask for a change and the agent edits the script, recompiles, and checks the part with numbers. It works through one tool, <b>eval</b>, with the same API you see in the Reference.</p>

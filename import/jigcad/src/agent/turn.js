@@ -41,7 +41,15 @@ export function explainError(e) {
   return { note: `Interrupted: ${msg}`, off: null };
 }
 
-export const newThread = () => ({ id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: 'New thread', turns: [] });
+export const newThread = () => ({ id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: 'New thread', turns: [], created: Date.now() });
+
+/** Closed threads with turns, newest first, at most ARCHIVE_MAX (the panel's History). */
+export const ARCHIVE_MAX = 50;
+export function archiveThread(archive, thread, now = Date.now()) {
+  if (!thread || !thread.turns || !thread.turns.length) return archive || [];
+  const rest = (archive || []).filter(t => t.id !== thread.id);
+  return [{ ...thread, closed: now }, ...rest].slice(0, ARCHIVE_MAX);
+}
 
 /**
  * Run a whole turn on `thread`.
@@ -55,6 +63,8 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
   if (!sample) return { ok: false, off: OFF_AT_SEND };
   thread.turns.push(images.length ? { role: 'user', text, images: images.length } : { role: 'user', text });   // the count, not the bytes
   if (thread.title === 'New thread') thread.title = text.slice(0, THREAD_TITLE);
+  thread.updated = Date.now();
+  if (!thread.preset && host && host.preset) thread.preset = host.preset.id;
   const turn = { role: 'agent', text: '', steps: [], pending: true };
   thread.turns.push(turn);
   onUpdate();
@@ -76,6 +86,7 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
   try {
     const res = await sample(turns, opts);
     turn.text = (res && res.text) ?? turn.text;
+    if (res && res.modelApplied) turn.model = res.modelApplied;
     if (res && res.truncated) turn.note = NOTES.truncated;
   } catch (e) {
     const x = explainError(e);
@@ -85,6 +96,7 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
   }
   for (const s of turn.steps) if (s.asking && s.resolve) s.resolve(false);
   turn.pending = false;
+  thread.updated = Date.now();
   onUpdate();
   return { ok: !turn.note || turn.note === NOTES.truncated, off };
 }
@@ -133,13 +145,15 @@ export function load(key, fallback) {
   try { const s = store(); const v = s && s.getItem(PREFIX + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
 }
 export function save(key, value) {
-  try { const s = store(); if (s) s.setItem(PREFIX + key, JSON.stringify(value)); } catch { /* storage full or blocked: this page load only */ }
+  try { const s = store(); if (!s) return false; s.setItem(PREFIX + key, JSON.stringify(value)); return true; } catch { return false; /* storage full or blocked: this page load only */ }
 }
 export function trimThreads(threads) {
   return threads.map(th => ({
     id: th.id, title: th.title,
+    ...(th.created ? { created: th.created } : {}), ...(th.updated ? { updated: th.updated } : {}),
+    ...(th.closed ? { closed: th.closed } : {}), ...(th.preset ? { preset: th.preset } : {}),
     turns: th.turns.slice(-TURNS_STORED).map(t => t.role === 'user' ? { role: 'user', text: t.text, ...(t.images ? { images: t.images } : {}) } : {
-      role: 'agent', text: t.text, ...(t.note ? { note: t.note } : {}),
+      role: 'agent', text: t.text, ...(t.note ? { note: t.note } : {}), ...(t.model ? { model: t.model } : {}),
       ...(t.blocks && t.blocks.length ? { blocks: t.blocks.filter(x => x.text).map(x => ({ kind: x.kind, at: x.at,
         text: x.kind === 'thought' && x.text.length > THOUGHT_STORED ? x.text.slice(0, THOUGHT_STORED) + '\n…' : x.text })) } : {}),
       steps: (t.steps || []).map(s => ({

@@ -37,7 +37,18 @@
 .agent-panel .threads .th.on { box-shadow: inset 0 -2px 0 var(--ink); }
 .agent-panel .threads .th .x { padding: 7px 8px 7px 0; font-size: 14px; line-height: 1; }
 .agent-panel .threads .th .x:hover { color: var(--accent); }
-.agent-panel .threads .new { margin-left: auto; color: var(--ink); flex: none; position: sticky; right: 0; background: var(--bg); border-left: 1px solid var(--hair); }
+.agent-panel .threads .acts { margin-left: auto; display: flex; flex: none; position: sticky; right: 0; background: var(--bg); border-left: 1px solid var(--hair); }
+.agent-panel .threads .acts button { color: var(--ink); }
+.agent-panel .threads .acts .hist.on { font-weight: 700; box-shadow: inset 0 -2px 0 var(--ink); }
+.agent-panel .agent-history { flex: 1 1 auto; overflow: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+.agent-panel .agent-history .hh { display: flex; gap: 10px; align-items: baseline; margin-bottom: 6px; flex-wrap: wrap; }
+.agent-panel .agent-history .hh .dim { flex: 1; }
+.agent-panel .agent-history .hs { margin-top: 8px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+.agent-panel .agent-history .hrow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--rule); }
+.agent-panel .agent-history .hrow.on .ht { font-weight: 700; }
+.agent-panel .agent-history .ht { background: none; border: 0; padding: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); cursor: pointer; }
+.agent-panel .agent-history .hm { color: var(--ink-2); white-space: nowrap; }
+.agent-panel .agent-history .ha { display: flex; gap: 8px; }
 .agent-panel .threads button:disabled { opacity: .4; cursor: default; }
 
 /* messages (kiln.css 134–136, 527) */

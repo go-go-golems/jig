@@ -228,3 +228,30 @@ test('reasoning, text and steps keep their order (blocks), and are stored', asyn
     { kind: 'thought', at: 1, text: 'It is on line 2.' }, { kind: 'text', at: 2, text: 'Done.' },
   ]);
 });
+
+test('closed threads go to the archive: newest first, empty ones dropped, at most ARCHIVE_MAX', async () => {
+  const { archiveThread, ARCHIVE_MAX } = await import('../../src/agent/turn.js');
+  const t = (id, n = 1) => ({ id, title: id, turns: Array.from({ length: n }, () => ({ role: 'user', text: 'x' })) });
+  let a = archiveThread([], t('a'), 1);
+  a = archiveThread(a, t('empty', 0), 2);
+  a = archiveThread(a, t('b'), 3);
+  assert.deepEqual(a.map(x => [x.id, x.closed]), [['b', 3], ['a', 1]]);
+  a = archiveThread(a, t('a'), 4);
+  assert.deepEqual(a.map(x => x.id), ['a', 'b'], 'closing again moves it to the front, once');
+  for (let i = 0; i < ARCHIVE_MAX + 5; i++) a = archiveThread(a, t('n' + i), 10 + i);
+  assert.equal(a.length, ARCHIVE_MAX);
+  assert.equal(a[0].id, 'n' + (ARCHIVE_MAX + 4));
+  const stored = trimThreads([{ ...t('s'), created: 1, updated: 2, closed: 3, preset: 'A-01' }])[0];
+  assert.deepEqual([stored.created, stored.updated, stored.closed, stored.preset], [1, 2, 3, 'A-01']);
+});
+
+test('a turn stamps the thread: updated, preset, model', async () => {
+  const host = createMockHost();
+  await host.compile();
+  const thread = newThread();
+  assert.ok(thread.created > 0);
+  await runTurn({ host, sample: async () => ({ text: 'ok', truncated: false, modelApplied: 'lunaroute/x' }), thread, text: 'hi', settings: { mode: 'auto' }, reference });
+  assert.ok(thread.updated >= thread.created);
+  assert.equal(thread.preset, host.preset && host.preset.id);
+  assert.equal(thread.turns[1].model, 'lunaroute/x');
+});
