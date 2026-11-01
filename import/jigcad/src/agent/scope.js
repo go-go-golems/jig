@@ -119,6 +119,7 @@ function makeFiles(host) {
 }
 
 // ── compile results ──────────────────────────────────────────────────────────
+const WARNINGS_SHOWN = 6;
 function errorList(p, err) {
   if (err) return [{ message: err.message || String(err), ...(err.file ? { file: err.file } : {}), ...(err.line ? { line: err.line } : {}), ...(err.column ? { column: err.column } : {}) }];
   const ds = (p && p.diagnostics) || [];
@@ -147,7 +148,9 @@ async function compileResult(promiseFn) {
   const ms = Math.round(now() - t0);
   const errors = errorList(p, err);
   const ok = !err && !!p && p.ok !== false && errors.length === 0;
-  const warnings = ((p && p.diagnostics) || []).filter(d => d.level === 'warning').length;
+  // warnings as text, like errors (JIG-009): a count alone hid "the cut removes no material" from the agent
+  const ws = ((p && p.diagnostics) || []).filter(d => d.level === 'warning').map(d => compactDiag(d));
+  const warnings = ws.length > WARNINGS_SHOWN ? [...ws.slice(0, WARNINGS_SHOWN), { more: ws.length - WARNINGS_SHOWN, see: 'program.diagnostics()' }] : ws;
   return { p, ok, ms, errors, warnings };
 }
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());

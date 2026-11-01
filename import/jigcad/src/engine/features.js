@@ -48,7 +48,7 @@ export function combine(state, named, op, id, ctx, hints = {}) {
       touchedNames.push(...live.map(b => b.id));
     }
     if (!hints.quiet && before && bodies.length === before && Math.abs(bodies.reduce((s, b) => s + b.volume(), 0) - vol0) <= 1e-9 * Math.max(1, vol0))
-      ctx.diag({ level: 'warning', kind: 'feature.noEffect', message: `${id}: the join adds no material (it lies inside the existing bodies)`, fix: 'check its position and size, or remove it' });
+      ctx.diag({ level: 'warning', kind: 'feature.noEffect', message: `${id}: the join adds no material (it lies inside the existing bodies)`, fix: hints.noEffectFix || 'check its position and size, or remove it' });
   } else if (op === 'cut' || op === 'intersect') {
     const out = [];
     let hit = 0, vBefore = 0, vAfter = 0;
@@ -62,7 +62,7 @@ export function combine(state, named, op, id, ctx, hints = {}) {
     }
     bodies = out.filter(Boolean);
     if (op === 'cut' && !hints.quiet && state.bodies.length && (!hit || Math.abs(vAfter - vBefore) <= 1e-9 * Math.max(1, vBefore)))
-      ctx.diag({ level: 'warning', kind: 'feature.noEffect', message: `${id}: the cut removes no material${hit ? '' : ' (it misses every body)'}`, fix: 'check its direction and depth (a cut from a sketch plane goes along the plane normal), or flip it with a negative depth' });
+      ctx.diag({ level: 'warning', kind: 'feature.noEffect', message: `${id}: the cut removes no material${hit ? '' : ' (it misses every body)'}`, fix: hints.noEffectFix || 'check its position, direction and depth: a cut from a sketch plane goes along the plane normal, and a negative depth goes the other way' });
   } else throw new Error(`unknown op '${op}'`);
   return { bodies, op, touched: touchedNames };
 }
@@ -332,7 +332,11 @@ FEATURES.emboss = (state, f, ctx) => {
   }
   const parts = S.prism(prof, { id: f.id, dist: op === 'cut' ? -depth : depth });
   const named = parts.map(p => namedFromExplicit(p.shape, p.explicit, f.id));
-  const res = combine(state, named, op === 'cut' ? 'cut' : 'join', f.id, ctx, { target: onBody });
+  // emboss chooses the direction from op (cut goes into the face, join stands out of it), so its depth is positive
+  const noEffectFix = depth < 0
+    ? `use a positive depth (mm(${fmt(-depth).replace(/ mm$/, '')})): op: 'cut' already cuts into the face and op: 'join' raises out of it`
+    : 'check that the region lies on the face (emboss centres it on the face unless the region has an at)';
+  const res = combine(state, named, op === 'cut' ? 'cut' : 'join', f.id, ctx, { target: onBody, noEffectFix });
   ctx.note(`emboss ${op} ${fmt(depth)}${onFace ? ` on ${onFace}` : ''}; ${named.length} piece${named.length === 1 ? '' : 's'}`);
   return finish(state, f.id, res, named, { kind: 'emboss', op, depth, on: onFace, pieces: named.length });
 };
@@ -432,6 +436,8 @@ function edgeOp(state, f, ctx, kind) {
     const order = idx.map((i, k) => k).sort((a, c) => (props[a].concave === props[c].concave ? 0 : props[a].concave ? -1 : 1));
     if (kind === 'fillet' && props.some(x => x.convex) && props.some(x => x.concave)) ctx.decide({ kind: 'fillet.order', chose: order.map(k => `${b.edgeNames[idx[k]]} (${props[k].convex ? 'convex' : 'concave'})`), reason: 'concave first: the root blend adds material, so the rim keeps a full face to roll on' });
     const oIdx = order.map(k => idx[k]), oVals = order.map(k => vals[k]);
+    const bad = oVals.find(v => !(v > 0));
+    if (bad !== undefined) throw ctx.fail('feature.failed', `${kind} ${f.id}: the ${kind === 'fillet' ? 'radius' : 'size'} is ${fmt(bad)}; it must be greater than 0`, `use a ${kind === 'fillet' ? 'radius' : 'size'} > 0, or remove the ${kind}`);
     let out;
     try {
       out = kind === 'fillet' ? ocFillet(b, oIdx, oVals, f.id) : ocChamfer(b, oIdx, oVals[0], f.id, { d2: f.opts.d2 != null ? ctx.len(f.opts.d2) : undefined, angle: f.opts.angle != null ? ctx.ang(f.opts.angle) : undefined });

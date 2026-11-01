@@ -149,3 +149,19 @@ test('exportFile reports without saving, and saves through host.saveFile when as
   const ro = labScope(host, { readOnly: true });
   assert.equal((await ro.exportFile('stl', { save: true })).saved, true, 'saving a file is allowed in read mode: it changes nothing');
 });
+
+test('run() and check() return warnings as text, at most six', async () => {
+  const { labScope } = await import('../../src/agent/scope.js');
+  const { createMockHost } = await import('./mock-host.js');
+  const host = createMockHost();
+  const w = n => Array.from({ length: n }, (_, i) => ({ level: 'warning', kind: 'feature.noEffect', at: `f${i}`, message: `f${i}: the cut removes no material`, fix: 'use a positive depth' }));
+  const prog = n => ({ ok: true, diagnostics: [{ level: 'info', kind: 'x', message: 'i' }, ...w(n)], summary: {}, metrics: {} });
+  host.compile = async () => (host.program = prog(1));
+  host.check = async () => prog(9);
+  const s = labScope(host);
+  const r = await s.run();
+  assert.deepEqual(r.warnings, [{ level: 'warning', kind: 'feature.noEffect', at: 'f0', message: 'f0: the cut removes no material', fix: 'use a positive depth' }]);
+  const c = await s.check('x');
+  assert.equal(c.warnings.length, 7);
+  assert.deepEqual(c.warnings[6], { more: 3, see: 'program.diagnostics()' });
+});

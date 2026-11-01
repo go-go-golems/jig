@@ -1,0 +1,55 @@
+{
+  "id": "w01-a01-hole-misses",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "repair",
+    "diagnostics",
+    "warnings"
+  ],
+  "setup": [
+    {
+      "edit": {
+        "path": "script.js",
+        "find": "{ direction: 'in', id: 'shell' })",
+        "replace": "{ direction: 'in', id: 'shell' })\n  .hole([[45, 0]], j.hole.simple(mm(5), 'through'), { id: 'mount' })"
+      }
+    }
+  ],
+  "request": "I added a 5 mm mounting hole through the floor, 20 mm right of the centre, but I am not sure it worked. Check it and fix it if needed.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 15305.0,
+      "tol": 0.5
+    },
+    {
+      "kind": "metric",
+      "name": "faces",
+      "min": 20
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "miss",
+        "no (material|effect)",
+        "outside",
+        "did(n.t| not) (work|cut)",
+        "removes nothing",
+        "wrong (place|position|x)",
+        "45"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return await run();",
+      "files.edit('script.js', \"[[45, 0]]\", \"[[20, 0]]\");\nconst r = await run(); return { ok: r.ok, errors: r.errors, warnings: r.warnings };"
+    ],
+    "answer": "The hole was at x = 45, outside the 60 mm box, so it removed no material (feature.noEffect). It is at x = 20 now and cuts the floor."
+  }
+}

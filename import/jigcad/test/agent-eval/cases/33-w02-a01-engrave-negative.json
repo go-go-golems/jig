@@ -1,0 +1,45 @@
+{
+  "id": "w02-a01-engrave-negative",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "text",
+    "diagnostics",
+    "warnings"
+  ],
+  "request": "Engrave the text JIG, 10 mm tall, into the outside of the front face (the −Y side). Use a depth of -0.6 mm so the cut goes into the wall.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "contains": "JIG"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "min": 15200,
+      "max": 15335
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        60,
+        40,
+        30
+      ],
+      "tol": 0.01
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \"{ direction: 'in', id: 'shell' })\", \"{ direction: 'in', id: 'shell' })\\n  .emboss(j.region.text('JIG', { size: 10 }), mm(-0.6), { on: j.feat('body').sideFace('outline.bottom'), op: 'cut', id: 'label' })\");\nconst r = await run(); return { ok: r.ok, errors: r.errors, warnings: r.warnings };",
+      "files.edit('script.js', \"mm(-0.6)\", \"mm(0.6)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors, warnings: r.warnings };"
+    ],
+    "answer": "With -0.6 mm the cut removed nothing (emboss already cuts into the face with op: 'cut'); I used 0.6 mm, and the engraving is 0.6 mm deep."
+  }
+}

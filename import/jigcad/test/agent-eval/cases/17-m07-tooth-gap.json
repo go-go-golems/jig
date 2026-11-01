@@ -7,7 +7,7 @@
     "assembly",
     "gears"
   ],
-  "request": "How much clearance is there between the pinion's and the wheel's teeth where they mesh?",
+  "request": "What is the smallest gap between the pinion's and the wheel's teeth, as the interference check measures it?",
   "checks": [
     {
       "kind": "unchanged"
