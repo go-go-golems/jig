@@ -1,7 +1,7 @@
 ---
 Title: 'Tell the agent when it forgot await: tracked promises in the eval tool, measured with the harness'
 Ticket: JIG-004-PROMISE-HINT
-Status: active
+Status: complete
 Topics:
     - agent
     - llm
@@ -12,7 +12,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-31T22:43:40.208287954-04:00
+LastUpdated: 2026-10-31T23:08:40.504898419-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
