@@ -1,7 +1,7 @@
 ---
 Title: 'Go project plumbing for jigcad: Makefile, golangci-lint, CI and a GoReleaser binary with the embedded workbench'
 Ticket: JIG-007-GO-PLUMBING
-Status: active
+Status: complete
 Topics:
     - build
     - ci
@@ -12,7 +12,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-31T23:18:41.480524479-04:00
+LastUpdated: 2026-10-31T23:25:12.846759641-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
