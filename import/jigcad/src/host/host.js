@@ -50,7 +50,7 @@ const DATA_EXT = /\.(json|csv|txt|svg|dxf|tsv)$/i;
 const DEBOUNCE_MS = 140;
 
 export class Host {
-  constructor({ forceMock = false } = {}) {
+  constructor({ forceMock = false, forceJsCompute = false } = {}) {
     this.content = content;
     this.files = new Map();
     this.published = {};
@@ -77,11 +77,11 @@ export class Host {
     this.scratch = (store.get('scratch', []) || []).filter(p => p && p.id && !content.presets.some(q => q.id === p.id));
     this.user = (store.get('user', []) || []).filter(p => p && /^U-\d+$/.test(p.id) && p.files && !content.presets.some(q => q.id === p.id));
     this.engine = createEngine({
-      forceMock,
+      forceMock, forceJsCompute,
       onChange: kind => {
         this.emit('engine', this.engine);
         if (kind === 'worker' && this.preset) {
-          this.compile().then(() => this.toast(`Engine loaded in ${fmtS(this.engine.initMs)}: recompiled with OpenCascade`));
+          this.compile().then(() => this.toast(`Engine loaded in ${fmtS(this.engine.initMs)}: recompiled with OpenCascade${this.engine.compute?.kind === 'rust' ? ' and jig-compute (Rust)' : ''}`));
         }
       },
     });

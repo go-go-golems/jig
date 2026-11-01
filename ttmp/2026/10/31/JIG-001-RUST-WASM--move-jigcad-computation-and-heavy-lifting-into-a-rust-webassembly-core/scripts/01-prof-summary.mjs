@@ -1,3 +1,5 @@
+// Group a V8 .cpuprofile's self time by module: each wasm module by its URL (OCCT is the large one), engine JS by file.
+// Usage: node 01-prof-summary.mjs <dir-with-one-.cpuprofile>
 import { readFileSync, readdirSync } from 'node:fs';
 const dir = process.argv[2];
 const f = readdirSync(dir).filter(x => x.endsWith('.cpuprofile'))[0];
@@ -9,7 +11,7 @@ for (let i = 0; i < p.samples.length; i++) { const n = byId.get(p.samples[i]); c
 const cat = new Map(), fn = new Map();
 for (const [id, ms] of self) {
   const n = byId.get(id), u = n.callFrame.url;
-  let c = u.includes('replicad_single') || u.startsWith('wasm') || n.callFrame.functionName.startsWith('$') ? 'occt-wasm' : u.includes('/src/engine/sketch/') ? 'js:sketch' : u.includes('/src/engine/') ? 'js:engine/' + u.split('/src/engine/')[1] : u.includes('vendor/replicad') ? 'js:replicad' : (n.callFrame.functionName || '(native)').startsWith('(') ? n.callFrame.functionName : 'other:' + (u.split('/').pop() || n.callFrame.functionName);
+  let c = u.startsWith('wasm') ? 'wasm module ' + u.replace('wasm://wasm/', '') : u.includes('replicad_single') ? 'occt-glue' : u.includes('/src/engine/sketch/') ? 'js:sketch' : u.includes('/src/engine/') ? 'js:engine/' + u.split('/src/engine/')[1] : u.includes('vendor/replicad') ? 'js:replicad' : (n.callFrame.functionName || '(native)').startsWith('(') ? n.callFrame.functionName : 'other:' + (u.split('/').pop() || n.callFrame.functionName);
   cat.set(c, (cat.get(c) ?? 0) + ms);
   const k = `${n.callFrame.functionName || '(anon)'} ${u.split('/').slice(-2).join('/')}:${n.callFrame.lineNumber + 1}`;
   fn.set(k, (fn.get(k) ?? 0) + ms);

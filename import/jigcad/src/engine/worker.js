@@ -5,6 +5,7 @@ import { makeJ, VERSION } from './j.js';
 import { compile as compileModel, gc, releasePrograms } from './program.js';
 import { exportAs } from './io.js';
 import { featureCache } from './compile.js';
+import * as RS from './rs/index.js';
 
 let J = null, BARE = null;
 let current = null;            // the last Program (kept for `call` and `export`)
@@ -13,8 +14,10 @@ let currentScope = null;       // { j, bare, data } of the last compile, for eva
 export async function init(opts) {
   const t0 = performance.now();
   await loadOC(opts);
+  // jig-compute (Rust → wasm) takes the numeric hot paths; without it the engine runs its JS implementations
+  try { await RS.loadCompute(opts ?? {}); } catch (e) { console.warn(`jig-compute unavailable, using JS: ${e.message}`); }
   if (!J) { const m = makeJ(); J = m.j; BARE = m.bare; }
-  return { ms: performance.now() - t0, version: VERSION };
+  return { ms: performance.now() - t0, version: VERSION, compute: computeInfo() };
 }
 
 // Parse preset data files: .json → object, .csv → { columns, rows }, other text → string
@@ -70,8 +73,11 @@ function scriptError(e, code, file, syntax = false, names = []) {
   return Object.assign(new Error(err.message), { info: err });
 }
 
+const computeInfo = () => ({ kind: RS.enabled() ? 'rust' : 'js', reason: RS.status.reason, version: RS.status.version, ms: RS.status.ms });
+
 export async function compileFiles({ files = {}, entry = 'script.js', data, options = {} }) {
   if (!J) await init();
+  RS.resetArena();   // mesh handles of the previous compile go; TriSoups still referenced rebuild on use
   const d = data ?? parseData(files, entry);
   const code = files[entry];
   releasePrograms(current);   // programs made by the previous script may go; the current one stays until replaced
@@ -173,7 +179,7 @@ export async function handle(msg) {
       case 'solveSketch': result = solveSketch(msg.sketchId, msg.drag); break;
       case 'export': result = exportCurrent(msg.format, msg.options); break;
       case 'run': result = { value: toPlain(await run(msg.code, msg.files)) }; break;
-      case 'stats': result = { cache: featureCache.size, freed: gc() }; break;
+      case 'stats': result = { cache: featureCache.size, freed: gc(), compute: computeInfo(), meshes: RS.liveMeshes() }; break;
       default: throw new Error(`unknown op '${op}'`);
     }
     return { id, ok: true, ...result };

@@ -2,7 +2,8 @@
 // supports estimate, bed fit, skyline plates, slicing with cusp metrics.
 import * as K from './kernel.js';
 import { meshBody } from './mesh.js';
-import { meshTris, orientationScore, sectionLoops, loopsProps, material, asPrinted } from './inspect.js';
+import { meshTris, catTris, freeTris, orientationScore, sectionLoops, loopsProps, material, asPrinted } from './inspect.js';
+import * as RS from './rs/index.js';
 import { fmtDir } from './holes.js';
 import { Part } from './part.js';
 import { callerLine } from './part.js';
@@ -142,7 +143,7 @@ function compileJob(job, opts, { compilePart, finalize }) {
         trace.push({ pass: 'teardrops', level: 'L4', iter, ms: performance.now() - tc, cached: res.cacheHits === res.featureCount, note: `${part.name}: build direction ${dirName(dir)}` });
       }
       const to = performance.now();
-      const tris = res.state.bodies.flatMap(b => meshTris(meshBody(b), it.place ?? K.IDENTITY, faceGeo(b)));
+      const tris = catTris(res.state.bodies.map(b => meshTris(meshBody(b), it.place ?? K.IDENTITY, faceGeo(b))));
       const supportsOff = o.supports === false;
       const factor = supportsOff ? 0 : (o.supports?.kind === 'grid' ? 1 : 0.35);
       const ranked = slotFixed(slot) ? [] : rankCandidates(tris, maxAngle, factor);   // a fixed direction needs no ranking
@@ -355,7 +356,7 @@ function sliceItems(items, t, full, sections = true) {
     // B-splines take seconds per layer; simple bodies keep exact sections
     const analytic = ['plane', 'cylinder', 'cone', 'sphere', 'torus'];
     const complex = it.res.state.bodies.some(b => b.nFaces > 80 || b.names.some((_, i) => !analytic.includes(b.faceInfo(i).kind)));
-    const tris = complex && sections ? it.res.state.bodies.flatMap(b => meshTris(meshBody(b), it.M)) : null;
+    const tris = complex && sections ? catTris(it.res.state.bodies.map(b => meshTris(meshBody(b), it.M))) : null;
     const shapes = complex || !sections ? [] : it.res.state.bodies.map(b => K.transformShape(b.shape, it.M));
     try {
       const ks = !sections ? [] : full ? [...Array(Math.min(n, 400)).keys()] : [...new Set([0, 1, Math.floor(n / 4), Math.floor(n / 2), Math.floor(3 * n / 4), n - 1])].filter(k => k >= 0 && k < n);
@@ -384,7 +385,11 @@ function sliceItems(items, t, full, sections = true) {
 
 // Section of a triangle mesh by the plane z: crossing segments chained into closed loops ([[x, y]…]).
 // Shared edges give bit-identical points (endpoints ordered before interpolating).
-function meshSection(tris, z) {
+export function meshSection(tris, z) {
+  if (RS.isSoup(tris)) { const r = RS.meshSection(tris, z); if (r) return r; return meshSectionJS(tris.records(), z); }
+  return meshSectionJS(tris, z);
+}
+export function meshSectionJS(tris, z) {
   z += 1e-7;   // keep the plane off vertices
   const segs = [];
   const cut = (p, q) => { const [a, b] = p[2] < q[2] || (p[2] === q[2] && (p[0] < q[0] || (p[0] === q[0] && p[1] < q[1]))) ? [p, q] : [q, p]; const t = (z - a[2]) / (b[2] - a[2]); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; };

@@ -108,7 +108,7 @@ function Header({ host, layoutId, chooseLayout, errors, good }) {
   const st = statusOf(host, errors);
   const m = good?.metrics || {};
   const edited = host.preset && host.isEdited();
-  const engineLine = host.engine.kind === 'worker' ? `the OpenCascade worker${host.engine.version ? ' ' + host.engine.version : ''}` : host.engine.kind === 'mock' ? `the mock engine (${host.engine.note})` : 'the engine, starting';
+  const engineLine = host.engine.kind === 'worker' ? `the OpenCascade worker${host.engine.version ? ' ' + host.engine.version : ''}${host.engine.compute?.kind === 'rust' ? ` with jig-compute ${host.engine.compute.version} (Rust)` : ''}` : host.engine.kind === 'mock' ? `the mock engine (${host.engine.note})` : 'the engine, starting';
   return (
     <header class="bar">
       <div class="brand">jig <i>workbench</i></div>

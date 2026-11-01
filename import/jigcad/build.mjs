@@ -4,6 +4,7 @@
 const { build, context } = await import(process.env.ESBUILD ?? '/opt/npm-tools/node_modules/esbuild/lib/main.js');
 import { cpSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -57,6 +58,20 @@ const common = {
 // preact's automatic runtime lives in preact/jsx-runtime
 common.alias['preact/jsx-runtime'] = V('preact/jsx-runtime/src/index.js');
 
+// jig-compute (Rust → wasm32-unknown-unknown): built with cargo when available (JIG_SKIP_CARGO=1 skips the build),
+// shipped as dist/jig_compute.wasm next to worker.js. Without it the engine runs its JS implementations.
+function buildCompute() {
+  const crate = join(ROOT, 'rust/jig-compute');
+  const out = join(crate, 'target/wasm32-unknown-unknown/release/jig_compute.wasm');
+  if (!process.env.JIG_SKIP_CARGO) {
+    try { execFileSync('cargo', ['build', '--release', '--target', 'wasm32-unknown-unknown'], { cwd: crate, stdio: ['ignore', 'ignore', 'inherit'] }); }
+    catch (e) { console.warn(`cargo build of jig-compute failed (${e.message.split('\n')[0]}); using the last build if there is one`); }
+  }
+  if (existsSync(out)) { cpSync(out, join(ROOT, 'dist/jig_compute.wasm')); return statSync(out).size; }
+  console.warn('no jig_compute.wasm: dist/ will run the JS implementations');
+  return 0;
+}
+
 function copyAssets() {
   mkdirSync(join(ROOT, 'dist/occt'), { recursive: true });
   cpSync(V('occt/replicad_single.wasm.gz'), join(ROOT, 'dist/occt/replicad_single.gz.wasm'));   // gzip bytes; the host serves .wasm, not .gz
@@ -69,6 +84,7 @@ function copyAssets() {
 async function run() {
   collectContent();
   copyAssets();
+  const computeBytes = buildCompute();
   const app = { ...common, entryPoints: [join(ROOT, 'src/main.jsx')], outfile: join(ROOT, 'dist/app.js') };
   const worker = { ...common, entryPoints: [join(ROOT, 'src/engine/worker.js')], outfile: join(ROOT, 'dist/worker.js'),
     platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'] };
@@ -78,7 +94,7 @@ async function run() {
   } else {
     await Promise.all([build(app), build(worker)]);
     const size = f => (statSync(join(ROOT, 'dist', f)).size / 1024).toFixed(0) + ' KiB';
-    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')}`);
+    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')}${computeBytes ? ` · dist/jig_compute.wasm ${size('jig_compute.wasm')}` : ''}`);
   }
 }
 run().catch(e => { console.error(e.message); process.exit(1); });

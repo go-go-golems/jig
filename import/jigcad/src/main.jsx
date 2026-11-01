@@ -26,7 +26,7 @@ try {
   }
 } catch { /* FontFace unavailable: canvases fall back to the system monospace */ }
 
-const host = new Host({ forceMock: location.hash === '#mock' });
+const host = new Host({ forceMock: location.hash === '#mock', forceJsCompute: location.hash === '#js-compute' });
 globalThis.jigHost = host;           // for the console and the UI tests
 
 render(<App host={host} />, document.getElementById('root'));

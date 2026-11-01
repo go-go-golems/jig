@@ -1,17 +1,17 @@
 // The engine client: promise RPC to dist/worker.js over the protocol of BUILD.md §2.
 // It probes the worker with `init`. Until the worker answers (or if it never speaks the protocol), requests go to
 // the in-thread mock engine so the workbench runs; the moment `init` answers, `onChange('worker')` fires and the host
-// recompiles with the real engine. `#mock` in the URL forces the mock.
+// recompiles with the real engine. `#mock` in the URL forces the mock; `#js-compute` keeps the worker off jig-compute (Rust).
 import { createMockEngine } from './mock-engine.js';
 
 const GRACE_MS = 12000;   // how long requests wait for the worker before the mock answers them
 
-export function createEngine({ forceMock = false, onChange = () => {} } = {}) {
+export function createEngine({ forceMock = false, forceJsCompute = false, onChange = () => {} } = {}) {
   const mock = createMockEngine();
   const pending = new Map();
   let seq = 0, worker = null, active = null, decide;
   const decided = new Promise(r => { decide = r; });
-  const engine = { kind: 'probing', version: null, initMs: null, note: '' };
+  const engine = { kind: 'probing', version: null, initMs: null, note: '', compute: null };
 
   const settle = (kind, note = '') => {
     const first = active == null;
@@ -55,8 +55,9 @@ export function createEngine({ forceMock = false, onChange = () => {} } = {}) {
         if (active !== 'worker') useMock(message);
       };
       setTimeout(() => useMock(`the engine worker did not answer init within ${GRACE_MS / 1000} s`), GRACE_MS);
-      post('init').then(r => {
+      post('init', { options: forceJsCompute ? { compute: 'js' } : {} }).then(r => {
         engine.version = r.version ?? null;
+        engine.compute = r.compute ?? null;   // { kind: 'rust' | 'js', reason, version, ms }: jig-compute status
         engine.initMs = r.ms ?? performance.now() - t0;
         settle('worker');
       }, err => useMock(err.message));

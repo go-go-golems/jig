@@ -201,7 +201,7 @@ node ttmp/.../scripts/01-prof-summary.mjs $SCRATCH/prof                       # 
 
 | Category (self time) | ms | share |
 |---|---:|---:|
-| OCCT wasm functions | 32,055 | 89.0 % |
+| OCCT (wasm functions + its JS glue) | 32,055 | 89.0 % |
 | `src/engine/inspect.js` (meshGap, orientation, support) | 1,657 | 4.6 % |
 | `src/engine/sketch/*` (solver, linalg, profiles) | 467 | 1.3 % |
 | `src/engine/kernel.js` (JS side of OCCT calls) | 379 | 1.1 % |
@@ -342,18 +342,24 @@ export function meshTris(mesh, m = K.IDENTITY, faces = null) {
 }
 ```
 
-For the analyses, a **lazy mesh handle** rides along with the triangle array so that callers that pass `tris`
-around (`rankCandidates(tris, …)`, `orientationScore(tris, u)`) keep their signatures:
+**TriSoup (as built).** With Rust active, `meshTris` returns a `TriSoup` (`src/engine/rs/index.js`) instead of an
+array of records. Every consumer of `tris` in the engine is one of the analyses (`orientationScore`,
+`rankCandidates`, `meshGap`, `meshSection`), so records are never materialised on the hot path:
 
 ```js
-// RS.meshTris returns a JS array of records (callers read t.a, t.n, …) and attaches the Rust handle
-const tris = RS.meshTris(mesh, m, faces);       // tris[RS.HANDLE] = RsMesh
-orientationScore(tris, u)                        // → tris[RS.HANDLE] ? Rust : JS
+class TriSoup {
+  parts            // [{ mesh, m, faces }]: what it was built from
+  handle()         // live Rust handle; rebuilt from `parts` when stale (after resetArena) — never dangling
+  length           // jc_mesh_len
+  records()        // JS records { a, b, c, n, area, face, cen } on demand (from Rust, or meshTrisJS if Rust is off)
+  free()           // jc_mesh_free; a second free is harmless (handles carry a generation)
+}
+catTris(list)      // replaces `bodies.flatMap(b => meshTris(…))`: a TriSoup over all parts, or a flat array in JS mode
+resetArena()       // worker.js compileFiles: frees every handle of the previous compile
 ```
 
-When callers only need scores (`rankCandidates`), records need not be materialised at all; `RS.meshTris` builds
-them lazily on first index access via a small proxy-free trick: it returns a real array filled on demand by
-`ensureRecords()` — see implementation notes in the diary for the variant actually chosen.
+The only caller changes are the two `flatMap` sites in `print.js` (now `catTris(bodies.map(…))`). Handle lifetime
+is per compile (the arena); because a stale TriSoup rebuilds itself, an arena reset can never break a caller.
 
 ### 6.4 Loading and fallback
 
@@ -429,6 +435,10 @@ await loadCompute(opts).catch(e => console.warn('jig-compute unavailable, using 
   indices (ops: `x[i]`, const, `+ − × ÷`, `sqrt`, `sin`, `cos`, `atan2`, `hypot`), evaluated with forward-mode
   dual numbers in Rust to give exact Jacobians. Constraints without a tape keep the JS loop.
 - **Status:** proposed (Phase 4).
+- **Measurement update (Phase 3):** `test/rs/bench.mjs` shows the Rust `factorJ`+solve is 2.5–2.9× faster than JS
+  even at 8×10 and 24×30 *including* the copies, so the "boundary cost eats the win" assumption was wrong for these
+  sizes. The tape is still the better end state (it removes the 4-point finite differences of JS closures), but a
+  kernel-only first step is now justified.
 
 ## 7. Pseudocode and key flows
 
@@ -564,3 +574,19 @@ External:
 - WebAssembly JS API (`WebAssembly.instantiate`, `Memory.grow` detaching buffers): MDN.
 - Rust target `wasm32-unknown-unknown`: `rustup target add wasm32-unknown-unknown`; `cargo build --target
   wasm32-unknown-unknown --release` produces `target/wasm32-unknown-unknown/release/jig_compute.wasm`.
+
+## 12. Results so far (Phases 1–3)
+
+| Path (real preset meshes, median of 5) | JS | Rust | speed-up |
+|---|---:|---:|---:|
+| M-10 planetary gearbox, 38,810 tris: rank 14 orientations with supports | 1,941 ms | 445 ms | 4.4× |
+| M-07 spur gears, 22,228 tris: rank orientations | 658 ms | 160 ms | 4.1× |
+| X-08 Pi case: 200 mesh sections | 207 ms | 28 ms | 7.4× |
+| M-06 threaded jar: mesh gap | 156 ms | 44 ms | 3.6× |
+| factorJ + solve 24×30, ×200 | 12.2 ms | 4.2 ms | 2.9× |
+
+- Parity: `node test/rs/parity.mjs` → 3,784 checks, 0 failures, 44,314 triangles over 8 presets.
+- Whole preset run, profiled: the jig-compute module accounts for 513 ms where `inspect.js` took 2,210 ms; non-wasm
+  JS self time fell from 7.6 s to 4.2 s. End-to-end wall time is dominated by OCCT, whose time varied ±20 % between
+  identical runs on this machine, so whole-suite wall clock is not a useful metric here.
+- Module: 92 KiB, no imports, instantiates in 3 ms (Node) / 10 ms (browser worker).

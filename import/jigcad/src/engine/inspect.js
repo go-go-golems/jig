@@ -1,5 +1,6 @@
 // Inspect (README §4.12): materials, mass (solid and as-printed), sections, overhangs, bed contact,
 // mobility (Grübler–Kutzbach), snap-fit beam checks, gear mesh checks. Mesh-based analyses use body meshes.
+import * as RS from './rs/index.js';
 import { getOC } from './oc.js';
 import * as K from './kernel.js';
 import { mm, gram, isQuantity } from './units.js';
@@ -77,6 +78,10 @@ function chainLoops(polys, tol = 1e-5) {
 }
 // Polygon properties (signed loops; outer and holes combined by orientation-independent nesting)
 export function loopsProps(loops) {
+  if (RS.enabled() && loops.reduce((n, l) => n + l.length, 0) >= 64) { const r = RS.loopsProps(loops); if (r) return r; }
+  return loopsPropsJS(loops);
+}
+export function loopsPropsJS(loops) {
   // orient: the loop with the largest |area| and those nested at even depth count +, odd −
   const raw = loops.map(l => ({ l, a: polyArea(l) }));
   const inside = (p, l) => { let c = false; for (let i = 0, j = l.length - 1; i < l.length; j = i++) { if (((l[i][1] > p[1]) !== (l[j][1] > p[1])) && (p[0] < (l[j][0] - l[i][0]) * (p[1] - l[i][1]) / (l[j][1] - l[i][1]) + l[i][0])) c = !c; } return c; };
@@ -106,6 +111,10 @@ export const polyArea = l => { let a = 0; for (let i = 0; i < l.length; i++) { c
 // triangles of planes, cylinders, cones and spheres carry the exact surface normal, not the facet's (a 45° cone
 // is exactly 45°, whatever the tessellation).
 export function meshTris(mesh, m = K.IDENTITY, faces = null) {
+  return RS.enabled() ? RS.meshTris(mesh, m, faces) : meshTrisJS(mesh, m, faces);
+}
+export { catTris, freeTris } from './rs/index.js';
+export function meshTrisJS(mesh, m = K.IDENTITY, faces = null) {
   const P = mesh.positions, I = mesh.indices; const n = I.length / 3;
   const tris = new Array(n);
   const R = d => { const o = K.matApply(m, [0, 0, 0]); return V.unit(V.sub(K.matApply(m, d), o)); };
@@ -143,6 +152,11 @@ function exactNormal(g, p, fn) {
 // each against triangles of the other through a uniform grid. A real distance between surface points, so it
 // never under-reports; Infinity when nothing is closer than maxD.
 export function meshGap(A, B, maxD) {
+  if (RS.isSoup(A) && RS.isSoup(B)) { const d = RS.meshGap(A, B, maxD); if (d !== undefined) return d; }
+  return meshGapJS(recs(A), recs(B), maxD);
+}
+const recs = t => (RS.isSoup(t) ? t.records() : t);
+export function meshGapJS(A, B, maxD) {
   const h = Math.max(maxD, 0.25), key = (i, j, k) => `${i},${j},${k}`;
   const grid = tris => { const g = new Map(); tris.forEach((t, n) => {
     const lo = [0, 1, 2].map(d => Math.floor((Math.min(t.a[d], t.b[d], t.c[d]) - maxD) / h)), hi = [0, 1, 2].map(d => Math.floor((Math.max(t.a[d], t.b[d], t.c[d]) + maxD) / h));
@@ -217,7 +231,11 @@ function pointTri(p, t) {   // distance from p to triangle (a, b, c)
   return V.len(V.sub(p, V.add(t.a, V.add(V.mul(ab, v), V.mul(ac, w)))));
 }
 // Overhang/support/bed-contact for build direction u. maxAngle from vertical (rad).
-export function orientationScore(tris, u, { maxAngle = Math.PI / 4, bedTol = 1e-3, supportFactor = 1 } = {}) {
+export function orientationScore(tris, u, o = {}) {
+  if (RS.isSoup(tris)) { const r = RS.orientationScore(tris, u, o); if (r) return r; }
+  return orientationScoreJS(recs(tris), u, o);
+}
+export function orientationScoreJS(tris, u, { maxAngle = Math.PI / 4, bedTol = 1e-3, supportFactor = 1 } = {}) {
   u = V.unit(u);
   let lo = Infinity, hi = -Infinity;
   for (const t of tris) for (const p of [t.a, t.b, t.c]) { const h = V.dot(p, u); if (h < lo) lo = h; if (h > hi) hi = h; }
@@ -317,3 +335,5 @@ export function gearMesh(a, b, o = {}) {
 }
 const mmv = x => x == null ? 0 : typeof x === 'number' ? x : x.value ?? Number(x);
 export { mmv };
+
+RS.setJsMeshTris(meshTrisJS);
