@@ -58,6 +58,7 @@ export function upMatrix(u) {
 
 class PrintJob {
   constructor(name, o) { this.name = name; this.o = o; Object.freeze(this); }
+  toString() { return `print job ${this.name}`; }
   get isPrintJob() { return true; }
   get kind() { return 'print'; }
   _w(patch) { return new PrintJob(this.name, { ...this.o, ...patch }); }

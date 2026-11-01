@@ -43,8 +43,8 @@ export async function lintScope(makeScope) {
   return offenders;
 }
 
-// What the lint found when it was written (2026-11-01); phase 2 empties this list.
-export const KNOWN = new Set(['faces', 'feature', 'sketch', 'select', 'view.set', 'presets.create', 'presets.rename', 'presets.load', 'measure.face', 'measure.edge', 'measure.bbox']);
+// Offenders still known. The lint found 11 when it was written (2026-11-01); phase 2 fixed them all.
+export const KNOWN = new Set([]);
 
 test('every scope function answers junk with a message that names the call', async () => {
   const offenders = await lintScope(async () => { const host = createMockHost({ delay: 0 }); await host.compile(); return labScope(host, {}); });

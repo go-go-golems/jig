@@ -40,6 +40,7 @@ export const param = {
 };
 class Design {
   constructor(params, fn, o = {}) { this.params = params; this.fn = fn; this.o = o; Object.freeze(this); }
+  toString() { return `design (${Object.keys(this.params ?? {}).join(', ')})`; }
   get isDesign() { return true; }
   get kind() { return 'design'; }
   defaults() { return Object.fromEntries(Object.entries(this.params).map(([k, p]) => [k, p.def])); }

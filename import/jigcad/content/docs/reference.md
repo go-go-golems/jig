@@ -257,7 +257,7 @@ A hole whose axis is perpendicular to the build direction becomes a 45° teardro
 - `j.lib.hinge.living({ length, thickness = 0.4, gap = 1, overlap = 2, material = 'PP' })` ✓: a living hinge; warns `print.layerStrength` when the material's allowable strain is under 5 %. Example: `j.lib.hinge.living({ length: mm(30) })`.
 - `j.lib.dovetail({ width, depth, angle, fit, length })` ✓: tail with `op: 'join'`, socket with `op: 'cut'`. Example: `j.lib.dovetail({ width: mm(10), depth: mm(5) })`.
 - `j.lib.insert('M3x5.7').boss({ wall, height })` ✓: a boss with an insert hole. Example: `j.lib.insert('M3x5.7').boss({ wall: lw(3) })`.
-- `j.lib.magnet({ d, h })` `j.lib.dowel({ d, l, fit })` ✓: a press-fit pocket; a dowel. Example: `j.lib.magnet({ d: mm(6), h: mm(3) })`.
+- `j.lib.magnet({ d, h })` `j.lib.dowel({ d, l, fit })` ✓: a press-fit pocket; a dowel. Both cut from the placement point into the surface (down the frame's z, which `j.frame.on(face)` points out of the face). Example: `j.lib.magnet({ d: mm(6), h: mm(3) })`.
 - `j.lib.snap.cantilever({ length = 12, thickness = 1.6, deflection = 1, width = 6, material = 'PETG', angle = 30°, retention = 90° })` ✓: a snap hook along the frame's z with an insertion ramp and a retention face, strain-checked (`print.snapStrain`); its info gives strain and the deflection and insertion forces in N. Example: `j.lib.snap.cantilever({ length: mm(12), thickness: mm(1.6), deflection: mm(1) })`.
 - `j.lib.screw(std, 'M3x8')` `j.lib.nut(std, 'M3')` `j.lib.washer` `j.lib.pin({ d, l })` ✓: simple hardware parts. Example: `j.lib.screw('ISO 7380', 'M3x8')`.
 - `j.lib.snap.annular` `j.lib.snap.torsion` `j.lib.bearing` ✗.

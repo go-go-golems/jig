@@ -4,6 +4,19 @@
 
 export const READONLY = ['files.write', 'files.edit', 'files.rename', 'files.remove', 'run', 'params.set', 'params.clear', 'presets.load', 'presets.create', 'presets.rename'];
 
+// argument checks with messages that name the call (JIG-012 phase 2; test/agent/lint.test.mjs)
+const kindOf = v => v === null ? 'null' : v === undefined ? 'nothing' : Array.isArray(v) ? 'an array' : typeof v === 'object' ? 'an object' : typeof v === 'string' ? (v ? `"${v.slice(0, 40)}"` : 'empty text') : `${typeof v} ${String(v)}`;
+export function textArg(verb, v, what, example) {
+  if (typeof v === 'string' && v) return v;
+  throw new TypeError(`${verb}: give ${what} as text, such as ${example} (got ${kindOf(v)})`);
+}
+const optionalText = (verb, v, what, example) => v == null ? v : textArg(verb, v, what, example);
+export function optsArg(verb, v, shape) {
+  if (v == null) return {};
+  if (typeof v !== 'object' || Array.isArray(v)) throw new TypeError(`${verb}: give an object ${shape} (got ${kindOf(v)})`);
+  return v;
+}
+
 const r3 = x => (typeof x === 'number' && Number.isFinite(x) ? +x.toFixed(3) : x);
 const v3 = a => (a ? Array.from(a, r3) : a);
 const sorted = a => [...a].sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
@@ -333,16 +346,19 @@ function geomOf(host, a, verb) {
 export function makeMeasure(host) {
   return {
     face(name) {
+      textArg('measure.face', name, 'the face name', "'box/body1:top'");
       const t = findTopo(host, name, 'measure.face');
       if (!t || t.type !== 'face') throw new Error(`measure.face: no face named ${name}`);
       return faceRecord(t.body, t.face);
     },
     edge(name) {
+      textArg('measure.edge', name, 'the edge name', "'box/body1:top|front'");
       const t = findTopo(host, name, 'measure.edge');
       if (!t || t.type !== 'edge') throw new Error(`measure.edge: no edge named ${name}`);
       return edgeRecord(t.body, t.edge);
     },
     bbox(bodyId) {
+      optionalText('measure.bbox', bodyId, 'the body id (or nothing, for all bodies)', "'box/body1'");
       const bodies = (good(host, 'measure.bbox').bodies || []).filter(b => !bodyId || b.id === bodyId || b.name === bodyId || b.part === bodyId);
       if (!bodies.length) throw new Error(`measure.bbox: no body ${bodyId}; bodies are ${(good(host, 'measure.bbox').bodies || []).map(b => b.id).join(', ')}`);
       const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
@@ -432,11 +448,13 @@ export function makeQueries(host) {
   return {
     why: target => call(host, 'why', 'why', target),
     async faces(selectorText) {
+      optionalText('faces', selectorText, 'a selector', "'%plane' or '>Z'");
       const r = await call(host, 'faces', 'faces', selectorText);
       return Array.isArray(r) ? resolveFaces(host, r).map(f => (f && typeof f === 'object' ? { name: f.name, kind: f.kind, area: r3(f.area), center: v3(f.center), ...(f.normal ? { normal: v3(f.normal) } : {}), ...(f.axis ? { radius: r3(f.axis.radius) } : {}) } : f)) : r;
     },
-    feature: id => call(host, 'feature', 'feature', id),
+    feature: id => call(host, 'feature', 'feature', textArg('feature', id, 'the feature id', "'fillet1'")),
     async sketch(id) {
+      textArg('sketch', id, 'the sketch id', "'s1'");
       try { return await call(host, 'sketch', 'sketch', id); }
       catch (e) {
         const s = (good(host, 'sketch').sketches || []).find(x => x.id === id);
@@ -506,7 +524,8 @@ export function labScope(host, { readOnly = false, console: con, images = null }
 
   const view = {
     get() { const v = host.view || {}; return { name: v.name, overlays: v.overlays ? [...v.overlays] : [], sketches: v.shown ? [...v.shown] : [] }; },
-    set({ name, overlays, sketches } = {}) {
+    set(o) {
+      const { name, overlays, sketches } = optsArg('view.set', o, '{ name?, overlays?, sketches? }');
       const patch = {};
       // sketches: the ids drawn on the part in the 3D views (Sketch ▾ › 3D); [] hides them
       if (sketches) {
@@ -538,7 +557,8 @@ export function labScope(host, { readOnly = false, console: con, images = null }
       if (!p) return null;
       return { id: p.id, title: p.title, group: p.group, about: p.about, mine: mine(p.id), edited: typeof host.isEdited === 'function' ? !!host.isEdited() : false };
     },
-    async create({ title, about, files, from, open = true } = {}) {
+    async create(o) {
+      const { title, about, files, from, open = true } = optsArg('presets.create', o, '{ title, about?, files? or from?, open? }');
       needs('createPreset', 'presets.create');
       if (files != null && from != null) throw new Error('presets.create: give files or from, not both');
       let id;
@@ -548,11 +568,13 @@ export function labScope(host, { readOnly = false, console: con, images = null }
       return { id, title: p ? p.title : title, files: p ? sorted(Object.keys(p.files || {})) : [], open: !!open };
     },
     rename(id, title) {
+      textArg('presets.rename', id, 'the preset id', "'U-01'");
       needs('renamePreset', 'presets.rename');
       try { return { id, title: host.renamePreset(id, title) }; }
       catch (e) { throw new Error(`presets.rename: ${e.message}`); }
     },
     async load(id) {
+      textArg('presets.load', id, 'the preset id', "'A-01'");
       const all = host.presets ? host.presets() : [];
       if (!all.some(p => p.id === id)) throw new Error(`presets.load: no preset ${id}; presets are ${all.map(p => p.id).join(', ')}`);
       await host.loadPreset(id);
@@ -575,6 +597,7 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     },
     select(name) {
       if (name == null) { host.select(null); return null; }
+      textArg('select', name, 'a face, edge or body name (or null to clear)', "'box/body1:top'");
       const t = findTopo(host, name, 'select');
       if (!t) throw new Error(`select: no face, edge or body named ${name}; list names with faces('…') or program.bodies()`);
       if (t.type === 'faces') throw new Error(`select: ${name} names ${t.pieces.length} split faces; give one (with its #a, #b suffix)`);

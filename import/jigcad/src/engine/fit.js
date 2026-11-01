@@ -21,13 +21,13 @@ export const fit = {
   classes(obj) { return obj ? Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' ? mm(v) : v])) : Object.fromEntries(Object.entries(DEFAULT_CLASSES).map(([k, v]) => [k, mm(v)])); },
   profile(name, o = {}) { return new FitProfile(name, { ...o, calibrated: !!o.classes }); },
   gap(cls) { return lazyFit(`gap(${cls})`, f => f.classes[cls] ?? err(cls)); },
-  hole(d, cls) { return lazyFit(`hole(${fmt(d)}, ${cls})`, (f, len) => { const n = len(d); const target = n + 2 * (f.classes[cls] ?? err(cls)); return target + compOf(f, target); }); },
-  pin(d, cls) { return lazyFit(`pin(${fmt(d)}, ${cls})`, (f, len) => len(d) - 2 * (f.classes[cls] ?? err(cls)) + 2 * f.xyComp); },
+  hole(d, cls) { return lazyFit(`hole(${fmt(d)}, ${cls})`, (f, len) => { const n = len(d); const target = n + 2 * (f.classes[cls] ?? err(cls)); return target + compOf(f, target); }, x => `${x} + 2 * gap.${cls}`); },
+  pin(d, cls) { return lazyFit(`pin(${fmt(d)}, ${cls})`, (f, len) => len(d) - 2 * (f.classes[cls] ?? err(cls)) + 2 * f.xyComp, x => `${x} - 2 * gap.${cls}`); },
   coupon(o = {}) { return coupon(o); },
   calibrate,
 };
 const err = cls => { throw new Error(`unknown fit class '${cls}'`); };
-const fmt = d => typeof d === 'number' ? `${d} mm` : String(d);
+const fmt = d => typeof d === 'number' ? `${d} mm` : typeof d === 'string' ? `'${d}'` : String(d);
 // Hole compensation (mm) for a hole of diameter d (number in mm or a Quantity). f is a FitProfile, whose
 // holeComp is a length or a function (d: Quantity, { fit }) → Quantity | mm, or a compile fit context
 // (holeComp(d mm) → mm already).
@@ -52,8 +52,14 @@ class FitQuantity extends Quantity {
   resolveSize(ctx = {}) { return this.resolve({ fit: ctx.fit }).value; }
 }
 const LEN = mm(1).d;
-function lazyFit(text, fn) {
-  const lenOf = x => typeof x === 'string' ? (CURRENT_LEN ? CURRENT_LEN(x) : NaN) : mmv(x);   // 'pin' names a param
+function lazyFit(text, fn, inParams = null) {
+  // 'pin' names a param: known while a feature compiles, not while .params() itself is read
+  const lenOf = x => {
+    if (typeof x !== 'string') return mmv(x);
+    if (CURRENT_LEN) return CURRENT_LEN(x);
+    throw new Error(`j.fit.${text}: '${x}' names a param, which has no value while .params() is read. ` +
+      `Inside a feature j.fit.${text} works${inParams ? `; in .params() write the expression '${inParams(x)}'` : ''}, or give a length such as mm(6).`);
+  };
   return new FitQuantity(0, LEN, 'mm', null, c => mm(fn(fitOf(c?.fit), lenOf)), `j.fit.${text}`);
 }
 

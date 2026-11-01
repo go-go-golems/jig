@@ -2,6 +2,9 @@
 // Limits (guides/agent/the-eval-tool.md, "The result format"): numbers to 5 decimals, 64 numbers on one line,
 // 60 list items, 80 keys, 5 levels. Typed arrays are summarised as `Float32Array(3600)`.
 
+// a value's own one-line description for the result (engine classes define it; toString is the fallback)
+export const DESCRIBE = Symbol.for('jig.describe');
+
 export const LIMITS = { decimals: 5, numbers: 64, items: 60, keys: 80, depth: 5, plain: 120 };
 
 // Plain (bare) strings: letters, digits, spaces and . , : / ( ) + - · × → %, plus the characters of
@@ -51,9 +54,13 @@ function scalar(v, o) {
   if (v instanceof Error) return str(`${v.name}: ${v.message}`);
   if (v instanceof Promise) return '[Promise]';
   if (v instanceof WeakMap || v instanceof WeakSet) return `[${v.constructor.name}]`;
-  // a runtime handle (class instance, not plain data) with kind and id: `kind id`
-  if (!Array.isArray(v) && !(v instanceof Map) && !(v instanceof Set) && !isPlainObject(v) && v.kind != null && v.id != null)
-    return `${v.kind} ${v.id}`;
+  if (!Array.isArray(v) && !(v instanceof Map) && !(v instanceof Set) && !isPlainObject(v)) {
+    // a value of the language describes itself (JIG-012): a quantity as '6.2 mm', a part as its features
+    if (typeof v[DESCRIBE] === 'function') { try { return str(String(v[DESCRIBE]())); } catch { /* fall through */ } }
+    if (typeof v.toString === 'function' && v.toString !== Object.prototype.toString) { try { const t = v.toString(); if (typeof t === 'string' && !t.startsWith('[object ')) return str(t); } catch { /* fall through */ } }
+    // a runtime handle (class instance, not plain data) with kind and id: `kind id`
+    if (v.kind != null && v.id != null) return `${v.kind} ${v.id}`;
+  }
   return null;
 }
 

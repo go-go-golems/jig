@@ -44,7 +44,7 @@ test('errors name the line of the step\'s own code', async () => {
   const r3 = await runEval(host, 'return (;');
   assert.match(r3.text, /^SyntaxError: /);
   const r4 = await runEval(host, 'return undefinedName;');
-  assert.match(r4.text, /^ReferenceError: undefinedName is not defined \(line 1\)$/);
+  assert.match(r4.text, /^ReferenceError: undefinedName is not defined \(line 1\)\nnote: undefinedName is not in this step.s scope\. Steps do not share variables/);
 });
 
 test('the host is not in scope; const names do not carry over', async () => {

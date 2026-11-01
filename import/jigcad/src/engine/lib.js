@@ -59,7 +59,8 @@ function magnet({ d = 6, h = 3 } = {}) {
     const fit = ctx.fitCtx(); const cls = f.opts.fit ?? 'press';
     const D = ctx.len(d) + 2 * fit.classes[cls] + fit.holeComp(ctx.len(d)), H = ctx.len(h) + 0.2;
     ctx.useFit(cls);
-    return { cut: [cylinder(f.id, 'pocket', D / 2, 0, H)], info: { modelled: { pocket: `Ø${D.toFixed(2)} × ${H.toFixed(2)} mm` } }, note: `pocket Ø ${D.toFixed(2)} × ${H.toFixed(2)} mm (${cls})` };
+    // into the surface, like dowel: from the placement point down its z (JIG-012)
+    return { cut: [cylinder(f.id, 'pocket', D / 2, -H, 0.01)], info: { modelled: { pocket: `Ø${D.toFixed(2)} × ${H.toFixed(2)} mm` } }, note: `pocket Ø ${D.toFixed(2)} × ${H.toFixed(2)} mm (${cls})` };
   });
 }
 function dowel({ d = 3, l = 10, fit = 'press' } = {}) {

@@ -11,9 +11,11 @@
 // The result is the same text the page's runEval writes: YAML of the value, logs first, notes for promises the code
 // never awaited. Keys a step adds to globalThis are removed after it, so steps do not leak into each other.
 import * as W from '../../engine/worker.js';
-import { compileStep, trackScope, makeConsole, formatResult, markPromises, promiseNotes, cut } from '../evaltool.js';
+import { compileStep, trackScope, guardScope, withHints, makeConsole, formatResult, markPromises, promiseNotes, cut } from '../evaltool.js';
 import { labScope, makeProgram, makeMeasure, makeQueries, compileResult, flatMetrics } from '../scope.js';
 import { listen, closePort } from './ports.js';
+import { guard } from '../../engine/guard.js';
+import { methodTable } from '../hints.js';
 
 const IDENT = /^[A-Za-z_$][\w$]*$/;
 let generation = 0;            // which check() made the engine's current Program
@@ -98,6 +100,24 @@ function mirrorHost(ctx, callRaw) {
 
 const FILE_CHANGES = ['write', 'edit', 'rename', 'remove'];
 
+// the methods of the language's values, for "x.m is not a function" hints (made once per worker)
+let METHODS = null;
+function methods() {
+  if (METHODS) return METHODS;
+  const { j, bare } = W.lang();
+  const samples = {};
+  const take = (kind, f) => { try { samples[kind] = f(); } catch { /* not in this build */ } };
+  take('part', () => j.part('x'));
+  take('quantity', () => bare.mm(1));
+  take('sketch', () => j.sketch('s'));
+  take('region', () => j.region.rect(bare.mm(1), bare.mm(1)));
+  take('selector', () => j.sel.faces());
+  take('assembly', () => j.assembly('a'));
+  take('print job', () => j.print('p'));
+  take('design', () => j.design({}, () => j.part('x')));
+  return (METHODS = methodTable(samples));
+}
+
 /** One step: { code, api, ctx, readOnly } → { ok, text }. call(path, args) → { ok, value | error, ctx? }. */
 export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false }, call) {
   let ctx = { files: {}, overrides: {}, entry: 'script.js', ...ctx0 };
@@ -151,7 +171,7 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   Object.assign(scope, bare, { j, data: W.parseData(ctx.files, ctx.entry) });
   scope.check = (variant, options) => check(() => ({ ...ctx, files: Object.fromEntries(mirror.files) }), variant, options);
 
-  const tracked = trackScope(scope, promises);
+  const tracked = guardScope(trackScope(scope, promises));
   tracked.console = con;
   tracked.log = con.log;
   const names = Object.keys(tracked).filter(k => IDENT.test(k));
@@ -164,7 +184,7 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   await queue;
   for (const k of Object.getOwnPropertyNames(globalThis)) if (!before.has(k)) { try { delete globalThis[k]; } catch { /* not configurable */ } }
   let text;
-  try { text = formatResult(value, logs, error, [...promiseNotes(promises), ...notes]); }
+  try { text = withHints(formatResult(value, logs, error, [...promiseNotes(promises), ...notes]), { error, code: String(code), names, j, methods: methods() }); }
   catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
   return { ok: !error, text: cut(text) };
 }
@@ -206,5 +226,5 @@ function liveProgram(data, gen) {
   };
   const p = { ...makeProgram(host), ...makeQueries(host), measure: makeMeasure(host) };
   Object.defineProperty(p, 'describe', { value: () => `program ${data.name ?? ''} (${data.kind}) from check()`, enumerable: false });
-  return p;
+  return guard(p, 'check().program');
 }

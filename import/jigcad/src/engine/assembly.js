@@ -14,6 +14,7 @@ export const joint = Object.fromEntries(Object.keys(DOF).map(k => [k, (o = {}) =
 
 class Assembly {
   constructor(name, o) { this.name = name; this.o = o; Object.freeze(this); }
+  toString() { return `assembly ${this.name}`; }
   get isAssembly() { return true; }
   get kind() { return 'assembly'; }
   _w(p) { return new Assembly(this.name, { ...this.o, ...p }); }

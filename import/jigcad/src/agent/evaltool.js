@@ -3,6 +3,8 @@
 import { labScope, filesObject } from './scope.js';
 import { runInSandbox } from './sandbox/client.js';
 import { yaml, yamlInline } from './yaml.js';
+import { guard, closest } from '../engine/guard.js';
+import { hintsFor, lineOf } from './hints.js';
 
 export const EVAL_TIMEOUT_MS = 25000;
 export const RESULT_CUT = 9000;
@@ -84,6 +86,32 @@ function track(p, label, promises) {
   return tp;
 }
 /** The scope with every function (one level into namespaces) wrapped so returned promises are tracked. */
+/**
+ * Guard the step's namespaces (files, program, params, …; engine/guard.js): a name a namespace does not have is an
+ * error at the read, naming the nearest names and where else in the scope the name is (`files.check` → check is
+ * a function on its own). Functions and other values are left as they are.
+ */
+export function guardScope(scope) {
+  const where = new Map();
+  for (const [k, v] of Object.entries(scope)) {
+    if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype)
+      for (const k2 of Object.keys(v)) where.set(k2, [...(where.get(k2) ?? []), k]);
+  }
+  const top = new Set(Object.keys(scope));
+  for (const [k, v] of Object.entries(scope)) {
+    // data is the preset's files, not a namespace: data.x ?? fallback stays a question
+    if (k === 'data' || !v || typeof v !== 'object' || Object.getPrototypeOf(v) !== Object.prototype) continue;
+    scope[k] = guard(v, k, {
+      elsewhere: n => (where.get(n) ?? []).filter(ns => ns !== k),
+      hint: (_, n) => {
+        const own = top.has(n) ? [n] : closest(n, [...top].filter(t => typeof scope[t] === 'function'), 2);
+        return own.length ? `In scope on its own: ${own.map(t => typeof scope[t] === 'function' ? `${t}(…)` : t).join(', ')}.` : '';
+      },
+    });
+  }
+  return scope;
+}
+
 export function trackScope(scope, promises) {
   const wrap = (fn, name) => (...args) => {
     const r = fn(...args);
@@ -137,6 +165,12 @@ export function formatResult(value, logs, error, notes = []) {
   return logs.length ? `logs:\n${logs.join('\n')}\n---\n${body}` : body;
 }
 
+/** The result text with the hints for its error, or for a NaN in it, appended (hints.js). */
+export function withHints(text, { error, code, names, j = null, methods = null }) {
+  const notes = hintsFor({ error, text: error ? '' : text, code, names, j, methods, line: error ? lineOf(errorText(error)) : null });
+  return notes.length ? `${text}\n${notes.join('\n')}` : text;
+}
+
 /**
  * Run one step's code against a fresh scope.
  * → { text, error: boolean, ms, value, images: [{ mimeType, data }] (from look()) }
@@ -146,7 +180,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   const promises = [];
   const con = makeConsole(logs, markPromises);
   const images = [];
-  const scope = trackScope(labScope(host, { readOnly, console: con, images }), promises);
+  const scope = guardScope(trackScope(labScope(host, { readOnly, console: con, images }), promises));
   delete scope.host;
   const names = Object.keys(scope).filter(k => IDENT.test(k));
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -170,7 +204,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, 1000))]);
   const ms = Math.round(now() - t0);
   let text;
-  try { text = formatResult(value, logs, error, promiseNotes(promises)); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
+  try { text = withHints(formatResult(value, logs, error, promiseNotes(promises)), { error, code, names }); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
   return { text: cut(text), error: !!error, ms, value, images };
 }
 

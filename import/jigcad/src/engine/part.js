@@ -15,6 +15,11 @@ export class Part {
   }
   get kind() { return 'part'; }
   get isPart() { return true; }
+  // one line for results and logs (JIG-012): the part and its features in order
+  toString() {
+    const f = this.items.map(x => `${x.id} (${x.type})`);
+    return `part ${this.name}: ${f.length ? (f.length > 12 ? [...f.slice(0, 11), `… ${f.length - 11} more`] : f).join(' · ') : 'no features yet'}`;
+  }
   _meta(patch) { return new Part(this.name, this.items, Object.freeze({ ...this.meta, ...patch }), this); }
   _add(type, args, opts = {}) {
     const auto = !opts?.id;

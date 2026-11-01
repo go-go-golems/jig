@@ -144,3 +144,76 @@ engine queries cross the port.
 
 ### Code review instructions
 - `node --test test/agent/sandbox.test.mjs`; `node tools/agent-eval.mjs --oracle`; `node ttmp/…/JIG-012…/scripts/01-browser-sandbox-check.mjs` with `jigcad serve` on :8787.
+
+## Step 4: Phase 2, errors that teach
+
+Phase 2 makes the misuse classes of the failure report loud at the point of the mistake. A name a namespace does
+not have is now an error at the read, naming the nearest names and where else the name lives. Values describe
+themselves in results. The common runtime errors get a note that says what to do. The 11 functions the message lint
+flagged now check their arguments, so the lint's known list is empty.
+
+The two engine fixes from JIG-011 are in. `j.fit.hole('md', …)` inside `.params()` names the param and gives the
+expression to write instead of failing as `mm(…) takes a number, got NaN`. `j.lib.magnet` now cuts into the surface,
+like `j.lib.dowel`.
+
+### Prompt context
+
+**User prompt (verbatim):** see Step 1 (the "1. do B straightaway … Then mplement" message and "commit at appropriate
+intervals and keep a detailed diary as you work").
+
+**Assistant interpretation:** implement phase 2 of the guide's plan (§11), validate it, commit it.
+
+**Inferred user intent:** the agent should learn the API from its errors instead of failing silently.
+
+### What I did
+- `src/engine/guard.js` (new): `guard(real, path, opts)` with a shadow target, `closest()` (optimal string alignment distance, half cost for case, prefix and containment bonus), `indexNames`, `guardTree` ("faces is j.sel.faces"). Probes (`then`, `toJSON`, `Symbol.*`, `inspect`, `$$typeof`, …) pass through as undefined; `in`, `Object.keys` and spreading see the real namespace.
+- `src/engine/j.js`: `makeJ()` returns `guardTree(j, 'j', { hint })`; the hint says that units are bare (`j.mm` → `mm(…)`). Scripts get the guarded `j` too (decision 2).
+- `src/agent/evaltool.js`: `guardScope(scope)` guards the step's namespaces after `trackScope`, on the page (`runEval`) and in the sandbox (`runStep`). `data` is left unguarded so `data.x ?? fallback` still works. The hint names top-level functions near the missing name (`program.facez` → `In scope on its own: faces(…)`). `withHints(text, …)` appends notes.
+- `src/agent/hints.js` (new): `hintsFor({ error, text, code, names, j, methods, line })`:
+  - not defined → `box is j.box`, nearest scope names, or "Steps do not share variables";
+  - `x.m is not a function` → nearest methods of the language's values by kind (part, quantity, sketch, region, selector, assembly, print job, design; `methodTable` is built from sample values in the sandbox);
+  - a read of undefined → the expression on the error line that was undefined, and for `.summary`/`.program`/`.metrics` the check()/run() explanation;
+  - NaN in a result → where it comes from.
+- `src/agent/sandbox/runner.js`: guarded scope; `check().program` guarded as `check().program`; hints with `j` and the method table.
+- `src/agent/yaml.js`: a non-plain value with its own `toString` (or `Symbol.for('jig.describe')`) prints as that one line. `toString()` added to Part (`part box: add1 (add) · fillet1 (fillet)`, capped at 12 features), Assembly, PrintJob and Design.
+- `src/agent/scope.js`: `textArg` and `optsArg`, used by `faces`, `feature`, `sketch`, `select`, `view.set`, `presets.create/rename/load`, `measure.face/edge/bbox`.
+- `src/engine/fit.js`: `lazyFit` refuses a param name outside a feature with the expression to write; param names are quoted in the fit text (`j.fit.hole('md', press)`).
+- `src/engine/lib.js`: the magnet pocket runs from z = −(h + 0.2) to +0.01. `test/engine/scripts/19-lib-hardware.js` places it on the floor's top face. `content/docs/reference.md` states the direction for both cutters.
+- Tests: `test/agent/guard.test.mjs` (5 tests); `eval.test.mjs` expects the note on an undefined name; `lint.test.mjs` KNOWN is empty.
+
+### Why
+- factory-videos and our own history agree: models read errors, not docs. A missing name that becomes `undefined` surfaces two lines later as "undefined is not a function" or a NaN in a metric. At the read, the message can still name the call.
+
+### What worked
+- `make test-js`: 74 + 15 + 62 + 42 passing; `tools/preset-check.mjs`: 72/72; `tools/book-check.mjs`: 159 blocks, no problems. Guarding `j` broke no engine test or preset.
+- Messages, from the sandbox:
+  - `TypeError: j.fit.hol does not exist. Did you mean j.fit.hole? (j.fit has: calibrate, classes, coupon, gap, hole, pin, profile, profileRegister)`
+  - `j.fit.faces does not exist. faces is j.sel.faces.`
+  - `ReferenceError: box is not defined (line 1)` + `note: box is j.box.`
+  - `TypeError: j.part(...).faces is not a function` + `note: … .faces() is a method of a selector; j.part(...) is something else.`
+  - `r.summary.name` after a failed `check()` → `note: r.summary is undefined. check() and run() give summary, metrics and program only when the script compiles (ok: true); …`
+  - fit in params: `j.fit.hole('md', press): 'md' names a param, which has no value while .params() is read. Inside a feature j.fit.hole('md', press) works; in .params() write the expression 'md + 2 * gap.press', or give a length such as mm(6).` The suggested expression compiles.
+
+### What didn't work
+- The first YAML probe used `part('box').box(…)`, which is not a Part method (`TypeError: part(...).box is not a function`): my probe was wrong, not the code.
+- `console.debg(…)` is not caught by the guard: in the sandbox, `console` is set after `guardScope`. Dropped that assertion; `console` stays a plain object.
+- The first fit test script redeclared `mm` and used `export default`, which the mock host's script format does not take (`Identifier 'mm' has already been declared`, then `Unexpected token 'export'`). Rewritten in the `return j.part(…)` form.
+- `eval.test.mjs` "errors name the line" failed once: it expected the bare `ReferenceError` line, and now a note follows. Updated the expectation.
+
+### What I learned
+- A Proxy over a frozen namespace cannot return a wrapped value for a frozen property of its own target (proxy invariant), so the guard's target is an empty shadow and every trap forwards. For functions, the shadow's non-configurable `prototype` has to appear in `ownKeys`.
+- `j.load` and `j.field` are Proxies of their own, where `k in real` is false. The guard accepts any defined answer from `Reflect.get` as a member.
+
+### What was tricky to build
+- Keeping probes working. `await j.fit` reads `then`, test tools read `asymmetricMatch` and `$$typeof`, Node's inspect reads `Symbol(nodejs.util.inspect.custom)`. All of them must stay undefined, not throw.
+
+### What warrants a second pair of eyes
+- `Transform` has a `then(u)` method (composition), so `await j.tx.move(…)` would call it as a thenable. This predates JIG-012 and is not caused by the guards.
+- Guarding `data` was left out on purpose. A missing data file still reads as undefined.
+
+### What should be done in the future
+- Phase 3: `help()`. Then the guard message can end with `help('j.fit')`.
+
+### Code review instructions
+- Start with `src/engine/guard.js`, `src/agent/hints.js`, then `guardScope` and `withHints` in `src/agent/evaltool.js`.
+- `node --test import/jigcad/test/agent/guard.test.mjs import/jigcad/test/agent/lint.test.mjs`; `make test-js`; `node import/jigcad/tools/preset-check.mjs --quiet`.

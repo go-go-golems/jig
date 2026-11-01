@@ -19,6 +19,7 @@ import { exportTo } from './io.js';
 import { inspectApi } from './inspect-api.js';
 import { sketch3d as kSketch3d } from './path3d.js';
 import { Deferred, isDeferred } from './geom.js';
+import { guardTree } from './guard.js';
 
 export const VERSION = 'jigcad-kernel 0.1 (OpenCascade 7.x wasm)';
 
@@ -54,7 +55,10 @@ export function makeJ() {
     scale: (...a) => a.some(lazy) ? new Deferred('tx', 'scale', a) : coreTx.scale(...a),
   });
   j.frame = Object.assign((o = {}) => [o.origin, o.x, o.z].some(lazy) ? new Deferred('frame', 'make', [o]) : coreFrame(o), coreFrame);
-  return { j, bare: core.bare };
+  // a name j does not have is an error at the read, with the nearest names (JIG-012; guard.js)
+  const bare = core.bare ?? {};
+  const hint = (path, k) => path === 'j' && k in bare ? `${k} is not under j: units and unit functions are in scope on their own, as ${k}(…).` : '';
+  return { j: guardTree(j, 'j', { hint }), bare };
 }
 function diffModels(a, b) {
   const ia = new Map((a.items ?? []).map(f => [f.id, f])), ib = new Map((b.items ?? []).map(f => [f.id, f]));
