@@ -202,7 +202,7 @@ button { cursor: pointer; }
 .prow { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 16px; border-bottom: 1px solid var(--rule); }
 .prow label { font-weight: 400; }
 .prow output { font-weight: 700; font-variant-numeric: tabular-nums; }
-.prow input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--ink); height: 16px; }
+.prow input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; }
 .prow input[type=checkbox] { accent-color: var(--ink); width: 14px; height: 14px; margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chips button { background: none; border: 1px solid var(--hair); padding: 4px 9px; font-size: var(--fs-xs); border-radius: 0; text-align: left; }
@@ -211,7 +211,7 @@ button { cursor: pointer; }
 .stagewrap { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; container: stage / inline-size; }
 .toolbar { flex: none; min-height: 46px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 8px; padding: 6px 12px; flex-wrap: wrap; }
 .toolbar .lbl { color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; }
-.toolbar input[type=range] { width: 92px; accent-color: var(--ink); }
+.toolbar input[type=range] { width: 92px; }
 .toolbar select { height: 30px; border: 1px solid var(--hair); background: var(--bg); padding: 0 6px; font-size: var(--fs-s); border-radius: 0; }
 .hint { flex: none; height: 30px; border-top: 1px solid var(--hair); display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: var(--fs-s); color: var(--ink-2); white-space: nowrap; overflow: hidden; }
 .hint b { color: var(--ink); font-weight: 700; }
@@ -432,7 +432,7 @@ body.dragging-view canvas, body.resizing-x canvas, body.resizing-y canvas, body.
 .prow .pn { color: var(--ink); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .prow .pn i { font-style: normal; font-weight: 400; color: var(--ink-2); }
 .prow .pc { min-width: 0; display: flex; }
-.prow .pc input[type=range] { width: 100%; accent-color: var(--ink); margin: 0; }
+.prow .pc input[type=range] { width: 100%; margin: 0; }
 .prow .pc select { height: 28px; border: 1px solid var(--hair); background: var(--bg); padding: 0 4px; font-size: var(--fs-xs); border-radius: 0; width: 100%; min-width: 0; }
 .prow .pc .seg { flex-wrap: wrap; }
 .prow .pv { color: var(--ink); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

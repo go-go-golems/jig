@@ -1,7 +1,7 @@
 // Params: the exposed parameters as sliders (ParamRow), then every parameter with its value, expression, source
 // and dependents. A change sets host.overrides and recompiles (debounced); the code keeps the defaults.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Tog, useHost } from '../common.jsx';
+import { Tog, useHost, pct } from '../common.jsx';
 import { num } from '../format.js';
 
 const defaults = new Map();   // `${preset}:${name}` → the value the code gives, seen when not overridden
@@ -91,7 +91,7 @@ export function ParamsView({ host }) {
             return (
               <div key={p.name} class={`prow ${hl === p.name ? 'hl' : ''}`} data-param={p.name}>
                 <span class="pn" title={p.name}>{p.exposed.label && p.exposed.label !== p.name ? <>{p.exposed.label} <i>{p.name}</i></> : <i class="solo">{p.name}</i>}</span>
-                <span class="pc"><input type="range" min={lo} max={hi} step={step} value={typeof v === 'number' ? v : p.value} aria-label={p.exposed.label || p.name}
+                <span class="pc"><input type="range" min={lo} max={hi} step={step} value={typeof v === 'number' ? v : p.value} style={pct(typeof v === 'number' ? v : p.value, lo, hi)} aria-label={p.exposed.label || p.name}
                   onInput={e => { setHl(p.name); host.setOverride(p.name, +e.currentTarget.value); }} /></span>
                 <span class="pv">{show(v, p.unit)}</span>
                 <button class="tabact" disabled={!(p.name in host.overrides)} title={d != null ? `default ${show(d, p.unit)}` : 'back to the code’s value'} aria-label={`Reset ${p.name}`}

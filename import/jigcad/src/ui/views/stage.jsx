@@ -1,7 +1,7 @@
 // Stage: the drafting sheet (createStage from src/stage, or the plain fallback sheet), its toolbar, its hint bar,
 // and the Inspector: the selected face's persistent name, genealogy and why(), then the part's metrics.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Menu, Seg, useHost, RUN_KEY } from '../common.jsx';
+import { Menu, Seg, useHost, RUN_KEY, pct } from '../common.jsx';
 import { loadStage } from '../modules.js';
 import { NAMED_VIEWS, OVERLAYS, squareView, isSketchPick } from '../../host/host.js';
 import { qty, num, vec, metric, DASH, bare } from '../format.js';
@@ -69,7 +69,7 @@ export function StageView({ host }) {
             ))}
           </Menu>
           <span class="lbl">Zoom</span>
-          <input type="range" min="0.25" max="4" step="0.05" aria-label="Zoom" value={v.zoom ?? 1} onInput={e => host.setView({ zoom: +e.currentTarget.value, scale: null })} />
+          <input type="range" min="0.25" max="4" step="0.05" aria-label="Zoom" value={v.zoom ?? 1} style={pct(v.zoom ?? 1, 0.25, 4)} onInput={e => host.setView({ zoom: +e.currentTarget.value, scale: null })} />
           <button class="btn sm" disabled={squared} title={`Back to the ${named?.title.toLowerCase() || 'axonometric'} view at zoom 1, centred on the part`}
             onClick={() => host.setView({ name: named ? v.name : 'axo', ...squareView() })}>Square up</button>
         </div>

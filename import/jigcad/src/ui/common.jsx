@@ -73,6 +73,9 @@ export function ThemeIcon({ theme }) {
 }
 
 /** Platform shortcut label: ⌘↵ on Apple, Ctrl+↵ elsewhere. */
+/** The share of a slider's range up to its value, as the `--p` the hairline slider fills to (jig.css). */
+export const pct = (v, lo, hi) => ({ '--p': `${Math.max(0, Math.min(100, ((v - lo) / ((hi - lo) || 1)) * 100))}%` });
+
 export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const RUN_KEY = isMac ? '⌘↵' : 'Ctrl+↵';
 export const RUN_KEY_LONG = isMac ? '⌘ Enter' : 'Ctrl+Enter';

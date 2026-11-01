@@ -190,3 +190,34 @@ body { overflow: hidden; }
 .chip.bad { border-color: var(--accent); color: var(--accent); font-weight: 700; }
 .entblock .kv dd.dim { font-weight: 400; }
 .entblock .crows { margin-top: -2px; }
+
+
+/* ── hairline sliders (design note "Hairline sliders for the Kiln workbench", 31 Oct 2026) ──────────────────────
+   A 1 px --hair track inked in --ink up to the value (--p, set by pct() in ui/common.jsx), a 5 × 12 px square
+   thumb with a 2 px --bg halo, widening to 7 px on hover and drag. The input stays 18 px tall to be easy to grab.
+   Vendor selectors sit in separate rules: one unknown selector drops a whole rule. No transitions. */
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  background: transparent; height: 18px; margin: 0; padding: 0; min-width: 0; cursor: pointer;
+}
+input[type=range]:focus { outline: none; }
+input[type=range]:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 1px; border: 0;
+  background: linear-gradient(to right, var(--ink) var(--p, 0%), var(--hair) var(--p, 0%));
+}
+input[type=range]::-moz-range-track { height: 1px; border: 0; background: var(--hair); }
+input[type=range]::-moz-range-progress { height: 1px; background: var(--ink); }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 5px; height: 12px; margin-top: -5.5px;   /* -(12 - 1) / 2 centres it on the 1 px track */
+  background: var(--ink); border: 0; border-radius: 0; box-shadow: 0 0 0 2px var(--bg);
+}
+input[type=range]::-moz-range-thumb {
+  width: 5px; height: 12px; background: var(--ink); border: 0; border-radius: 0; box-shadow: 0 0 0 2px var(--bg);
+}
+input[type=range]:hover::-webkit-slider-thumb { width: 7px; }
+input[type=range]:active::-webkit-slider-thumb { width: 7px; }
+input[type=range]:hover::-moz-range-thumb { width: 7px; }
+input[type=range]:active::-moz-range-thumb { width: 7px; }
+input[type=range]:disabled { opacity: 0.4; cursor: default; }
