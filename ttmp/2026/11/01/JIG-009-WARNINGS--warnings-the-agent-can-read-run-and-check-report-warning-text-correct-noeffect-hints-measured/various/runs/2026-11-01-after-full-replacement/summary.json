@@ -1,0 +1,42 @@
+{
+  "tiers": [
+    "default"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 1,
+      "passed": 1,
+      "p": 1,
+      "lo": 0.2065432914738929,
+      "hi": 1,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 5,
+      "rounds": 6,
+      "input": 113164,
+      "cachedShare": 0.8257042875826235,
+      "output": 962,
+      "seconds": 8.805,
+      "outcomes": {
+        "ok": 1
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "a03-fix-dof",
+      "tags": [
+        "edit",
+        "sketch"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 5
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "stamp": "2026-11-01T18-00-03",
+  "base": "http://127.0.0.1:8787/",
+  "repeat": 1,
+  "compute": "rust",
+  "tiers": [
+    "default"
+  ],
+  "cases": [
+    "a03-fix-dof"
+  ],
+  "tierModels": {
+    "complex": "lunaroute/deepseek-4.1-flash",
+    "default": "lunaroute/glm-5.3-flash",
+    "quick": "lunaroute/glm-5.3-flash"
+  },
+  "maxRounds": 16,
+  "engine": "jigcad-kernel 0.1 (OpenCascade 7.x wasm)",
+  "look": null
+}

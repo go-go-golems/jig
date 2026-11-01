@@ -1,0 +1,96 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 6,
+      "passed": 4,
+      "p": 0.6666666666666666,
+      "lo": 0.29998832134152864,
+      "hi": 0.9032306674407831,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 9.166666666666666,
+      "rounds": 10.166666666666666,
+      "input": 197509.83333333334,
+      "cachedShare": 0.9321392437001027,
+      "output": 1827.3333333333333,
+      "seconds": 32.66883333333333,
+      "outcomes": {
+        "ok": 6
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 6,
+      "passed": 5,
+      "p": 0.8333333333333334,
+      "lo": 0.43649056343635395,
+      "hi": 0.9699474141282697,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 10,
+      "rounds": 11,
+      "input": 234670.5,
+      "cachedShare": 0.9457118243096881,
+      "output": 3579.5,
+      "seconds": 115.12599999999999,
+      "outcomes": {
+        "ok": 6
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "w01-a01-hole-misses",
+      "tags": [
+        "repair",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.3333333333333335
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 5.333333333333333
+        }
+      }
+    },
+    {
+      "id": "w02-a01-engrave-negative",
+      "tags": [
+        "edit",
+        "text",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 1,
+          "fails": {
+            "metric": 3
+          },
+          "toolCalls": 15
+        },
+        "complex": {
+          "n": 3,
+          "passed": 2,
+          "fails": {
+            "file": 1,
+            "metric": 1
+          },
+          "toolCalls": 14.666666666666666
+        }
+      }
+    }
+  ]
+}

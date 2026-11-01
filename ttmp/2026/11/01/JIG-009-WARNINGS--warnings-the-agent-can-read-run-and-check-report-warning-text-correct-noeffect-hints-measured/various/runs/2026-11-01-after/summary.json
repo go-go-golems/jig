@@ -1,0 +1,91 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 6,
+      "passed": 6,
+      "p": 1,
+      "lo": 0.6096569663469354,
+      "hi": 0.9999999999999999,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 7.666666666666667,
+      "rounds": 8.666666666666666,
+      "input": 164701.33333333334,
+      "cachedShare": 0.9561711704418503,
+      "output": 1129.6666666666667,
+      "seconds": 15.371333333333334,
+      "outcomes": {
+        "ok": 6
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 6,
+      "passed": 6,
+      "p": 1,
+      "lo": 0.6096569663469354,
+      "hi": 0.9999999999999999,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 10,
+      "rounds": 10.666666666666666,
+      "input": 229651.66666666666,
+      "cachedShare": 0.9725105413270824,
+      "output": 3725.8333333333335,
+      "seconds": 98.13566666666667,
+      "outcomes": {
+        "ok": 6
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "w01-a01-hole-misses",
+      "tags": [
+        "repair",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 6
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 7
+        }
+      }
+    },
+    {
+      "id": "w02-a01-engrave-negative",
+      "tags": [
+        "edit",
+        "text",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 9.333333333333334
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 13
+        }
+      }
+    }
+  ]
+}
