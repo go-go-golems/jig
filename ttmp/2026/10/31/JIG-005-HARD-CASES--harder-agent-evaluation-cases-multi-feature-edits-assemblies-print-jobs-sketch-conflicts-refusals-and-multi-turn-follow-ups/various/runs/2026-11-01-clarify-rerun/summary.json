@@ -1,0 +1,70 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 3,
+      "passed": 2,
+      "p": 0.6666666666666666,
+      "lo": 0.20765495512648796,
+      "hi": 0.9385096847238394,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 5,
+      "rounds": 7,
+      "input": 126183.66666666667,
+      "cachedShare": 0.8892857237201857,
+      "output": 662,
+      "seconds": 17.138,
+      "outcomes": {
+        "ok": 3
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 3,
+      "passed": 3,
+      "p": 1,
+      "lo": 0.43849391955098227,
+      "hi": 1,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 3,
+      "rounds": 4.666666666666667,
+      "input": 89995.33333333333,
+      "cachedShare": 0.9818583185794819,
+      "output": 1130.6666666666667,
+      "seconds": 44.916,
+      "outcomes": {
+        "ok": 3
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "a01-bigger-clarify",
+      "tags": [
+        "edit",
+        "multi-turn",
+        "clarify"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 2,
+          "fails": {
+            "metric": 2
+          },
+          "toolCalls": 5
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    }
+  ]
+}

@@ -32,7 +32,9 @@
       "any": [
         "1\\s*(DOF|degree)",
         "one (free )?degree",
-        "under"
+        "under",
+        "DOF[^\\n]{0,30}=\\s*1\\b",
+        "not fully constrained"
       ]
     }
   ],

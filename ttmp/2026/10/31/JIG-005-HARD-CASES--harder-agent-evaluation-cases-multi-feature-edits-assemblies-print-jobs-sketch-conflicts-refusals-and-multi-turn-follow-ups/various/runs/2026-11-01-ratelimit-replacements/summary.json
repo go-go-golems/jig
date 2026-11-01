@@ -1,0 +1,90 @@
+{
+  "tiers": [
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "complex",
+      "n": 4,
+      "passed": 4,
+      "p": 1,
+      "lo": 0.5100999795960008,
+      "hi": 1,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 6.75,
+      "rounds": 7.75,
+      "input": 162734,
+      "cachedShare": 0.9818230978160679,
+      "output": 2173.25,
+      "seconds": 70.63125,
+      "outcomes": {
+        "ok": 3,
+        "rate_limited": 1
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "a01-readonly-refuse",
+      "tags": [
+        "read-only",
+        "edit"
+      ],
+      "byTier": {
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "m07-wheel-30",
+      "tags": [
+        "edit",
+        "assembly",
+        "gears",
+        "multi-feature"
+      ],
+      "byTier": {
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 12
+        }
+      }
+    },
+    {
+      "id": "h04-switch-toggle",
+      "tags": [
+        "edit",
+        "configs"
+      ],
+      "byTier": {
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a01-undo-change",
+      "tags": [
+        "edit",
+        "multi-turn"
+      ],
+      "byTier": {
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 7
+        }
+      }
+    }
+  ]
+}
