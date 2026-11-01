@@ -1,0 +1,23 @@
+{
+  "stamp": "2026-11-01T05-06-02",
+  "base": "http://127.0.0.1:8788/",
+  "repeat": 3,
+  "compute": "rust",
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "cases": [
+    "v01-s01-describe",
+    "v02-a01-engrave-front",
+    "v03-a01-footprint-drawing"
+  ],
+  "tierModels": {
+    "complex": "lunaroute/deepseek-4.1-flash",
+    "default": "lunaroute/glm-5.3-flash",
+    "quick": "lunaroute/glm-5.3-flash"
+  },
+  "maxRounds": 16,
+  "engine": "jigcad-kernel 0.1 (OpenCascade 7.x wasm)",
+  "look": "chrome"
+}

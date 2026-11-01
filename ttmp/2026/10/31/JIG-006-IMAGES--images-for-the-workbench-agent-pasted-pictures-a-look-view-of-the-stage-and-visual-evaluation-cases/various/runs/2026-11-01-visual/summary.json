@@ -1,0 +1,115 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 9,
+      "passed": 8,
+      "p": 0.8888888888888888,
+      "lo": 0.5649937852319399,
+      "hi": 0.9801096286728695,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 3.111111111111111,
+      "rounds": 3.888888888888889,
+      "input": 73291.11111111111,
+      "cachedShare": 0.9147569812922591,
+      "output": 578.4444444444445,
+      "seconds": 15.879111111111111,
+      "outcomes": {
+        "ok": 9
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 9,
+      "passed": 9,
+      "p": 1,
+      "lo": 0.7008472464490407,
+      "hi": 1,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 7.444444444444445,
+      "rounds": 7.777777777777778,
+      "input": 166238.55555555556,
+      "cachedShare": 0.9533180897331612,
+      "output": 4092.6666666666665,
+      "seconds": 56.68255555555555,
+      "outcomes": {
+        "ok": 9
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "v01-s01-describe",
+      "tags": [
+        "visual",
+        "question",
+        "look"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 7.333333333333333
+        }
+      }
+    },
+    {
+      "id": "v02-a01-engrave-front",
+      "tags": [
+        "visual",
+        "edit",
+        "text",
+        "look"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 2,
+          "fails": {
+            "metric": 1
+          },
+          "toolCalls": 3.6666666666666665
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 10
+        }
+      }
+    },
+    {
+      "id": "v03-a01-footprint-drawing",
+      "tags": [
+        "visual",
+        "edit",
+        "image"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.6666666666666665
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 5
+        }
+      }
+    }
+  ]
+}

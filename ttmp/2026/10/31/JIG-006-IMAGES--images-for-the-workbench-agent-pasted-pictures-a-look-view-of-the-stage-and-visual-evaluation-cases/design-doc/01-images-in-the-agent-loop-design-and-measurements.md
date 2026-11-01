@@ -127,3 +127,71 @@ the usual ones (file, metric, answer), plus `stepCode` matching `look\(` where l
   this part".
 - Run the visual cases × 2 tiers × 3 repeats with `--look chrome`, and the full set once to compare tool calls and
   input tokens with and without `look` available.
+
+## 5. Results
+
+### 5.1 Transport
+
+| Probe | default (glm-5.3-flash) | complex (deepseek-4.1-flash) |
+|---|---|---|
+| request image through `jigcad serve`, before the fix | "NO IMAGE", 49 input tokens | – |
+| request image through `jigcad serve`, after | all shapes, colours, positions and the 7; 317 input tokens | all correct; 263 |
+| tool-result image (`scripts/02-tool-image-probe.mjs`) | all correct, with pixel coordinates; 738 input tokens, 2 rounds | "The picture did reach me", all correct; 976, 2 rounds |
+| panel in a browser (Playwright): attached drawing + "match it, then look at the plan" | read 80 × 50 from the drawing, edited, `look('plan')`, described the hatched shadow it saw | – |
+
+### 5.2 Visual cases (3 cases × 2 tiers × 3 repeats, `--look chrome`)
+
+| Case | default | complex | looks per run (default / complex) |
+|---|---|---|---|
+| v01-s01-describe (read mode: look and describe the outline) | 3/3 | 3/3 | 1.3 / 2.7 |
+| v02-a01-engrave-front (engrave JIG on −Y, look at the front, confirm it reads left to right) | 2/3 | 3/3 | 1 / 1.7 |
+| v03-a01-footprint-drawing (attached drawing, no mention of looking) | 3/3 | 3/3 | 0.7 / 1.3 |
+
+24 renders took 2.0 s in total in headless Chrome. `look()` is cheap; the cost is in the model's rounds: deepseek used
+6–13 tool calls and 47–111 s on v01/v02, glm 1–4 calls and 8–26 s.
+
+In **v03**, nothing in the request asks the agent to look, and it looked anyway in 5 of 6 runs to check its edit
+against the drawing.
+
+### 5.3 The failure: a picture overriding a warning
+
+glm's v02 run #2 wrote `.emboss(j.region.text('JIG', { size: 10, align: 'center' }), mm(-0.6), { on: … })`, a
+negative depth. The engine compiled it with `warning feature.noEffect: engrave: the cut removes no material` and
+22 faces (the letters imprinted on the face, nothing cut). `run()` returned `warnings: 1`, a count without the text.
+The model wrote "volume unchanged at 15344 mm³ — the cut is too small to dent the figure much", called
+`look('front')`, and answered "JIG reads left to right". Rendering its edit (`scripts/03-render-emboss-variants.mjs`)
+shows why: the front view of the imprint shows the letters in light lines (`various/v02-neg.jpg`), and a correct cut
+looks the same from the front. The picture confirmed the orientation correctly and said nothing about depth. The
+metrics and the warning did say something, and the model chose the picture.
+
+Two consequences:
+
+- `run()` should return warnings as `{ kind, message }` like errors, not as a count; the warning text was the
+  evidence the model needed and never read. This changes every turn's results and should be measured on its own.
+- The reference's `look()` entry should say what a drawing cannot show (depth, hidden faces) and point to metrics
+  and diagnostics for those.
+
+### 5.4 Does the agent look when nobody asks?
+
+The 28 non-visual cases ran once per tier with `look()` available (`various/runs/2026-11-01-look-available`;
+the case filter also matched the three `v0…` cases, which are excluded here).
+
+| Tier | Runs | Passed | Runs that called `look()` | Cases |
+|---|---|---|---|---|
+| default (glm) | 28 | 24 | 3 | h04-switch-toggle, a01-engrave, a01-bigger-clarify |
+| complex (deepseek) | 28 | 27 | 4 | h04-switch-toggle, h01-large, a01-mount-holes, a01-bigger-clarify |
+
+The agent looks rarely and only on edits whose shape matters: a different switch plate, an engraving, holes, a new
+size. It never looked on questions, diagnostics or parameter edits. 20 renders took 2.3 s. Four of the five failures
+were infrastructure (glm: three `rate_limited`; deepseek: one `authentication_error` from lunaroute). The fifth,
+glm's m07-tooth-gap, answered "backlash 0.4 mm … split across the two flanks" where the case expects the ≈ 0.2 mm
+smallest gap the interference check measures. The question "how much clearance is there between the teeth" fits
+both quantities. That is a case ambiguity (JIG-005), and the question should name the interference gap.
+
+### 5.5 Conclusion
+
+Images work end to end, in both directions, on both models. `look()` is cheap to render, is used sparingly and
+sensibly without prompting, and helps where the request is about appearance (v03: the agent verified its edit against
+the drawing). It also introduces a new failure: a picture can confirm what it shows, such as letters and orientation,
+while the model ignores evidence it cannot show, such as depth. The next change is to make `run()` report warning
+text, so that such evidence is in front of the model whether it looks or not.
