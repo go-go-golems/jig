@@ -86,15 +86,21 @@ async function run() {
   copyAssets();
   const computeBytes = buildCompute();
   const app = { ...common, entryPoints: [join(ROOT, 'src/main.jsx')], outfile: join(ROOT, 'dist/app.js'), external: ['node:*'] };   // rs/wasm.js reads files only under Node
-  const worker = { ...common, entryPoints: [join(ROOT, 'src/engine/worker.js')], outfile: join(ROOT, 'dist/worker.js'),
+  const worker = { ...common, entryPoints: [join(ROOT, 'src/engine/worker-main.js')], outfile: join(ROOT, 'dist/worker.js'),
     platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'] };
+  // the agent's sandbox worker (JIG-012): the engine and the eval runner in one classic script, started from a blob:
+  // URL inside a sandboxed frame (it cannot fetch, so the engine gets its wasm bytes from the page)
+  const agentWorker = { ...common, format: 'iife', entryPoints: [join(ROOT, 'src/agent/sandbox/worker-main.js')], outfile: join(ROOT, 'dist/agent-worker.js'),
+    platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'],
+    // the OpenCascade glue resolves its directory from import.meta.url even when it gets the bytes; a fixed base, never fetched
+    define: { ...common.define, 'import.meta.url': '"https://sandbox.invalid/agent-worker.js"' } };
   if (watch) {
-    for (const cfg of [app, worker]) (await context(cfg)).watch();
+    for (const cfg of [app, worker, agentWorker]) (await context(cfg)).watch();
     console.log('watching');
   } else {
-    await Promise.all([build(app), build(worker)]);
+    await Promise.all([build(app), build(worker), build(agentWorker)]);
     const size = f => (statSync(join(ROOT, 'dist', f)).size / 1024).toFixed(0) + ' KiB';
-    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')}${computeBytes ? ` · dist/jig_compute.wasm ${size('jig_compute.wasm')}` : ''}`);
+    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')} · dist/agent-worker.js ${size('agent-worker.js')}${computeBytes ? ` · dist/jig_compute.wasm ${size('jig_compute.wasm')}` : ''}`);
   }
 }
 run().catch(e => { console.error(e.message); process.exit(1); });

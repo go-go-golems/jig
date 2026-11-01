@@ -22,13 +22,14 @@ function flags(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--oracle') o.oracle = true;
+    else if (a === '--no-sandbox') o.noSandbox = true;
     else if (a === '--help' || a === '-h') o.help = true;
     else if (a.startsWith('--')) { const [k, v] = a.slice(2).split('='); o[k] = v ?? argv[++i]; }
   }
   return o;
 }
 const o = flags(process.argv.slice(2));
-if (o.help) { console.log('usage: node tools/agent-eval.mjs [--base URL] [--tiers default,complex] [--repeat n] [--cases ids] [--out DIR] [--deadline s] [--compute rust|js] [--oracle] [--look chrome]'); process.exit(0); }
+if (o.help) { console.log('usage: node tools/agent-eval.mjs [--base URL] [--tiers default,complex] [--repeat n] [--cases ids] [--out DIR] [--deadline s] [--compute rust|js] [--oracle] [--look chrome] [--no-sandbox]'); process.exit(0); }
 
 for (const [path, fix] of [['src/generated/content.json', 'node build.mjs'], ['vendor/occt/replicad_single.wasm', 'gunzip -k vendor/occt/replicad_single.wasm.gz']]) {
   if (!existsSync(join(ROOT, path))) { console.error(`missing ${path}: run \`${fix}\` in import/jigcad`); process.exit(2); }
@@ -64,6 +65,14 @@ if (o.look === 'chrome') {
   looker = await startChromeLook({ base: o.base.endsWith('/') ? o.base : o.base + '/', log: console.log });
 }
 const host = new Host({ engine, renderView: looker ? a => looker.render({ presetId: host.preset?.id, ...a }) : null });
+// JIG-012: the agent's steps run in a sandbox worker with its own engine, as in the browser (--no-sandbox: on the host)
+let sandbox = null;
+if (!o.noSandbox) {
+  const { createNodeSandbox } = await import('../src/agent/sandbox/node.js');
+  sandbox = createNodeSandbox({ compute: o.compute });
+  const r = await sandbox.start();
+  console.log(`sandbox: node worker, engine in ${Math.round(r.ms)} ms (${r.compute})`);
+}
 await engine.ready;
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -73,14 +82,14 @@ const jsonl = join(out, 'results.jsonl');
 writeFileSync(jsonl, '');
 const tiers = o.oracle ? ['oracle'] : o.tiers.split(',').map(s => s.trim()).filter(Boolean);
 const meta = { stamp, base: o.oracle ? 'oracle' : o.base, repeat: +o.repeat, compute: engine.compute?.kind, tiers, cases: cases.map(c => c.id),
-  tierModels: info?.tiers ?? null, maxRounds: info?.maxRounds ?? null, engine: engine.version, look: o.look || null };
+  tierModels: info?.tiers ?? null, maxRounds: info?.maxRounds ?? null, engine: engine.version, look: o.look || null, sandbox: sandbox ? 'node' : null };
 writeFileSync(join(out, 'meta.json'), JSON.stringify(meta, null, 2));
 console.log(`agent-eval: ${cases.length} cases × ${tiers.join(', ')} × ${o.repeat} → ${out}`);
 if (info) console.log(`backend: ${JSON.stringify(info.tiers)} · max rounds ${info.maxRounds} · engine ${engine.compute?.kind}`);
 
 // --oracle: each case's own known-good turn(s) (no network)
 const records = await runAll(cases, {
-  host, tiers, repeat: +o.repeat, deadlineMs: +o.deadline * 1000,
+  host, tiers, sandbox, repeat: +o.repeat, deadlineMs: +o.deadline * 1000,
   sample, sampleFor: o.oracle ? oracleSample : null,
   onRecord: r => appendFileSync(jsonl, JSON.stringify(r) + '\n'),
   log: line => { if (!line.startsWith('…')) console.log(line); },
@@ -91,4 +100,5 @@ writeFileSync(join(out, 'summary.md'), md);
 writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2));
 console.log('\n' + md);
 if (looker) { console.log(`look: ${looker.stats.renders} renders, ${Math.round(looker.stats.ms)} ms`); looker.close(); }
+sandbox?.close();
 process.exit(records.some(r => r.outcome === 'setup_error') ? 1 : 0);

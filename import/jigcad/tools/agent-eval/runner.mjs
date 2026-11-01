@@ -86,7 +86,7 @@ const stepSummary = s => ({ code: cut(s.code, STEP_TEXT), result: cut(s.result, 
  * and the steps of all turns.
  * → { case, tier, repeat, pass, outcome, timedOut, ms, toolCalls, turns, usage, promptChars, checks, answer, answers?, note, steps, error? }
  */
-export async function runCase(c, { host, sample, tier = 'default', repeat = 1, deadlineMs = 300_000 }) {
+export async function runCase(c, { host, sample, tier = 'default', repeat = 1, deadlineMs = 300_000, sandbox = null }) {
   const base = { case: c.id, tier, repeat, mode: c.mode || 'auto', tags: c.tags || [] };
   try {
     if (!(await host.loadPreset(c.preset))) throw new Error(`no preset ${c.preset}`);
@@ -119,7 +119,7 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
       if (ctl.signal.aborted) break;
       cap.usage = null;
       await runTurn({ host, sample: cap.fn, thread, text, images: text === c.request ? images : [], settings: { mode, tier, effort: c.effort || '' },
-        reference: host.reference(), signal: ctl.signal, onUpdate: mode === 'ask' ? approve : () => {} });
+        reference: host.reference(), signal: ctl.signal, sandbox, onUpdate: mode === 'ask' ? approve : () => {} });
       if (cap.usage) usages.push(cap.usage);
     }
   } finally { clearTimeout(timer); }
@@ -145,11 +145,11 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
 
 /** Run every case × tier × repeat in order; onRecord(record) after each (e.g. append to results.jsonl). */
 /** sampleFor(case) may give each case its own sample function (the CLI's --oracle mode); else `sample` is used. */
-export async function runAll(cases, { host, sample, sampleFor = null, tiers = ['default'], repeat = 1, deadlineMs, onRecord = () => {}, log = () => {} }) {
+export async function runAll(cases, { host, sample, sampleFor = null, tiers = ['default'], repeat = 1, deadlineMs, onRecord = () => {}, log = () => {}, sandbox = null }) {
   const out = [];
   for (const tier of tiers) for (let r = 1; r <= repeat; r++) for (const c of cases) {
     log(`… ${tier} #${r} ${c.id}`);
-    const rec = await runCase(c, { host, sample: sampleFor ? sampleFor(c) : sample, tier, repeat: r, deadlineMs });
+    const rec = await runCase(c, { host, sample: sampleFor ? sampleFor(c) : sample, tier, repeat: r, deadlineMs, sandbox });
     out.push(rec);
     onRecord(rec);
     const u = rec.usage;

@@ -214,13 +214,20 @@ export function transferables(reply) {
   return t;
 }
 
-if (typeof self !== 'undefined' && typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+// The worker's message loop is in worker-main.js (the dist/worker.js entry), so other bundles can import this
+// module without taking over their worker's messages (JIG-012: the agent's sandbox runs its own engine).
+export function serve(scope) {
   let queue = Promise.resolve();
-  self.onmessage = e => {
+  scope.onmessage = e => {
     queue = queue.then(async () => {
       const reply = await handle(e.data);
-      try { self.postMessage(reply, transferables(reply)); }
-      catch (err) { self.postMessage({ id: e.data?.id, ok: false, error: { message: `reply not cloneable: ${err.message}` } }); }
+      try { scope.postMessage(reply, transferables(reply)); }
+      catch (err) { scope.postMessage({ id: e.data?.id, ok: false, error: { message: `reply not cloneable: ${err.message}` } }); }
     });
   };
 }
+
+/** The language of this engine instance (after init): { j, bare } (bare: the unit functions scripts see). */
+export const lang = () => ({ j: J, bare: BARE });
+/** The current Program (the last compile kept): the live object, not its data. */
+export const currentProgram = () => current;

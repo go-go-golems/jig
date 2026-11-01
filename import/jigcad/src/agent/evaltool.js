@@ -1,6 +1,7 @@
 // The agent's one tool, `eval`: an async function body run against the lab scope, raced against a 25 s timeout,
 // its value serialised to YAML and cut at 9,000 characters. Files are snapshotted before each step.
 import { labScope, filesObject } from './scope.js';
+import { runInSandbox } from './sandbox/client.js';
 import { yaml, yamlInline } from './yaml.js';
 
 export const EVAL_TIMEOUT_MS = 25000;
@@ -18,7 +19,8 @@ export const EVAL_INPUT_SCHEMA = {
 const SOURCE_URL = 'agent-eval.js';
 const IDENT = /^[A-Za-z_$][\w$]*$/;
 
-function compile(names, code) {
+/** The step's code as an async function of the scope's names (the sandbox runner uses the same, so lines match). */
+export function compileStep(names, code) {
   return new Function(...names, '"use strict";\nreturn (async () => {\n' + code + '\n})();\n//# sourceURL=' + SOURCE_URL);
 }
 
@@ -27,7 +29,7 @@ let lineOffset = null;
 function probeOffset() {
   if (lineOffset !== null) return lineOffset;
   lineOffset = 0;
-  try { compile([], 'throw new Error("probe")')().catch(e => { const n = frameLine(e); if (n) lineOffset = n - 1; }); } catch { /* keep 0 */ }
+  try { compileStep([], 'throw new Error("probe")')().catch(e => { const n = frameLine(e); if (n) lineOffset = n - 1; }); } catch { /* keep 0 */ }
   return lineOffset;
 }
 function frameLine(e) {
@@ -151,7 +153,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   const t0 = now();
   let value, error = null, timer = null, onAbort = null;
   try {
-    const fn = compile(names, String(code));
+    const fn = compileStep(names, String(code));
     const racers = [
       fn(...names.map(k => scope[k])),
       new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`eval timed out after ${Math.round(timeoutMs / 100) / 10} s`)), timeoutMs); }),
@@ -196,9 +198,10 @@ export async function restoreSnapshot(host, snapshot) {
 /**
  * The tool object handed to sample(). Each call creates a step record:
  * { code, result, running, asking, resolve, error, ms, snapshot, changed, reverted }.
- * opts: getMode() → 'auto' | 'ask' | 'read'; onStep(step) when created; onUpdate() on every change; signal (Stop).
+ * opts: getMode() → 'auto' | 'ask' | 'read'; onStep(step) when created; onUpdate() on every change; signal (Stop);
+ * sandbox: a sandbox client (src/agent/sandbox/client.js), or a function resolving to one, or null for the page.
  */
-export function createEvalTool(host, { getMode = () => 'auto', onStep = () => {}, onUpdate = () => {}, signal, timeoutMs } = {}) {
+export function createEvalTool(host, { getMode = () => 'auto', onStep = () => {}, onUpdate = () => {}, signal, timeoutMs, sandbox = null } = {}) {
   return {
     name: 'eval',
     description: EVAL_TOOL_DESCRIPTION,
@@ -227,7 +230,17 @@ export function createEvalTool(host, { getMode = () => 'auto', onStep = () => {}
       }
       step.snapshot = takeSnapshot(host);
       step.running = true; onUpdate();
-      const r = await runEval(host, code, { readOnly: getMode() === 'read', signal: sig, timeoutMs });
+      // JIG-012: the step runs in the sandbox (its own engine, j in scope) when there is one; on the page otherwise
+      const sb = typeof sandbox === 'function' ? await sandbox() : sandbox;
+      let r;
+      if (sb) {
+        try { r = await runInSandbox(sb, host, code, { readOnly: getMode() === 'read', signal: sig, timeoutMs }); }
+        catch (e) {
+          if (sig && sig.aborted) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
+          r = await runEval(host, code, { readOnly: getMode() === 'read', signal: sig, timeoutMs });
+          r.text += `\nnote: the sandbox could not run this step (${e.message}); it ran on the page, where j and the units are not available`;
+        }
+      } else r = await runEval(host, code, { readOnly: getMode() === 'read', signal: sig, timeoutMs });
       step.running = false; step.result = r.text; step.error = r.error; step.ms = r.ms;
       step.changed = filesChanged(step.snapshot, host);
       if (r.images.length) step.images = r.images.length;

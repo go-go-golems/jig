@@ -141,7 +141,7 @@ export function flatMetrics(p) {
   for (const [k, m] of Object.entries((p && p.metrics) || {})) out[k] = m && typeof m === 'object' && 'value' in m ? m.value : m;
   return out;
 }
-async function compileResult(promiseFn) {
+export async function compileResult(promiseFn) {
   const t0 = now();
   let p = null, err = null;
   try { p = await promiseFn(); } catch (e) { err = e && (e.error || e); }
@@ -168,7 +168,7 @@ const good = (host, verb) => {
 };
 const globRe = g => new RegExp('^' + String(g).replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\u0000/g, '.*').replace(/\?/g, '.') + '$');
 
-function makeProgram(host) {
+export function makeProgram(host) {
   return {
     summary() { const p = prog(host, 'program.summary'); return { ok: p.ok !== false, kind: p.kind, name: p.name, ...(p.summary || {}) }; },
     metrics(names) {
@@ -330,7 +330,7 @@ function geomOf(host, a, verb) {
   throw new Error(`${verb}: ${a} names ${t.pieces.length} split faces; give one (with its #a, #b suffix)`);
 }
 
-function makeMeasure(host) {
+export function makeMeasure(host) {
   return {
     face(name) {
       const t = findTopo(host, name, 'measure.face');
@@ -423,6 +423,26 @@ function makeLab(host, guard) {
       if (/^lab:(param\?.*value=|preset|build|run|compile|reset)/.test(t)) guard('lab.follow ' + t.split('?')[0]);
       if (typeof host.link !== 'function') throw new Error('lab.follow: this workbench does not follow links yet');
       return host.link(t) !== false;
+    },
+  };
+}
+
+/** why, faces, feature, sketch on a host's compiled program (the page's, or a live check() in the sandbox). */
+export function makeQueries(host) {
+  return {
+    why: target => call(host, 'why', 'why', target),
+    async faces(selectorText) {
+      const r = await call(host, 'faces', 'faces', selectorText);
+      return Array.isArray(r) ? resolveFaces(host, r).map(f => (f && typeof f === 'object' ? { name: f.name, kind: f.kind, area: r3(f.area), center: v3(f.center), ...(f.normal ? { normal: v3(f.normal) } : {}), ...(f.axis ? { radius: r3(f.axis.radius) } : {}) } : f)) : r;
+    },
+    feature: id => call(host, 'feature', 'feature', id),
+    async sketch(id) {
+      try { return await call(host, 'sketch', 'sketch', id); }
+      catch (e) {
+        const s = (good(host, 'sketch').sketches || []).find(x => x.id === id);
+        if (!s) throw e;
+        return { id: s.id, dof: s.dof, status: s.status, conflicts: s.conflicts, entities: s.entities.map(x => ({ id: x.id, kind: x.kind, dofFree: x.dofFree })), constraints: s.constraints.map(c => ({ id: c.id, kind: c.kind, refs: c.refs, status: c.status })) };
+      }
     },
   };
 }
@@ -546,20 +566,7 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     run,
     check,
     program,
-    why: target => call(host, 'why', 'why', target),
-    async faces(selectorText) {
-      const r = await call(host, 'faces', 'faces', selectorText);
-      return Array.isArray(r) ? resolveFaces(host, r).map(f => (f && typeof f === 'object' ? { name: f.name, kind: f.kind, area: r3(f.area), center: v3(f.center), ...(f.normal ? { normal: v3(f.normal) } : {}), ...(f.axis ? { radius: r3(f.axis.radius) } : {}) } : f)) : r;
-    },
-    feature: id => call(host, 'feature', 'feature', id),
-    async sketch(id) {
-      try { return await call(host, 'sketch', 'sketch', id); }
-      catch (e) {
-        const s = (good(host, 'sketch').sketches || []).find(x => x.id === id);
-        if (!s) throw e;
-        return { id: s.id, dof: s.dof, status: s.status, conflicts: s.conflicts, entities: s.entities.map(x => ({ id: x.id, kind: x.kind, dofFree: x.dofFree })), constraints: s.constraints.map(c => ({ id: c.id, kind: c.kind, refs: c.refs, status: c.status })) };
-      }
-    },
+    ...makeQueries(host),
     selection() {
       const s = host.selection;
       if (!s) return null;

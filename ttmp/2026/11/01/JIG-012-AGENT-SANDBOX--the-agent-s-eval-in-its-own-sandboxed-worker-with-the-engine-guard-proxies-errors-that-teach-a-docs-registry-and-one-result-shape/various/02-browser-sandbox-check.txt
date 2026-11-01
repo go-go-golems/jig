@@ -1,0 +1,15 @@
+start: {"ms":146,"compute":"rust"} 322 ms (first start includes fetching the bytes)
+j in scope: j.fit.hole(6 mm, press)
+check() live program: ok: true | volume: 15344.26542 | planes: 11
+sync files.read: 26
+program.summary (page state): box
+fetch refused: refused: Failed to fetch
+WebSocket refused: refused by CSP: connect-src
+importScripts refused: refused: NetworkError
+no localStorage: undefined
+no document: undefined
+indexedDB refused: refused: SecurityError
+origin: null
+parent unreachable: undefined
+runaway loop: Error: eval timed out after 2 s; the sandbox restarted, so anything the step kept is gone
+after restart: 2 326 ms (includes the new engine)

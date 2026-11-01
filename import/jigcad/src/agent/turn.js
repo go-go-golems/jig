@@ -57,7 +57,7 @@ export function archiveThread(archive, thread, now = Date.now()) {
  *       signal (Stop), onUpdate() after every change, timeoutMs (tests).
  * → { ok, off? } where off is the banner sentence when the agent cannot work here.
  */
-export async function runTurn({ host, sample, thread, text, images = [], settings, reference = '', signal, onUpdate = () => {}, timeoutMs }) {
+export async function runTurn({ host, sample, thread, text, images = [], settings, reference = '', signal, onUpdate = () => {}, timeoutMs, sandbox = null }) {
   text = String(text || '').trim();
   if (!text) return { ok: false };
   if (!sample) return { ok: false, off: OFF_AT_SEND };
@@ -75,6 +75,7 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
     onUpdate,
     signal,
     timeoutMs,
+    sandbox,
   });
   const turns = toTurns(host, { ...thread, turns: thread.turns.slice(0, -1) }, reference);
   const opts = { tools: [tool], signal, modelTier: settings.tier || 'default', cache: false,

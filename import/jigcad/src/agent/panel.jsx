@@ -14,6 +14,29 @@ import { httpSample } from '../host/sample-http.js';
 import { threadMarkdown, transcriptFilename } from './transcript.js';
 import { saveOrCopy } from '../ui/save.js';
 import { prepareImage, imageFiles, MAX_ATTACH } from './images.js';
+import { createFrameSandbox } from './sandbox/frame.js';
+import { runInSandbox } from './sandbox/client.js';
+
+// JIG-012: the agent's steps run in a sandboxed frame's worker with its own engine (j in scope, no access to this
+// page). One per page session, started when the panel finds a model; without the real engine, or if it cannot
+// start, steps run on the page as before.
+let SANDBOX = null, SANDBOX_FAILED = null;
+function agentSandbox(host) {
+  if (SANDBOX_FAILED || typeof document === 'undefined' || !host?.engine || host.engine.kind !== 'worker') return null;
+  return (SANDBOX ??= createFrameSandbox());
+}
+async function startedSandbox(host) {
+  const sb = agentSandbox(host);
+  if (!sb) return null;
+  try { await sb.start(); return sb; }
+  catch (e) { SANDBOX_FAILED = e.message; console.warn(`agent sandbox unavailable, steps run on the page: ${e.message}`); return null; }
+}
+// for checks and debugging, next to window.jigHost: jigSandbox.run(code) runs a step as the agent would
+if (typeof window !== 'undefined') window.jigSandbox = {
+  start: () => startedSandbox(window.jigHost).then(sb => sb && sb.info),
+  run: async (code, o = {}) => { const sb = await startedSandbox(window.jigHost); if (!sb) throw new Error(SANDBOX_FAILED || 'no sandbox'); return runInSandbox(sb, window.jigHost, code, o); },
+  restart: () => SANDBOX?.restart(),
+};
 
 export { reference };
 
@@ -249,6 +272,7 @@ export function AgentPanel({ host, sample: sampleProp }) {
     p.then(s => {
       if (!live) return;
       sampleRef.current = typeof s === 'function' ? s : null;
+      if (sampleRef.current) host?.engine?.ready?.then(() => startedSandbox(host));   // warm: the engine takes about a second
       if (!sampleRef.current) S.off = OFF_AT_LOAD;
       else if (S.off === OFF_AT_LOAD) S.off = null;
       re();
@@ -279,7 +303,7 @@ export function AgentPanel({ host, sample: sampleProp }) {
     try {
       // shell, round 2: the Reference as the workbench shows it (the language reference, then this lab API)
       const ref = (host && typeof host.reference === 'function' && host.reference()) || reference;
-      const r = await runTurn({ host, sample, thread, text, images, settings: S.settings, reference: ref, signal: ctl.signal, onUpdate: rerender });
+      const r = await runTurn({ host, sample, thread, text, images, settings: S.settings, reference: ref, signal: ctl.signal, onUpdate: rerender, sandbox: () => startedSandbox(host) });
       if (r.off) S.off = r.off;
     } finally {
       S.busy = false; S.runningId = null; S.ctl = null;
