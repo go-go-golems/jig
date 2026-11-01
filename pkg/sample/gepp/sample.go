@@ -24,6 +24,11 @@ import (
 // results (images excluded), as the Node worker does.
 const maxContextBytes = 512 << 10
 
+// lastRoundNote is the user turn added before the last round of a call that used tools (jigcad addition).
+const lastRoundNote = "No tool calls are left in this turn. Answer now in plain text from what you have found so far. " +
+	"Say plainly what is done, what you checked, and what is unfinished."
+
+
 // failure ends a call with a contract error code.
 type failure struct{ code, message string }
 
@@ -113,6 +118,10 @@ func (c *call) run(ctx context.Context) error {
 		rctx := ctx
 		if round < rounds-1 && len(c.r.Tools) > 0 { // the last round offers no tools
 			rctx = tools.WithRegistry(rctx, registry)
+		} else if round > 0 && len(c.r.Tools) > 0 {
+			// Without this, models that spent every round on tools (seen with deepseek-4.1-flash) often return an
+			// empty answer once the tools disappear; the note asks for a final answer from what was found.
+			turns.AppendBlock(t, turns.NewUserTextBlock(lastRoundNote))
 		}
 		s := &sink{c: c, round: round, model: m.Ref()}
 		out, err := eng.RunInference(events.WithEventSinks(rctx, s), t)

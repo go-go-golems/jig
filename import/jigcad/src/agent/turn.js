@@ -18,6 +18,7 @@ export const OFF_CODES = {
   capability_disabled: 'Claude is unavailable in this view.',
   tools_unavailable: 'This view cannot run the agent’s tool.',
   capability_removed: 'This app version cannot run the agent.',
+  unauthorized: 'This server needs its access token. Open the workbench once with ?token=… in the address.',
 };
 // Notes under a turn that ended early.
 export const NOTES = {
@@ -26,6 +27,8 @@ export const NOTES = {
   prompt_too_large: 'The conversation is too long. Start a new thread.',
   refused: 'Claude declined this request.',
   truncated: 'The answer hit the length limit.',
+  authentication_error: 'The model provider rejected the server’s login. Log in through Pi, then restart jigcad serve.',
+  empty_completion: 'The model returned an empty answer. Try again, or pick another model.',
 };
 
 /** The sentence for a rejection: { note, off } where off is the banner sentence when the agent cannot work here. */

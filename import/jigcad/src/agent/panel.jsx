@@ -10,6 +10,7 @@ import { renderMarkdown } from './markdown.js';
 import * as workbench from '../ui/markdown.js';
 import { firstLine } from './prompt.js';
 import { followLink } from './links.js';
+import { httpSample } from '../host/sample-http.js';
 
 export { reference };
 
@@ -60,10 +61,14 @@ let samplePromise = null;
 export function getSample() {
   if (!samplePromise) samplePromise = (async () => {
     try {
+      // claude.ai's runtime first; else the jigcad serve backend next to the page (Go, pi + lunaroute)
       const c = typeof window !== 'undefined' ? window.claude : null;
-      if (!c || typeof c.use !== 'function') return null;
-      const s = await c.use('sample');
-      return typeof s === 'function' ? s : null;
+      if (c && typeof c.use === 'function') {
+        const s = await c.use('sample');
+        if (typeof s === 'function') return s;
+      }
+      if (typeof fetch !== 'function' || typeof location === 'undefined' || !/^https?:$/.test(location.protocol)) return null;
+      return await httpSample();
     } catch { return null; }
   })();
   return samplePromise;
@@ -193,6 +198,8 @@ export function AgentPanel({ host, sample: sampleProp }) {
   const mode = MODES.find(m => m.value === S.settings.mode) || MODES[0];
   const brief = (host && host.preset && host.preset.agent) || { fragments: {} };
   const frNames = Object.keys(brief.fragments || {});
+  const backend = sampleRef.current && sampleRef.current.info;   // set by the jigcad serve adapter only
+  const tierModel = backend && backend.tiers ? backend.tiers[S.settings.tier || 'default'] || '' : '';
 
   async function send(text) {
     text = String(text ?? S.draft).trim();
@@ -252,6 +259,7 @@ export function AgentPanel({ host, sample: sampleProp }) {
         <Seg label="Mode" value={S.settings.mode} options={MODES} onChange={v => setSetting('mode', v)} />
         <span class="ctl-l">Model</span>
         <Seg label="Model" value={S.settings.tier} options={MODELS} onChange={v => setSetting('tier', v)} />
+        {tierModel ? <span class="ctl-l agent-model" title="The model this tier uses on the jigcad serve backend">{tierModel}</span> : null}
         <span class="ctl-l">Thinking</span>
         <Seg label="Thinking" value={S.settings.effort} options={THINKING} onChange={v => setSetting('effort', v)} />
       </div>

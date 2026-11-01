@@ -265,6 +265,10 @@ func TestLastRoundOffersNoTools(t *testing.T) {
 	require.NoError(t, b.Sample(context.Background(), r, rec.emit, exec))
 	assert.Contains(t, p.bodies[0], "tools")
 	assert.NotContains(t, p.bodies[1], "tools")
+	msgs := p.bodies[1]["messages"].([]any)
+	last := msgs[len(msgs)-1].(map[string]any)
+	assert.Equal(t, "user", last["role"])
+	assert.Contains(t, last["content"], "No tool calls are left", "the last round asks for an answer")
 	assert.Equal(t, "done", rec.last("result").Result.Text)
 }
 
