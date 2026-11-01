@@ -38,6 +38,7 @@ export function StageView({ host }) {
   const squared = !v.yaw && !v.pitch && (v.zoom ?? 1) === 1 && !v.scale && !v.pan?.[0] && !v.pan?.[1] && !v.target;
   const err = p?.ok === false ? p.diagnostics.find(d => d.level === 'error') : null;
   const sketches = good?.sketches || [];
+  const shown = v.shown || new Set();   // sketches drawn in the 3D views
   const sk0 = v.name === 'sketch' ? sketches.find(x => x.id === v.sketch) || sketches[0] : null;
   // a failing compile keeps the last good part, but its sketch as it solved (an over-constrained one fails the compile)
   const sk = sk0 && p?.ok === false ? (p.sketches || []).find(x => x.id === sk0.id) || sk0 : sk0;
@@ -51,13 +52,26 @@ export function StageView({ host }) {
         <div class="toolbar">
           <Seg label="View" options={VIEW_OPTS} value={v.name} onChange={name => host.setView({ name, ...squareView(), zoom: v.zoom ?? 1, sketch: null })} />
           {sketches.length > 0 && (
-            <Menu btnClass={`btn sm ${v.name === 'sketch' ? 'on' : ''}`} menuClass="sketches" title="Draw one of the part's sketches in its own plane"
-              label={<>{v.name === 'sketch' ? <>Sketch <b>{sk?.id}</b></> : 'Sketch'} <span class="dim">{sketches.length}</span> ▾</>}>
+            <Menu btnClass={`btn sm ${v.name === 'sketch' ? 'on' : ''}`} menuClass="sketches" title="Open a sketch in its own plane, or show sketches in the 3D views"
+              label={<>{v.name === 'sketch' ? <>Sketch <b>{sk?.id}</b></> : 'Sketch'} <span class="dim">{shown.size ? `${shown.size} shown · ` : ''}{sketches.length}</span> ▾</>}>
+              <div class="mh">Sketches<small>name: open in its plane · 3D: draw it on the part</small></div>
               {sketches.map(x => (
-                <button key={x.id} class={v.name === 'sketch' && sk?.id === x.id ? 'on' : ''} onClick={() => openSketch(host, x.id)}>
-                  <span class="t">{x.id}</span><small>{sketchStatus(x, modeOf(x.id))}</small>
-                </button>
+                <div class="skrow" key={x.id}>
+                  <button class={v.name === 'sketch' && sk?.id === x.id ? 'on' : ''} title={`Open sketch ${x.id} in its own plane`} onClick={() => openSketch(host, x.id)}>
+                    <span class="t">{x.id}</span><small>{sketchStatus(x, modeOf(x.id))}</small>
+                  </button>
+                  <button data-keep class={`show3d ${shown.has(x.id) ? 'on' : ''}`} role="checkbox" aria-checked={shown.has(x.id) ? 'true' : 'false'}
+                    aria-label={`Show sketch ${x.id} in the 3D views`} title={`${shown.has(x.id) ? 'Hide' : 'Show'} sketch ${x.id} in the 3D views`}
+                    onClick={() => host.toggleSketchShown(x.id)}>
+                    <span class={`box ${shown.has(x.id) ? 'on' : ''}`} /><span class="t">3D</span>
+                  </button>
+                </div>
               ))}
+              {sketches.length > 1 && (
+                <button data-keep onClick={() => host.setView({ shown: shown.size === sketches.length ? new Set() : new Set(sketches.map(x => x.id)) })}>
+                  <span class="t">{shown.size === sketches.length ? 'Hide all in 3D' : 'Show all in 3D'}</span><small>draw every sketch on the part</small>
+                </button>
+              )}
               {v.name === 'sketch' && <button onClick={() => host.setView({ name: 'axo', ...squareView(), sketch: null })}><span class="t">Back to the part</span><small>the axonometric view</small></button>}
             </Menu>
           )}

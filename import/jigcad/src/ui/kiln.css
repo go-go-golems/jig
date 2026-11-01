@@ -611,6 +611,12 @@ canvas.spark { width: 100%; height: 56px; display: block; }
 .chk { display: inline-flex; gap: 5px; align-items: center; font-size: var(--fs-xs); color: var(--ink-2); }
 .chk input { accent-color: var(--ink); margin: 0; }
 .menu.overlays { min-width: 280px; }
+.menu.sketches { min-width: 320px; }
+.menu.sketches .skrow { display: flex; align-items: stretch; }
+.menu.sketches .skrow > button:first-child { flex: 1; min-width: 0; }
+.menu.sketches .skrow .show3d { flex: none; width: auto; gap: 6px; align-items: center; padding-left: 10px; padding-right: 10px; border-left: 1px solid var(--hair); }
+.menu.sketches .box { width: 9px; height: 9px; border: 1px solid var(--ink-2); flex: none; }
+.menu.sketches .box.on { background: var(--ink); border-color: var(--ink); }
 .menu.overlays button { align-items: center; }
 .menu.overlays .box { width: 9px; height: 9px; border: 1px solid var(--ink-2); flex: none; }
 .menu.overlays .box.on { background: var(--ink); border-color: var(--ink); }

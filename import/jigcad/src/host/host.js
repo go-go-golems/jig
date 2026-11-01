@@ -44,7 +44,8 @@ export const OVERLAYS = [
 ];
 const DEFAULT_OVERLAYS = OVERLAYS.filter(o => o.on).map(o => o.key);
 // host.view: { name, yaw, pitch (orbit offsets from the named view, rad), zoom (1 = the part fits the sheet),
-//              scale (px/mm, overrides zoom; null), pan: [right, up] mm, target (mm, null = the scene's centre), sketch, overlays }
+//              scale (px/mm, overrides zoom; null), pan: [right, up] mm, target (mm, null = the scene's centre), sketch (the
+//              sketch view's sketch), shown (Set of sketch ids drawn in the 3D views), overlays }
 export const squareView = () => ({ yaw: 0, pitch: 0, zoom: 1, scale: null, pan: [0, 0], target: null });
 const DATA_EXT = /\.(json|csv|txt|svg|dxf|tsv)$/i;
 const DEBOUNCE_MS = 140;
@@ -65,7 +66,7 @@ export class Host {
     this.selection = null;
     this.hover = null;
     this.node = null;
-    this.view = { name: 'axo', ...squareView(), sketch: null, overlays: new Set(DEFAULT_OVERLAYS) };
+    this.view = { name: 'axo', ...squareView(), sketch: null, shown: new Set(), overlays: new Set(DEFAULT_OVERLAYS) };
     this.overrides = {};
     this.intents = {};
     this.openFile = null;
@@ -141,7 +142,7 @@ export class Host {
     this.fragments = new Set(Array.isArray(savedFr) ? savedFr.filter(k => k in meta.agent.fragments) : meta.agent.defaultFragments);
     const name = NAMED_VIEWS[meta.view] ? meta.view : 'axo';
     const overlays = meta.overlays ? String(meta.overlays).split(',').map(s => s.trim()).filter(Boolean) : DEFAULT_OVERLAYS;
-    this.view = { name, ...squareView(), zoom: Number(meta.zoom) || 1, sketch: null, overlays: new Set(overlays) };
+    this.view = { name, ...squareView(), zoom: Number(meta.zoom) || 1, sketch: null, shown: new Set(), overlays: new Set(overlays) };
     store.set('preset', id);
     for (const e of ['preset', 'files', 'view', 'selection', 'hover', 'node', 'overrides', 'fragments']) this.emit(e, this[e]);
     await this.compile();
@@ -500,12 +501,19 @@ export class Host {
     const next = { ...this.view, ...patch };
     if (patch.name && patch.name !== this.view.name && patch.yaw == null && patch.pitch == null) Object.assign(next, { yaw: 0, pitch: 0, pan: [0, 0], target: null });
     if (patch.overlays && !(patch.overlays instanceof Set)) next.overlays = new Set(patch.overlays);
+    if (patch.shown && !(patch.shown instanceof Set)) next.shown = new Set(patch.shown);
     this.view = next;
     this.emit('view', this.view);
     // a sketch's constraint or entity is picked on that sketch's sheet: leaving it lets the pick go
     const s = this.selection, gone = p => p && isSketchPick(p) && (next.name !== 'sketch' || (next.sketch && next.sketch !== p.sketch));
     if (('name' in patch || 'sketch' in patch) && gone(s)) this.select(null);
     if (('name' in patch || 'sketch' in patch) && gone(this.hover)) this.setHover(null);
+  }
+  /** Show a sketch in the 3D views (axo, front, side, plan) or hide it; `on` forces. The sketch view is separate. */
+  toggleSketchShown(id, on) {
+    const s = new Set(this.view.shown || []);
+    if (on ?? !s.has(id)) s.add(id); else s.delete(id);
+    this.setView({ shown: s });
   }
   toggleOverlay(name, on) {
     const s = new Set(this.view.overlays);

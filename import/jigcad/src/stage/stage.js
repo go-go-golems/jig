@@ -65,7 +65,7 @@ export function createStage(element, host = {}, options = {}) {
   // ---- view
   const pushView = () => {
     if (fromHost || !host.setView) return;
-    try { host.setView({ name: view.name, yaw: view.yaw, pitch: view.pitch, zoom: view.zoom, pan: view.pan.slice(), sketch: view.sketch, scale: last ? last.cam.s : null, target: last ? last.cam.T : null, overlays: new Set(on) }); } catch { /* the host may refuse */ }
+    try { host.setView({ name: view.name, yaw: view.yaw, pitch: view.pitch, zoom: view.zoom, pan: view.pan.slice(), sketch: view.sketch, shown: new Set(view.shown || []), scale: last ? last.cam.s : null, target: last ? last.cam.T : null, overlays: new Set(on) }); } catch { /* the host may refuse */ }
   };
   function setView(patch = {}, quiet) {
     if (typeof patch === 'string') patch = { name: patch };
@@ -271,11 +271,13 @@ export function createStage(element, host = {}, options = {}) {
   sub('theme', () => setTimeout(invalidate, 30));
   sub('view', v => {
     v = v || host.view; if (!v) return;
-    const cur = { name: view.name, yaw: view.yaw, pitch: view.pitch, zoom: view.zoom, sketch: view.sketch };
-    const nxt = { name: v.name ?? cur.name, yaw: v.yaw ?? cur.yaw, pitch: v.pitch ?? cur.pitch, zoom: v.zoom ?? cur.zoom, sketch: v.sketch ?? cur.sketch };
+    // sketch: null from the host means no sketch (`??` used to keep the stage's own, so "back to the part" kept it)
+    const cur = { name: view.name, yaw: view.yaw, pitch: view.pitch, zoom: view.zoom, sketch: view.sketch ?? null, shown: [...(view.shown || [])].sort() };
+    const nxt = { name: v.name ?? cur.name, yaw: v.yaw ?? cur.yaw, pitch: v.pitch ?? cur.pitch, zoom: v.zoom ?? cur.zoom,
+      sketch: v.sketch === undefined ? cur.sketch : v.sketch, shown: v.shown ? [...v.shown].sort() : cur.shown };
     const sameOverlays = !v.overlays || (v.overlays.size === on.size && [...v.overlays].every(k => on.has(k)));
     if (JSON.stringify(cur) === JSON.stringify(nxt) && sameOverlays) return;
-    fromHost = true; try { setView({ ...nxt, pan: v.pan || view.pan, overlays: v.overlays }); } finally { fromHost = false; }
+    fromHost = true; try { setView({ ...nxt, shown: new Set(nxt.shown), pan: v.pan || view.pan, overlays: v.overlays }); } finally { fromHost = false; }
   });
   offs.push(onTheme(invalidate, doc));
   const ro = new ResizeObserver(() => { size(); invalidate(); }); ro.observe(element);

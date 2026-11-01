@@ -78,7 +78,7 @@ test('params, view, export, presets', async () => {
   assert.equal(host.program.params.find(p => p.name === 'wall').src, 'override');
   await s.params.clear();
   assert.deepEqual(s.params.overrides(), {});
-  assert.deepEqual(s.view.set({ name: 'front', overlays: { dims: false, names: true } }), { name: 'front', overlays: ['shadows', 'grid', 'names'] });
+  assert.deepEqual(s.view.set({ name: 'front', overlays: { dims: false, names: true } }), { name: 'front', overlays: ['shadows', 'grid', 'names'], sketches: [] });
   assert.throws(() => s.view.set({ name: 'iso' }), /axo, front, side or plan/);
   const ex = await s.exportFile('stl');
   assert.deepEqual(Object.keys(ex), ['format', 'filename', 'mime', 'bytes', 'report']);
@@ -164,4 +164,18 @@ test('run() and check() return warnings as text, at most six', async () => {
   const c = await s.check('x');
   assert.equal(c.warnings.length, 7);
   assert.deepEqual(c.warnings[6], { more: 3, see: 'program.diagnostics()' });
+});
+
+test('view.set({ sketches }) shows sketches in the 3D views and checks the ids', async () => {
+  const { labScope } = await import('../../src/agent/scope.js');
+  const { createMockHost } = await import('./mock-host.js');
+  const host = createMockHost();
+  await host.compile();
+  host.program.sketches = [{ id: 'pot' }, { id: 'saucer' }];
+  const patches = [];
+  const set = host.setView; host.setView = p => { patches.push(p); return set ? set.call(host, p) : undefined; };
+  const s = labScope(host);
+  s.view.set({ sketches: ['pot'] });
+  assert.deepEqual([...patches.at(-1).shown], ['pot']);
+  assert.throws(() => s.view.set({ sketches: ['lid'] }), /no sketch lid \(sketches: pot, saucer\)/);
 });

@@ -485,9 +485,16 @@ export function labScope(host, { readOnly = false, console: con, images = null }
   };
 
   const view = {
-    get() { const v = host.view || {}; return { name: v.name, overlays: v.overlays ? [...v.overlays] : [] }; },
-    set({ name, overlays } = {}) {
+    get() { const v = host.view || {}; return { name: v.name, overlays: v.overlays ? [...v.overlays] : [], sketches: v.shown ? [...v.shown] : [] }; },
+    set({ name, overlays, sketches } = {}) {
       const patch = {};
+      // sketches: the ids drawn on the part in the 3D views (Sketch ▾ › 3D); [] hides them
+      if (sketches) {
+        const known = new Set(((host.program || host.lastGood || {}).sketches || []).map(x => x.id));
+        const bad = [...sketches].filter(id => !known.has(id));
+        if (bad.length) throw new Error(`view.set: no sketch ${bad.join(', ')} (sketches: ${[...known].join(', ') || 'none'})`);
+        patch.shown = new Set(sketches);
+      }
       if (name) {
         if (!['axo', 'front', 'side', 'plan'].includes(name)) throw new Error('view.set: name is axo, front, side or plan');
         patch.name = name;

@@ -41,10 +41,16 @@ function off(canvas, w, h) {
 // the sketch a sheet shows, if any: the view's (by id), or the program's first when the program is a sketch
 export function activeSketch(program, view, overrides) {
   const list = program && program.sketches || [];
-  let id = view.sketch;
+  let id = view.name === 'sketch' ? view.sketch : null;
   if (!id && program && program.kind === 'sketch' && list.length) id = list[0].id;
   if (!id) return null;
   return (overrides && overrides.get && overrides.get(id)) || list.find(s => s.id === id) || null;
+}
+// the sketches a 3D view draws in place: view.shown (ids), as solved (overrides) when a drag moved them
+export function shownSketches(program, view, overrides) {
+  if (view.name === 'sketch' || !view.shown || !view.shown.size) return [];
+  const list = program && program.sketches || [];
+  return [...view.shown].map(id => (overrides && overrides.get && overrides.get(id)) || list.find(s => s.id === id)).filter(Boolean);
 }
 
 // draw(canvas, program, view, options) → the state the interactive stage keeps for picking (renderSheet returns
@@ -159,6 +165,7 @@ export function draw(canvas, program, viewIn, o = {}) {
       label(ctx, C, `PLATE ${pl.index}`, p, { dx: -6, dy: 8, align: 'right', size: K.labelSm, tone: 'muted' });
     }
   }
+  if (!thumb) for (const s3 of shownSketches(program, view, o.sketches)) if (s3 !== sk) drawSketch(ctx, C, cam, s3, has, {});
   if (sk) state.sketchLayout = drawSketch(ctx, C, cam, sk, thumb ? (() => false) : has, { dragging: o.dragging, hoverRef: o.hoverRef, selected: thumb ? null : o.selection });
   if (o.hover && has('names')) drawHover(ctx, C, state, o.hover);
 
