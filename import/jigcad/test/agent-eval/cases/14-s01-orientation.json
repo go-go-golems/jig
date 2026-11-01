@@ -13,8 +13,11 @@
     },
     {
       "kind": "answer",
-      "matches": [
-        "[-−–]\\s*Y|minus Y|negative Y"
+      "any": [
+        "[-−–]\\s*Y|minus Y|negative Y",
+        "on (its|their|the) side",
+        "side (profile )?(down|flat)",
+        "lies? flat on (its|the) side"
       ]
     },
     {
