@@ -316,3 +316,49 @@ message. No backward compatibility is kept (decision 3).
 
 ### Code review instructions
 - `summaryOf`/`logsOf`/`metrics` in `src/agent/scope.js`, `scriptLog` in `src/engine/worker.js`; `node --test import/jigcad/test/agent/sandbox.test.mjs import/jigcad/test/agent/scope.test.mjs`.
+
+**Commit (code):** 8ee332b (phase 4); c9df0c0 (two new cases)
+
+## Step 7: Phase 2 measured; a phase 1 bug in the sandbox's j; promise hints
+
+The phase 2 batch (frozen worktree at a1d6890, `--tiers default,complex --repeat 1 --look chrome`) passed 63/66
+(`various/runs/2026-11-01-phase2/`, report `various/05-failures-phase2.md`). One of the three failures is an
+`authentication_error` from the model proxy, not the agent. The failure report showed what the guards had not
+reached. Most of the new `.map is not a function` steps were unawaited `faces()` promises kept in a variable. My
+phase 2 hint made them worse with "Nearest methods: .max() (quantity)". One step showed `j.frame.on is not a
+function`, which turned out to be a bug from phase 1.
+
+### What I did
+- Read every not-a-function step of the batch (script in this step's commands; the steps are in `results.jsonl`).
+- `src/agent/sandbox/runner.js`: `j`, the bare units and `data` are added after `trackScope`/`guardScope`. Before, `trackScope` saw `j` as a plain object and replaced it with a shallow copy whose functions were wrappers. That lost the members of `j`'s functions (`j.frame.on`, `j.q.sin`) and the top-level guard (`j.bx`). Present since phase 1.
+- `runner.js`: `check()`'s live program is tracked like the scope (`(await check()).program.faces(…)` gets the unawaited-promise note with a runnable fix). It is guarded with `help: true`.
+- `src/agent/hints.js`: "not a function" knows array, string and promise methods. A call that answers later (`faces(...)`, `p.faces(...)`, `program.ir(...)`) gets "returns a Promise: write (await …).map(…)". `.then` on a sync value gets "its value is there already". Array and string methods on a non-array/non-text say so, with what to return to look. No note when the step already has the unawaited-promise note. Language-method suggestions only for other names.
+- `tools/agent-eval/failures.mjs`: with the promise note, `x.m is not a function` and reads of undefined count as the promise, unless `x` is a scope namespace (`program.metric` stays a wrong name). Test added.
+- Recomputed both reports with the corrected classifier: `various/03-failures-baseline.md`, `various/05-failures-phase2.md`.
+
+### What worked
+| | baseline (b560730) | phase 2 (a1d6890) |
+|---|---:|---:|
+| passed | 64/66 | 63/66 (1 auth error) |
+| failed steps | 64 of 361 (18 %) | 60 of 386 (16 %) |
+| runs with a misuse error | 16 (24 %) | 12 (18 %) |
+| misuse steps | 30 | 20 |
+| `j`/`mm`/`deg` not defined | 21 steps | 0 |
+| never recovered | 5 | 1 |
+| stuck loops | 2 | 1 |
+- One repeat of 33 cases per tier: pass-rate differences are within noise. The misuse counts and the recovery numbers move the same way.
+- `make test-js`: 80 + 15 + 62 + 42 passing.
+
+### What didn't work
+- My first classifier change counted `TypeError: program.metric is not a function` + an unrelated promise note as a promise; the existing classifier test caught it (`expected: 'not a function: .metric'`, `actual: 'promise not awaited'`).
+- `j.q.sin(deg(30))` is `0.49999999999999994`; the new test rounds.
+
+### What I learned
+- The phase 1 tests checked `j.fit.hole` (a member of a plain sub-object), which survived the copy. Nothing exercised a member of one of `j`'s functions.
+- Phase 4 removes one failure from this batch by design: `b.faces.map` on `program.bodies()` (`faces` was a count).
+
+### What warrants a second pair of eyes
+- The `look()` renders of the phase 2 batch came from a `dist/` I rebuilt mid-batch (Step 5).
+
+### Code review instructions
+- `node --test import/jigcad/test/agent/sandbox.test.mjs import/jigcad/test/agent/failures.test.mjs`; `node import/jigcad/tools/agent-eval/failures.mjs <results.jsonl>`.

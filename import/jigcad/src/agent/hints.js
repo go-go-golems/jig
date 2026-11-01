@@ -20,8 +20,9 @@ const LINE = /\(line (\d+)\)$/;
  *   j         the language namespace, when the step has it (the sandbox)
  *   methods   { kind: [method names] } of the language's values (help.js methodsByKind; sandbox)
  *   line      the step's line of the error (errorText's), or null
+ *   promised  whether the step already has a note for a promise it never awaited
  */
-export function hintsFor({ error, text = '', code = '', names = [], j = null, methods = null, line = null }) {
+export function hintsFor({ error, text = '', code = '', names = [], j = null, methods = null, line = null, promised = false }) {
   const out = [];
   const msg = error && typeof error === 'object' ? String(error.message ?? '') : '';
   if (error?.guard) return out;   // a guard's message already says it all
@@ -29,8 +30,8 @@ export function hintsFor({ error, text = '', code = '', names = [], j = null, me
   let m;
   if (error?.name === 'ReferenceError' && (m = /^(\w+|\$\w*) is not defined$/.exec(msg))) {
     out.push(notDefined(m[1], names, j));
-  } else if (error?.name === 'TypeError' && (m = /^(.+)\.(\w+) is not a function$/.exec(msg)) && methods) {
-    const h = notAMethod(m[1], m[2], methods);
+  } else if (error?.name === 'TypeError' && (m = /^(.+)\.(\w+) is not a function$/.exec(msg))) {
+    const h = notAMethod(m[1], m[2], methods ?? {}, promised);
     if (h) out.push(h);
   } else if (error?.name === 'TypeError' && (m = /^Cannot read properties of (undefined|null) \(reading '([^']+)'\)$/.exec(msg))) {
     out.push(readOfUndefined(m[1], m[2], code, line));
@@ -52,7 +53,21 @@ function notDefined(name, names, j) {
   return `note: ${name} is not in this step's scope. Steps do not share variables: a const, let or globalThis value from an earlier step is gone. Define it again here, or keep it in a file and read it.`;
 }
 
-function notAMethod(expr, method, methods) {
+// the scope's calls that answer with a Promise (also on check()'s live program)
+const ASYNC_CALL = /(?:^|\.)(run|check|why|faces|feature|sketch|look|area|ir|get|set|clear|load|create|exportFile)\(\.\.\.\)$/;
+const ARRAY = new Set(['map', 'filter', 'slice', 'join', 'forEach', 'find', 'findIndex', 'some', 'every', 'reduce', 'flatMap', 'includes', 'indexOf', 'sort', 'concat', 'at', 'flat', 'entries', 'keys', 'values']);
+const STRING = new Set(['split', 'trim', 'replace', 'replaceAll', 'startsWith', 'endsWith', 'toUpperCase', 'toLowerCase', 'match', 'matchAll', 'padStart', 'padEnd', 'charAt']);
+const PROMISE = new Set(['then', 'catch', 'finally']);
+
+function notAMethod(expr, method, methods, promised) {
+  const common = ARRAY.has(method) || STRING.has(method);
+  if (promised && (common || ASYNC_CALL.test(expr))) return '';   // the note on the unawaited promise says it
+  if (ASYNC_CALL.test(expr) && !PROMISE.has(method)) return `note: ${expr} returns a Promise: write (await ${expr}).${method}(…).`;
+  if (PROMISE.has(method)) return `note: ${expr} is not a Promise; its value is there already: use it without .${method}().`;
+  const what = /\(\.\.\.\)$/.test(expr) ? expr : expr.split(/[.([]/)[0];
+  const later = 'Results of faces, why, feature, sketch, check and program.ir arrive later: await them.';
+  if (ARRAY.has(method)) return `note: ${expr} is not an array, so it has no .${method}(). Return ${what} to see what it is. ${later}`;
+  if (STRING.has(method)) return `note: ${expr} is not text, so it has no .${method}(). Return ${what} to see what it is. ${later}`;
   const has = Object.entries(methods).filter(([, ms]) => ms.includes(method)).map(([k]) => k);
   const near = [];
   for (const [kind, ms] of Object.entries(methods)) for (const n of closest(method, ms, 2)) near.push(`.${n}() (${kind})`);

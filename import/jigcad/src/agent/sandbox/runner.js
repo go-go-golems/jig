@@ -157,10 +157,14 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
 
   // local: the language and a compile in this engine
   const { j, bare } = W.lang();
-  Object.assign(scope, bare, { j, data: W.parseData(ctx.files, ctx.entry) });
-  scope.check = (variant, options) => check(() => ({ ...ctx, files: Object.fromEntries(mirror.files) }), variant, options);
+  // the live program's calls are tracked like the scope's, so an unawaited r.program.faces(…) gets its note
+  const trackProgram = p => trackScope({ '(await check()).program': p }, promises)['(await check()).program'];
+  scope.check = (variant, options) => check(() => ({ ...ctx, files: Object.fromEntries(mirror.files) }), variant, options, trackProgram);
 
   const tracked = guardScope(trackScope(scope, promises));
+  // the language goes in as it is, after tracking: trackScope copies plain objects and wraps functions, which
+  // would strip the members of j's functions (j.frame.on, j.q.sin) and its guard. j is guarded already.
+  Object.assign(tracked, bare, { j, data: W.parseData(ctx.files, ctx.entry) });
   tracked.console = con;
   tracked.log = con.log;
   tracked.help = makeHelp({ scope: tracked, j, langMd, kinds: kinds() });
@@ -174,13 +178,13 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   await queue;
   for (const k of Object.getOwnPropertyNames(globalThis)) if (!before.has(k)) { try { delete globalThis[k]; } catch { /* not configurable */ } }
   let text;
-  try { text = withHints(formatResult(value, logs, error, [...promiseNotes(promises), ...notes]), { error, code: String(code), names, j, methods: methods() }); }
+  try { const pn = promiseNotes(promises); text = withHints(formatResult(value, logs, error, [...pn, ...notes]), { error, code: String(code), names, j, methods: methods(), promised: pn.length > 0 }); }
   catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
   return { ok: !error, text: cut(text) };
 }
 
 /** check(variant?, options?) in this engine: { ok, ms, errors, warnings, summary, metrics, program }. */
-async function check(getCtx, variant, options = {}) {
+async function check(getCtx, variant, options = {}, wrap = p => p) {
   const ctx = getCtx();
   let files = { ...ctx.files };
   if (typeof variant === 'string') files['script.js'] = variant;
@@ -200,7 +204,7 @@ async function check(getCtx, variant, options = {}) {
     out.warnings = r.warnings;
     out.summary = summaryOf(r.p);
     out.metrics = flatMetrics(r.p);
-    out.program = liveProgram(r.p, gen);
+    out.program = liveProgram(r.p, gen, wrap);
   }
   const logs = logsOf(r.p) ?? (failedLogs?.length ? failedLogs : undefined);
   if (logs) out.logs = logs;
@@ -209,7 +213,7 @@ async function check(getCtx, variant, options = {}) {
 
 // The Program of one check(), with the page's query functions (scope.js) over this engine. It answers until the
 // next check() replaces the engine's current Program.
-function liveProgram(data, gen) {
+function liveProgram(data, gen, wrap) {
   const host = {
     program: data, lastGood: data,
     call: async (method, ...args) => {
@@ -218,6 +222,7 @@ function liveProgram(data, gen) {
     },
   };
   const p = { ...makeProgram(host), ...makeQueries(host), measure: makeMeasure(host) };
-  Object.defineProperty(p, 'describe', { value: () => `program ${data.name ?? ''} (${data.kind}) from check()`, enumerable: false });
-  return guard(p, 'check().program');
+  const tracked = wrap(p);
+  Object.defineProperty(tracked, 'describe', { value: () => `program ${data.name ?? ''} (${data.kind}) from check()`, enumerable: false });
+  return guard(tracked, 'check().program', { help: true });
 }

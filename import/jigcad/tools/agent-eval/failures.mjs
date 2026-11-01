@@ -13,6 +13,9 @@ export const SCOPE_NAMES = [...new Set(scopeNames()
   .filter(n => !['console', 'log', 'data'].includes(n))
   .map(n => n.startsWith('lab.') ? 'lab.' : n === 'j' ? 'j.' : n))];
 
+// the scope's namespaces: a wrong member of one is a wrong name, not a promise
+const NAMESPACES = new Set(['program', 'files', 'measure', 'params', 'view', 'presets', 'lab', 'j', 'console']);
+
 // scope functions that return promises (the engine answers them)
 const ASYNC = new Set(['run', 'check', 'why', 'faces', 'feature', 'sketch', 'look', 'measure.area', 'params.get', 'params.set', 'params.clear', 'presets.load', 'presets.create', 'exportFile', 'program.ir']);
 
@@ -24,7 +27,11 @@ export function classify(step) {
   // a promise the code used as a value: the JIG-004 note, or (in runs before it) a method of the promise called
   const asyncCall = /^TypeError: (?:await )?([\w$]+(?:\.[\w$]+)?)\(\.\.\.\)\.\w+ is not a function/.exec(head);
   if (asyncCall && ASYNC.has(asyncCall[1])) return 'promise not awaited';
-  if (noted && (!step?.error || /\(\.\.\.\)\.\w+ is not a function|Cannot read properties/.test(head.split('\n')[0]))) return 'promise not awaited';
+  // with the note, "x.m is not a function" or a read of undefined is the promise (holes = faces(…); holes.map(…)),
+  // unless x is a namespace of the scope (program.metric is a wrong name, whatever else the step left unawaited)
+  const nf = /^TypeError: ([\w$]+)[\w$.()[\]'"]*\.\w+ is not a function/.exec(head);
+  const onNamespace = nf && NAMESPACES.has(nf[1]) && !/\(\.\.\.\)\.\w+ is not a function/.test(head.split('\n')[0]);
+  if (noted && !onNamespace && (!step?.error || /is not a function|Cannot read properties/.test(head.split('\n')[0]))) return 'promise not awaited';
   if (/eval timed out/.test(head)) return 'timeout';
   if (/^Declined|The person declined/.test(head)) return null;
   let m;

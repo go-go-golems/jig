@@ -26,3 +26,8 @@ test('analyse: recovery and stuck loops', () => {
   assert.deepEqual(Object.fromEntries(a.recovery), { 1: 1, 2: 1, 3: 1 });
   assert.equal(a.coverage.get('files.read'), 1);
 });
+
+test('a promise kept in a variable and used as a value is the promise', () => {
+  const c = r => classify({ result: r, error: true });
+  assert.equal(c("TypeError: holes.map is not a function (line 3)\nnote: faces('x') returned a Promise that this step never awaited. Write: const x = await faces('x');"), 'promise not awaited');
+});

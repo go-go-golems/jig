@@ -79,3 +79,10 @@ test('one result shape: summary as program.summary(), plain metrics, logs from t
   assert.match(failed, /ok: false\nlogs:\n {2}- before/);
   assert.match(await run(host, 'return { v: program.metrics().volume.value }'), /note: NaN or undefined in the result: program\.metrics\(\) and check\(\)\.metrics give plain numbers/);
 });
+
+test('the language is the engine\'s own j: members of its functions and its guard survive', async () => {
+  const host = await fresh();
+  assert.equal(await run(host, "return typeof j.frame.on + ' ' + typeof j.q.sin"), 'function function');
+  assert.match(await run(host, 'return j.bx'), /^TypeError: j\.bx does not exist\. Did you mean j\.box/);
+  assert.equal(await run(host, 'return Math.round(j.q.sin(deg(30)) * 1e6) / 1e6'), '0.5');
+});

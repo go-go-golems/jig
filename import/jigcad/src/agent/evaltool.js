@@ -168,8 +168,8 @@ export function formatResult(value, logs, error, notes = []) {
 }
 
 /** The result text with the hints for its error, or for a NaN in it, appended (hints.js). */
-export function withHints(text, { error, code, names, j = null, methods = null }) {
-  const notes = hintsFor({ error, text: error ? '' : text, code, names, j, methods, line: error ? lineOf(errorText(error)) : null });
+export function withHints(text, { error, code, names, j = null, methods = null, promised = false }) {
+  const notes = hintsFor({ error, text: error ? '' : text, code, names, j, methods, promised, line: error ? lineOf(errorText(error)) : null });
   return notes.length ? `${text}\n${notes.join('\n')}` : text;
 }
 
@@ -212,7 +212,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, 1000))]);
   const ms = Math.round(now() - t0);
   let text;
-  try { text = withHints(formatResult(value, logs, error, promiseNotes(promises)), { error, code, names }); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
+  try { const pn = promiseNotes(promises); text = withHints(formatResult(value, logs, error, pn), { error, code, names, promised: pn.length > 0 }); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
   return { text: cut(text), error: !!error, ms, value, images };
 }
 
