@@ -119,6 +119,14 @@
 .agent-panel details.tool .tb { border-top: 1px solid var(--rule); padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
 .agent-panel details.tool .tb > pre.src { max-height: 280px; color: var(--ink); }
 .agent-panel details.tool .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.agent-panel details.thought { margin: 4px 0; border-left: 2px solid var(--hair); }
+.agent-panel details.thought > summary { list-style: none; display: grid; grid-template-columns: 8px auto minmax(0, 1fr); gap: 8px; align-items: center; padding: 2px 8px; cursor: pointer; font-size: var(--fs-xs); color: var(--ink-2); }
+.agent-panel details.thought > summary::-webkit-details-marker { display: none; }
+.agent-panel details.thought .dot { width: 7px; height: 7px; border: 1px solid var(--ink-2); }
+.agent-panel details.thought.live .dot { background: var(--ink-2); animation: bl 0.8s steps(2) infinite; }
+.agent-panel details.thought .nm { font-style: italic; }
+.agent-panel details.thought .ms { white-space: nowrap; }
+.agent-panel details.thought .tt { padding: 2px 8px 6px 18px; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-xs); line-height: 1.45; color: var(--ink-2); }
 .agent-panel .agent-log > *, .agent-panel .msg > *, .agent-panel details.tool .tb > * { flex-shrink: 0; }
 @media (max-width: 640px) { .agent-panel .agent-set { padding: 6px 12px; } }
 

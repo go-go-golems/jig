@@ -149,16 +149,44 @@ function Answer({ host, text }) {
   return <div class="md doc-inline" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+// The model's reasoning before a step or the answer: open and following the text while it streams, then folded to
+// one line (the person can open it again).
+function Thought({ thought, live }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => { const el = ref.current; if (live && el) el.scrollTop = el.scrollHeight; });
+  const words = (thought.text.match(/\S+/g) || []).length;
+  return (
+    <details class={'thought' + (live ? ' live' : '')} open={live || OPEN.has(thought)} onToggle={e => { if (live) return; if (e.currentTarget.open) OPEN.add(thought); else OPEN.delete(thought); }}>
+      <summary><i class="dot" /><span class="nm">{live ? 'Thinking' : 'Thought'}</span><span class="ms">{words} word{words === 1 ? '' : 's'}</span></summary>
+      <div class="tt" ref={ref}>{thought.text}</div>
+    </details>
+  );
+}
+
 function AgentTurn({ host, turn, onRevert, onCopy }) {
   const failed = !!turn.note && !turn.text;
+  const steps = turn.steps || [];
+  // reasoning, text and steps in the order they happened (blocks: turn.js addBlock); a turn without blocks (a
+  // runtime that does not stream, a thread saved before blocks) shows its steps, then the whole answer
+  const blocks = (turn.blocks || []).filter(x => x.text);
+  const hasText = blocks.some(x => x.kind === 'text');
+  const lastBlock = blocks[blocks.length - 1];
+  const live = x => !!turn.pending && x === lastBlock && x.at === steps.length;
+  const block = (x, key) => x.kind === 'thought'
+    ? <Thought key={key} thought={x} live={live(x)} />
+    : <Answer key={key} host={host} text={x.text} />;
+  const before = i => blocks.map((x, j) => x.at === i ? block(x, 'b' + j) : null);
+  const waiting = turn.pending && !(lastBlock && live(lastBlock));
   return (
     <div class={'msg agent' + (failed ? ' error' : '')}>
       <span class="who">Agent</span>
-      {(turn.steps || []).map((s, i) => (
-        <Step key={i} step={s} onRevert={() => onRevert(turn, i)} onCopy={() => onCopy(s.code)} onAnswer={ok => { if (s.resolve) s.resolve(ok); }} />
-      ))}
-      {turn.text ? <Answer host={host} text={turn.text} /> : null}
-      {turn.pending && !turn.text ? <span class="thinking">{(turn.steps || []).length ? 'Working' : 'Thinking'}</span> : null}
+      {steps.map((s, i) => [
+        before(i),
+        <Step key={'s' + i} step={s} onRevert={() => onRevert(turn, i)} onCopy={() => onCopy(s.code)} onAnswer={ok => { if (s.resolve) s.resolve(ok); }} />,
+      ])}
+      {before(steps.length)}
+      {!hasText && turn.text ? <Answer host={host} text={turn.text} /> : null}
+      {waiting ? <span class="thinking">{steps.length ? 'Working' : 'Thinking'}</span> : null}
       {turn.note ? <span class="note">{turn.note}</span> : null}
     </div>
   );

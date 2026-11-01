@@ -156,3 +156,22 @@ test('JIG-006: request images and tool-result images reach the server', async ()
     await assert.rejects(sample('x', { images: Array(5).fill({ mimeType: 'image/jpeg', data: JPEG }) }), e => e.code === 'invalid_request');
   } finally { await b.close(); }
 });
+
+test('onThinking receives the reasoning; no placeholder text then', async () => {
+  const b = await backend(async (req, sse, ctx) => {
+    ctx.res.writeHead(200, { 'content-type': 'text/event-stream' });
+    sse('call', { call: 'jc2' });
+    sse('thinking', { text: 'The wall', delta: 'The wall' });
+    sse('thinking', { text: 'The wall is 2 mm.', delta: ' is 2 mm.' });
+    sse('text', { text: 'It is 2 mm.', delta: 'It is 2 mm.' });
+    sse('result', { text: 'It is 2 mm.', truncated: false, modelTierApplied: req.modelTier });
+    ctx.res.end();
+  });
+  try {
+    const texts = [], thoughts = [];
+    const sample = createHttpSample(b.base);
+    await sample([{ role: 'user', content: 'wall?' }], { onText: u => texts.push(u.text), onThinking: u => thoughts.push([u.text, u.delta]) });
+    assert.deepEqual(thoughts, [['The wall', 'The wall'], ['The wall is 2 mm.', ' is 2 mm.']]);
+    assert.deepEqual(texts, ['It is 2 mm.']);
+  } finally { await b.close(); }
+});

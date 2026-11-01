@@ -137,6 +137,9 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
     unhandledRejections: seen.count - unhandledBefore, ...(seen.count > unhandledBefore ? { lastUnhandled: seen.last } : {}),
     checks, answer: turn.text, note: turn.note || null, steps: steps.map(stepSummary),
     ...(agentTurns.length > 1 ? { answers: agentTurns.map(t => t.text) } : {}),
+    // the model's reasoning, before which step of its turn it came (empty for a model that does not stream it)
+    ...(agentTurns.some(t => (t.blocks || []).some(b => b.kind === 'thought' && b.text))
+      ? { thinking: agentTurns.flatMap((t, n) => (t.blocks || []).filter(b => b.kind === 'thought' && b.text).map(b => ({ turn: n, at: b.at, text: b.text }))) } : {}),
   };
 }
 

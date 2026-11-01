@@ -67,7 +67,9 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
     timeoutMs,
   });
   const turns = toTurns(host, { ...thread, turns: thread.turns.slice(0, -1) }, reference);
-  const opts = { tools: [tool], signal, modelTier: settings.tier || 'default', cache: false, onText: ({ text: t }) => { turn.text = t; onUpdate(); } };
+  const opts = { tools: [tool], signal, modelTier: settings.tier || 'default', cache: false,
+    onText: ({ text: t }) => { turn.text = t; addBlock(turn, 'text', t); onUpdate(); },
+    onThinking: ({ text: t }) => { addBlock(turn, 'thought', t); onUpdate(); } };
   if (settings.effort) opts.effort = settings.effort;
   if (images.length) opts.images = images;
   let off = null;
@@ -79,12 +81,34 @@ export async function runTurn({ host, sample, thread, text, images = [], setting
     const x = explainError(e);
     turn.note = x.note;
     off = x.off;
-    if (e && e.code === 'refused') turn.text = '';
+    if (e && e.code === 'refused') { turn.text = ''; if (turn.blocks) turn.blocks = turn.blocks.filter(b => b.kind !== 'text'); }
   }
   for (const s of turn.steps) if (s.asking && s.resolve) s.resolve(false);
   turn.pending = false;
   onUpdate();
   return { ok: !turn.note || turn.note === NOTES.truncated, off };
+}
+
+/**
+ * What the person sees of a turn, in order: blocks of reasoning ('thought') and of text ('text'), each placed before
+ * the step it led to. `block.at` is the number of steps taken when the block began, so blocks with at = steps.length
+ * come after the last step. `full` is the call's cumulative stream of that kind (rounds joined by a blank line, as
+ * the server sends it); a block ends when the other kind arrives or a step is taken. turn.text stays the whole text:
+ * the history and the evaluation read it.
+ */
+export function addBlock(turn, kind, full) {
+  full = String(full || '');
+  const blocks = turn.blocks || (turn.blocks = []);
+  const seen = turn.seen || (turn.seen = { thought: 0, text: 0 });
+  const k = (turn.steps || []).length;
+  let last = blocks[blocks.length - 1];
+  if (!last || last.kind !== kind || last.at !== k) {
+    last = { kind, at: k, from: Math.min(seen[kind], full.length), text: '' };
+    blocks.push(last);
+  }
+  seen[kind] = full.length;
+  last.text = full.slice(last.from).replace(/^\s+/, '');
+  return last;
 }
 
 /** Revert the files to before step i of a turn; marks it and every later step reverted. */
@@ -102,6 +126,7 @@ export async function revertStep(host, turn, i) {
 const PREFIX = 'jigcad.v1.';
 export const TURNS_STORED = 30;
 export const RESULT_STORED = 3000;
+export const THOUGHT_STORED = 4000;   // characters of each reasoning segment kept in localStorage
 
 function store() { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } }
 export function load(key, fallback) {
@@ -115,6 +140,8 @@ export function trimThreads(threads) {
     id: th.id, title: th.title,
     turns: th.turns.slice(-TURNS_STORED).map(t => t.role === 'user' ? { role: 'user', text: t.text, ...(t.images ? { images: t.images } : {}) } : {
       role: 'agent', text: t.text, ...(t.note ? { note: t.note } : {}),
+      ...(t.blocks && t.blocks.length ? { blocks: t.blocks.filter(x => x.text).map(x => ({ kind: x.kind, at: x.at,
+        text: x.kind === 'thought' && x.text.length > THOUGHT_STORED ? x.text.slice(0, THOUGHT_STORED) + '\n…' : x.text })) } : {}),
       steps: (t.steps || []).map(s => ({
         code: s.code, ms: s.ms, error: !!s.error, changed: !!s.changed, reverted: !!s.reverted,
         result: s.result && s.result.length > RESULT_STORED ? s.result.slice(0, RESULT_STORED) + '\n…' : s.result,

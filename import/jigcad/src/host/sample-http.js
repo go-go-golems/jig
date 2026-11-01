@@ -1,7 +1,7 @@
 // The `sample` capability over jigcad serve's HTTP backend (Go, pkg/server): one call is one streamed
 // POST api/sample; the model's tool calls arrive as `tool` events, run here, and their results go back to
 // api/sample/{call}/tools/{use}; aborting cancels on the server. Same contract as window.claude's sample:
-//   sample(turns, { tools, signal, modelTier, model, effort, onText }) → { text, truncated, modelTierApplied, modelApplied?, usage? }
+//   sample(turns, { tools, signal, modelTier, model, effort, onText, onThinking }) → { text, truncated, modelTierApplied, modelApplied?, usage? }
 // rejecting with an Error whose .code is one of the contract codes (and .usage when the server sent it). usage is
 // { input, cacheRead, cacheWrite, output, rounds, toolCalls, model }: jigcad serve's addition, read by tools/agent-eval.
 // Ported from slop-computer web/runtime/src/sample.ts without consent and caching. Images (JIG-006): o.images go with
@@ -126,7 +126,10 @@ export function createHttpSample(base = '', fetchImpl = (...a) => fetch(...a)) {
         switch (type) {
           case 'call': callId = ev.call; break;
           case 'thinking':
-            if (!text && !thinking && o.onText) { thinking = true; o.onText({ text: 'Thinking…', delta: '' }); }
+            // the model's reasoning, cumulative over the call (rounds joined by a blank line); a caller without
+            // onThinking gets one 'Thinking…' placeholder as text, as before
+            if (o.onThinking) o.onThinking({ text: ev.text, delta: ev.delta });
+            else if (!text && !thinking && o.onText) { thinking = true; o.onText({ text: 'Thinking…', delta: '' }); }
             break;
           case 'text':
             text = ev.text;

@@ -196,3 +196,35 @@ test('JIG-006: images go to the sample call; the thread keeps their count only',
   await runTurn({ host, sample, thread, text: 'and now?', settings: { mode: 'auto' } });
   assert.equal(seen, undefined, 'a message without images sends none');
 });
+
+test('reasoning, text and steps keep their order (blocks), and are stored', async () => {
+  const host = createMockHost();
+  await host.compile();
+  const thread = newThread();
+  // the server's streams are cumulative over the call, rounds joined by a blank line
+  const sample = async (messages, opts) => {
+    const [tool] = opts.tools;
+    opts.onThinking({ text: 'Find the wall', delta: 'Find the wall' });
+    opts.onThinking({ text: 'Find the wall first.', delta: ' first.' });
+    opts.onText({ text: 'Looking.', delta: 'Looking.' });
+    await tool.execute({ code: STEP1 }, { signal: opts.signal });
+    opts.onThinking({ text: 'Find the wall first.\n\nIt is on line 2.', delta: '\n\nIt is on line 2.' });
+    await tool.execute({ code: STEP2 }, { signal: opts.signal });
+    opts.onText({ text: 'Looking.\n\nDone.', delta: '\n\nDone.' });
+    return { text: 'Looking.\n\nDone.', truncated: false };
+  };
+  await runTurn({ host, sample, thread, text: 'walls 2.4', settings: { mode: 'auto' }, reference });
+  const turn = thread.turns[1];
+  assert.equal(turn.text, 'Looking.\n\nDone.', 'the whole text stays for the history');
+  assert.deepEqual(turn.blocks.map(b => [b.kind, b.at, b.text]), [
+    ['thought', 0, 'Find the wall first.'],
+    ['text', 0, 'Looking.'],
+    ['thought', 1, 'It is on line 2.'],
+    ['text', 2, 'Done.'],
+  ]);
+  const stored = trimThreads([thread])[0].turns[1];
+  assert.deepEqual(stored.blocks, [
+    { kind: 'thought', at: 0, text: 'Find the wall first.' }, { kind: 'text', at: 0, text: 'Looking.' },
+    { kind: 'thought', at: 1, text: 'It is on line 2.' }, { kind: 'text', at: 2, text: 'Done.' },
+  ]);
+});
