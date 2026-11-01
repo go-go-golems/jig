@@ -1,7 +1,7 @@
 ---
 Title: 'Exports that save: browser downloads outside claude.ai, the agent can hand over files, quiet STEP'
 Ticket: JIG-008-EXPORT
-Status: active
+Status: complete
 Topics:
     - agent
     - export
@@ -11,7 +11,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-01T11:56:32.055042145-05:00
+LastUpdated: 2026-11-01T11:57:20.018663568-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
