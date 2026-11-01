@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "907b9504cc384907f1d40701a6d4ad5e5702bcc6a99804c15ea768d0feac01e9",
+  "request": {
+    "ticket": "JIG-003-AGENT-EVAL",
+    "status": "complete",
+    "intent": "",
+    "entry": "Ticket closed: harness, 14 cases with oracles, first baseline. Follow-ups: JIG-004 (Promise hint), JIG-005 (harder cases)"
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-1a0df64f47bdd7cbb1cf4ce82539aea5",
+    "state": "committed",
+    "created_at": "2026-11-01T02:43:33.577590607Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "4dd86de02714c88a601cf98b5084ce983772cab5d1ec8fa0e0895423c836bfdf",
+      "index.md": "c49d3711120b14df6cfe43597045e0586045981f55caae95ef6370b57a57df26"
+    },
+    "after": {
+      "changelog.md": "c9dadfcc9a04681dd430f160aaebea43439ea43283be24ce1c45c9d7aef3130d",
+      "index.md": "f436870632eaa5115d5b89c04c0f7da53ba505dce47e2bc3d5259ecede5be039"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "4dd86de02714c88a601cf98b5084ce983772cab5d1ec8fa0e0895423c836bfdf",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTAtMzEKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMC0zMQoKVGlja2V0IGNyZWF0ZWQ7IGludGVybiBndWlkZSB3cml0dGVuIGFuZCB1cGxvYWRlZCB0byByZU1hcmthYmxlICgvYWkvMjAyNi8xMC8zMS9KSUctMDAzKQoKIyMgMjAyNi0xMC0zMQoKSGFybmVzcyBpbXBsZW1lbnRlZCAocGhhc2VzIDEtNSkgYW5kIGZpcnN0IGJhc2VsaW5lIHJ1bjogODQvODQgcGFzc2VkIG9uIGdsbS01LjMtZmxhc2ggYW5kIGRlZXBzZWVrLTQuMS1mbGFzaDsgfjIyJSBvZiBzdGVwcyBjYWxsIGFzeW5jIGxhYiBmdW5jdGlvbnMgd2l0aG91dCBhd2FpdDsgbmV4dDogUHJvbWlzZSBoaW50LCBoYXJkZXIgY2FzZXMKCiMjIDIwMjYtMTAtMzEKClRpY2tldCBjbG9zZWQ6IGhhcm5lc3MsIDE0IGNhc2VzIHdpdGggb3JhY2xlcywgZmlyc3QgYmFzZWxpbmUuIEZvbGxvdy11cHM6IEpJRy0wMDQgKFByb21pc2UgaGludCksIEpJRy0wMDUgKGhhcmRlciBjYXNlcykK"
+    },
+    {
+      "path": "index.md",
+      "before": "c49d3711120b14df6cfe43597045e0586045981f55caae95ef6370b57a57df26",
+      "after": "LS0tClRpdGxlOiAnQWdlbnQgZXZhbHVhdGlvbiBoYXJuZXNzOiBzY3JpcHRlZCBjYXNlcywgaGVhZGxlc3MgcnVubmVyIG9uIHRoZSByZWFsIGVuZ2luZSwgcGVyLW1vZGVsIHJlc3VsdHMgdGhyb3VnaCBsdW5hcm91dGUnClRpY2tldDogSklHLTAwMy1BR0VOVC1FVkFMClN0YXR1czogY29tcGxldGUKVG9waWNzOgogICAgLSBhZ2VudAogICAgLSBsbG0KICAgIC0gdGVzdGluZwpEb2NUeXBlOiBpbmRleApJbnRlbnQ6IGxvbmctdGVybQpPd25lcnM6IFtdClJlbGF0ZWRGaWxlczogW10KRXh0ZXJuYWxTb3VyY2VzOiBbXQpTdW1tYXJ5OiAiIgpMYXN0VXBkYXRlZDogMjAyNi0xMC0zMVQyMjo0MzozMy41Nzc1MzM1ODEtMDQ6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KCiMgQWdlbnQgZXZhbHVhdGlvbiBoYXJuZXNzOiBzY3JpcHRlZCBjYXNlcywgaGVhZGxlc3MgcnVubmVyIG9uIHRoZSByZWFsIGVuZ2luZSwgcGVyLW1vZGVsIHJlc3VsdHMgdGhyb3VnaCBsdW5hcm91dGUKCiMjIE92ZXJ2aWV3Cgo8IS0tIFByb3ZpZGUgYSBicmllZiBvdmVydmlldyBvZiB0aGUgdGlja2V0LCBpdHMgZ29hbHMsIGFuZCBjdXJyZW50IHN0YXR1cyAtLT4KCiMjIEtleSBMaW5rcwoKLSAqKlJlbGF0ZWQgRmlsZXMqKjogU2VlIGZyb250bWF0dGVyIFJlbGF0ZWRGaWxlcyBmaWVsZAotICoqRXh0ZXJuYWwgU291cmNlcyoqOiBTZWUgZnJvbnRtYXR0ZXIgRXh0ZXJuYWxTb3VyY2VzIGZpZWxkCgojIyBTdGF0dXMKCkN1cnJlbnQgc3RhdHVzOiAqKmFjdGl2ZSoqCgojIyBUb3BpY3MKCi0gYWdlbnQKLSBsbG0KLSB0ZXN0aW5nCgojIyBUYXNrcwoKU2VlIFt0YXNrcy5tZF0oLi90YXNrcy5tZCkgZm9yIHRoZSBjdXJyZW50IHRhc2sgbGlzdC4KCiMjIENoYW5nZWxvZwoKU2VlIFtjaGFuZ2Vsb2cubWRdKC4vY2hhbmdlbG9nLm1kKSBmb3IgcmVjZW50IGNoYW5nZXMgYW5kIGRlY2lzaW9ucy4KCiMjIFN0cnVjdHVyZQoKLSBkZXNpZ24vIC0gQXJjaGl0ZWN0dXJlIGFuZCBkZXNpZ24gZG9jdW1lbnRzCi0gcmVmZXJlbmNlLyAtIFByb21wdCBwYWNrcywgQVBJIGNvbnRyYWN0cywgY29udGV4dCBzdW1tYXJpZXMKLSBwbGF5Ym9va3MvIC0gQ29tbWFuZCBzZXF1ZW5jZXMgYW5kIHRlc3QgcHJvY2VkdXJlcwotIHNjcmlwdHMvIC0gVGVtcG9yYXJ5IGNvZGUgYW5kIHRvb2xpbmcKLSB2YXJpb3VzLyAtIFdvcmtpbmcgbm90ZXMgYW5kIHJlc2VhcmNoCi0gYXJjaGl2ZS8gLSBEZXByZWNhdGVkIG9yIHJlZmVyZW5jZS1vbmx5IGFydGlmYWN0cwo="
+    }
+  ]
+}

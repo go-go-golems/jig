@@ -51,19 +51,83 @@ export function cut(text, max = RESULT_CUT) {
   return text.slice(0, max) + `\n… cut (${text.length} chars). Return less: pick fields, slice arrays.`;
 }
 
-export function makeConsole(logs) {
-  const line = args => args.map(a => (typeof a === 'string' ? a : yamlInline(a))).join(' ');
+// ── tracked promises (JIG-004) ────────────────────────────────────────────────
+// Lab functions that ask the engine (faces, why, feature, sketch, check, run, …) return promises. Code that forgets
+// `await` works with the promise instead of the value: its YAML is {}, and a rejection surfaces after the step.
+// runEval wraps the scope so every promise a lab function returns is tracked; `await`, returning it, Promise.all,
+// .then/.catch/.finally mark it consumed. What is still unconsumed when the step ends gets a note in the result,
+// with its error if it failed, and shows as a marker wherever it appears in the value or a log line.
+const TRACKED = Symbol('jigcad.trackedPromise');
+const argText = a => {
+  let s;
+  // strings in single quotes, as the model writes them (and as YAML quoting leaves them readable)
+  try { s = typeof a === 'string' ? `'${a.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'` : a === undefined ? 'undefined' : typeof a === 'function' ? 'fn' : JSON.stringify(a) ?? String(a); } catch { s = '…'; }
+  return s.length > 60 ? s.slice(0, 59) + '…' : s;
+};
+function track(p, label, promises) {
+  const t = { label, consumed: false, settled: false, error: null, p: null };
+  t.p = Promise.resolve(p).then(() => { t.settled = true; }, e => { t.settled = true; t.error = e; });   // handled: no unhandled rejection
+  promises.push(t);
+  const tp = {
+    then(a, b) { t.consumed = true; return Promise.resolve(p).then(a, b); },
+    catch(b) { t.consumed = true; return Promise.resolve(p).catch(b); },
+    finally(f) { t.consumed = true; return Promise.resolve(p).finally(f); },
+  };
+  Object.defineProperty(tp, TRACKED, { value: t });
+  Object.defineProperty(tp, Symbol.toStringTag, { value: 'Promise' });
+  return tp;
+}
+/** The scope with every function (one level into namespaces) wrapped so returned promises are tracked. */
+export function trackScope(scope, promises) {
+  const wrap = (fn, name) => (...args) => {
+    const r = fn(...args);
+    return r && typeof r.then === 'function' && !r[TRACKED] ? track(r, `${name}(${args.map(argText).join(', ')})`, promises) : r;
+  };
+  const out = {};
+  for (const [k, v] of Object.entries(scope)) {
+    if (k === 'console' || k === 'log') out[k] = v;
+    else if (typeof v === 'function') out[k] = wrap(v, k);
+    else if (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype) {
+      out[k] = Object.fromEntries(Object.entries(v).map(([k2, v2]) => [k2, typeof v2 === 'function' ? wrap(v2, `${k}.${k2}`) : v2]));
+    } else out[k] = v;
+  }
+  return out;
+}
+const isPlain = v => v && typeof v === 'object' && (Array.isArray(v) || [Object.prototype, null].includes(Object.getPrototypeOf(v)));
+/** A copy of v with tracked promises replaced by marker strings (plain objects and arrays, depth ≤ 8). */
+export function markPromises(v, depth = 0, seen = new WeakSet()) {
+  if (v && typeof v === 'object' && v[TRACKED]) return `<Promise from ${v[TRACKED].label}: not awaited>`;
+  if (!isPlain(v) || depth > 8 || seen.has(v)) return v;
+  seen.add(v);
+  if (Array.isArray(v)) return v.map(x => markPromises(x, depth + 1, seen));
+  const out = {};
+  for (const [k, x] of Object.entries(v)) out[k] = markPromises(x, depth + 1, seen);
+  return out;
+}
+/** Notes for the promises a step never consumed (same call written several times: one note with a count). */
+export function promiseNotes(promises) {
+  const open = new Map();
+  for (const t of promises) if (!t.consumed) open.set(t.label, [...(open.get(t.label) || []), t]);
+  return [...open].map(([label, ts]) => {
+    const err = ts.find(t => t.error)?.error;
+    return `note: ${label} returned a Promise that this step never awaited${ts.length > 1 ? ` (${ts.length}×)` : ''}. Write: const x = await ${label};` +
+      (err ? ` It failed: ${err?.message ?? err}` : '');
+  });
+}
+
+export function makeConsole(logs, mark = x => x) {
+  const line = args => args.map(a0 => { const a = mark(a0); return typeof a === 'string' ? a : yamlInline(a); }).join(' ');
   const log = (...a) => { logs.push(line(a)); };
   return {
     log, info: log, debug: log,
     warn: (...a) => { logs.push('warn: ' + line(a)); },
     error: (...a) => { logs.push('error: ' + line(a)); },
-    table: v => { logs.push(yaml(v)); },
+    table: v => { logs.push(yaml(mark(v))); },
   };
 }
 
-export function formatResult(value, logs, error) {
-  const body = error ? errorText(error) : yaml(value);
+export function formatResult(value, logs, error, notes = []) {
+  const body = (error ? errorText(error) : yaml(markPromises(value))) + (notes.length ? '\n' + notes.join('\n') : '');
   return logs.length ? `logs:\n${logs.join('\n')}\n---\n${body}` : body;
 }
 
@@ -73,8 +137,9 @@ export function formatResult(value, logs, error) {
  */
 export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_TIMEOUT_MS, signal } = {}) {
   const logs = [];
-  const con = makeConsole(logs);
-  const scope = labScope(host, { readOnly, console: con });
+  const promises = [];
+  const con = makeConsole(logs, markPromises);
+  const scope = trackScope(labScope(host, { readOnly, console: con }), promises);
   delete scope.host;
   const names = Object.keys(scope).filter(k => IDENT.test(k));
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -93,9 +158,12 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
     value = await Promise.race(racers);
   } catch (e) { error = e || new Error('undefined'); }
   finally { clearTimeout(timer); if (signal && onAbort) signal.removeEventListener('abort', onAbort); }
+  // promises the step never consumed: give pending ones a moment to settle, so a failure can be reported
+  const open = promises.filter(t => !t.consumed && !t.settled);
+  if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, 1000))]);
   const ms = Math.round(now() - t0);
   let text;
-  try { text = formatResult(value, logs, error); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
+  try { text = formatResult(value, logs, error, promiseNotes(promises)); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }
   return { text: cut(text), error: !!error, ms, value };
 }
 

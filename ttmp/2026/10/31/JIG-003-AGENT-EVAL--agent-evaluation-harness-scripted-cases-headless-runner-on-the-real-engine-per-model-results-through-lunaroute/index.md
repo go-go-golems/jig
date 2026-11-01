@@ -1,7 +1,7 @@
 ---
 Title: 'Agent evaluation harness: scripted cases, headless runner on the real engine, per-model results through lunaroute'
 Ticket: JIG-003-AGENT-EVAL
-Status: active
+Status: complete
 Topics:
     - agent
     - llm
@@ -12,7 +12,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-31T21:58:10.960892644-04:00
+LastUpdated: 2026-10-31T22:43:33.577533581-04:00
 WhatFor: ""
 WhenToUse: ""
 ---

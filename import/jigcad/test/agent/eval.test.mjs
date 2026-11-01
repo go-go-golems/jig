@@ -114,3 +114,54 @@ test('Stop resolves a waiting step as declined', async () => {
   assert.equal(await p, DECLINED_TO_MODEL);
   assert.equal(steps[0].result, DECLINED_RESULT);
 });
+
+// ── JIG-004: promises a step forgets to await ────────────────────────────────
+test('an unawaited lab call gets a note and a marker instead of {}', async () => {
+  const host = createMockHost();
+  await host.compile();
+  const r = await runEval(host, "const fs = faces('%plane');\nreturn { fs, n: fs.length };");
+  assert.equal(r.error, false);
+  assert.match(r.text, /<Promise from faces\('%plane'\): not awaited>/);
+  assert.match(r.text, /note: faces\('%plane'\) returned a Promise that this step never awaited\. Write: const x = await faces\('%plane'\);/);
+});
+
+test('awaited, returned and Promise.all calls get no note', async () => {
+  const host = createMockHost();
+  await host.compile();
+  for (const code of ["const fs = await faces('%plane'); return fs.length;", "return faces('%plane');",
+    "const [a, b] = await Promise.all([faces('%plane'), why('body/end')]); return [a.length, b.target];",
+    "return await feature('nope').catch(e => e.message);"]) {
+    const r = await runEval(host, code);
+    assert.doesNotMatch(r.text, /note:|not awaited/, code);
+  }
+});
+
+test('a rejected unawaited call reports its error inside the step, with no unhandled rejection', async () => {
+  const host = createMockHost();
+  await host.compile();
+  let unhandled = 0;
+  const on = () => { unhandled++; };
+  process.on('unhandledRejection', on);
+  try {
+    const r = await runEval(host, "feature('nope'); return 'started';");
+    await new Promise(res => setTimeout(res, 20));
+    assert.match(r.text, /note: feature\('nope'\) returned a Promise that this step never awaited\. Write: const x = await feature\('nope'\); It failed: .*no feature nope/);
+    assert.equal(unhandled, 0);
+  } finally { process.off('unhandledRejection', on); }
+});
+
+test('a TypeError from using a promise as a value comes with the note; logs show the marker', async () => {
+  const host = createMockHost();
+  await host.compile();
+  const r = await runEval(host, "const fs = faces('%plane');\nconsole.log(fs);\nreturn fs.map(f => f.name);");
+  assert.equal(r.error, true);
+  assert.match(r.text, /logs:\n<Promise from faces\('%plane'\): not awaited>/);
+  assert.match(r.text, /TypeError: fs\.map is not a function[\s\S]*note: faces\('%plane'\)/);
+});
+
+test('the same call written twice gets one note with a count', async () => {
+  const host = createMockHost();
+  await host.compile();
+  const r = await runEval(host, "faces('%plane'); faces('%plane'); return 1;");
+  assert.match(r.text, /never awaited \(2×\)/);
+});
