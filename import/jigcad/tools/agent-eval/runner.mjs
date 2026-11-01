@@ -7,6 +7,17 @@ import { runTurn, newThread, NOTES } from '../../src/agent/turn.js';
 import { evaluate } from './checks.mjs';
 
 const STEP_TEXT = 400;
+
+// Eval code that starts a promise without awaiting it (`faces('x')` instead of `await faces('x')`) leaves a
+// rejection nobody handles. A browser logs it to the console and the page goes on; Node's default ends the process.
+// The runner behaves like the page: it counts such rejections and records them on the case that was running.
+const unhandled = { count: 0, last: null, installed: false };
+/** Record one unhandled rejection (the process-level handler; exported for tests). */
+export function onUnhandled(reason) { unhandled.count++; unhandled.last = String(reason?.message ?? reason).slice(0, 300); }
+export function trackUnhandled() {
+  if (!unhandled.installed) { unhandled.installed = true; process.on('unhandledRejection', onUnhandled); }
+  return unhandled;
+}
 const cut = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
 /** Read cases/*.json (sorted by file name); `filter` keeps ids containing any of its comma-separated parts. */
@@ -70,6 +81,7 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
     return { ...base, pass: false, outcome: 'setup_error', error: e.message, checks: [], toolCalls: 0, ms: 0 };
   }
   const initialFiles = Object.fromEntries(host.files);
+  const seen = trackUnhandled(), unhandledBefore = seen.count;
   const thread = newThread();
   const cap = captureUsage(sample);
   const ctl = new AbortController();
@@ -87,6 +99,7 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
       reference: host.reference(), signal: ctl.signal, onUpdate: mode === 'ask' ? approve : () => {} });
   } finally { clearTimeout(timer); }
   const ms = Math.round(performance.now() - t0);
+  await new Promise(r => setTimeout(r, 0));   // let rejections of the turn's last step surface
   const turn = thread.turns[thread.turns.length - 1];
   // judge what the person would see after the turn: the final files (and overrides) compiled
   const program = await host.compile();
@@ -94,6 +107,7 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
   return {
     ...base, pass: checks.every(x => x.pass), outcome: timedOut ? 'deadline' : noteCode(turn.note), timedOut, ms,
     toolCalls: turn.steps.length, usage: cap.usage, promptChars: cap.promptChars, sampleError: cap.error,
+    unhandledRejections: seen.count - unhandledBefore, ...(seen.count > unhandledBefore ? { lastUnhandled: seen.last } : {}),
     checks, answer: turn.text, note: turn.note || null, steps: turn.steps.map(stepSummary),
   };
 }

@@ -133,6 +133,16 @@ test('ask mode approves every step; a turn past its deadline is recorded as such
   assert.equal(late.pass, false);
 });
 
+test('unhandled rejections are counted instead of ending the process', async () => {
+  // node:test fails a test on any unhandled rejection (even an emitted one), so call the handler directly; the CLI run covers the
+  // real path (eval code calling faces('…') without await)
+  const { trackUnhandled, onUnhandled } = await import('../../tools/agent-eval/runner.mjs');
+  const u = trackUnhandled(), before = u.count;
+  onUnhandled(new Error("faces: selector: unknown token 'shell/inner*'"));
+  assert.equal(u.count, before + 1);
+  assert.match(u.last, /unknown token/);
+});
+
 test('captureUsage keeps error usage; noteCode maps turn notes back to codes', async () => {
   const cap = captureUsage(async () => { throw Object.assign(new Error('empty'), { code: 'empty_completion', usage: { input: 9, rounds: 16 } }); });
   await assert.rejects(cap.fn([{ role: 'user', content: 'x' }], {}));
