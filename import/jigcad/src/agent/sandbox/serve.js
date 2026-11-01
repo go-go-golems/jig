@@ -12,7 +12,7 @@
 // A call that changes what the mirror holds returns the new ctx with its value.
 import { labScope, filesObject } from '../scope.js';
 
-export const BRIDGED = ['run', 'look', 'exportFile', 'params.get', 'params.set', 'params.clear', 'presets.create', 'presets.load',
+export const BRIDGED = ['run', 'look', 'exportFile', 'params.set', 'params.clear', 'presets.create', 'presets.load',
   'presets.rename', 'select', 'view.set', 'lab.follow', 'files.write', 'files.edit', 'files.rename', 'files.remove'];
 export const RAW_CALL = '__call';
 // calls after which the sandbox's mirror is out of date
@@ -33,6 +33,8 @@ export function ctxOf(host) {
     overrides: typeof host.overrideValues === 'function' ? host.overrideValues() : {},
     overridesRaw: ov instanceof Map ? Object.fromEntries(ov) : { ...(ov || {}) },
     program: host.program ?? null, lastGood: host.lastGood ?? null,
+    // the files and override values of the last good compile, for the sandbox's shadow of it (JIG-013)
+    goodInputs: host.goodInputs ?? null,
     selection: host.selection ?? null, view: plainView(host.view),
     preset: presetMeta(host.preset), presets: (typeof host.presets === 'function' ? host.presets() : []).map(presetMeta),
     entry: 'script.js',

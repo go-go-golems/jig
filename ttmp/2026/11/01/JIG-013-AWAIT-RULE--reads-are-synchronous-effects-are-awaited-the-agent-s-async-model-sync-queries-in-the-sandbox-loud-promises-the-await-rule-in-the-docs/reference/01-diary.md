@@ -92,3 +92,38 @@ and a diary, then a measured batch, then a vault report pushed to go-go-parc.
 
 ### What warrants a second pair of eyes
 - The shadow depends on the page and the sandbox compiling identical inputs to identical programs. The guide makes a mismatch an error, not a wrong answer.
+
+**Commit (docs):** 285fa5a
+
+## Step 2: Phases 1 and 2, engine slots and synchronous reads in the sandbox
+
+The engine worker can now keep named Programs beside its current one, and answer on any of them synchronously
+(`callSync`). The sandbox uses that for a shadow: it compiles the inputs of the page's last good compile into its
+`shadow` slot, and `faces`, `why`, `feature`, `sketch`, `measure.area`, `params.get` and `program.ir` answer from
+it without a Promise. `check()`'s live program answers the same way from the `check` slot. `faces()` with no
+selector lists every face, and in the sandbox a selector can be a value (`faces(j.sel.faces('>Z'))`).
+
+### What I did
+- `src/engine/program.js`: `releasePrograms(...keep)`; `Program.faces()` with no selector, `''` or `'*'` returns every face.
+- `src/engine/worker.js`: `slots` (`setSlot`, `keepAll` keeps the current Program and every slot alive through `gc()`), `compileFiles` `options.slot`, `callSync(slot, method, args)`, `evalArgSync` (selector text `j.…` as a plain function over `j`, the bare names and the slot's data), `slotData`, `dropSlot`; `call` and `callSync` share `answer(P, method, a)`.
+- `src/host/host.js`: `goodInputs = { files, override }` on every successful compile. `serve.js` `ctxOf` sends it. The mock host records it too.
+- `src/agent/sandbox/runner.js`: `ensureShadow(ctx)` before each step and after each bridged call that returned a new `ctx`. It compiles `goodInputs` into the `shadow` slot when the page's `lastGood.hash` changed, and checks that the shadow's hash equals the page's (engine hashes `h:…`; the mock host's fake hash is not compared). `mirror.callSync` answers from the shadow, or throws the reason it cannot. `check()` compiles into the `check` slot; `liveProgram`'s host has `callSync` with the staleness check.
+- `src/agent/scope.js`: `ask(host, method, verb, args, shape)`, one query path that gives a value when the host has `callSync` and a Promise otherwise (the page). `why`, `faces`, `feature`, `sketch`, `program.ir`, `measure.area`, `params.get` use it. `faces(sel?)` accepts nothing, `''`, `'*'`, text, or (sandbox) a selector value. `why` and `params.get` check their argument. A message that already starts with the verb is not prefixed again (`faces: faces: …`).
+- `serve.js`: `params.get` is no longer bridged (it is a read; the sandbox answers it).
+- Tests: `test/agent/slots.test.mjs` (two slots and the current Program after three compiles; `callSync` equals `call`; selector text equals selector value; `faces()` counts every face; the same inputs give the same hash in any slot, for A-01 with an override and the two-body X-05). `sandbox.test.mjs`: reads are values, not Promises; `faces()`/`'*'`/`''`; `why`, `feature`, `params.get`, `measure.area`, selector values, `check().program`; `await` on a value; reads follow `await run()` (top face 30 → 20).
+
+### Why
+- These reads were asynchronous only because the Program was in another thread. A copy of it in the sandbox's own engine removes the port from the read path.
+
+### What worked
+- `make test-js`: 83 + 15 + 62 + 42 passing. `node tools/agent-eval.mjs --oracle`: 33/33 through the Node sandbox (two cases need `look()` and are skipped without `--look`).
+
+### What didn't work
+- My first read test assumed the mock box has non-planar faces (`faces().length > faces('%plane').length` was false: 11 and 11) and that `params.get('wall').value` is a number (it is a quantity record). It also expected `- 30\n- 20` where the YAML writes short number lists inline: `[30, 20]`.
+
+### What I learned
+- `select`, `view.set`, `presets.rename` and `lab.follow` have been asynchronous in the sandbox since JIG-012, because they are bridged to the page. They change the workbench, so they belong with the awaited calls. The rule in the guide's §3 table becomes: *reading (and editing files) is synchronous; compiling, drawing and changing the workbench — params, presets, selection, view, links, exports — is awaited.* I corrected the guide.
+
+### What warrants a second pair of eyes
+- The shadow compile happens before the step's timer matters to the person, but it counts toward the step's 25 s. A large preset adds about a second after each successful `run()`.
+- On the page (the fallback), reads stay Promises: `ask()` keeps the page's contract.

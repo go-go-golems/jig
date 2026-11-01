@@ -10,6 +10,12 @@ import * as RS from './rs/index.js';
 let J = null, BARE = null;
 let current = null;            // the last Program (kept for `call` and `export`)
 let currentScope = null;       // { j, bare, data } of the last compile, for evaluating selector text
+// Named slots (JIG-013): Programs kept beside the current one, each answering callSync(slot, …). The agent's
+// sandbox keeps 'shadow' (the page's last good compile) and 'check' (its last check()). Every slot's bodies
+// survive gc(): see keepAll().
+const slots = new Map();       // slot → { prog, scope }
+const keepAll = (...extra) => releasePrograms(current, ...[...slots.values()].map(s => s.prog), ...extra);
+const setSlot = (slot, prog, scope) => { if (!slot || slot === 'current') { current = prog; currentScope = scope; } else slots.set(slot, { prog, scope }); };
 
 export async function init(opts) {
   const t0 = performance.now();
@@ -80,7 +86,7 @@ export async function compileFiles({ files = {}, entry = 'script.js', data, opti
   RS.resetArena();   // mesh handles of the previous compile go; TriSoups still referenced rebuild on use
   const d = data ?? parseData(files, entry);
   const code = files[entry];
-  releasePrograms(current);   // programs made by the previous script may go; the current one stays until replaced
+  keepAll();   // programs made by the previous script may go; the current one and the slots stay until replaced
   if (code == null) throw new Error(`no ${entry} in files`);
   let model;
   const ts = performance.now();
@@ -92,15 +98,15 @@ export async function compileFiles({ files = {}, entry = 'script.js', data, opti
     throw Object.assign(new Error(info.message), { info, program: { ...errorProgram(info), logs } });
   }
   const scriptMs = performance.now() - ts;
-  if (model?.data && model.P) { current = model; currentScope = { data: d }; releasePrograms(model); gc(); return { program: { ...model.data, logs } }; }
+  if (model?.data && model.P) { setSlot(options.slot, model, { data: d }); keepAll(); gc(); return { program: { ...model.data, logs } }; }
   let prog;
   try { prog = compileModel(model, { override: options.override ?? null, config: options.config ?? null, fit: options.fit, seed: options.seed, layers: !!options.layers, interference: options.interference ?? null }); }
   catch (e) { return { program: { ...errorProgram({ message: e.message, stack: e.stack, kind: e.kind ?? 'compile.failed' }), logs } }; }
   prog.data.logs = logs;
   prog.data.trace.unshift({ pass: 'script', level: 'L0', ms: scriptMs, cached: false, note: `${entry} evaluated to a ${prog.data.kind}` });
-  if (options.keep === false) { releasePrograms(current); gc(); return { program: prog.data }; }   // a what-if: the current Program stays
-  current = prog; currentScope = { data: d };
-  releasePrograms(prog);
+  if (options.keep === false) { keepAll(); gc(); return { program: prog.data }; }   // a what-if: the current Program and the slots stay
+  setSlot(options.slot, prog, { data: d });
+  keepAll();
   gc();
   return { program: prog.data };
 }
@@ -134,8 +140,32 @@ async function evalArg(a) {
 }
 export async function call(method, args = []) {
   if (!current) throw new Error('nothing compiled yet');
-  const P = current;
-  const a = await Promise.all(args.map(evalArg));
+  return answer(current, method, await Promise.all(args.map(evalArg)));
+}
+
+// Selector text 'j.…' evaluated synchronously: a plain function over j, the bare names and the slot's data (the
+// async evalArg runs it as a script body, which may await; selector expressions never need to).
+function evalArgSync(a, scope) {
+  if (typeof a !== 'string' || !/^\s*j\./.test(a)) return a;
+  const names = ['j', ...Object.keys(BARE), 'data'];
+  let f;
+  try { f = (0, eval)(`(function (${names.join(', ')}) { return (${a}); })`); }
+  catch (e) { throw new Error(`cannot read the selector ${a}: ${e.message}`); }
+  return f(J, ...Object.values(BARE), scope?.data ?? {});
+}
+
+/** call(), synchronously, on a slot's Program ('current' or a named slot) (JIG-013). */
+export function callSync(slot, method, args = []) {
+  const s = !slot || slot === 'current' ? (current && { prog: current, scope: currentScope }) : slots.get(slot);
+  if (!s) throw new Error(slot && slot !== 'current' ? `nothing compiled in the ${slot} slot yet` : 'nothing compiled yet');
+  return answer(s.prog, method, args.map(a => evalArgSync(a, s.scope)));
+}
+/** The ProgramData of a slot, or null. */
+export const slotData = slot => (!slot || slot === 'current' ? current?.data : slots.get(slot)?.prog.data) ?? null;
+/** Forget a named slot (its bodies go at the next gc()). */
+export function dropSlot(slot) { slots.delete(slot); keepAll(); }
+
+function answer(P, method, a) {
   switch (method) {
     case 'why': return P.why(a[0]);
     case 'param': return P.param(a[0]);

@@ -19,7 +19,33 @@ import { makeHelp, languageKinds, methodsByKind } from '../help.js';
 import langMd from '../../../content/docs/reference.md';
 
 const IDENT = /^[A-Za-z_$][\w$]*$/;
-let generation = 0;            // which check() made the engine's current Program
+let generation = 0;            // which check() made the program in the engine's 'check' slot
+
+// The shadow (JIG-013): the page's last good compile, compiled again in this worker's 'shadow' slot from the same
+// inputs (ctx.goodInputs), so reads (faces, why, feature, sketch, measure.area, params.get, program.ir) answer
+// synchronously. Rebuilt before a step when the page's last good compile changed, and after a bridged call that
+// recompiled the page.
+const shadow = { key: null, error: 'no successful compile yet; fix the errors and run() again' };
+const keyOf = ctx => ctx.lastGood?.hash ?? (ctx.goodInputs ? JSON.stringify(ctx.goodInputs).length + ':' + hashText(JSON.stringify(ctx.goodInputs)) : null);
+function hashText(t) { let h = 2166136261; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); }
+async function ensureShadow(ctx) {
+  const key = ctx.goodInputs ? keyOf(ctx) : null;
+  if (key === shadow.key && key) return;
+  if (!ctx.goodInputs) { shadow.key = null; shadow.error = 'no successful compile yet; fix the errors and run() again'; W.dropSlot('shadow'); return; }
+  try {
+    await W.compileFiles({ files: ctx.goodInputs.files, entry: ctx.entry || 'script.js', options: { override: ctx.goodInputs.override ?? {}, slot: 'shadow' } });
+    const mine = W.slotData('shadow')?.hash, page = ctx.lastGood?.hash;
+    // the engine's hashes ('h:…') must agree: the same inputs and engine give the same program
+    if (/^h:/.test(page ?? '') && mine !== page) { shadow.key = null; shadow.error = `the sandbox's copy of the workbench's program differs from it (${mine} ≠ ${page}); reads cannot answer: report this`; return; }
+    shadow.key = key; shadow.error = null;
+  } catch (e) {
+    shadow.key = null; shadow.error = `the sandbox could not compile the workbench's last good program: ${e.message}`;
+  }
+}
+const shadowCall = (method, ...args) => {
+  if (shadow.error) throw new Error(shadow.error);
+  return W.callSync('shadow', method, args);
+};
 
 /** Serve the control port of a sandbox worker. initDefaults go into init (Node passes nothing: it reads files). */
 export function serveControl(port, initDefaults = {}) {
@@ -84,6 +110,7 @@ function mirrorHost(ctx, callRaw) {
     renameFile(from, to) { const t = files.get(from); files.delete(from); files.set(to, t); return true; },
     deleteFile(path) { return files.delete(path); },
     call: (method, ...args) => callRaw(method, args),
+    callSync: shadowCall,
     apply(c) {
       m._ctx = { ...m._ctx, ...c };
       if (c.files) { files.clear(); for (const [k, v] of Object.entries(c.files)) files.set(k, v); }
@@ -114,6 +141,7 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   const con = makeConsole(logs, markPromises);
   let queue = Promise.resolve();   // file changes the page has not confirmed yet, in order
   const refresh = c => { if (c) { ctx = { ...ctx, ...c }; mirror.apply(c); } };
+  await ensureShadow(ctx);
 
   // engine queries on the page's last compile: their results are shaped here by the scope's own code
   const callRaw = async (method, args) => {
@@ -132,6 +160,7 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
     await queue;
     const r = await call(path, args);
     refresh(r.ctx);
+    if (r.ctx) await ensureShadow(ctx);   // a recompile on the page: the reads follow it
     if (!r.ok) { const e = new Error(r.error?.message ?? `${path} failed`); if (r.error?.name && r.error.name !== 'Error') e.name = r.error.name; throw e; }
     return r.value;
   };
@@ -195,7 +224,7 @@ async function check(getCtx, variant, options = {}, wrap = p => p) {
   const o = { ...(options || {}) };
   let failedLogs;
   const r = await compileResult(async () => {
-    try { return (await W.compileFiles({ files, entry: ctx.entry || 'script.js', options: o })).program; }
+    try { return (await W.compileFiles({ files, entry: ctx.entry || 'script.js', options: { ...o, slot: 'check' } })).program; }
     catch (e) { failedLogs = e.program?.logs; throw Object.assign(new Error(e.message), e.info || {}); }
   });
   const gen = ++generation;
@@ -216,9 +245,9 @@ async function check(getCtx, variant, options = {}, wrap = p => p) {
 function liveProgram(data, gen, wrap) {
   const host = {
     program: data, lastGood: data,
-    call: async (method, ...args) => {
+    callSync: (method, ...args) => {
       if (gen !== generation) throw new Error('this program is from an earlier check(); call check() again');
-      return W.call(method, args);
+      return W.callSync('check', method, args);
     },
   };
   const p = { ...makeProgram(host), ...makeQueries(host), measure: makeMeasure(host) };

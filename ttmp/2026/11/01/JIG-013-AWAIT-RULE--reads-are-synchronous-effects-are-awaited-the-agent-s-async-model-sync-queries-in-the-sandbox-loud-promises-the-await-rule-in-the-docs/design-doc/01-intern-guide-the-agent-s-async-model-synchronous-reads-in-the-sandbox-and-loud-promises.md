@@ -80,7 +80,9 @@ sandbox to the page. Every message across a port is asynchronous.
 
 The new contract has one sentence:
 
-> **Reading is synchronous. Anything that compiles, draws, or changes the workbench returns a Promise: `await` it.**
+> **Reading (and editing files) is synchronous. Anything that compiles, draws, or changes the workbench — params, presets, selection, view, links, exports — returns a Promise: `await` it.**
+
+(Corrected during phase 2: `select`, `view.set`, `presets.rename` and `lab.follow` were bridged, and so asynchronous, since JIG-012; they change the workbench and stay in the awaited column. File edits stay synchronous because the sandbox applies them to its copy at once and the page follows in order.)
 
 | Synchronous (read) | Asynchronous (compile, draw, change) |
 |---|---|
@@ -90,9 +92,9 @@ The new contract has one sentence:
 | `why`, `faces`, `feature`, `sketch` | `params.set`, `params.clear` |
 | `measure.*` — face, edge, distance, angle, bbox, area | `presets.load`, `presets.create` |
 | `params.list`, `params.get`, `params.overrides` | `exportFile(format, o?)` |
-| `selection`, `select`, `view.get`, `view.set`, `presets.list/current/rename` | |
+| `selection`, `view.get`, `presets.list/current` | `select`, `view.set`, `presets.rename`, `lab.follow` |
 | `check().program` and all its reads | |
-| `j`, the units, `data`, `help`, `lab.*`, `log` | |
+| `j`, the units, `data`, `help`, `lab.*` links (not `lab.follow`), `log` | |
 
 Two facts make the rule safe to follow:
 

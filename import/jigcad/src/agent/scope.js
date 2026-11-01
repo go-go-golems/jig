@@ -232,18 +232,19 @@ export function makeProgram(host) {
         edges: g.edges.map(e => `${e.from} → ${e.to}${e.kind ? ' ' + e.kind : ''}`),
       };
     },
-    async ir(level = 'L1', opts = {}) {
+    ir(level = 'L1', opts = {}) {
       const L = String(level).toUpperCase();
       if (!/^L[0-6]$/.test(L)) throw new Error('program.ir: level is L0 … L6');
-      let text;
-      if (opts.node) text = await call(host, 'ir', 'program.ir', L, { node: opts.node });
-      else text = (good(host, 'program.ir').ir || {})[L];
-      if (typeof text !== 'string') text = text == null ? '' : String(text);
-      if (opts.from != null) {
-        const lines = text.split('\n'); const a = Math.max(1, opts.from), b = Math.min(lines.length, opts.to ?? a + 59);
-        return lines.slice(a - 1, b).map((l, i) => `${a + i}  ${l}`).join('\n');
-      }
-      return text;
+      const shape = t => {
+        let text = typeof t === 'string' ? t : t == null ? '' : String(t);
+        if (opts.from != null) {
+          const lines = text.split('\n'); const a = Math.max(1, opts.from), b = Math.min(lines.length, opts.to ?? a + 59);
+          text = lines.slice(a - 1, b).map((l, i) => `${a + i}  ${l}`).join('\n');
+        }
+        return text;
+      };
+      if (opts.node) return ask(host, 'ir', 'program.ir', [L, { node: opts.node }], shape);
+      return asHost(host, shape((good(host, 'program.ir').ir || {})[L]));
     },
     bodies() {
       return (good(host, 'program.bodies').bodies || []).map(b => ({ id: b.id, part: b.part, faceCount: (b.faces || []).length, edgeCount: (b.edges || []).length, bbox: b.bbox && b.bbox.map(v3) }));
@@ -256,11 +257,28 @@ export function makeProgram(host) {
   };
 }
 
+const prefixed = (verb, e) => { const m = (e && (e.message || (e.error && e.error.message))) || String(e); return new Error(m.startsWith(`${verb}:`) ? m : `${verb}: ${m}`); };
 async function call(host, method, verb, ...args) {
   if (typeof host.call !== 'function') throw new Error(`${verb}: the engine is not ready`);
   try { return await host.call(method, ...args); }
-  catch (e) { const m = (e && (e.message || (e.error && e.error.message))) || String(e); throw new Error(`${verb}: ${m}`); }
+  catch (e) { throw prefixed(verb, e); }
 }
+/**
+ * One query path (JIG-013): a value when the host answers synchronously (host.callSync: the sandbox, over its
+ * shadow of the page's program or a check()'s program), a Promise when it does not (the page, whose engine is in
+ * a worker). shape(v) turns the engine's answer into the scope's.
+ */
+function ask(host, method, verb, args, shape = v => v) {
+  if (typeof host.callSync === 'function') {
+    let v;
+    try { v = host.callSync(method, ...args); } catch (e) { throw prefixed(verb, e); }
+    return shape(v);
+  }
+  return call(host, method, verb, ...args).then(shape);
+}
+/** v as the host's queries give it: as it is when they are synchronous, else as a Promise (the page's contract). */
+const asHost = (host, v) => (typeof host.callSync === 'function' ? v : Promise.resolve(v));
+const isSelector = v => v && typeof v === 'object' && !Array.isArray(v);
 
 // ── faces, edges and measurement on the compiled bodies ──────────────────────
 function applyPoint(t, p) {
@@ -383,17 +401,19 @@ export function makeMeasure(host) {
       }
       return { min: v3(min), max: v3(max), size: v3(max.map((x, i) => x - min[i])), unit: 'mm' };
     },
-    async area(namesOrSelector) {
+    area(namesOrSelector) {
       const list = [].concat(namesOrSelector);
-      let faces = [];
+      const faces = [], queries = [];
       for (const n of list) {
         const t = typeof n === 'string' ? findTopo(host, n, 'measure.area') : null;
         if (t && t.type === 'face') faces.push(t.face);
         else if (t && t.type === 'faces') faces.push(...t.pieces.map(x => x.face));
-        else if (typeof n === 'string') faces.push(...resolveFaces(host, await call(host, 'faces', 'measure.area', n) || []));
+        else if (typeof n === 'string') queries.push(n);
+        else throw new TypeError(`measure.area: give face names or a selector as text, such as '%plane' (got ${n === null ? 'null' : typeof n})`);
       }
-      const sum = faces.reduce((s, f) => s + (f.area || 0), 0);
-      return { area: r3(sum), unit: 'mm²', faces: faces.length };
+      const total = more => { const all = [...faces, ...more]; return { area: r3(all.reduce((s, f) => s + (f.area || 0), 0)), unit: 'mm²', faces: all.length }; };
+      if (typeof host.callSync === 'function') return total(queries.flatMap(q => resolveFaces(host, ask(host, 'faces', 'measure.area', [q]) || [])));
+      return Promise.all(queries.map(q => call(host, 'faces', 'measure.area', q))).then(rs => total(rs.flatMap(r => resolveFaces(host, r || []))));
     },
     distance(a, b) {
       const A = geomOf(host, a, 'measure.distance'), B = geomOf(host, b, 'measure.distance');
@@ -458,21 +478,27 @@ function makeLab(host, guard) {
 /** why, faces, feature, sketch on a host's compiled program (the page's, or a live check() in the sandbox). */
 export function makeQueries(host) {
   return {
-    why: target => call(host, 'why', 'why', target),
-    async faces(selectorText) {
-      optionalText('faces', selectorText, 'a selector', "'%plane' or '>Z'");
-      const r = await call(host, 'faces', 'faces', selectorText);
-      return Array.isArray(r) ? resolveFaces(host, r).map(f => (f && typeof f === 'object' ? { name: f.name, kind: f.kind, area: r3(f.area), center: v3(f.center), ...(f.normal ? { normal: v3(f.normal) } : {}), ...(f.axis ? { radius: r3(f.axis.radius) } : {}) } : f)) : r;
+    why: target => {
+      if (!(typeof host.callSync === 'function' && isSelector(target))) textArg('why', target, 'a selector, a face name, \'param:name\' or \'feature:id\'', "'>Z' or 'body/end'");
+      return ask(host, 'why', 'why', [target]);
     },
-    feature: id => call(host, 'feature', 'feature', textArg('feature', id, 'the feature id', "'fillet1'")),
-    async sketch(id) {
+    // faces() or faces('*'): every face; a selector value (j.sel.faces('>Z')) works where the host is in the same realm
+    faces(sel) {
+      const all = sel == null || sel === '' || sel === '*';
+      if (!all && !(typeof host.callSync === 'function' && isSelector(sel))) textArg('faces', sel, 'a selector (or nothing, for every face)', "'%plane' or '>Z'");
+      return ask(host, 'faces', 'faces', all ? [] : [sel], r => (Array.isArray(r) ? resolveFaces(host, r).map(f => (f && typeof f === 'object' ? { name: f.name, kind: f.kind, area: r3(f.area), center: v3(f.center), ...(f.normal ? { normal: v3(f.normal) } : {}), ...(f.axis ? { radius: r3(f.axis.radius) } : {}) } : f)) : r));
+    },
+    feature: id => ask(host, 'feature', 'feature', [textArg('feature', id, 'the feature id', "'fillet1'")]),
+    sketch(id) {
       textArg('sketch', id, 'the sketch id', "'s1'");
-      try { return await call(host, 'sketch', 'sketch', id); }
-      catch (e) {
+      // from the program data when the engine has no live record of it
+      const fromData = e => {
         const s = (good(host, 'sketch').sketches || []).find(x => x.id === id);
         if (!s) throw e;
         return { id: s.id, dof: s.dof, status: s.status, conflicts: s.conflicts, entities: s.entities.map(x => ({ id: x.id, kind: x.kind, dofFree: x.dofFree })), constraints: s.constraints.map(c => ({ id: c.id, kind: c.kind, refs: c.refs, status: c.status })) };
-      }
+      };
+      if (typeof host.callSync === 'function') { try { return ask(host, 'sketch', 'sketch', [id]); } catch (e) { return fromData(e); } }
+      return call(host, 'sketch', 'sketch', id).catch(fromData);
     },
   };
 }
@@ -516,7 +542,7 @@ export function labScope(host, { readOnly = false, console: con, images = null }
 
   const params = {
     list: glob => program.params(glob),
-    async get(name) { return call(host, 'param', 'params.get', name); },
+    get(name) { return ask(host, 'param', 'params.get', [textArg('params.get', name, 'the param name', "'wall'")]); },
     overrides() { const o = host.overrides; return o instanceof Map ? Object.fromEntries(o) : { ...(o || {}) }; },
     async set(name, value) {
       if (typeof name !== 'string') throw new Error('params.set: give the param name and a value (a number in its unit, or text such as "80 mm")');

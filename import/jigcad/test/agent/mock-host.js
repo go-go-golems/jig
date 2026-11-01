@@ -133,7 +133,7 @@ export function createMockHost({ delay = 5, preset = PRESET } = {}) {
       host.compiling = true; host.emit('compiling', true);
       await new Promise(r => setTimeout(r, delay));
       const p = compileBox(Object.fromEntries(host.files), { override: host.overrides });
-      host.program = p; if (p.ok) host.lastGood = p;
+      host.program = p; if (p.ok) { host.lastGood = p; host.goodInputs = { files: Object.fromEntries(host.files), override: { ...(host.overrides instanceof Map ? Object.fromEntries(host.overrides) : host.overrides || {}) } }; }
       host.compiling = false; host.emit('program', p);
       return p;
     },

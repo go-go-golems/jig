@@ -199,6 +199,12 @@ export class Program {
   // Resolve a selector (value, 'j.…' text, query text like '>Z' or '%cylinder and +Z', or a persistent name)
   // to face records { name, body, index, kind, area, center, normal?, axis? } (body-local coordinates).
   faces(sel, opts = {}) {
+    // no selector (or '*'): every face of every body (JIG-013)
+    if (sel == null || sel === '' || sel === '*') {
+      const all = [];
+      for (const p of this.P.parts) for (const b of p.res.state.bodies) b.names.forEach((n, i) => all.push(this._record({ body: b, index: i, name: n }, 'faces')));
+      return opts.names ? all.map(r => r.name) : all;
+    }
     let s = sel instanceof FeatureRef ? sel.faces() : sel;
     if (typeof s === 'string') {
       const hits = [];
@@ -296,7 +302,8 @@ export function genealogy(name) {
 }
 
 // Forget every kept Program except `keepOnly` (called by the worker before each compile).
-export function releasePrograms(keepOnly = null) { livePrograms.clear(); if (keepOnly) livePrograms.add(keepOnly); }
+// keep: the Programs whose bodies must survive the next gc() (the worker's current one, and its named slots)
+export function releasePrograms(...keep) { livePrograms.clear(); for (const p of keep) if (p) livePrograms.add(p); }
 // Free kernel bodies not reachable from the cache or the live programs.
 export function gc() {
   const keep = [];

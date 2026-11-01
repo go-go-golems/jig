@@ -311,7 +311,8 @@ export class Host {
     let program;
     try {
       this._checkData(files);
-      const reply = await this.engine.request('compile', { files, entry: 'script.js', options: { override: this.overrideValues() } });
+      var override = this.overrideValues();
+      const reply = await this.engine.request('compile', { files, entry: 'script.js', options: { override } });
       program = reply.program;
       if (!program || typeof program !== 'object') throw new Error('the engine returned no program');
       program.roundTripMs = performance.now() - t0;
@@ -323,7 +324,8 @@ export class Host {
     if (seq !== this._seq) return program;            // a newer compile was asked for; drop this one
     this.compiling = false;
     this.program = program;
-    if (program.ok !== false) this.lastGood = program;
+    // the inputs of the last good compile: the agent's sandbox compiles them again to answer reads (JIG-013)
+    if (program.ok !== false) { this.lastGood = program; this.goodInputs = { files, override: override ?? {} }; }
     this._compiled = key;
     this.dirty = this._compiled !== JSON.stringify(Object.fromEntries(this.files));
     this._refreshSelection();

@@ -86,3 +86,20 @@ test('the language is the engine\'s own j: members of its functions and its guar
   assert.match(await run(host, 'return j.bx'), /^TypeError: j\.bx does not exist\. Did you mean j\.box/);
   assert.equal(await run(host, 'return Math.round(j.q.sin(deg(30)) * 1e6) / 1e6'), '0.5');
 });
+
+test('reads are synchronous in the sandbox (JIG-013): the shadow of the page\'s program, and check()\'s program', async () => {
+  const host = await fresh();
+  assert.equal(await run(host, "return faces('%plane').length > 0 && !(faces('%plane') instanceof Promise)"), 'true');
+  assert.equal(await run(host, "return faces().length === faces('*').length && faces().length >= faces('%plane').length && faces('').length === faces().length"), 'true');
+  assert.match(await run(host, "return why('>Z').kind"), /^faces$/);
+  assert.equal(await run(host, "return typeof feature('body').id"), 'string');
+  assert.equal(await run(host, "return params.get('wall').text"), '2 mm');
+  assert.equal(await run(host, "return measure.area('%plane').faces > 0"), 'true');
+  assert.equal(await run(host, "return faces(j.sel.faces('>Z')).length === faces('>Z').length"), 'true');
+  assert.equal(await run(host, "const r = await check(); return r.program.faces('%plane').length === faces('%plane').length"), 'true');
+  // await on a value is harmless
+  assert.equal(await run(host, "return (await faces('%plane')).length > 0"), 'true');
+  // after run() the reads follow the page's new compile
+  const t = await run(host, "const before = faces('>Z')[0].center[2]; files.edit('script.js', 'h: mm(30)', 'h: mm(20)'); await run(); return [before, faces('>Z')[0].center[2]]");
+  assert.equal(t, '[30, 20]');
+});
