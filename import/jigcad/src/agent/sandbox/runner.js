@@ -12,7 +12,7 @@
 // never awaited. Keys a step adds to globalThis are removed after it, so steps do not leak into each other.
 import * as W from '../../engine/worker.js';
 import { compileStep, trackScope, guardScope, withHints, makeConsole, formatResult, markPromises, promiseNotes, cut } from '../evaltool.js';
-import { labScope, makeProgram, makeMeasure, makeQueries, compileResult, flatMetrics } from '../scope.js';
+import { labScope, makeProgram, makeMeasure, makeQueries, compileResult, flatMetrics, summaryOf, logsOf } from '../scope.js';
 import { listen, closePort } from './ports.js';
 import { guard, HELP } from '../../engine/guard.js';
 import { makeHelp, languageKinds, methodsByKind } from '../help.js';
@@ -189,18 +189,21 @@ async function check(getCtx, variant, options = {}) {
   else if (variant != null) throw new Error('check: give the script text, or { path: text } for the files to change, or nothing for the current files');
   // at the script's own values, as the page's check() always was; options.override applies the overrides given
   const o = { ...(options || {}) };
+  let failedLogs;
   const r = await compileResult(async () => {
     try { return (await W.compileFiles({ files, entry: ctx.entry || 'script.js', options: o })).program; }
-    catch (e) { throw Object.assign(new Error(e.message), e.info || {}); }
+    catch (e) { failedLogs = e.program?.logs; throw Object.assign(new Error(e.message), e.info || {}); }
   });
   const gen = ++generation;
   const out = { ok: r.ok, ms: r.ms, errors: r.errors };
   if (r.p && r.ok) {
     out.warnings = r.warnings;
-    out.summary = { ok: true, kind: r.p.kind, name: r.p.name, ...(r.p.summary || {}) };
+    out.summary = summaryOf(r.p);
     out.metrics = flatMetrics(r.p);
     out.program = liveProgram(r.p, gen);
   }
+  const logs = logsOf(r.p) ?? (failedLogs?.length ? failedLogs : undefined);
+  if (logs) out.logs = logs;
   return out;
 }
 

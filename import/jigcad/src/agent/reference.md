@@ -58,7 +58,7 @@ The files are copied before each step; when a step changes a file, the step offe
 
 <!-- agent-scope -->
 
-Which world a number comes from: `run()` and `program.*` describe the open program, with the Params view's overrides; `check()` compiles the files you give at the script's own values unless `options.override` says otherwise. Metrics say their fidelity: `exact` for the B-rep, `approx` for meshes and as-printed models, `heuristic` for proxies that need calibrating.
+Which world a number comes from: `run()` and `program.*` describe the open program, with the Params view's overrides; `check()` compiles the files you give at the script's own values unless `options.override` says otherwise. Metrics are plain numbers in their units; `program.metrics({ detail: true })` says each one's unit and fidelity: `exact` for the B-rep, `approx` for meshes and as-printed models, `heuristic` for proxies that need calibrating. In a script, `log(…)` (or `console.log`) reports a value it computed: the lines come back as `logs` in `run()` and `check()`.
 
 ## lab: links
 

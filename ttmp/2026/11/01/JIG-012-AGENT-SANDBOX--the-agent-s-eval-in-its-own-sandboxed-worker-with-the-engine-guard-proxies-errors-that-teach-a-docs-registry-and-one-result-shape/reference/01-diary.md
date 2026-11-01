@@ -273,3 +273,46 @@ should lead somewhere real.
 
 ### Code review instructions
 - `src/agent/docs.js`, `src/agent/help.js`, `src/agent/langdocs.js`; `node --test import/jigcad/test/agent/docs.test.mjs`.
+
+**Commit (code):** 6cdc273
+
+## Step 6: Phase 4, one result shape
+
+Every result that describes a compile now has one shape. `run().summary`, `check().summary` and
+`program.summary()` are the same object. `program.metrics()` gives plain numbers, and `{ detail: true }` gives
+`{ value, unit, fidelity }`. `program.bodies()` names its counts `faceCount` and `edgeCount`. A script can call
+`log(…)` (or `console.log`), and the lines come back as `logs` in `run()` and `check()`, so a script can report a
+value it computed. This answers JIG-011's finding that the agent encoded answers in a bounding box or an error
+message. No backward compatibility is kept (decision 3).
+
+### Prompt context
+
+**User prompt (verbatim):** see Step 1.
+
+**Assistant interpretation:** phase 4 of the plan (§9 of the guide).
+
+**Inferred user intent:** the agent should not have to learn three shapes for one thing.
+
+### What I did
+- `src/agent/scope.js`: `summaryOf(p)` and `logsOf(p)`. `run()`, the page's `check()`, and `program.summary()` use them. `program.metrics(names?, { detail })` or `metrics({ names, detail })`; an unknown name throws with the list of metrics. `program.bodies()` returns `faceCount` and `edgeCount`.
+- `src/agent/sandbox/runner.js`: `check()` builds its summary with `summaryOf`, and returns `logs` from a script that failed too (from the error's program).
+- `src/engine/worker.js`: `runScript` gets `log` and `console` (log, info, debug, warn: …, error: …) through `extra`. Lines are formatted with the value's own `toString` (quantities as `2.4 mm`), otherwise JSON with numbers to 5 decimals; at most 100 lines of 400 characters. `program.logs` is on every compile result, including error programs.
+- `src/agent/hints.js`: `m.volume.value` that reads undefined, or a NaN or undefined in a result from code that reads `metrics(…).x.value`, gets a note saying the metrics are plain numbers now.
+- Registry rows (run, check, program.summary, program.metrics, program.bodies), the reference's paragraph on metrics and `log`, and the prompt's fidelity line are updated.
+- Tests: `scope.test.mjs` (plain and detail metrics, unknown metric, `faceCount`); `turn.test.mjs` STEP2 reads `.mass`; `sandbox.test.mjs` gains the shape contract (summary equality, plain metrics, `logs` from a passing and a failing script, the `.value` note).
+
+### Why
+- In the history, `program.metrics().volume` appears in 355 steps, written with and without `.value`, and `program.bodies()` returned counts under names that suggest lists (`faces: 11`). One shape removes a class of read-of-undefined and NaN results.
+
+### What worked
+- `make test-js`: 78 + 15 + 62 + 42 passing; presets 72/72.
+- `check()` of a script with `log("wall", mm(2).add(mm(0.4)), { n: 3 })` returns `logs: ['wall 2.4 mm {"n":3}']`. A script that logs and then throws returns `ok: false` with its `logs`.
+
+### What didn't work
+- Nothing failed in this step. Note that a script that declares its own `log` or `console` would now fail with "Identifier has already been declared". None of the 72 presets, the book, the guides or the engine scripts do.
+
+### What warrants a second pair of eyes
+- On the page, a script that throws loses its logs: the host's compile rejects, and `compileResult` gets no program. Only the sandbox's `check()` keeps them. The agent's `check()` runs in the sandbox, so the agent's path has them.
+
+### Code review instructions
+- `summaryOf`/`logsOf`/`metrics` in `src/agent/scope.js`, `scriptLog` in `src/engine/worker.js`; `node --test import/jigcad/test/agent/sandbox.test.mjs import/jigcad/test/agent/scope.test.mjs`.

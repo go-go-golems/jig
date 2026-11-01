@@ -10,7 +10,7 @@ import { createMockHost } from './mock-host.js';
 const reference = readFileSync(new URL('../../src/agent/reference.md', import.meta.url), 'utf8');
 
 export const STEP1 = "return files.grep('wall', 'script.js');";
-export const STEP2 = "const before = program.metrics('mass').mass.value;\nfiles.edit('script.js', 'wall: mm(2)', 'wall: mm(2.4)');\nconst r = await run();\nreturn { ok: r.ok, errors: r.errors, before, after: program.metrics('mass').mass.value };";
+export const STEP2 = "const before = program.metrics('mass').mass;\nfiles.edit('script.js', 'wall: mm(2)', 'wall: mm(2.4)');\nconst r = await run();\nreturn { ok: r.ok, errors: r.errors, before, after: program.metrics('mass').mass };";
 export const ANSWER = 'I changed the wall from 2 to 2.4 mm at [script.js:2](lab:open?file=script.js&line=2) and recompiled.';
 
 // The scripted model: records what it receives, calls eval twice, streams the answer.
@@ -71,7 +71,7 @@ test('a two-step turn: instructions once, context every time, earlier steps as o
   assert.ok(!msgs[0].content.startsWith('[context]'));
   assert.ok(msgs[0].content.startsWith('You are the coding agent inside jigcad'));
   assert.equal(msgs[1].content.split('\n')[0], `[eval] return files.grep('wall', 'script.js'); → - "script.js:2 .params({ w: mm(60), d: mm(40), h: mm(30), wall: mm(2) })" - "script.js:4 .shell(j.feat('body').endFace(), 'wall', { id: 'shell' })"`);
-  assert.match(msgs[1].content.split('\n')[1], /^\[eval\] const before = program\.metrics\('mass'\)\.mass\.value; → ok: true errors: \[\] before: 19\.28448 after: 22\.7814$/);
+  assert.match(msgs[1].content.split('\n')[1], /^\[eval\] const before = program\.metrics\('mass'\)\.mass; → ok: true errors: \[\] before: 19\.28448 after: 22\.7814$/);
   assert.ok(msgs[1].content.endsWith(ANSWER));
   assert.ok(msgs[2].content.startsWith('[context]'));
   assert.ok(msgs[2].content.includes('files: notes.md, script.js* (* edited)'));

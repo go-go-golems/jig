@@ -149,6 +149,11 @@ function compactDiag(d) {
   if (d.fix) o.fix = d.fix;
   return o;
 }
+/** The one summary shape (JIG-012): program.summary(), run().summary and check().summary are this object. */
+export function summaryOf(p) { return { ok: p.ok !== false, kind: p.kind, name: p.name, ...(p.summary || {}) }; }
+/** The script's log() lines of a compile, or undefined when it logged nothing. */
+export const logsOf = p => (p && Array.isArray(p.logs) && p.logs.length ? p.logs : undefined);
+
 export function flatMetrics(p) {
   const out = {};
   for (const [k, m] of Object.entries((p && p.metrics) || {})) out[k] = m && typeof m === 'object' && 'value' in m ? m.value : m;
@@ -183,15 +188,22 @@ const globRe = g => new RegExp('^' + String(g).replace(/[.+^${}()|\\]/g, '\\$&')
 
 export function makeProgram(host) {
   return {
-    summary() { const p = prog(host, 'program.summary'); return { ok: p.ok !== false, kind: p.kind, name: p.name, ...(p.summary || {}) }; },
-    metrics(names) {
+    summary() { return summaryOf(prog(host, 'program.summary')); },
+    // plain numbers in their units ({ volume: 15552, mass: 19.28, bbox: [60, 40, 30] }); { detail: true } gives
+    // { value, unit, fidelity } per metric. metrics(names?, opts?) or metrics({ names?, detail? })
+    metrics(a, b) {
       const p = good(host, 'program.metrics');
+      const isOpts = a && typeof a === 'object' && !Array.isArray(a);
+      const names = isOpts ? a.names : a, detail = !!(isOpts ? a.detail : b?.detail);
+      if (names != null && typeof names !== 'string' && !Array.isArray(names)) throw new TypeError('program.metrics: give a metric name, a list of names, or { names, detail }');
       const want = names == null ? null : new Set([].concat(names));
       const out = {};
       for (const [k, m] of Object.entries(p.metrics || {})) {
         if (want && !want.has(k)) continue;
-        out[k] = m && typeof m === 'object' ? { value: m.value, unit: m.unit, fidelity: m.fidelity } : m;
+        const obj = m && typeof m === 'object' && 'value' in m;
+        out[k] = detail ? (obj ? { value: m.value, unit: m.unit, fidelity: m.fidelity } : { value: m }) : (obj ? m.value : m);
       }
+      if (want) { const missing = [...want].filter(k => !(k in out)); if (missing.length) throw new Error(`program.metrics: no metric ${missing.join(', ')}; metrics are ${Object.keys(p.metrics || {}).join(', ')}`); }
       return out;
     },
     diagnostics(level) {
@@ -234,7 +246,7 @@ export function makeProgram(host) {
       return text;
     },
     bodies() {
-      return (good(host, 'program.bodies').bodies || []).map(b => ({ id: b.id, part: b.part, faces: (b.faces || []).length, edges: (b.edges || []).length, bbox: b.bbox && b.bbox.map(v3) }));
+      return (good(host, 'program.bodies').bodies || []).map(b => ({ id: b.id, part: b.part, faceCount: (b.faces || []).length, edgeCount: (b.edges || []).length, bbox: b.bbox && b.bbox.map(v3) }));
     },
     print() {
       const pr = good(host, 'program.print').print;
@@ -481,7 +493,9 @@ export function labScope(host, { readOnly = false, console: con, images = null }
   async function run() {
     const r = await compileResult(() => host.compile());
     const out = { ok: r.ok, ms: r.ms, errors: r.errors };
-    if (r.p && r.ok) { out.warnings = r.warnings; out.summary = r.p.summary || {}; }
+    if (r.p && r.ok) { out.warnings = r.warnings; out.summary = summaryOf(r.p); }
+    const logs = logsOf(r.p);
+    if (logs) out.logs = logs;
     return out;
   }
 
@@ -494,7 +508,9 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     if (typeof host.check !== 'function') throw new Error('check: the workbench cannot compile variants yet');
     const r = await compileResult(() => host.check(files0, options));
     const out = { ok: r.ok, ms: r.ms, errors: r.errors };
-    if (r.p && r.ok) { out.warnings = r.warnings; out.summary = r.p.summary || {}; out.metrics = flatMetrics(r.p); }
+    if (r.p && r.ok) { out.warnings = r.warnings; out.summary = summaryOf(r.p); out.metrics = flatMetrics(r.p); }
+    const logs = logsOf(r.p);
+    if (logs) out.logs = logs;
     return out;
   }
 

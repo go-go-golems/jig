@@ -84,17 +84,19 @@ export async function compileFiles({ files = {}, entry = 'script.js', data, opti
   if (code == null) throw new Error(`no ${entry} in files`);
   let model;
   const ts = performance.now();
-  try { model = await runScript(code, { data: d, file: entry }); }
+  const logs = [];
+  try { model = await runScript(code, { data: d, file: entry, extra: scriptLog(logs) }); }
   catch (e) {
     // script errors are failed replies with the position in script.js (and an error program for display)
     const info = e.info ?? { message: e.message, file: entry };
-    throw Object.assign(new Error(info.message), { info, program: errorProgram(info) });
+    throw Object.assign(new Error(info.message), { info, program: { ...errorProgram(info), logs } });
   }
   const scriptMs = performance.now() - ts;
-  if (model?.data && model.P) { current = model; currentScope = { data: d }; releasePrograms(model); gc(); return { program: model.data }; }
+  if (model?.data && model.P) { current = model; currentScope = { data: d }; releasePrograms(model); gc(); return { program: { ...model.data, logs } }; }
   let prog;
   try { prog = compileModel(model, { override: options.override ?? null, config: options.config ?? null, fit: options.fit, seed: options.seed, layers: !!options.layers, interference: options.interference ?? null }); }
-  catch (e) { return { program: errorProgram({ message: e.message, stack: e.stack, kind: e.kind ?? 'compile.failed' }) }; }
+  catch (e) { return { program: { ...errorProgram({ message: e.message, stack: e.stack, kind: e.kind ?? 'compile.failed' }), logs } }; }
+  prog.data.logs = logs;
   prog.data.trace.unshift({ pass: 'script', level: 'L0', ms: scriptMs, cached: false, note: `${entry} evaluated to a ${prog.data.kind}` });
   if (options.keep === false) { releasePrograms(current); gc(); return { program: prog.data }; }   // a what-if: the current Program stays
   current = prog; currentScope = { data: d };
@@ -102,6 +104,25 @@ export async function compileFiles({ files = {}, entry = 'script.js', data, opti
   gc();
   return { program: prog.data };
 }
+// log(…) and console.log/warn/error/info in a script (JIG-012): lines for the compile's result (program.logs), so a
+// script can report a value it computed; at most 100 lines of 400 characters
+const LOG_LINES = 100, LOG_CHARS = 400;
+const logText = v => {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object' && typeof v.toString === 'function' && v.toString !== Object.prototype.toString) { try { const t = String(v); if (!t.startsWith('[object')) return t; } catch { /* JSON */ } }
+  try { return JSON.stringify(v, (k, x) => (x && typeof x === 'object' && typeof x.toString === 'function' && x.toString !== Object.prototype.toString && !Array.isArray(x) && Object.getPrototypeOf(x) !== Object.prototype ? String(x) : typeof x === 'number' ? +x.toFixed(5) : x)) ?? String(v); } catch { return String(v); }
+};
+function scriptLog(logs) {
+  const put = prefix => (...a) => {
+    if (logs.length === LOG_LINES) logs.push(`… more lines not kept`);
+    if (logs.length > LOG_LINES) return;
+    const line = prefix + a.map(logText).join(' ');
+    logs.push(line.length > LOG_CHARS ? line.slice(0, LOG_CHARS) + '…' : line);
+  };
+  const log = put('');
+  return { log, console: { log, info: log, debug: log, warn: put('warn: '), error: put('error: ') } };
+}
+
 function errorProgram(info) {
   return { ok: false, hash: null, kind: 'error', name: 'error', summary: { errors: 1 }, metrics: {}, diagnostics: [{ level: 'error', kind: info.kind ?? 'script.error', at: info.file ?? 'script.js', message: info.message, line: info.line, column: info.column }],
     trace: [], decisions: [], params: [], graph: { nodes: [], edges: [] }, sketches: [], bodies: [], print: null, ir: { L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '' }, error: info };

@@ -35,7 +35,9 @@ export function hintsFor({ error, text = '', code = '', names = [], j = null, me
   } else if (error?.name === 'TypeError' && (m = /^Cannot read properties of (undefined|null) \(reading '([^']+)'\)$/.exec(msg))) {
     out.push(readOfUndefined(m[1], m[2], code, line));
   }
-  if (!error && /(^|[\s:[,])NaN($|[\s,\]])/m.test(text)) {
+  if (!error && /(^|[\s:[,])(NaN|undefined)($|[\s,\]])/m.test(text) && /metrics\([^)]*\)[\w.[\]'"]*\.value\b|\.metrics\.\w+\.value\b/.test(code)) {
+    out.push('note: NaN or undefined in the result: program.metrics() and check().metrics give plain numbers (m.volume, not m.volume.value); program.metrics({ detail: true }) gives { value, unit, fidelity }.');
+  } else if (!error && /(^|[\s:[,])NaN($|[\s,\]])/m.test(text)) {
     out.push("note: NaN in the result: arithmetic mixed a quantity with a missing value (undefined) or with a string. Give numbers with q.in('mm'), and check the fields read exist.");
   }
   return out.filter(Boolean);
@@ -72,6 +74,9 @@ function readOfUndefined(what, prop, code, line) {
   for (const l of lines) { const m = re.exec(l); re.lastIndex = 0; if (m) { found = m[1]; break; } }
   if (found) {
     const last = found.split('.').pop();
+    if (last === 'value' && /metrics\(/.test(code)) {
+      return `note: ${found} is ${what}: program.metrics() and check().metrics give plain numbers (m.volume, not m.volume.value); program.metrics({ detail: true }) gives { value, unit, fidelity }.`;
+    }
     if (RESULT_KEYS.has(last)) {
       return `note: ${found} is ${what}. check() and run() give summary, metrics and program only when the script compiles (ok: true); when it fails they give errors. Test r.ok first, or return r.errors.`;
     }

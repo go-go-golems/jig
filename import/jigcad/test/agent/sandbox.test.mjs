@@ -65,3 +65,17 @@ test('the eval tool runs its steps in the sandbox when it has one', async () => 
   const pageTool = createEvalTool(host, {});
   assert.match(await pageTool.execute({ code: 'return mm(1)' }), /^ReferenceError: mm is not defined/);
 });
+
+test('one result shape: summary as program.summary(), plain metrics, logs from the script (JIG-012 phase 4)', async () => {
+  const host = await fresh();
+  const same = await run(host, 'const r = await check(); return JSON.stringify(r.summary) === JSON.stringify(r.program.summary()) && JSON.stringify((await run()).summary) === JSON.stringify(program.summary())');
+  assert.equal(same, 'true');
+  assert.match(await run(host, 'return typeof program.metrics().volume'), /^number$/);
+  assert.match(await run(host, "return program.metrics('volume', { detail: true }).volume.fidelity"), /^exact$/);
+  assert.match(await run(host, 'return Object.keys(program.bodies()[0])'), /- faceCount\n- edgeCount/);
+  const logged = await run(host, "const r = await check(files.read('script.js').replace('return box', 'log(\"wall\", mm(2).add(mm(0.4)), { n: 3 })\\nreturn box')); return r.logs");
+  assert.equal(logged, '- "wall 2.4 mm {\\"n\\":3}"');
+  const failed = await run(host, "const r = await check('log(\"before\")\\nthrow new Error(\"no\")'); return { ok: r.ok, logs: r.logs }");
+  assert.match(failed, /ok: false\nlogs:\n {2}- before/);
+  assert.match(await run(host, 'return { v: program.metrics().volume.value }'), /note: NaN or undefined in the result: program\.metrics\(\) and check\(\)\.metrics give plain numbers/);
+});

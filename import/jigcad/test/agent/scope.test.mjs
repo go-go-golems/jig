@@ -41,13 +41,16 @@ test('run and check report { ok, errors } and numbers; check leaves the editor a
 
 test('program helpers', async () => {
   const { s } = await setup();
-  assert.deepEqual(s.program.metrics('mass'), { mass: { value: 15552 * 1.24e-3, unit: 'g', fidelity: 'exact' } });
+  assert.deepEqual(s.program.metrics('mass'), { mass: 15552 * 1.24e-3 });
+  assert.deepEqual(s.program.metrics('mass', { detail: true }), { mass: { value: 15552 * 1.24e-3, unit: 'g', fidelity: 'exact' } });
+  assert.deepEqual(s.program.metrics({ names: ['mass'], detail: true }).mass.unit, 'g');
+  assert.throws(() => s.program.metrics('nope'), /program\.metrics: no metric nope; metrics are /);
   assert.equal(s.program.params('w*').length, 2);
   assert.deepEqual(s.program.graph().edges, ['base → body profile', 'body → shell body']);
   assert.equal(s.program.diagnostics('info')[0].kind, 'fit.uncalibrated');
   assert.equal((await s.program.ir('L2')).split('\n')[0], 'w = 60 mm');
   assert.equal(await s.program.ir('L4', { node: 'shell', from: 1, to: 1 }), '1  L4 of shell:');
-  assert.deepEqual(s.program.bodies()[0], { id: 'box/body1', part: 'box', faces: 11, edges: 2, bbox: [[-30, -20, 0], [30, 20, 30]] });
+  assert.deepEqual(s.program.bodies()[0], { id: 'box/body1', part: 'box', faceCount: 11, edgeCount: 2, bbox: [[-30, -20, 0], [30, 20, 30]] });
 });
 
 test('queries, measurement and selection', async () => {
