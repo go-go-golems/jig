@@ -213,14 +213,22 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 
 	started := time.Now()
 	var usage sample.Usage
+	rounds := 0
 	var toolUses atomic.Int32 // tools of one round run in parallel
+	// callUsage is the call's token usage so far; it ends the result and error events (this server's page belongs to
+	// its operator, unlike slop's untrusted apps, and the evaluation harness reads it).
+	callUsage := func() *usageOut {
+		return &usageOut{Input: usage.Input, CacheRead: usage.CacheRead, CacheWrite: usage.CacheWrite, Output: usage.Output,
+			Rounds: rounds, ToolCalls: int(toolUses.Load()), Model: usage.Model}
+	}
 	var outcome string
 	emit := func(e sample.Event) {
 		switch e.Type {
 		case "text", "thinking":
 			send(e.Type, map[string]string{"text": e.Text, "delta": e.Delta})
 		case "usage":
-			if e.Usage != nil { // kept in the server log, never sent to the page
+			if e.Usage != nil { // summed per call: the log line and the result's usage
+				rounds++
 				usage.Input += e.Usage.Input
 				usage.Output += e.Usage.Output
 				usage.CacheRead += e.Usage.CacheRead
@@ -229,12 +237,12 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 			}
 		case "result":
 			outcome = "ok"
-			send("result", e.Result)
+			send("result", resultOut{Result: e.Result, Usage: callUsage()})
 		case "error":
 			if e.Error != nil {
 				outcome = e.Error.Code
 			}
-			send("error", e.Error)
+			send("error", errorOut{Failure: e.Error, Usage: callUsage()})
 		}
 	}
 	execute := func(tctx context.Context, e sample.Event) (sample.ToolResult, error) {
@@ -256,7 +264,7 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 	err := s.cfg.Sample.Sample(ctx, req, emit, execute)
 	if err != nil && ctx.Err() == nil {
 		outcome = "upstream_error"
-		send("error", map[string]string{"code": "upstream_error", "message": "The model backend failed"})
+		send("error", errorOut{Failure: &sample.Failure{Code: "upstream_error", Message: "The model backend failed"}, Usage: callUsage()})
 		s.cfg.Log.Printf("sample %s: backend: %v", req.CallID, err)
 	}
 	if ctx.Err() != nil && outcome == "" {
@@ -322,6 +330,27 @@ func (s *Server) takeTool(c *call, use string) chan sample.ToolResult {
 	ch := c.tools[use]
 	delete(c.tools, use)
 	return ch
+}
+
+// usageOut is a call's token usage as the page receives it, at the end of the result or error event.
+type usageOut struct {
+	Input      int64  `json:"input"`
+	CacheRead  int64  `json:"cacheRead"`
+	CacheWrite int64  `json:"cacheWrite"`
+	Output     int64  `json:"output"`
+	Rounds     int    `json:"rounds"`
+	ToolCalls  int    `json:"toolCalls"`
+	Model      string `json:"model,omitempty"`
+}
+
+type resultOut struct {
+	*sample.Result
+	Usage *usageOut `json:"usage,omitempty"`
+}
+
+type errorOut struct {
+	*sample.Failure
+	Usage *usageOut `json:"usage,omitempty"`
 }
 
 // ── wire helpers ───────────────────────────────────────────────────────────────

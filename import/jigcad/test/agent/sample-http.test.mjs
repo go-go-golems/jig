@@ -49,7 +49,8 @@ test('a tool round trip streams text and returns the result', async () => {
     sse('tool', { use: 'u1', name: 'eval', input: { code: '1+1' } });
     const r = await ctx.tool('u1');
     sse('text', { text: 'Checking.\n\nIt is ' + r.value, delta: '…' });
-    sse('result', { text: 'Checking.\n\nIt is ' + r.value, truncated: false, modelTierApplied: req.modelTier, modelUsed: 'lunaroute/deepseek-4.1-flash' });
+    sse('result', { text: 'Checking.\n\nIt is ' + r.value, truncated: false, modelTierApplied: req.modelTier, modelUsed: 'lunaroute/deepseek-4.1-flash',
+      usage: { input: 900, cacheRead: 400, cacheWrite: 0, output: 30, rounds: 2, toolCalls: 1 } });
     ctx.res.end();
   });
   try {
@@ -60,6 +61,7 @@ test('a tool round trip streams text and returns the result', async () => {
     assert.equal(res.text, 'Checking.\n\nIt is value: 2');
     assert.equal(res.modelTierApplied, 'complex');
     assert.equal(res.modelApplied, 'lunaroute/deepseek-4.1-flash');
+    assert.deepEqual(res.usage, { input: 900, cacheRead: 400, cacheWrite: 0, output: 30, rounds: 2, toolCalls: 1 });
     assert.deepEqual(texts, ['Thinking…', 'Checking.', 'Checking.\n\nIt is value: 2']);
     const post = b.log.find(x => x.url === '/api/sample');
     assert.equal(post.body.tools[0].name, 'eval');
@@ -93,13 +95,13 @@ test('errors keep their contract codes', async () => {
     ctx.res.writeHead(200, { 'content-type': 'text/event-stream' });
     sse('call', { call: 'jc3' });
     sse('text', { text: 'partial', delta: 'partial' });
-    sse('error', { code: 'authentication_error', message: 'log in' });
+    sse('error', { code: 'authentication_error', message: 'log in', usage: { input: 5, output: 0, rounds: 1 } });
     ctx.res.end();
   });
   try {
     const sample = createHttpSample(b.base);
     await assert.rejects(sample('early'), e => e.code === 'prompt_too_large');
-    await assert.rejects(sample('late'), e => e.code === 'authentication_error' && e.text === 'partial');
+    await assert.rejects(sample('late'), e => e.code === 'authentication_error' && e.text === 'partial' && e.usage.rounds === 1);
     await assert.rejects(sample([{ role: 'assistant', content: 'x' }]), e => e.code === 'invalid_request');
   } finally { await b.close(); }
 });

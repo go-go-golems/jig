@@ -1,8 +1,9 @@
 // The `sample` capability over jigcad serve's HTTP backend (Go, pkg/server): one call is one streamed
 // POST api/sample; the model's tool calls arrive as `tool` events, run here, and their results go back to
 // api/sample/{call}/tools/{use}; aborting cancels on the server. Same contract as window.claude's sample:
-//   sample(turns, { tools, signal, modelTier, model, effort, onText }) → { text, truncated, modelTierApplied, modelApplied? }
-// rejecting with an Error whose .code is one of the contract codes.
+//   sample(turns, { tools, signal, modelTier, model, effort, onText }) → { text, truncated, modelTierApplied, modelApplied?, usage? }
+// rejecting with an Error whose .code is one of the contract codes (and .usage when the server sent it). usage is
+// { input, cacheRead, cacheWrite, output, rounds, toolCalls, model }: jigcad serve's addition, read by tools/agent-eval.
 // Ported from slop-computer web/runtime/src/sample.ts without consent, images and caching.
 
 export const MAX_PROMPT_BYTES = 256 << 10;
@@ -121,9 +122,11 @@ export function createHttpSample(base = '', fetchImpl = (...a) => fetch(...a)) {
           case 'tool': runTool(callId, tools, ev, ctrl.signal); break;
           case 'result':
             return Object.freeze({ text: ev.text, truncated: !!ev.truncated, modelTierApplied: ev.modelTierApplied ?? tier,
-              ...(ev.modelUsed || ev.modelApplied ? { modelApplied: ev.modelUsed || ev.modelApplied } : {}) });
+              ...(ev.modelUsed || ev.modelApplied ? { modelApplied: ev.modelUsed || ev.modelApplied } : {}),
+              ...(ev.usage ? { usage: ev.usage } : {}) });
           case 'error':
-            throw fail(ev.code, ev.message ?? 'the model call failed', ev.text || text ? { text: ev.text || text } : undefined);
+            throw fail(ev.code, ev.message ?? 'the model call failed', {
+              ...(ev.text || text ? { text: ev.text || text } : {}), ...(ev.usage ? { usage: ev.usage } : {}) });
         }
       }
       if (o.signal && o.signal.aborted) throw fail('cancelled', 'the call was aborted', text ? { text } : undefined);

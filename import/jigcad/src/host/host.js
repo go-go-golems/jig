@@ -50,7 +50,9 @@ const DATA_EXT = /\.(json|csv|txt|svg|dxf|tsv)$/i;
 const DEBOUNCE_MS = 140;
 
 export class Host {
-  constructor({ forceMock = false, forceJsCompute = false } = {}) {
+  // engine: an engine client to use instead of the worker (Node tools such as tools/agent-eval.mjs pass one built on
+  // src/engine/worker.js handle(); it needs ready, request(op, args), compute and initMs).
+  constructor({ forceMock = false, forceJsCompute = false, engine = null } = {}) {
     this.content = content;
     this.files = new Map();
     this.published = {};
@@ -76,7 +78,7 @@ export class Host {
     // scratch presets kept in this browser; older ones were numbered S-nn, which collides with the shelf's first prints
     this.scratch = (store.get('scratch', []) || []).filter(p => p && p.id && !content.presets.some(q => q.id === p.id));
     this.user = (store.get('user', []) || []).filter(p => p && /^U-\d+$/.test(p.id) && p.files && !content.presets.some(q => q.id === p.id));
-    this.engine = createEngine({
+    this.engine = engine || createEngine({
       forceMock, forceJsCompute,
       onChange: kind => {
         this.emit('engine', this.engine);
@@ -512,7 +514,7 @@ export class Host {
     if (t !== 'light' && t !== 'dark') {
       try { t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; } catch { t = 'light'; }
     }
-    document.documentElement.dataset.theme = t;
+    if (typeof document !== 'undefined') document.documentElement.dataset.theme = t;
   }
   cycleTheme() {
     this.theme = { system: 'light', light: 'dark', dark: 'system' }[this.theme] || 'system';

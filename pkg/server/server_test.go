@@ -120,6 +120,12 @@ func TestToolRoundTrip(t *testing.T) {
 	res := next(t, ch)
 	require.Equal(t, "result", res.typ, "usage events are not forwarded")
 	assert.Equal(t, `The answer is "2"`, res.data["text"])
+	u := res.data["usage"].(map[string]any)
+	assert.EqualValues(t, 10, u["input"])
+	assert.EqualValues(t, 3, u["output"])
+	assert.EqualValues(t, 1, u["rounds"])
+	assert.EqualValues(t, 1, u["toolCalls"])
+	assert.Equal(t, "lunaroute/glm-5.3-flash", u["model"])
 
 	// The tool use is gone once answered.
 	r, err = http.Post(ts.URL+"/api/sample/"+id+"/tools/use1", "application/json", strings.NewReader(`{"value":"2"}`))
@@ -144,6 +150,7 @@ func TestCancelWhileToolWaits(t *testing.T) {
 	e := next(t, ch)
 	assert.Equal(t, "error", e.typ)
 	assert.Equal(t, "cancelled", e.data["code"])
+	assert.NotNil(t, e.data["usage"], "error events carry usage too")
 }
 
 func TestRejectsBeforeStreaming(t *testing.T) {

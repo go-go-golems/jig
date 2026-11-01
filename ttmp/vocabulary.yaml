@@ -17,6 +17,8 @@ topics:
       description: The jigcad coding agent and its model backend
     - slug: llm
       description: LLM providers, inference and streaming
+    - slug: testing
+      description: Test suites, harnesses and evaluation
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
