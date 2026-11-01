@@ -120,3 +120,55 @@ per-case comparison, so the conclusion rests on the totals and the long-run case
 - **Thenable, not Promise.** `x instanceof Promise` is false for a tracked promise. No scope consumer relies on it.
   Model code that tests it would see `false`; the marker text explains what the value is.
 - **Wrapping cost.** One closure per scope function per step; negligible next to an engine call.
+
+## 6. Results
+
+The rerun used the same 14 cases × 2 tiers × 3 repeats as the JIG-003 baseline, on the build of commit f9118b5,
+through the same `jigcad serve` (glm-5.3-flash on the default tier, deepseek-4.1-flash on the complex tier).
+`scripts/01-compare.py` printed:
+
+| Metric | default before → after | complex before → after |
+|---|---|---|
+| passed (as recorded) | 42 → 41 | 42 → 40 |
+| passed (corrected checks, §6.2) | 42 → 42 | 42 → 41 (one `rate_limited`) |
+| steps | 152 → 145 | 211 → 217 |
+| steps with an unawaited async call (regex) | 35 → 20 | 44 → 16 |
+| steps whose result carried a Promise note | 0 → 26 | 0 → 17 |
+| runs that repeated the mistake after a note | – → 2 | – → 2 |
+| unhandled rejections | 4 → 0 | 5 → 0 |
+| tool calls, mean (max) | 3.62 (12) → 3.45 (13) | 5.02 (17) → 5.17 (22) |
+| seconds, median (max) | 3.83 (25.1) → 4.12 (34.9) | 8.10 (47.2) → 10.85 (102.1) |
+| seconds per model round, median | 1.04 → 1.03 | 1.97 → 2.31 |
+| output tokens per second, median | 115 → 100 | 123 → 111 |
+
+### 6.1 What the hint changed
+
+- **Errors became visible.** No rejection escaped a step (9 → 0). In 43 steps the model received the note; in 35 of
+  84 runs at least one step had one. In 31 of those 35 runs, no later step repeated the mistake. The note is
+  read and acted on: in the longest run, step 2 `const e = faces('%cylinder'); return e.map(…)` returned
+  `TypeError: e.map is not a function` followed by the note, and step 5 was `const cyl = await faces('%cylinder')`.
+- **The mistake still happens once.** The note corrects after the fact; it does not prevent the first unawaited
+  call. Steps with an unawaited call fell by 54 % (79 → 36) because the repeats stopped, not because first attempts
+  improved.
+
+### 6.2 What it did not change
+
+- **Pass rate.** Two recorded failures were case bugs, not model failures: deepseek wrote the mass as
+  `$19.03\ \text{g}$` (LaTeX), which `19[.,]0\d*\s*g` rejected, and glm answered "printed on its side" to the
+  orientation question, which the check required as `−Y`. Both checks were loosened in JIG-005 (commit after
+  fb629fc); rescored, the hint run is 42/42 and 41/42, the one failure a `rate_limited` from lunaroute after
+  6 steps. The baseline rescored with the corrected checks stays 84/84.
+- **Turn length and time.** Tool calls per run did not fall (3.62 → 3.45 and 5.02 → 5.17), and the long runs are
+  long for another reason. The 22-step complex run of `a01-fillet-too-large` hit the note once (step 2), then spent
+  16 steps searching for the largest fillet radius that works (`check()` over 19, 19.5, 19.9, 20 and 25 mm), and
+  finally changed the sketch's corner radius to 19.9 mm. That is engineering exploration, not tool misuse. The time
+  difference is within the noise of three repeats and partly backend latency: seconds per round on the complex
+  tier rose 17 % between the runs while the code under test did not change what a round costs.
+
+### 6.3 Conclusion and next step
+
+Keep the hint: it removes a class of silent failures at no cost (no failing check, no new prompt text, a closure
+per scope function). It is not a speed improvement. Preventing the first mistake would need a change the model reads
+before it writes code. The reference's API table could mark async functions (`await faces(sel)` instead of
+`faces(sel)`), as it already does for `look()`. That change touches the prompt every case reads, so it should be
+measured on its own, after the harder case set (JIG-005) exists to measure it on.
