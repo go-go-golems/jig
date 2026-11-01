@@ -11,7 +11,7 @@
 // The result is the same text the page's runEval writes: YAML of the value, logs first, notes for promises the code
 // never awaited. Keys a step adds to globalThis are removed after it, so steps do not leak into each other.
 import * as W from '../../engine/worker.js';
-import { compileStep, trackScope, guardScope, withHints, makeConsole, formatResult, markPromises, promiseNotes, cut } from '../evaltool.js';
+import { compileStep, trackScope, guardScope, withHints, makeConsole, formatResult, markPromises, promiseNotes, cut, settleValue, drain } from '../evaltool.js';
 import { labScope, makeProgram, makeMeasure, makeQueries, compileResult, flatMetrics, summaryOf, logsOf } from '../scope.js';
 import { listen, closePort } from './ports.js';
 import { guard, HELP } from '../../engine/guard.js';
@@ -200,10 +200,13 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   const names = Object.keys(tracked).filter(k => IDENT.test(k));
   const before = new Set(Object.getOwnPropertyNames(globalThis));
   let value, error = null;
-  try { value = await compileStep(names, String(code))(...names.map(k => tracked[k])); }
-  catch (e) { error = e || new Error('undefined'); }
-  const open = promises.filter(t => !t.consumed && !t.settled);
-  if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, 1000))]);
+  const t0 = Date.now(), budget = 22000;   // the client ends the worker at 25 s
+  try {
+    value = await compileStep(names, String(code))(...names.map(k => tracked[k]));
+    value = await settleValue(value, budget - (Date.now() - t0));
+  } catch (e) { error = e || new Error('undefined'); }
+  // calls the step started and never awaited: let them finish within the step's time, so a failure is reported
+  await drain(promises, Math.max(1000, budget - (Date.now() - t0)));
   await queue;
   for (const k of Object.getOwnPropertyNames(globalThis)) if (!before.has(k)) { try { delete globalThis[k]; } catch { /* not configurable */ } }
   let text;

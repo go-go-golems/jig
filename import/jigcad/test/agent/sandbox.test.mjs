@@ -103,3 +103,22 @@ test('reads are synchronous in the sandbox (JIG-013): the shadow of the page\'s 
   const t = await run(host, "const before = faces('>Z')[0].center[2]; files.edit('script.js', 'h: mm(30)', 'h: mm(20)'); await run(); return [before, faces('>Z')[0].center[2]]");
   assert.equal(t, '[30, 20]');
 });
+
+test('loud promises, awaited return values, finished pending calls (JIG-013 phase 3)', async () => {
+  const host = await fresh();
+  assert.match(await run(host, 'const r = check(); return r.ok'), /^TypeError: check\(\) returned a Promise: write \(await check\(\)\)\.ok \(line 1\)$/);
+  assert.match(await run(host, 'return run().summary.name'), /^TypeError: run\(\) returned a Promise: write \(await run\(\)\)\.summary/);
+  // await, Promise.all, .then still work
+  assert.equal(await run(host, 'const [a, b] = await Promise.all([check(), check()]); return a.ok && b.ok'), 'true');
+  assert.equal(await run(host, 'return check().then(r => r.ok)'), 'true');
+  // a Promise inside the returned value is awaited, without a note
+  const t = await run(host, 'return { r: check() }');
+  assert.match(t, /^r:\n {2}ok: true/);
+  assert.doesNotMatch(t, /never awaited/);
+  // a call left running finishes before the step ends; the note stays
+  const before = host.files.get('script.js');
+  const u = await run(host, "files.edit('script.js', 'h: mm(30)', 'h: mm(25)'); run(); return 1");
+  assert.match(u, /^1\nnote: run\(\) returned a Promise that this step never awaited/);
+  assert.match(await run(host, 'return program.summary().bbox ?? faces(\'>Z\')[0].center[2]'), /25/);
+  host.setFile('script.js', before);
+});

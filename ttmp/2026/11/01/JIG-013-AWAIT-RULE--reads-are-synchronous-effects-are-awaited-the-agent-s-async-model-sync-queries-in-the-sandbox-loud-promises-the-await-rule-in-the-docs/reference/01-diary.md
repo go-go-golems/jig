@@ -127,3 +127,36 @@ selector lists every face, and in the sandbox a selector can be a value (`faces(
 ### What warrants a second pair of eyes
 - The shadow compile happens before the step's timer matters to the person, but it counts toward the step's 25 s. A large preset adds about a second after each successful `run()`.
 - On the page (the fallback), reads stay Promises: `ask()` keeps the page's contract.
+
+**Commit (code):** 8db4985
+
+## Step 3: Phase 3, loud promises, awaited return values, finished pending calls
+
+The calls that stay asynchronous now fail where they are misused. A tracked Promise is a Proxy that answers
+`then`, `catch`, `finally` and the usual probes, and throws on any other property with the fix:
+`TypeError: check() returned a Promise: write (await check()).ok (line 1)`. Promises inside a returned value are
+awaited. Calls a step starts and never awaits are allowed to finish within the step's time, so their failures are
+reported. JIG-012's final batch finished during this step; its results and the resulting changes are in JIG-012's
+diary, Step 8.
+
+### What I did
+- `src/agent/evaltool.js`:
+  - `track()` returns `loud(tp, t)`. It passes `then`, `catch`, `finally`, `constructor`, `toString`, `valueOf`, `toLocaleString`, `toJSON` and every symbol, so `await`, `Promise.all`, `JSON.stringify`, `String()`, `markPromises` and `promiseNotes` keep working. It throws on anything else, and marks the Promise consumed so no note repeats the error.
+  - `settleValue(v, ms)` awaits Promises inside the returned value (plain objects and arrays, depth ≤ 8). A rejection becomes `<label failed: message>`.
+  - `drain(promises, ms)` waits for unsettled calls until the step's time is used up (at least 1 s), instead of 1 s.
+  - Both are used in `runEval` (page) and `runStep` (sandbox, budget 22 s of the client's 25 s).
+- `src/agent/hints.js`: `ASYNC_CALL` lists the awaited calls of the new rule (run, check, look, exportFile, select, params.set/clear, presets.load/create/rename, view.set, lab.follow). A not-a-function on `faces(...)` no longer says it returns a Promise.
+- `tools/agent-eval/failures.mjs`: the loud message is the class "promise not awaited".
+- Tests: `sandbox.test.mjs` (loud on `check().ok` and `run().summary`; `Promise.all`, `.then` still work; `return { r: check() }` gives the result with no note; `run()` left running finishes, with its note). `eval.test.mjs`: the two JIG-004 tests now describe the loud behaviour (the page path).
+
+### Why
+- Of the 49 unawaited steps in JIG-012's last batch, 25 "succeeded" with a wrong value. A loud error is the cheapest fix the model knows how to act on: 58 of 69 failed steps recovered on the next step.
+
+### What worked
+- `make test-js`: 84 + 15 + 62 + 42 passing.
+
+### What didn't work
+- Two JIG-004 tests failed as expected (`an unawaited lab call gets a note and a marker instead of {}`: `actual: true, expected: false` for `r.error`; the TypeError test expected `fs.map is not a function`). I rewrote them for the new contract rather than keeping the old one.
+
+### What warrants a second pair of eyes
+- A tracked Promise is not a real `Promise` (it never was; JIG-004 made it a thenable). `x instanceof Promise` is false for it, as before.

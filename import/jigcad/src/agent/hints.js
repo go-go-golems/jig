@@ -53,8 +53,8 @@ function notDefined(name, names, j) {
   return `note: ${name} is not in this step's scope. Steps do not share variables: a const, let or globalThis value from an earlier step is gone. Define it again here, or keep it in a file and read it.`;
 }
 
-// the scope's calls that answer with a Promise (also on check()'s live program)
-const ASYNC_CALL = /(?:^|\.)(run|check|why|faces|feature|sketch|look|area|ir|get|set|clear|load|create|exportFile)\(\.\.\.\)$/;
+// the scope's calls that answer with a Promise (JIG-013: compiling, drawing, changing the workbench; reads are values)
+const ASYNC_CALL = /(?:^|[^.\w])(run|check|look|exportFile|select|params\.set|params\.clear|presets\.load|presets\.create|presets\.rename|view\.set|lab\.follow)\(\.\.\.\)$/;
 const ARRAY = new Set(['map', 'filter', 'slice', 'join', 'forEach', 'find', 'findIndex', 'some', 'every', 'reduce', 'flatMap', 'includes', 'indexOf', 'sort', 'concat', 'at', 'flat', 'entries', 'keys', 'values']);
 const STRING = new Set(['split', 'trim', 'replace', 'replaceAll', 'startsWith', 'endsWith', 'toUpperCase', 'toLowerCase', 'match', 'matchAll', 'padStart', 'padEnd', 'charAt']);
 const PROMISE = new Set(['then', 'catch', 'finally']);
@@ -65,7 +65,7 @@ function notAMethod(expr, method, methods, promised) {
   if (ASYNC_CALL.test(expr) && !PROMISE.has(method)) return `note: ${expr} returns a Promise: write (await ${expr}).${method}(…).`;
   if (PROMISE.has(method)) return `note: ${expr} is not a Promise; its value is there already: use it without .${method}().`;
   const what = /\(\.\.\.\)$/.test(expr) ? expr : expr.split(/[.([]/)[0];
-  const later = 'Results of faces, why, feature, sketch, check and program.ir arrive later: await them.';
+  const later = 'Results of run, check, look and calls that change the workbench arrive later: await them.';
   if (ARRAY.has(method)) return `note: ${expr} is not an array, so it has no .${method}(). Return ${what} to see what it is. ${later}`;
   if (STRING.has(method)) return `note: ${expr} is not text, so it has no .${method}(). Return ${what} to see what it is. ${later}`;
   const has = Object.entries(methods).filter(([, ms]) => ms.includes(method)).map(([k]) => k);

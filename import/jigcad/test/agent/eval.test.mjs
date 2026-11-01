@@ -116,13 +116,16 @@ test('Stop resolves a waiting step as declined', async () => {
 });
 
 // ── JIG-004: promises a step forgets to await ────────────────────────────────
-test('an unawaited lab call gets a note and a marker instead of {}', async () => {
+test('an unawaited lab call used as a value throws with the fix; inside the returned value it is awaited (JIG-013)', async () => {
   const host = createMockHost();
   await host.compile();
-  const r = await runEval(host, "const fs = faces('%plane');\nreturn { fs, n: fs.length };");
-  assert.equal(r.error, false);
-  assert.match(r.text, /<Promise from faces\('%plane'\): not awaited>/);
-  assert.match(r.text, /note: faces\('%plane'\) returned a Promise that this step never awaited\. Write: const x = await faces\('%plane'\);/);
+  const r = await runEval(host, "const fs = faces('%plane');\nreturn { n: fs.length };");
+  assert.equal(r.error, true);
+  assert.match(r.text, /^TypeError: faces\('%plane'\) returned a Promise: write \(await faces\('%plane'\)\)\.length \(line 2\)$/);
+  const r2 = await runEval(host, "const fs = faces('%plane');\nreturn { fs };");
+  assert.equal(r2.error, false);
+  assert.match(r2.text, /^fs:\n {2}- name: /);
+  assert.doesNotMatch(r2.text, /never awaited/);
 });
 
 test('awaited, returned and Promise.all calls get no note', async () => {
@@ -150,13 +153,14 @@ test('a rejected unawaited call reports its error inside the step, with no unhan
   } finally { process.off('unhandledRejection', on); }
 });
 
-test('a TypeError from using a promise as a value comes with the note; logs show the marker', async () => {
+test('a promise used as a value throws at the read (JIG-013); logs show the marker', async () => {
   const host = createMockHost();
   await host.compile();
   const r = await runEval(host, "const fs = faces('%plane');\nconsole.log(fs);\nreturn fs.map(f => f.name);");
   assert.equal(r.error, true);
   assert.match(r.text, /logs:\n<Promise from faces\('%plane'\): not awaited>/);
-  assert.match(r.text, /TypeError: fs\.map is not a function[\s\S]*note: faces\('%plane'\)/);
+  assert.match(r.text, /TypeError: faces\('%plane'\) returned a Promise: write \(await faces\('%plane'\)\)\.map \(line 3\)/);
+  assert.doesNotMatch(r.text, /never awaited/);
 });
 
 test('the same call written twice gets one note with a count', async () => {

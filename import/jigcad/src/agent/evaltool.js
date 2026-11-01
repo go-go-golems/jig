@@ -84,7 +84,49 @@ function track(p, label, promises) {
   };
   Object.defineProperty(tp, TRACKED, { value: t });
   Object.defineProperty(tp, Symbol.toStringTag, { value: 'Promise' });
-  return tp;
+  return loud(tp, t);
+}
+// Loud promises (JIG-013): a tracked Promise used as a value throws at the read, with the fix, instead of reading
+// as undefined. await, .then/.catch/.finally, Promise.all/resolve (they read then), String() and JSON pass.
+const PASS = new Set(['then', 'catch', 'finally', 'constructor', 'toString', 'valueOf', 'toLocaleString', 'toJSON']);
+function loud(tp, t) {
+  return new Proxy(tp, {
+    get(target, k) {
+      if (typeof k === 'symbol' || PASS.has(k)) return Reflect.get(target, k);
+      t.consumed = true;   // the error says it; no note on top
+      throw new TypeError(`${t.label} returned a Promise: write (await ${t.label}).${String(k)}`);
+    },
+  });
+}
+const isTracked = v => v != null && (typeof v === 'object' || typeof v === 'function') && !!v[TRACKED];
+
+/**
+ * The returned value with the Promises inside it awaited (JIG-013): `return { r: check() }` gives the result, not a
+ * marker. Plain objects and arrays, depth ≤ 8; a rejection becomes '<label failed: message>'. ms caps the wait.
+ */
+export async function settleValue(v, ms = 20000) {
+  const deadline = Date.now() + ms;
+  const walk = async (x, depth) => {
+    if (isTracked(x) || x instanceof Promise) {
+      const label = isTracked(x) ? x[TRACKED].label : 'a Promise';
+      const left = deadline - Date.now();
+      if (left <= 0) return x;
+      try { return await Promise.race([x, new Promise((_, rej) => setTimeout(() => rej(new Error('still running')), left))]); }
+      catch (e) { return `<${label} failed: ${e?.message ?? e}>`; }
+    }
+    if (depth > 8 || !x || typeof x !== 'object' || !isPlain(x)) return x;
+    if (Array.isArray(x)) return Promise.all(x.map(y => walk(y, depth + 1)));
+    const out = {};
+    for (const [k, y] of Object.entries(x)) out[k] = await walk(y, depth + 1);
+    return out;
+  };
+  if (!isTracked(v) && !(v instanceof Promise) && !isPlain(v)) return v;
+  return walk(v, 0);
+}
+/** Wait for the calls a step started and did not await (run(); …), at most ms (JIG-013: until the step's time is up). */
+export async function drain(promises, ms) {
+  const open = promises.filter(t => !t.settled);
+  if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, Math.max(0, ms)))]);
 }
 /** The scope with every function (one level into namespaces) wrapped so returned promises are tracked. */
 /**
@@ -205,11 +247,11 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
       if (signal.aborted) onAbort(); else signal.addEventListener('abort', onAbort, { once: true });
     }));
     value = await Promise.race(racers);
+    value = await settleValue(value, Math.max(0, timeoutMs - (now() - t0)));
   } catch (e) { error = e || new Error('undefined'); }
   finally { clearTimeout(timer); if (signal && onAbort) signal.removeEventListener('abort', onAbort); }
-  // promises the step never consumed: give pending ones a moment to settle, so a failure can be reported
-  const open = promises.filter(t => !t.consumed && !t.settled);
-  if (open.length) await Promise.race([Promise.all(open.map(t => t.p)), new Promise(r => setTimeout(r, 1000))]);
+  // calls the step started and never awaited: let them finish (within the step's time), so a failure is reported
+  await drain(promises, Math.max(1000, timeoutMs - (now() - t0)));
   const ms = Math.round(now() - t0);
   let text;
   try { const pn = promiseNotes(promises); text = withHints(formatResult(value, logs, error, pn), { error, code, names, promised: pn.length > 0 }); } catch (e) { text = `Error: the result could not be written as YAML: ${e.message}`; error = e; }

@@ -27,6 +27,7 @@ export function classify(step) {
   // a promise the code used as a value: the JIG-004 note, or (in runs before it) a method of the promise called
   const asyncCall = /^TypeError: (?:await )?([\w$]+(?:\.[\w$]+)?)\(\.\.\.\)\.\w+ is not a function/.exec(head);
   if (asyncCall && ASYNC.has(asyncCall[1])) return 'promise not awaited';
+  if (/^TypeError: .+ returned a Promise: write \(await /.test(head)) return 'promise not awaited';   // JIG-013 loud promises
   // with the note, "x.m is not a function" or a read of undefined is the promise (holes = faces(…); holes.map(…)),
   // unless x is a namespace of the scope (program.metric is a wrong name, whatever else the step left unawaited)
   const nf = /^TypeError: ([\w$]+)[\w$.()[\]'"]*\.\w+ is not a function/.exec(head);
