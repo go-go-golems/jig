@@ -27,6 +27,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// version is set at release time (-ldflags "-X main.version=…", see .goreleaser.yaml).
+var version = "dev"
+
 type serveFlags struct {
 	listen, dist, piDir, token string
 	quick, def, complex        string
@@ -35,7 +38,7 @@ type serveFlags struct {
 }
 
 func main() {
-	root := &cobra.Command{Use: "jigcad", Short: "The jigcad CAD workbench and its agent backend", SilenceUsage: true}
+	root := &cobra.Command{Use: "jigcad", Short: "The jigcad CAD workbench and its agent backend", SilenceUsage: true, Version: version}
 	root.AddCommand(serveCmd())
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -93,7 +96,7 @@ func serve(ctx context.Context, f serveFlags) error {
 		if err != nil {
 			return fmt.Errorf("model backend (Pi agent directory %s): %w (or pass --no-models)", dir, err)
 		}
-		defer b.Close()
+		defer func() { _ = b.Close() }()
 		cfg.Sample = b
 		for _, m := range b.Models() {
 			if m.Tier != "" {

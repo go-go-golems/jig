@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make test-go
+
+  web:
+    name: workbench, JS tests, embedded binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: import/jigcad/rust/jig-compute
+      - name: Build the workbench
+        run: make web
+      - name: JavaScript tests (agent, harness and oracles, engine core, engine on OpenCascade)
+        run: make test-js
+      - name: Embedded binary
+        run: make build-bin
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          ./dist/jigcad --version
+          ./dist/jigcad serve --no-models --listen 127.0.0.1:8787 &
+          for _ in $(seq 1 50); do curl -fsS http://127.0.0.1:8787/ -o /dev/null && break; sleep 0.2; done
+          curl -fsS http://127.0.0.1:8787/ | grep -q '<title>jig workbench</title>'
+          curl -fsS http://127.0.0.1:8787/api/sample/models | grep -q '"available":false'
+          kill %1
