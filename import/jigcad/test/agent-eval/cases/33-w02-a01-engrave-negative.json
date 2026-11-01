@@ -16,7 +16,8 @@
     {
       "kind": "file",
       "path": "script.js",
-      "contains": "JIG"
+      "matches": "text\\(\\s*['\"`]JIG['\"`]",
+      "note": "the text region, not a comment: an agent left a probe letter in the region and 'JIG' only in its comment (JIG-009 run)"
     },
     {
       "kind": "metric",
