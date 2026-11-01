@@ -362,3 +362,28 @@ function`, which turned out to be a bug from phase 1.
 
 ### Code review instructions
 - `node --test import/jigcad/test/agent/sandbox.test.mjs import/jigcad/test/agent/failures.test.mjs`; `node import/jigcad/tools/agent-eval/failures.mjs <results.jsonl>`.
+
+**Commit (code):** d789833
+
+## Step 8: The batch after phases 3–5
+
+The last JIG-012 batch ran from the worktree frozen at d789833 (phases 3–5, the fixes of Step 7, 35 cases):
+68/70 passed (`various/runs/2026-11-02-phase4/`, report `various/06-failures-phase4.md`). Both failures are the
+new `a01-magnet-pocket` case.
+
+### What worked
+| | baseline | phase 2 | phases 3–5 |
+|---|---:|---:|---:|
+| passed | 64/66 | 63/66 (1 auth error) | 68/70 |
+| failed steps | 18 % | 16 % | 15 % (69 of 450) |
+| runs with a misuse error | 24 % | 18 % | 16 % (11 of 70) |
+| stuck loops | 2 | 1 | 1 |
+| never recovered | 5 | 1 | 0 |
+| `help` calls | — | — | 10 |
+- The model called `help` 10 times, including `help(j.lib.magnet)` and `help('part.add')`.
+
+### What didn't work
+- `promise not awaited` grew to 49 steps in 38 runs. Part of the growth is measurement: since Step 7, calls on `check()`'s live program are tracked (10 of the 49). `check` is still the most forgotten (16), then `faces` 9, `run` 7, `sketch` 7. This is the motivation for JIG-013.
+- `a01-magnet-pocket`, default tier: `add magnetPocket failed: Cannot read properties of undefined (reading 'type')` after a sequence of edits. It does not reproduce in the sandbox or on a harness Host replaying the same edits (JIG-013 diary, Step 1).
+- `a01-magnet-pocket`, complex tier: the agent's last variant placed the pocket with `j.frame.on(j.sel.faces('+Z and %plane').sortBy(f => f.center[2]).first())`. The engine warned "magnet: the cut removes no material", and the agent answered anyway. With `j.frame.on(j.sel.names('faces', ['shell/inner[body/start]']))` (its earlier variant) the pocket cuts 51.3 mm³. I checked that `j.frame.on(face)` points out of the face and that the magnet cuts into it, from the inner floor and from the outer bottom alike, so the reference's sentence from Step 4 is correct.
+- Selector values passed to `faces()` were refused 3 times ("got an object"), and `faces('')`/`faces('*')` 3 times. JIG-013 accepts both.
