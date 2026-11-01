@@ -252,3 +252,47 @@ correctly in 12 steps.
 ### Technical details
 - Result mapping: `modelApplied` in the page result is the server's `modelUsed` (the model that actually ran).
 - `lastRoundNote`: "No tool calls are left in this turn. Answer now in plain text from what you have found so far. Say plainly what is done, what you checked, and what is unfinished."
+
+## Step 5: Vault report
+
+I wrote the third jigcad report for the go-go-parc vault in the textbook style used for the first two, with the three
+browser screenshots, and pushed it. The report explains the sample contract, why tools run in the page, the Pi and
+lunaroute model path, the round loop, the empty-last-round failure and its fix, the adapter, access control and the
+measurements.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** "Then the go side is done, also write a report for the vault."
+**Inferred user intent:** A durable explanation of the Go serving work next to the two Rust reports.
+**Commit (code):** go-go-parc 084bf51 — "jigcad report 3: a Go model backend for the workbench agent (JIG-002)"
+
+### What I did
+- Copied `various/0{1,2,3}-*.png` to `go-go-parc/Projects/2026/10/31/_assets/jigcad-agent-*.png`.
+- Wrote `Projects/2026/10/31/PROJECT REPORT - jigcad - A Go Model Backend for the Workbench Agent.md`; staged only that note and the three images (the unrelated dropcut-studio changes stay untouched); `git push`.
+
+### Why
+- Same folder and naming as the two JIG-001 reports so the three link to each other.
+
+### What worked
+- `git status -sb` → `## main...origin/main` after the push.
+
+### What didn't work
+- My first draft claimed "about 20 K tokens for round 1" and compared the flash models with larger ones; neither was measured. Replaced with the measured average (194 K over ten requests ≈ 19 K each) and an observation from these runs only.
+
+### What I learned
+- N/A.
+
+### What was tricky to build
+- Keeping the report's numbers traceable: every token, time and outcome figure is copied from the server's per-call log lines quoted in Step 4.
+
+### What warrants a second pair of eyes
+- Section 6 states that the repeated Deep run is not a controlled comparison; the fix is justified by the guarantee it gives, not by one run.
+
+### What should be done in the future
+- N/A.
+
+### Code review instructions
+- Read the report's §3 (tool path) and §6 (last round) against `pkg/server/server.go` `start` and `pkg/sample/gepp/sample.go` `run`.
+
+### Technical details
+- Assets: `jigcad-agent-balanced-glm-turn.png`, `jigcad-agent-deep-deepseek-turn.png`, `jigcad-agent-ask-mode-waiting.png`.
