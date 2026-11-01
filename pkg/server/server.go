@@ -29,9 +29,9 @@ import (
 
 // Limits of the page-facing protocol (the same as slop's runtime limits).
 const (
-	MaxPromptBytes     = 256 << 10 // the input text of one call
-	MaxToolResultBytes = 32 << 10  // one tool result
-	MaxTools           = 16 // enforced by sample.ValidateRequest
+	MaxPromptBytes     = 256 << 10         // the input text of one call
+	MaxToolResultBytes = 32 << 10          // one tool result
+	MaxTools           = 16                // enforced by sample.ValidateRequest
 	toolWait           = 150 * time.Second // how long a call waits for one tool result
 )
 
@@ -223,6 +223,8 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 			if e.Usage != nil { // kept in the server log, never sent to the page
 				usage.Input += e.Usage.Input
 				usage.Output += e.Usage.Output
+				usage.CacheRead += e.Usage.CacheRead
+				usage.CacheWrite += e.Usage.CacheWrite
 				usage.Model = e.Usage.Model
 			}
 		case "result":
@@ -260,8 +262,8 @@ func (s *Server) start(w http.ResponseWriter, r *http.Request) {
 	if ctx.Err() != nil && outcome == "" {
 		outcome = "cancelled"
 	}
-	s.cfg.Log.Printf("sample %s tier=%s model=%s asked=%q tools=%d in=%d out=%d ms=%d outcome=%s",
-		req.CallID, in.ModelTier, usage.Model, in.Model, toolUses.Load(), usage.Input, usage.Output,
+	s.cfg.Log.Printf("sample %s tier=%s model=%s asked=%q tools=%d in=%d cacheRead=%d cacheWrite=%d out=%d ms=%d outcome=%s",
+		req.CallID, in.ModelTier, usage.Model, in.Model, toolUses.Load(), usage.Input, usage.CacheRead, usage.CacheWrite, usage.Output,
 		time.Since(started).Milliseconds(), outcome)
 }
 
@@ -301,8 +303,8 @@ func (s *Server) cancel(w http.ResponseWriter, r *http.Request) {
 // ── the call registry ──────────────────────────────────────────────────────────
 
 func (s *Server) add(id string, c *call) { s.mu.Lock(); s.calls[id] = c; s.mu.Unlock() }
-func (s *Server) remove(id string)        { s.mu.Lock(); delete(s.calls, id); s.mu.Unlock() }
-func (s *Server) get(id string) *call     { s.mu.Lock(); defer s.mu.Unlock(); return s.calls[id] }
+func (s *Server) remove(id string)       { s.mu.Lock(); delete(s.calls, id); s.mu.Unlock() }
+func (s *Server) get(id string) *call    { s.mu.Lock(); defer s.mu.Unlock(); return s.calls[id] }
 
 // waitTool registers a tool use and returns the channel its result arrives on.
 func (s *Server) waitTool(c *call, use string) chan sample.ToolResult {

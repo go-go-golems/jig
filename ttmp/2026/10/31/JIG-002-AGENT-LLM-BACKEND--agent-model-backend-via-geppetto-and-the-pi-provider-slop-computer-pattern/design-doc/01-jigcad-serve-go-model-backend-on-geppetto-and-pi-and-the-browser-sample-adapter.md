@@ -248,7 +248,12 @@ GOTOOLCHAIN=auto go build -tags embed -o jigcad ./cmd/jigcad   # single binary
   with `authentication_error` and the operator logs in again through Pi.
 - Flash models may follow the agent's long reference less reliably than larger models. That is a model-quality
   question, not a protocol one; measure it in the live phase.
-- No prompt caching: each round resends the whole conversation, including the roughly 14 KB agent reference.
+- Each round resends the whole conversation, including the roughly 14 KB agent reference, but lunaroute caches
+  prompt prefixes automatically (measured 2026-10-31, `various/04-prompt-cache-measurements.md`): from round 2 on,
+  94–99 % of the prompt tokens are cache reads, and a real 8-tool turn on a fresh server read 88 % from cache. The
+  cache is per model and per lunaroute session (one session id per server process), so the first round after a
+  restart or a tier switch is cold. geppetto maps `prompt_tokens_details.cached_tokens` but not DeepSeek's
+  `created_cache_tokens`, so the server logs cache writes as 0.
 
 ## 10. References
 

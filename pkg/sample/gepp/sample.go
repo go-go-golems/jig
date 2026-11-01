@@ -28,7 +28,6 @@ const maxContextBytes = 512 << 10
 const lastRoundNote = "No tool calls are left in this turn. Answer now in plain text from what you have found so far. " +
 	"Say plainly what is done, what you checked, and what is unfinished."
 
-
 // failure ends a call with a contract error code.
 type failure struct{ code, message string }
 

@@ -19,6 +19,10 @@ RelatedFiles:
       Note: round loop, lastRoundNote
     - Path: repo://pkg/server/server.go
       Note: HTTP layer and call registry
+    - Path: repo://ttmp/2026/10/31/JIG-002-AGENT-LLM-BACKEND--agent-model-backend-via-geppetto-and-the-pi-provider-slop-computer-pattern/scripts/cache-probe/main.go
+      Note: prompt-cache probe
+    - Path: repo://ttmp/2026/10/31/JIG-002-AGENT-LLM-BACKEND--agent-model-backend-via-geppetto-and-the-pi-provider-slop-computer-pattern/various/04-prompt-cache-measurements.md
+      Note: raw cache measurements
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-10-31T20:57:40.428733785-04:00
@@ -296,3 +300,68 @@ measurements.
 
 ### Technical details
 - Assets: `jigcad-agent-balanced-glm-turn.png`, `jigcad-agent-deep-deepseek-turn.png`, `jigcad-agent-ask-mode-waiting.png`.
+
+## Step 6: Measuring prompt caching through lunaroute
+
+Asked whether the reference is resent "multiple copies each round", I had to correct two claims of mine. The
+reference appears once per request (in the first user message), and I had written in Step 4, the design doc and
+both vault reports that this path has "no prompt caching" without measuring it. This step measured it. lunaroute
+caches prompt prefixes automatically for both models, and the earlier token totals overstate the uncached work by
+roughly a factor of eight.
+
+### Prompt Context
+
+**User prompt (verbatim):** "do you mean the reference is attached again (multiple copies) each round? because wouldn't prefix caching otherwise make things reasonably cheap?" — followed by "ok, well, continue"
+
+**Assistant interpretation:** Verify whether provider-side prefix caching applies to the agent's rounds, then correct the docs and reports accordingly.
+
+**Inferred user intent:** Avoid optimising (trimming the reference) for a cost that may not exist; get the facts right in the written record.
+
+**Commit (code):** see the commit that adds this step — "JIG-002: log prompt-cache tokens; cache-probe and usage-proxy; measurements"
+
+### What I did
+- `pkg/server/server.go`: the per-call log line now has `cacheRead=` and `cacheWrite=` (summed from `usage` events).
+- `scripts/usage-proxy/main.go`: a reverse proxy to `https://gw.lunaroute.com` that logs only the `usage` object and model of each streamed chunk (no headers, prompts or credentials).
+- A scratch copy of `~/.pi/agent` (symlinks, plus `models.json`/`models-store.json` with the lunaroute base URL rewritten to the proxy); deleted afterwards.
+- `scripts/cache-probe/main.go`: drives `gepp.Backend.Sample` with the agent reference as the prefix and a prompt forcing four eval rounds; prints each round's usage. Needs `pi.WithLocalProviders()` for the plain-HTTP loopback proxy.
+- Real turns through `jigcad serve` (fresh process, real Pi directory) on A-01: Balanced, then a Deep follow-up in the same thread.
+- Raw evidence: `various/04-prompt-cache-measurements.md`.
+
+### Why
+- Measuring first decides whether "send the reference only in round 1" is worth building.
+
+### What worked
+- Probe, glm-5.3-flash: round 1 `input 4302 cacheRead 0`; rounds 2–5 `cacheRead 4096, 4096, 4352, 4352` of 4333–4393.
+- Probe, deepseek-4.1-flash: round 1 `input 4639 cacheRead 0`; rounds 2–5 `cacheRead 4608, 4864, 4864, 4864` of 4832–5002. Raw usage shows `prompt_tokens_details.cached_tokens` and, for DeepSeek, `created_cache_tokens: 4608` on round 1.
+- Same process, second call with the same prefix: round 1 `cacheRead 4096` (glm) and `4608` (deepseek) — warm.
+- New process: round 1 cold again (`cacheRead 0`) one minute later.
+- Real turn, Balanced: `tools=8 in=170359 cacheRead=149248 cacheWrite=0 out=1650 ms=16668 outcome=ok` (88 % cached).
+- Real follow-up, Deep: `tools=1 in=39988 cacheRead=20224 out=512 ms=3478 outcome=ok` (round 1 cold for this model in this session, round 2 warm).
+
+### What didn't work
+- `jigcad serve --pi-agent-dir <proxied copy>` failed every call in 1 ms with `upstream_error`: geppetto's Pi provider refuses plain-HTTP and loopback base URLs unless `pi.WithLocalProviders()` is passed (`agentdir.go:117`). I did not add a server flag for a one-off measurement; the probe program enables it instead.
+- `pkill -f "scratchpad/jigcad serve"` killed its own shell again (exit 144) and the probe file was never written; rewrote it with the editor and stopped processes by PID from `ps`.
+- `gofmt -l` flagged `pkg/sample/gepp/sample.go` (an extra blank line from Step 4) and `pkg/server/server.go` (comment alignment); fixed with `gofmt -w`.
+
+### What I learned
+- The research note's "Prompt caching: not implemented" referred to Anthropic's explicit `cache_control`. OpenAI-compatible providers such as lunaroute cache prefixes automatically, with no request flag; I carried the Anthropic statement over to this path without checking.
+- The cache is session-affine: the per-process `x-lunaroute-session` id makes calls of one server process share a warm cache; a restart starts cold.
+- Cache hits arrive in blocks (4096, 4352, 4608, 4864 tokens): the tail of each request since the last block boundary is uncached.
+
+### What was tricky to build
+- Observing the provider's raw usage without logging secrets: the proxy logs only the parsed `usage` object of `data:` lines; the scratch agent directory symlinks `auth.json` instead of copying it.
+
+### What warrants a second pair of eyes
+- `cacheWrite` is always 0 in the server log, because geppetto does not map DeepSeek's `created_cache_tokens`. A geppetto change would be needed to report it.
+
+### What should be done in the future
+- Drop "send the reference only in round 1" from the plan; the remaining cost per round is the uncached tail plus output.
+- Keep the lunaroute session id stable for the server's lifetime (as now); consider persisting it across restarts only if cold first rounds matter.
+
+### Code review instructions
+- `pkg/server/server.go` log line; `scripts/cache-probe/main.go`; `scripts/usage-proxy/main.go`.
+- Re-run: start `go run ./ttmp/…/scripts/usage-proxy`, point a copy of `~/.pi/agent` at `http://127.0.0.1:9911/v1`, then `go run ./ttmp/…/scripts/cache-probe --pi-agent-dir <copy>`.
+
+### Technical details
+- lunaroute usage chunk (glm, round 2): `{"completion_tokens":13,"prompt_tokens":4333,"prompt_tokens_details":{"cached_tokens":4096},"reasoning_tokens":1,…}`.
+- Pi lists lunaroute's cost for both models as 0, so caching affects latency and provider load rather than money here.
