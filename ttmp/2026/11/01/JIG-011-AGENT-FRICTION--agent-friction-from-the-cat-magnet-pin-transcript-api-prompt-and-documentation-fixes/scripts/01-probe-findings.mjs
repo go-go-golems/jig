@@ -1,0 +1,21 @@
+import { register } from 'node:module';
+const ROOT = process.argv[2];
+register(new URL(`file://${ROOT}/test/engine/loader.mjs`).href);
+const W = await import(`file://${ROOT}/src/engine/worker.js`);
+await W.handle({ id: 0, op: 'init' });
+const run = async (name, script) => {
+  const c = await W.handle({ id: 1, op: 'compile', files: { 'script.js': script }, entry: 'script.js', options: {} });
+  const p = c.program || c.result || c;
+  const diags = (p.diagnostics || []).map(d => `${d.level} ${d.kind}: ${d.message}`);
+  const vol = p.metrics?.volume?.value ?? p.metrics?.volume;
+  console.log(name, '| ok', p.ok !== false && !c.error, '| vol', vol, '|', (c.error?.message || '') , diags.slice(0, 3).join(' ; '));
+};
+const head = `const head = j.region.circle('w / 2');\n`;
+await run('plain        ', head + `return j.part('c').params({ w: mm(44), t: mm(4.2) }).extrude(head, 't', { id: 'body' })`);
+await run('magnet at t  ', head + `return j.part('c').params({ w: mm(44), t: mm(4.2) }).extrude(head, 't', { id: 'body' }).add(j.lib.magnet({ d: mm(6), h: mm(3) }), { at: j.tx.move(0, 0, 't'), op: 'cut', id: 'magnet' })`);
+await run('magnet at 0  ', head + `return j.part('c').params({ w: mm(44), t: mm(4.2) }).extrude(head, 't', { id: 'body' }).add(j.lib.magnet({ d: mm(6), h: mm(3) }), { op: 'cut', id: 'magnet' })`);
+await run('dowel at t   ', head + `return j.part('c').params({ w: mm(44), t: mm(4.2) }).extrude(head, 't', { id: 'body' }).add(j.lib.dowel({ d: mm(3), l: mm(6) }), { at: j.tx.move(0, 0, 't'), op: 'cut', id: 'dowel' })`);
+await run('fit name parm', `return j.part('p').params({ md: mm(6), mdf: j.fit.hole('md', 'press') }).extrude(j.region.circle('mdf / 2'), mm(2), { id: 'b' })`);
+await run('fit name feat', `return j.part('p').params({ md: mm(6) }).extrude(j.region.circle(j.fit.hole('md', 'press').div(2)), mm(2), { id: 'b' })`);
+await run('fit num parm ', `return j.part('p').params({ md: mm(6), mdf: j.fit.hole(mm(6), 'press') }).extrude(j.region.circle('mdf / 2'), mm(2), { id: 'b' })`);
+await run('gap.press    ', `return j.part('p').params({ md: mm(6), mdf: 'md + 2 * gap.press' }).extrude(j.region.circle('mdf / 2'), mm(2), { id: 'b' })`);
