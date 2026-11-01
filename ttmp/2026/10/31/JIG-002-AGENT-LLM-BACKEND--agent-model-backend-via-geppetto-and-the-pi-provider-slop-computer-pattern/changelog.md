@@ -19,3 +19,7 @@ Vault report 3 written and pushed (go-go-parc 084bf51): PROJECT REPORT - jigcad 
 ## 2026-10-31
 
 Measured prompt caching through lunaroute: 94–99% cache reads from round 2, 88% on a real 8-tool turn; cache is per model and per session. Server log now reports cacheRead/cacheWrite; corrected the 'no prompt caching' claim
+
+## 2026-10-31
+
+Ticket closed. Follow-up: JIG-003 agent evaluation harness
