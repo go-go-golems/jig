@@ -1,6 +1,8 @@
 // linalg.js · small dense linear algebra for the sketch solver (row-major Float64Array).
 // qrcp: Householder QR with column pivoting (rank-revealing), full Q on request.
 // minNormSolve: minimum-norm solution of J h = b via QR of Jᵀ (handles rank deficiency and redundancy).
+// factorJ and cholSolve run in jig-compute (Rust → wasm) when it is loaded; the JS bodies (…JS) are the reference.
+import * as RS from '../rs/index.js';
 
 export function qrcp(A, m, n, { wantQ = false, tol = 1e-10 } = {}) {
   const R = Float64Array.from(A);
@@ -117,6 +119,22 @@ function reflect({ j, v, vn }, y, m) {
 
 // Factor J (m × n) through QR of Jᵀ: { rank, solve(b) → minimum-norm h with J h ≈ b, nullBasis, rowBasis (lazy) }
 export function factorJ(J, m, n, tol = 1e-10) {
+  return RS.enabled() && m > 0 ? factorJRust(J, m, n, tol) : factorJJS(J, m, n, tol);
+}
+// Same shape as factorJJS. Rust refactors per request (one solve per factorisation in the solver loops), so the
+// first solve() also yields the rank; nullBasis asks once with want_null.
+function factorJRust(J, m, n, tol) {
+  let rank = null, nb = null, rb = null;
+  const run = (b, wantNull) => { const r = RS.factorSolve(J, m, n, b, { tol, wantNull }); if (!r) throw new Error('jig-compute failed in factorJ'); rank = r.rank; return r; };
+  const unitRows = () => { const f = factorJJS(J, m, n, tol); return f.rowBasis; };
+  return {
+    get rank() { if (rank == null) run(null, false); return rank; },
+    solve: b => Float64Array.from(run(b, false).h),
+    get nullBasis() { return nb ??= run(null, true).nullBasis; },
+    get rowBasis() { return rb ??= unitRows(); },
+  };
+}
+export function factorJJS(J, m, n, tol = 1e-10) {
   if (m === 0) {
     return { rank: 0, rowBasis: [], get nullBasis() { return Array.from({ length: n }, (_, i) => { const e = new Float64Array(n); e[i] = 1; return e; }); }, solve: () => new Float64Array(n) };
   }
@@ -144,6 +162,10 @@ export function factorJ(J, m, n, tol = 1e-10) {
 
 // Cholesky solve of (A + μI) x = b for symmetric positive (semi)definite A (n × n)
 export function cholSolve(A, n, b, mu = 0) {
+  if (RS.enabled()) { const x = RS.cholSolve(A, n, b, mu); if (x !== undefined) return x; }
+  return cholSolveJS(A, n, b, mu);
+}
+export function cholSolveJS(A, n, b, mu = 0) {
   const L = new Float64Array(n * n);
   for (let i = 0; i < n; i++) {
     for (let j = 0; j <= i; j++) {

@@ -35,6 +35,6 @@ for (const id of ['M-07', 'M-06', 'X-08', 'M-10']) {
 let seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
 for (const [m, n] of [[8, 10], [24, 30], [60, 80]]) {
   const J = Float64Array.from({ length: m * n }, rnd), bv = Float64Array.from({ length: m }, rnd);
-  row(`factorJ + solve ${m}×${n} (×200)`, time(() => { for (let k = 0; k < 200; k++) LA.factorJ(J, m, n).solve(bv); }), time(() => { for (let k = 0; k < 200; k++) RS.factorSolve(J, m, n, bv); }));
+  row(`factorJ + solve ${m}×${n} (×200)`, time(() => { for (let k = 0; k < 200; k++) LA.factorJJS(J, m, n).solve(bv); }), time(() => { for (let k = 0; k < 200; k++) RS.factorSolve(J, m, n, bv); }));
 }
 console.log(`\nmodule load ${RS.status.ms.toFixed(1)} ms · ${RS.status.bytes} bytes · live meshes ${RS.liveMeshes()}`);

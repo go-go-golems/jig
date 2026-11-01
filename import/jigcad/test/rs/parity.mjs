@@ -95,14 +95,14 @@ for (let trial = 0; trial < 60; trial++) {
   const J = Float64Array.from({ length: m * n }, rnd);
   if (trial % 3 === 0 && m > 1) J.set(J.subarray(0, n), n);   // a repeated row
   const b = Float64Array.from({ length: m }, rnd);
-  const fj = LA.factorJ(J, m, n), fr = RS.factorSolve(J, m, n, b, { wantNull: true });
+  const fj = LA.factorJJS(J, m, n), fr = RS.factorSolve(J, m, n, b, { wantNull: true });
   check(`factorJ rank ${m}×${n}`, fj.rank === fr.rank, `js ${fj.rank} rust ${fr.rank}`);
   check(`factorJ solve ${m}×${n}`, vnear(Array.from(fr.h), Array.from(fj.solve(b)), 1e-9, 1e-10));
   const nj = fj.nullBasis;
   check(`factorJ null ${m}×${n}`, nj.length === fr.nullBasis.length && nj.every((v, k) => vnear(Array.from(fr.nullBasis[k]), Array.from(v), 1e-9, 1e-10)));
   check(`qrcp rank ${m}×${n}`, LA.qrcp(J, m, n).rank === RS.qrcpRank(J, m, n));
   const A = new Float64Array(n * n); for (let i = 0; i < m; i++) for (let a = 0; a < n; a++) for (let c = 0; c < n; c++) A[a * n + c] += J[i * n + a] * J[i * n + c];
-  const g = Float64Array.from({ length: n }, rnd), cj = LA.cholSolve(A, n, g, 1e-3), cr = RS.cholSolve(A, n, g, 1e-3);
+  const g = Float64Array.from({ length: n }, rnd), cj = LA.cholSolveJS(A, n, g, 1e-3), cr = RS.cholSolve(A, n, g, 1e-3);
   check(`chol ${n}`, (cj == null && cr == null) || vnear(Array.from(cr), Array.from(cj), 1e-9, 1e-10));
 }
 

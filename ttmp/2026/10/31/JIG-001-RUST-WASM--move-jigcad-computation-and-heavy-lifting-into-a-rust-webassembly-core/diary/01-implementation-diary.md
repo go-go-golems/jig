@@ -239,3 +239,89 @@ noise, not the new code.
 ### Technical details
 
 - Build: `ESBUILD=/path/to/esbuild/lib/main.js node build.mjs`; Node tests need `gunzip -k vendor/occt/replicad_single.wasm.gz` once.
+
+## Step 4: Hairline sliders (side request)
+
+While Phase 3 was being committed, the user asked for the slider styling from a design note to be applied too.
+I restyled both range inputs in jigcad (the Params rows and the stage zoom) as Kiln hairline sliders and checked
+them in the browser in both themes. This step is a milestone entry: no failures, one design choice.
+
+### Prompt Context
+
+**User prompt (verbatim):** "Apply @~/Downloads/Hairline sliders for the Kiln workbench.md to the styling for the sliders as well"
+**Assistant interpretation:** Apply the note's CSS and `--p` fill helper to jigcad's range inputs.
+**Inferred user intent:** Sliders that match the Kiln rules (1 px rules, square marks, tokens only).
+
+### Evidence and commits
+
+- Commit `08247b5` "Hairline sliders for the Kiln workbench": `src/ui/jig.css` (hairline rules appended; `jig.css` loads after `kiln.css`), `src/ui/kiln.css` (removed `accent-color` and the fixed 16 px height from the three range rules), `src/ui/common.jsx` (`pct(v, lo, hi)`), `src/ui/views/params.jsx` and `src/ui/views/stage.jsx` (`style={pct(…)}`).
+- Browser: all five sliders on A-01 are 18 px tall with `accent-color: auto`; an override set from code (`w = 100` in a 30–120 range) gives `--p: 77.8%`. Screenshots `various/02-hairline-sliders-light.png`, `various/03-hairline-sliders-dark.png`.
+
+### Noteworthy decisions or failures
+
+- The note's vertical-fader rules were left out: jigcad has no vertical sliders.
+- Only Chromium was checked (Playwright). Firefox (`::-moz-range-progress`) and Safari are untested.
+
+### Remaining requirements and next action
+
+- Firefox/Safari visual check when available.
+
+## Step 5: Solver linear algebra in Rust (Phase 4, first slice)
+
+The Phase 3 benchmark showed `factorJ` + solve is 2.5–2.9× faster in Rust even for 8×10 and 24×30 matrices,
+copies included. So I routed the sketch solver's `factorJ` and `cholSolve` (`src/engine/sketch/linalg.js`)
+through jig-compute when it is loaded, keeping `factorJJS`/`cholSolveJS` as the reference. The residuals and
+finite-difference Jacobians stay in JS; the residual tape (D6) is still the next step.
+
+### Prompt Context
+
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Start Phase 4 with the part the measurements justify.
+**Inferred user intent:** More of the numeric work in Rust, with no behaviour change.
+
+### What I did
+
+- `linalg.js`: `factorJ` dispatches to `factorJRust` (same `{ rank, solve, nullBasis, rowBasis }` shape; the rank comes from the first request; `nullBasis` is one request with `want_null`); `cholSolve` dispatches with the JS body as fallback.
+- `test/rs/parity.mjs` and `test/rs/bench.mjs` now compare against `factorJJS`/`cholSolveJS` explicitly.
+- New `test/rs/sketch-dump.mjs`: dumps solved sketch data (entities, constraint status and values, DOF, conflicts) rounded to 1e-9.
+
+### Why
+
+- Measured win at solver sizes, and a small, reversible change.
+
+### What worked
+
+- `node test/engine-core/run.mjs` → `62 passed` (JS: the core harness does not load Rust).
+- `node test/engine/run.mjs` → `42 passed` with Rust kernels, including 13 (conflict diagnostic), 25 (drag), 41 (sketch lines).
+- `node test/rs/parity.mjs` → `3784 checks passed, 0 failed`.
+- `node tools/preset-check.mjs --quiet` → `72/72`.
+- `sketch-dump.mjs` for A-03, M-03, W-07, H-11, S-10: Rust and `JIG_COMPUTE=js` outputs byte-identical (34,616 bytes each, empty diff).
+
+### What didn't work
+
+- No failures.
+
+### What I learned
+
+- Results are identical after rounding to 1e-9, so the Rust QR follows the same pivot order as the JS one.
+
+### What was tricky to build
+
+- JS `factorJ` factors once and solves many times; the C ABI factors and solves in one call. The solver loops do one solve per factorisation, so the wrapper re-runs the factorisation only when `nullBasis` is also needed (in `dragCluster`). That is acceptable at these sizes but would be wasteful for many solves per factorisation.
+
+### What warrants a second pair of eyes
+
+- `factorJRust.rowBasis` falls back to the JS factorisation (nothing uses it today).
+
+### What should be done in the future
+
+- Residual tape + dual-number Jacobians in Rust (D6), then move `dogleg`/`levenbergMarquardt`/`dragCluster` wholesale.
+- Load jig-compute in `test/engine-core/harness.mjs` too, so the core suite exercises both paths.
+
+### Code review instructions
+
+- `src/engine/sketch/linalg.js` top; run the commands above.
+
+### Technical details
+
+- `jc_factor_solve(J, m, n, b, tol, want_null) → rank`; result layout `h (n)` then `(n − rank) × n` null-basis entries.
