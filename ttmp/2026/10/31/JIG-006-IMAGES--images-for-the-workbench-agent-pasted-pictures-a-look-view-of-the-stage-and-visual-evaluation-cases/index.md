@@ -1,7 +1,7 @@
 ---
 Title: 'Images for the workbench agent: pasted pictures, a look() view of the stage, and visual evaluation cases'
 Ticket: JIG-006-IMAGES
-Status: active
+Status: complete
 Topics:
     - agent
     - llm
@@ -12,7 +12,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-31T22:58:34.488424191-04:00
+LastUpdated: 2026-11-01T01:55:55.834665496-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
