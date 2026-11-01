@@ -69,9 +69,7 @@ const pageRender = a => `(async (a) => {
   for (const [p, t] of Object.entries(a.files)) if (h.files.get(p) !== t) { if (h.files.has(p)) h.setFile(p, t); else h.addFile(p, t); }
   h.resetOverrides();
   for (const [k, v] of Object.entries(a.overrides || {})) h.setOverride(k, v);
-  clearTimeout(h._timer); h._timer = null;      // setOverride schedules a compile that would supersede this one
-  while (h.compiling) await new Promise(r => setTimeout(r, 20));
-  await h.compile();
+  await h.compileNow();                         // setOverride schedules a compile that would supersede a plain compile()
   return await h.renderView({ view: a.view, width: a.width, height: a.height, overlays: a.overlays });
 })(${JSON.stringify(a)})`;
 

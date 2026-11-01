@@ -352,6 +352,12 @@ export class Host {
       return failedProgram(err, performance.now() - t0);
     }
   }
+  /** Compile now: cancel a scheduled compile and wait for one in flight, so this compile's result is the one kept. */
+  async compileNow() {
+    clearTimeout(this._timer); this._timer = null;
+    while (this.compiling) await new Promise(r => setTimeout(r, 20));
+    return this.compile();
+  }
   scheduleCompile(ms = DEBOUNCE_MS) {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this.compile(), ms);
