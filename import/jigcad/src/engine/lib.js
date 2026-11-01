@@ -14,6 +14,8 @@ import { region, rectLoop } from './region.js';
 
 const V = K.V;
 const mmv = x => x == null ? null : typeof x === 'number' ? x : x.isSymbolic ? null : x.value ?? Number(x);
+// a size for a feature's label: a param name or expression as written ('mag_d'), a length as its number
+const lbl = x => typeof x === 'string' ? x : mmv(x);
 
 class LibFeature {
   constructor(label, spec, builder) { this.label = label; this.spec = spec; this._b = builder; Object.freeze(this); }
@@ -55,7 +57,7 @@ function insert(size = 'M3x5.7', o = {}) {
   };
 }
 function magnet({ d = 6, h = 3 } = {}) {
-  return new LibFeature(`magnet(${mmv(d)}×${mmv(h)})`, { d, h }, (ctx, f) => {
+  return new LibFeature(`magnet(${lbl(d)}×${lbl(h)})`, { d, h }, (ctx, f) => {
     const fit = ctx.fitCtx(); const cls = f.opts.fit ?? 'press';
     const D = ctx.len(d) + 2 * fit.classes[cls] + fit.holeComp(ctx.len(d)), H = ctx.len(h) + 0.2;
     ctx.useFit(cls);
@@ -64,7 +66,7 @@ function magnet({ d = 6, h = 3 } = {}) {
   });
 }
 function dowel({ d = 3, l = 10, fit = 'press' } = {}) {
-  return new LibFeature(`dowel(Ø${mmv(d)}×${mmv(l)})`, { d, l, fit }, (ctx, f) => {
+  return new LibFeature(`dowel(Ø${lbl(d)}×${lbl(l)})`, { d, l, fit }, (ctx, f) => {
     const fc = ctx.fitCtx(); const D = ctx.len(d) + 2 * fc.classes[fit] + fc.holeComp(ctx.len(d)), depth = ctx.len(l) / 2 + 0.5;
     ctx.useFit(fit);
     return { cut: [cylinder(f.id, 'bore', D / 2, -depth, 0.01)], info: { modelled: { hole: `Ø${D.toFixed(2)} × ${depth.toFixed(1)} mm` } }, note: `dowel hole Ø ${D.toFixed(2)} × ${depth.toFixed(1)} mm` };

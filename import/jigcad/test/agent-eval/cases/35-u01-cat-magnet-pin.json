@@ -1,0 +1,48 @@
+{
+  "id": "u01-cat-magnet-pin",
+  "preset": "D-03",
+  "mode": "auto",
+  "tags": [
+    "create",
+    "preset",
+    "library",
+    "fit"
+  ],
+  "request": "Create a configurable cat magnet pin in a new preset: a flat cat head about 30 mm across and 4 mm thick, with a press-fit pocket for a 10 × 2 mm disc magnet in its back that does not go through.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "height",
+      "min": 3.5,
+      "max": 4.5
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "min": 1500,
+      "max": 4500
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "magnet",
+      "notMatches": "nx"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "magnet",
+        "pocket"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "const p = await presets.create({ title: 'Cat magnet pin', about: 'a cat-head pin with a press-fit pocket for a 10 × 2 mm magnet', files: { 'script.js': \"// A cat-head pin with a press-fit pocket for a disc magnet in its back.\\nreturn j.part('cat')\\n  .params({ head: mm(30), t: mm(4), mag_d: mm(10), mag_h: mm(2) })\\n  .expose(['head', 't', 'mag_d', 'mag_h'])\\n  .extrude(\\n    j.region.circle('head / 2')\\n      .union(j.region.polygon([[-14, 4], [-12, 18], [-3, 13]]))\\n      .union(j.region.polygon([[14, 4], [12, 18], [3, 13]])),\\n    't', { id: 'head' })\\n  .add(j.lib.magnet({ d: 'mag_d', h: 'mag_h' }), { at: j.tx.move(0, 0, 't'), op: 'cut', id: 'magnet' })\\n\", 'notes.md': '# Cat magnet pin\\n\\nA 30 mm cat head, 4 mm thick, with a press-fit pocket for a 10 × 2 mm magnet in its back.\\n' } });\nconst r = await run(); return { id: p.id, ok: r.ok, errors: r.errors, volume: r.ok ? program.metrics('volume').volume : null };"
+    ],
+    "answer": "Created U-01 · Cat magnet pin: a 30 mm cat head (a circle and two ears), 4 mm thick, with params head, t, mag_d and mag_h; j.lib.magnet cuts a Ø10.20 × 2.20 mm press-fit pocket into its back, leaving 1.8 mm in front."
+  }
+}

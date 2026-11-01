@@ -1,0 +1,50 @@
+{
+  "id": "a01-magnet-pocket",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "library",
+    "fit"
+  ],
+  "request": "Add a press-fit pocket for a 6 × 1.5 mm disc magnet in the middle of the floor, cut into the floor from the inside. How big is the pocket?",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 15292.94,
+      "tol": 1
+    },
+    {
+      "kind": "metric",
+      "name": "faces",
+      "min": 21
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        60,
+        40,
+        30
+      ],
+      "tol": 0.01
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "6\\.2",
+        "1\\.7"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \"{ direction: 'in', id: 'shell' })\", \"{ direction: 'in', id: 'shell' })\\n  .add(j.lib.magnet({ d: mm(6), h: mm(1.5) }), { at: j.tx.move(0, 0, 'wall'), op: 'cut', id: 'magnet' })\");\nconst r = await run(); return { ok: r.ok, errors: r.errors, pocket: r.ok ? (await feature('magnet')).modelled : null };"
+    ],
+    "answer": "Added a press-fit pocket at the centre of the floor, cut down from the floor's top face: Ø6.20 × 1.70 mm (the 6 mm magnet plus the press gap and hole compensation; 1.5 mm plus 0.2 mm), leaving 0.3 mm of floor under it."
+  }
+}
