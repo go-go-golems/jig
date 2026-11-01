@@ -1,7 +1,7 @@
 ---
 Title: 'Harder agent evaluation cases: multi-feature edits, assemblies, print jobs, sketch conflicts, refusals and multi-turn follow-ups'
 Ticket: JIG-005-HARD-CASES
-Status: active
+Status: complete
 Topics:
     - agent
     - llm
@@ -12,7 +12,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-10-31T22:50:25.598072049-04:00
+LastUpdated: 2026-11-01T01:05:53.260191514-04:00
 WhatFor: ""
 WhenToUse: ""
 ---
