@@ -231,3 +231,19 @@ Things to verify before relying on it:
 
 - the Option A asset-path and CSP behaviour;
 - the OAuth `x-api-key` problem.
+
+## 8. Decision (2026-10-31)
+
+The user chose: **serve from Go (Option B), with Pi as the provider and lunaroute models**: `lunaroute/glm-5.3-flash` and `lunaroute/deepseek-4.1-flash`.
+
+- **The models exist.** Both ids are in `~/.pi/agent/models-store.json` under `lunaroute` (an `openai-completions` provider at `https://gw.lunaroute.com/v1`), and `auth.json` has a `lunaroute` OAuth login. `models.json` lists an older set (`deepseek-v4-flash`, `glm-5.2-*`). The catalog file carries the current ids.
+- **Tier mapping:**
+
+  | Tier | Model |
+  |---|---|
+  | quick | `lunaroute/glm-5.3-flash` |
+  | default | `lunaroute/glm-5.3-flash` |
+  | complex | `lunaroute/deepseek-4.1-flash` |
+
+  All three can be overridden with `--model-quick`, `--model-default` and `--model-complex`. The jigcad agent panel's Model setting picks the tier.
+- **The Claude caveat (§4) no longer blocks anything.** lunaroute goes through `openai-completions`, not the Anthropic OAuth path.
