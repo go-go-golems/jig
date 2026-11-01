@@ -9,4 +9,4 @@
 - [ ] Phase 4: linalg kernels + solver residual tape with dual-number Jacobians <!-- t:bkji -->
 - [ ] Phase 5 (later ticket): stage rasteriser in Rust <!-- t:ikxi -->
 - [ ] Phase 4b: residual tape + dual-number Jacobians; move dogleg/LM/drag loops to Rust <!-- t:wfyd -->
-- [ ] Side request: hairline sliders (Params rows, stage zoom) <!-- t:2eqn -->
+- [x] Side request: hairline sliders (Params rows, stage zoom) <!-- t:2eqn -->

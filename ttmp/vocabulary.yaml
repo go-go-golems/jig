@@ -13,6 +13,10 @@ topics:
       description: CAD engine, kernel and geometry
     - slug: performance
       description: Profiling and performance work
+    - slug: agent
+      description: The jigcad coding agent and its model backend
+    - slug: llm
+      description: LLM providers, inference and streaming
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
