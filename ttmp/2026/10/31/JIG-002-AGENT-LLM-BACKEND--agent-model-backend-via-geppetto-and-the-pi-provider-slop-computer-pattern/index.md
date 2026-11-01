@@ -1,7 +1,7 @@
 ---
 Title: Agent model backend via geppetto and the pi provider (slop-computer pattern)
 Ticket: JIG-002-AGENT-LLM-BACKEND
-Status: active
+Status: complete
 Topics:
     - agent
     - llm

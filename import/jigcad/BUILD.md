@@ -126,3 +126,14 @@ host.presetFiles(id) · host.findPreset(id) · host.preset.agent   // meta.json 
 - SketchData entities and constraints carry `line` (script.js line of the call that made them; helper constraints: the helper's line; implied: the entity's line); dimensions carry `expr` when they come from an expression.
 - Selection may be `{ sketch, constraint: id }` or `{ sketch, entity: id }` besides faces and edges; it survives recompiles by id. Hover previews: `host.hover`, `host.setHover(sel)`, event `hover`.
 - `src/engine/callsite.js` holds `callerLine()` for core and kernel.
+
+## 8. Serving with the Go model backend (JIG-002)
+
+`node build.mjs` writes `dist/`. From the repository root, `go run ./cmd/jigcad serve` serves `dist/` on
+`http://127.0.0.1:8787/` together with the agent's model backend: `POST /api/sample` (SSE), tool results on
+`/api/sample/{call}/tools/{use}`, `/api/sample/{call}/cancel`, `GET /api/sample/models`. Model calls go through Pi's
+agent directory (`~/.pi/agent`) with geppetto's `providers/pi`; tiers default to `lunaroute/glm-5.3-flash` (quick,
+default) and `lunaroute/deepseek-4.1-flash` (complex), overridable with `--model-quick/-default/-complex`. The agent
+panel uses `window.claude` when the page runs on claude.ai and the backend otherwise (`src/host/sample-http.js`).
+`go build -tags embed ./cmd/jigcad` embeds `dist/` into one binary. A non-loopback `--listen` requires `--token`
+(or `JIGCAD_TOKEN`); open `/?token=…` once to set the cookie. Go needs 1.26.6 or newer (`GOTOOLCHAIN=auto`).
