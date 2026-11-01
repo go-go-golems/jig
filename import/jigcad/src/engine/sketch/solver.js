@@ -3,12 +3,39 @@
 // minimum-norm solution through a rank-revealing QR) with Levenberg–Marquardt fallback. DOF = n − rank J.
 // Redundant rows are found incrementally; conflicts get a minimal conflicting set by a deletion filter.
 import { factorJ, cholSolve, RowSpace, norm, normInf, lsCoefficients, qrcp } from './linalg.js';
+import { buildTape } from './sym.js';
+import * as RS from '../rs/index.js';
+
+// ── tapes: with jig-compute loaded, every equation (sym.js expression) is solved in Rust ───────────────────
+// A sketch system gets one tape; each equation remembers its index (tid) and the TapeRef.
+export function ensureTape(sys) {
+  if (sys._tape !== undefined) return sys._tape;
+  const eqs = sys.cons.flatMap(c => c.eqs ?? []);
+  if (!eqs.length || !eqs.every(e => e.s)) return (sys._tape = null);
+  const ref = new RS.TapeRef(buildTape(eqs.map(e => e.s)));
+  eqs.forEach((e, k) => { e.tid = k; e.tref = ref; });
+  return (sys._tape = ref);
+}
+const tapedRef = eqs => {
+  if (!RS.enabled() || !eqs.length) return null;
+  const ref = eqs[0].tref;
+  return ref && eqs.every(e => e.tref === ref) ? ref : null;
+};
+const tidsOf = eqs => Uint32Array.from(eqs, e => e.tid);
 
 const TOL_F = 1e-10, FEASIBLE = 1e-8;
 export const METHODS = ['dogleg', 'lm', 'newton'];
 
 // ── local problem over a set of columns ──────────────────────────────────────
 export function makeProblem(x, eqs, cols) {
+  const ref = tapedRef(eqs);
+  if (ref) {
+    const n = cols.length, m = eqs.length, tids = tidsOf(eqs), C = Uint32Array.from(cols), X = x;
+    const set = xc => { for (let k = 0; k < n; k++) X[cols[k]] = xc[k]; };
+    const get = () => Float64Array.from(cols, c => X[c]);
+    const both = xc => { set(xc); const o = RS.tapeJacobian(ref, X, C, tids); if (!o) throw new Error('jig-compute failed in tapeJacobian'); return o; };
+    return { n, m, res: xc => Float64Array.from(both(xc).r), jac: xc => Float64Array.from(both(xc).J), get, set, cols, taped: true };
+  }
   const n = cols.length, m = eqs.length;
   const colOf = new Map(cols.map((c, k) => [c, k]));
   const local = eqs.map(e => ({ f: e.f, vars: e.vars, lc: e.vars.map(v => colOf.get(v)) }));
@@ -175,6 +202,7 @@ function runStrategy(F, x0, strat) {
     const alt = RUN[strat.fallback](F, out.residual < normInf(F.res(x0)) ? out.x : x0, strat);
     if (alt.converged || alt.residual < out.residual) { out = alt; used = strat.fallback; fellBack = true; }
   }
+  F.set(out.x);   // the shared vector holds the kept result, not a rejected fallback's last point
   return { ...out, used, fellBack };
 }
 
@@ -207,6 +235,11 @@ const byPriority = (a, b) => (PRIORITY[a.src] ?? 2) - (PRIORITY[b.src] ?? 2) || 
 
 function eqsOf(cons) { return cons.flatMap(c => c.eqs); }
 function trySolve(sys, x0, cluster, cons, strat) {
+  const eqs = eqsOf(cons), ref = tapedRef(eqs);
+  if (ref) {
+    const o = RS.tapeSolve(ref, Float64Array.from(x0), Uint32Array.from(cluster.cols), tidsOf(eqs), strat);
+    if (o) return { ...o, X: Float64Array.from(o.X), x: Float64Array.from(cluster.cols, c => o.X[c]) };
+  }
   const x = Float64Array.from(x0);
   const F = makeProblem(x, eqsOf(cons), cluster.cols);
   const out = runStrategy(F, F.get(), strat);
@@ -299,6 +332,31 @@ function dependencySupport(sys, X, cluster, cons) {
 export function analyseCluster(sys, X, cluster, cons) {
   const cols = cluster.cols, n = cols.length;
   const ordered = cons.slice().sort(byPriority);
+  const ref = tapedRef(eqsOf(ordered));
+  if (ref) {
+    const ents = cluster.entities.map(id => Object.values(sys.entities.get(id).p).map(i => cols.indexOf(i)).filter(k => k >= 0));
+    const a = RS.tapeAnalyse(ref, X, Uint32Array.from(cols), tidsOf(eqsOf(ordered)), Uint32Array.from(ordered, c => c.eqs.length), ents);
+    if (a) {
+      const redundant = [], rowOwner = [];
+      ordered.forEach((c, g) => {
+        const { added, coef } = a.groups[g];
+        if (added < c.eqs.length) {
+          c.status = c.status === 'conflict' ? 'conflict' : 'redundant';
+          c.partial = added > 0;
+          if (added === 0 && coef) {
+            const maxc = Math.max(1e-300, ...Array.from(coef, Math.abs));
+            c.impliedBy = [...new Set(Array.from(coef, (v, k) => (Math.abs(v) > 1e-6 * maxc ? rowOwner[k] : null)).filter(Boolean))];
+          }
+          redundant.push(c.id);
+        }
+        c.eqs.forEach(() => rowOwner.push(c.id));
+      });
+      const dofFree = new Map(), entityDof = new Map();
+      cols.forEach((c, k) => { if (a.free[k] > 1e-8) dofFree.set(c, true); });
+      cluster.entities.forEach((id, k) => entityDof.set(id, a.entityDof[k]));
+      return { rank: a.rank, dof: n - a.rank, redundant, dofFree, entityDof };
+    }
+  }
   const F = makeProblem(X, eqsOf(ordered), cols);
   const J = F.jac(F.get());
   const rs = new RowSpace(n, 1e-8);
@@ -345,6 +403,7 @@ export function analyseCluster(sys, X, cluster, cons) {
 // ── whole-sketch solve ────────────────────────────────────────────────────────
 export function solveSketch(sys, { slot = null, sketchId = sys.id } = {}) {
   sys.cons.forEach((c, i) => { c.order = i; });
+  if (RS.enabled()) ensureTape(sys);
   const active = sys.cons.filter(c => c.status !== 'invalid' && !c.driven && c.eqs && c.eqs.length);
   const X = Float64Array.from(sys.x);
   const clusters = clustersOf(sys, active);
@@ -366,6 +425,14 @@ export function solveSketch(sys, { slot = null, sketchId = sys.id } = {}) {
 // ── drag: least-change motion of one point, warm-started, only its cluster ────
 export function dragCluster(sys, X, cluster, cons, H, target, { maxIter = 40 } = {}) {
   const eqs = eqsOf(cons), cols = cluster.cols, n = cols.length;
+  if (RS.enabled() && H.s && eqs.every(e => e.s)) {
+    // a small tape of the cluster's equations plus the dragged point's two coordinates
+    const ref = new RS.TapeRef(buildTape([...eqs.map(e => e.s), H.s[0], H.s[1]]));
+    try {
+      const m = eqs.length, o = RS.tapeDrag(ref, X, Uint32Array.from(cols), Uint32Array.from({ length: m }, (_, k) => k), m, m + 1, target, maxIter);
+      if (o) { for (const c of cols) X[c] = o.X[c]; return { iterations: o.iterations, residual: o.residual, converged: o.converged }; }
+    } finally { ref.free(); }
+  }
   const F = makeProblem(X, eqs, cols);
   const colOf = new Map(cols.map((c, k) => [c, k]));
   let x = F.get(), it = 0;

@@ -4,6 +4,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { summary } from './harness.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
+// jig-compute (Rust) solves taped sketches when loaded; JIG_COMPUTE=js runs the JS solver
+const RS = await import('../../src/engine/rs/index.js');
+try { await RS.loadCompute(); } catch (e) { console.log(`jig-compute not loaded: ${e.message}`); }
+console.log(`compute: ${RS.enabled() ? 'rust ' + RS.status.version : 'js'}`);
 const files = readdirSync(here).filter(f => f.endsWith('.test.mjs')).sort();
 const t0 = performance.now();
 for (const f of files) {

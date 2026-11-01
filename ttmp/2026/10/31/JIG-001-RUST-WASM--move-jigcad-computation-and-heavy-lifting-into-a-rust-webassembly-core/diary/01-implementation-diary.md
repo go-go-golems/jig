@@ -325,3 +325,115 @@ finite-difference Jacobians stay in JS; the residual tape (D6) is still the next
 ### Technical details
 
 - `jc_factor_solve(J, m, n, b, tol, want_null) → rank`; result layout `h (n)` then `(n − rank) × n` null-basis entries.
+
+## Step 6: The residual tape and the whole solver loop in Rust (Phase 4b)
+
+The user asked me to finish the Rust ticket: Phase 4b (the solver) and Phase 5 (the renderer), followed by a vault
+report. The blocker for 4b was that every constraint residual was a JS closure. I turned each equation into data:
+a small expression DAG (`src/engine/sketch/sym.js`). The JS closure is now generated from that expression by
+codegen, with the same operation order. Rust receives the expression as a linear tape and evaluates residuals and
+exact reverse-mode gradients from it. On that tape, Rust now runs the cluster solve (dog-leg, Levenberg–Marquardt,
+Newton, fallback), the rank, redundancy and DOF analysis, and the drag.
+
+The results surprised me in a useful way. The Rust solver with exact Jacobians gives byte-identical solved
+sketches (rounded to 1e-9) to the JS solver with finite differences. The book's 374-line check output is
+identical between the two modes as well.
+
+### Prompt Context
+
+**User prompt (verbatim):** "write a detailed project report for the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see skill).      
+ Commit and push the bsidian vault when done (go-go-parc vault).   
+
+Then continue witih phase 4b and 5 to close the rust ticket. 
+
+For the LLM serving, we use pi and however use the lunaroute/glm-5.3-flash and deepseek-4.1-flash models.
+update the ticket, then do the rust stuff, then when the rust stuff is finished, write another report (with screenshots for both reports if possible), then continue with the go serving and all the agent functionality working through lunaroute. commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)
+
+Then the go side is done, also write a report for the vault."
+**Assistant interpretation:** Vault report 1 (done, vault commit `0f7b793`), record the model choice in JIG-002 (done, `9fe56d3`), then Phase 4b and 5, report 2, the Go server, report 3.
+**Inferred user intent:** Close the Rust ticket properly, then have a working agent backed by lunaroute through Pi.
+
+### What I did
+
+- `src/engine/sketch/sym.js` (new):
+  - nodes `{op, a, b, v}` with ops `c x add sub mul div neg sqrt sin cos atan2 hypot nz wrapPi sweep sweepCCW`;
+  - 2D helpers (`vsub vdot vcross vlen polar vmid sdist`);
+  - `compile(node)` → JS function by codegen with shared subexpressions;
+  - `buildTape(roots)` → `{ ops: Float64Array(4·T), starts: Uint32Array(E+1) }`, one contiguous run of instructions per equation;
+  - `evalTape` (JS interpreter used by the tests).
+- `sketch/system.js`: every handle has `s`, its symbolic form beside `get`. Points are `[X(ix), X(iy)]`; arc points are `polar(c, r, angle)`; the line midpoint is `vmid`. The `coord` equation uses `eqS`.
+- `sketch/constraints.js`: every equation is rewritten as `eqS(vars, expr)`. Side and branch choices at x0 (signs, angle targets) are still computed numerically, unchanged. A copy of the original is in the scratchpad (`constraints.orig.js`).
+- `rust/jig-compute/src/tape.rs`: decode with validation (operands must refer to earlier instructions, op ≤ 15), `eval`, and `grad` (reverse mode). Its registry is generation-tagged and capped at 1,024 tapes; the oldest is evicted, and the JS `TapeRef` re-uploads a stale tape.
+- `src/solve.rs`: literal ports of `dogleg`, `levenberg_marquardt`, `newton`, `run_strategy` and `drag`. `src/analyse.rs`: `RowSpace`, `ls_coefficients`, `analyse` (rank, redundant groups with coefficients, free diagonal, entity DOF through `qrcp_rank`).
+- New C ABI: `jc_tape_new/len/free/live`, `jc_tape_jacobian`, `jc_tape_solve`, `jc_tape_drag`, `jc_tape_analyse`. ABI version 1.3.
+- `sketch/solver.js` uses the tape when `jig-compute` is loaded:
+  - `ensureTape(sys)` builds one tape per system and gives each equation a `tid` and `tref`;
+  - `makeProblem` gets Rust residuals and exact Jacobians;
+  - `trySolve` runs `jc_tape_solve`;
+  - `analyseCluster` runs `jc_tape_analyse`;
+  - `dragCluster` runs `jc_tape_drag` on a small tape of the cluster equations plus the dragged point's two coordinates.
+- Bug fix in JS `runStrategy`: `F.set(out.x)` after a rejected fallback. Before, the shared vector kept the rejected fallback's last point, while the residual reported was the primary method's.
+- `src/engine/rs/index.js`: `TapeRef`, `tapeJacobian`, `tapeSolve`, `tapeDrag`, `tapeAnalyse`, call `counters`. `rs/wasm.js`: a `withJs(fn)` hook for in-process parity. `worker.js` `stats` now reports `tapes` and `rustCalls`. `test/engine-core/run.mjs` loads jig-compute unless `JIG_COMPUTE=js`.
+- Tests:
+  - `rust/jig-compute/tests/tape.rs`: every op's gradient against central differences; a distance solve and a drag.
+  - `test/rs/parity.mjs`: on real sketches, closure = JS tape = Rust residual, the exact Jacobian against central differences, and Rust drag against JS drag.
+  - `test/rs/bench.mjs`: whole sketch solves.
+
+### Why
+
+- Generating the JS closure from the same expression leaves one definition per equation, so the JS fallback and the Rust tape cannot drift apart.
+- Solving with exact derivatives removes the finite-difference step problems recorded in BOOK-ISSUES ("FD step false conflict far from the origin").
+
+### What worked
+
+- JS path after the rewrite: `JIG_COMPUTE=js node test/rs/sketch-dump.mjs` matched the dump saved before the rewrite byte for byte (`cmp` reported no difference). The `runStrategy` fix changed nothing there either.
+- Rust path:
+  - core `62 passed` with `compute: rust 1.2`, and again in JS mode;
+  - the core suite made 71 `tapeSolve`, 55 `tapeJacobian` and 4 `tapeDrag` calls in Rust (from `RS.counters`);
+  - engine `42 passed`; presets `72/72`;
+  - Rust and JS sketch dumps identical;
+  - `node tools/book-check.mjs` → `159 blocks compiled · no problems`, with output identical between modes (374 lines, timings stripped).
+- `node test/rs/parity.mjs` → `4019 checks passed, 0 failed`. On tapes: 4 sketches, 230 equation evaluations, worst relative difference between exact and finite-difference Jacobians 1.07e-8.
+- `cargo test --release`: 4 test binaries OK (7 tests).
+- Benchmark (median of 3), `node test/rs/bench.mjs 3`:
+  - A-03 sketch solve ×20: 5.33 → 2.10 ms (×2.5);
+  - M-03 ×20: 23.19 → 10.60 ms (×2.2).
+
+### What didn't work
+
+- My first instrumentation tried to wrap the wasm exports: `TypeError: Cannot assign to read only property 'jc_tape_solve' of object '[object Object]'`. `instance.exports` is frozen. I added `counters` to the bridge instead.
+- A regex insertion of the counters broke a one-line arrow: `return rust(X =>  count('meshSection');decodeLoops(…)`. Fixed by hand.
+- The native drag test asserted 1e-6. It got `[5.2e-25, 5.6e-25, -0.000115, 4.99999999868]`: the least-change iteration approaches the nearest point asymptotically within 40 steps, which is also how JS behaves. I set the tolerance to 1e-3 and added a Rust-against-JS drag comparison to the parity suite.
+- After the first cut (residuals, Jacobians and loops in Rust), M-03 was only ×1.1. Profiling 300 re-solves showed `analyseCluster` at 15 % self time, the largest single item: the JS Gram–Schmidt and the per-entity projector QR. Moving that pass to Rust (`jc_tape_analyse`) brought M-03 to ×2.2.
+- The profiling script first failed with `ENOENT … scandir 'file:///…/content/presets/'`: I passed a URL string to `readdirSync`. Fixed with `new URL(…).pathname`.
+
+### What I learned
+
+- With exact Jacobians the solutions do not change at 1e-9. The finite differences in JS were accurate enough for every preset and book sketch.
+- `instance.exports` is frozen, so instrumentation belongs in the bridge.
+
+### What was tricky to build
+
+- **Keeping JS numerics bit-identical through the rewrite.** Each `eqS` expression mirrors the old closure's operation order exactly: `-q[0] * sp` is `mul(neg(q0), sp)`, and `(len(u) * len(v)) || 1e-300` is `nz(mul(vlen(u), vlen(v)))`. The codegen emits a straight-line function in that order. The byte-identical dump proves it worked.
+- **Derivatives of piecewise ops.** `wrapPi` has derivative 1. `nz` has derivative 1 unless its argument is 0 or NaN. `sweep` and `sweepCCW` give ∓1 to a0/a1, except where the raw sweep is below 1e-12 and the function is clamped to the constant 2π.
+- **Groups and owners in the Rust analysis.** The JS `indepRows` actually holds *all* previous rows; the name is misleading. Coefficient k therefore refers to row k of the ordered Jacobian. The JS side rebuilds `rowOwner` in the same order.
+
+### What warrants a second pair of eyes
+
+- `tape.rs` gradient rules for `atan2`/`hypot` at the origin: no gradient there, same as a zero step.
+- The 1,024-tape cap and eviction under long sessions with many sketches; a re-upload costs only one copy.
+
+### What should be done in the future
+
+- `dependencySupport` (conflict narrowing) still uses the JS RowSpace with Rust Jacobians. It is rare and fine for now.
+
+### Code review instructions
+
+- Start with `src/engine/sketch/sym.js`, `constraints.js` (compare it with the scratch copy of the original), `rust/jig-compute/src/{tape,solve,analyse}.rs`, and the tape section of `sketch/solver.js`.
+- Validate: `node test/engine-core/run.mjs` (both modes), `node test/rs/parity.mjs`, `node test/rs/sketch-dump.mjs` vs `JIG_COMPUTE=js …`, `node tools/book-check.mjs`.
+
+### Technical details
+
+- Tape instruction `[op, a, b, v]`; op codes as in `sym.js` `OP`; operands are relative to the equation start.
+- `jc_tape_solve(h, x, nx, cols, ncols, eqs, neq, method, fallback, maxIter, tau)` → `[converged, iters, residual, used, fellBack, x…]`.
+- `jc_tape_analyse(…, groups, ngroups, ents, nwords, nents)` → `[rank, (added, ncoef, coef…)×groups, free×n, dof×ents]`.

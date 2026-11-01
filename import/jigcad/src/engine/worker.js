@@ -179,7 +179,7 @@ export async function handle(msg) {
       case 'solveSketch': result = solveSketch(msg.sketchId, msg.drag); break;
       case 'export': result = exportCurrent(msg.format, msg.options); break;
       case 'run': result = { value: toPlain(await run(msg.code, msg.files)) }; break;
-      case 'stats': result = { cache: featureCache.size, freed: gc(), compute: computeInfo(), meshes: RS.liveMeshes() }; break;
+      case 'stats': result = { cache: featureCache.size, freed: gc(), compute: computeInfo(), meshes: RS.liveMeshes(), tapes: RS.liveTapes(), rustCalls: { ...RS.counters } }; break;
       default: throw new Error(`unknown op '${op}'`);
     }
     return { id, ok: true, ...result };

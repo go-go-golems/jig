@@ -106,5 +106,59 @@ for (let trial = 0; trial < 60; trial++) {
   check(`chol ${n}`, (cj == null && cr == null) || vnear(Array.from(cr), Array.from(cj), 1e-9, 1e-10));
 }
 
+// residual tapes on real sketches: compiled closure = JS tape interpreter = Rust residual; Rust Jacobian (exact)
+// against central differences of the closure; cluster solve and drag, Rust against JS, on the same system
+{
+  const W = await import('../../src/engine/worker.js');
+  const PG = await import('../../src/engine/program.js');
+  const SY = await import('../../src/engine/sketch/sym.js');
+  const SV = await import('../../src/engine/sketch/solver.js');
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const PD = new URL('../../content/presets/', import.meta.url).pathname;
+  let neq = 0, nsk = 0, worstJ = 0;
+  for (const id of ['A-03', 'M-03', 'W-07', 'H-11', 'S-10', 'D-02', 'X-03']) {
+    const dir = PD + readdirSync(PD).find(d => d.startsWith(id));
+    const model = await W.runScript(readFileSync(dir + '/script.js', 'utf8'), { data: W.parseData(Object.fromEntries(readdirSync(dir).map(f => [f, readFileSync(dir + '/' + f, 'utf8')]))) });
+    const prog = PG.compile(model, {});
+    for (const part of prog.P.parts) for (const [sid, rec] of part.res.sketches) {
+      const solved = rec.solved; if (!solved?.sys) continue;
+      const sys = solved.sys, ref = SV.ensureTape(sys); if (!ref) continue;
+      nsk++;
+      const eqs = sys.cons.flatMap(c => c.eqs ?? []), x = Float64Array.from(solved.X ?? sys.x);
+      const xs = [x, Float64Array.from(x, (v, i) => v + 0.37 * Math.sin(3.1 * i + 1))];   // the solution and a perturbed point
+      for (const xv of xs) {
+        const cols = Uint32Array.from(sys.x.map((_, i) => i).filter(i => !sys.fixed[i])), tids = Uint32Array.from(eqs, e => e.tid);
+        const rj = RS.tapeJacobian(ref, xv, cols, tids), n = cols.length;
+        eqs.forEach((e, k) => {
+          neq++;
+          const a = e.f(xv), b = SY.evalTape(ref.tape, e.tid, xv), c = rj.r[k];
+          check(`${id}/${sid} eq ${k} residual`, near(a, b, 1e-12, 1e-12) && near(a, c, 1e-12, 1e-12), `closure ${a} js-tape ${b} rust ${c}`);
+          for (let j = 0; j < n; j++) {
+            const xp = Float64Array.from(xv), xm = Float64Array.from(xv), h = 1e-6 * Math.max(1, Math.abs(xv[cols[j]]));
+            xp[cols[j]] += h; xm[cols[j]] -= h;
+            const fd = (e.f(xp) - e.f(xm)) / (2 * h), ex = rj.J[k * n + j];
+            const err = Math.abs(fd - ex) / Math.max(1, Math.abs(ex));
+            if (err > worstJ) worstJ = err;
+          }
+        });
+      }
+      // a cluster solve from a perturbed start and a drag of the first free point, Rust then JS
+      const free = sys.order.map(eid => sys.entities.get(eid)).find(en => en.kind === 'point' || en.kind === 'line');
+      if (free) {
+        const ref2 = free.kind === 'point' ? free.id : `${free.id}.end`;
+        let pr; try { pr = solved.point(ref2); } catch { pr = null; }
+        if (pr) {
+          const to = [pr[0] + 1.5, pr[1] - 0.75];
+          const dr = solved.drag(ref2, to), dj = RS.withJs(() => solved.drag(ref2, to));
+          const prr = dr.point(ref2), pjj = dj.point(ref2);
+          check(`${id}/${sid} drag ${ref2}`, near(prr[0], pjj[0], 1e-6, 1e-6) && near(prr[1], pjj[1], 1e-6, 1e-6), `rust ${prr} js ${pjj}`);
+        }
+      }
+    }
+  }
+  check('tape Jacobians match central differences', worstJ < 1e-5, `worst relative error ${worstJ}`);
+  console.log(`tapes: ${nsk} sketches, ${neq} equation evaluations, worst |exact − FD| / max(1, |exact|) = ${worstJ.toExponential(2)} · live tapes ${RS.liveTapes()}`);
+}
+
 console.log(`\n${pass} checks passed, ${fail} failed · ${ntri} triangles · ${(performance.now() - t0).toFixed(0)} ms · live meshes ${RS.liveMeshes()}`);
 process.exit(fail ? 1 : 0);

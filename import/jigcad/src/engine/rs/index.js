@@ -4,10 +4,13 @@
 // Meshes: meshTris() returns a TriSoup instead of an array of records. A TriSoup owns a Rust mesh handle and
 // remembers what it was built from (display mesh, placement, face geometry), so it can rebuild the handle after
 // resetArena() or produce JS records if the module is gone. catTris() is the TriSoup-aware `flatMap`.
-import { compute, put, release, result, onTrap, status, loadCompute } from './wasm.js';
+import { compute, put, release, result, onTrap, status, loadCompute, withJs } from './wasm.js';
 
-export { loadCompute, status };
+export { loadCompute, status, withJs };
 export const enabled = () => compute() != null;
+/** calls that ran in Rust, by bridge function (diagnostics; the worker reports them in `stats`) */
+export const counters = {};
+const count = k => { counters[k] = (counters[k] ?? 0) + 1; };
 
 // Face geometry for exact normals (rust/jig-compute/src/mesh.rs GEO_STRIDE)
 const GEO_STRIDE = 13;
@@ -111,14 +114,14 @@ export function rust(fn) {
 }
 
 export function orientationScore(soup, u, { maxAngle = Math.PI / 4, bedTol = 1e-3, supportFactor = 1 } = {}) {
-  return rust(X => {
+  return rust(X => { count('orientationScore');
     const r = result(X, X.jc_orientation_score(soup.handle(), u[0], u[1], u[2], maxAngle, bedTol, supportFactor));
     const nf = r[9];
     return { dir: [r[6], r[7], r[8]], overhangArea: r[0], bedContact: r[1], height: r[2], supportVolume: r[3], overhangFaces: Array.from(r.subarray(10, 10 + nf)), lo: r[4], hi: r[5] };
   });
 }
 export function meshGap(A, B, maxD) {
-  return rust(X => {
+  return rust(X => { count('meshGap');
     const d = X.jc_mesh_gap(A.handle(), B.handle(), maxD);
     if (Number.isNaN(d)) throw new Error('jc_mesh_gap: stale mesh handle');
     return d;
@@ -131,10 +134,10 @@ const decodeLoops = (r, i0 = 0) => {
   return { loops, end: i };
 };
 export function meshSection(soup, z) {
-  return rust(X => decodeLoops(result(X, X.jc_mesh_section(soup.handle(), z))).loops);
+  return rust(X => { count('meshSection'); return decodeLoops(result(X, X.jc_mesh_section(soup.handle(), z))).loops; });
 }
 export function loopsProps(loops) {
-  return rust(X => {
+  return rust(X => { count('loopsProps');
     let size = 1; for (const l of loops) size += 1 + 2 * l.length;
     const enc = new Float64Array(size);
     let i = 0; enc[i++] = loops.length;
@@ -149,7 +152,7 @@ export function loopsProps(loops) {
 
 // ── linear algebra (sketch/linalg.js shapes) ────────────────────────────────
 export function factorSolve(J, m, n, b, { tol = 1e-10, wantNull = false } = {}) {
-  return rust(X => {
+  return rust(X => { count('factorSolve');
     const bj = put(X, J, Float64Array), bb = put(X, b ?? new Float64Array(m), Float64Array);
     try {
       const rank = X.jc_factor_solve(bj.p, m, n, bb.p, tol, wantNull ? 1 : 0);
@@ -160,11 +163,75 @@ export function factorSolve(J, m, n, b, { tol = 1e-10, wantNull = false } = {}) 
   });
 }
 export function cholSolve(A, n, b, mu = 0) {
-  return rust(X => {
+  return rust(X => { count('cholSolve');
     const ba = put(X, A, Float64Array), bb = put(X, b, Float64Array);
     try { return X.jc_chol_solve(ba.p, n, bb.p, mu) ? result(X, n) : null; } finally { release(X, ba, bb); }
   });
 }
 export function qrcpRank(A, m, n, tol = 1e-10) {
   return rust(X => { const ba = put(X, A, Float64Array); try { return X.jc_qrcp_rank(ba.p, m, n, tol); } finally { release(X, ba); } });
+}
+
+// ── residual tapes (sketch solver, Phase 4b) ────────────────────────────────
+// A TapeRef owns the tape data (sym.js buildTape) and a Rust handle, re-uploaded when stale (the Rust registry is
+// capped and evicts its oldest tapes).
+export class TapeRef {
+  constructor(tape) { this.tape = tape; this.h = 0; }
+  handle(X) {
+    if (this.h && X.jc_tape_len(this.h) >= 0) return this.h;
+    const ops = put(X, this.tape.ops, Float64Array), st = put(X, this.tape.starts, Uint32Array);
+    try { const h = X.jc_tape_new(ops.p, this.tape.ops.length / 4, st.p, this.tape.count); if (h < 0) result(X, h); this.h = h >>> 0; }
+    finally { release(X, ops, st); }
+    return this.h;
+  }
+  free() { const X = compute(); if (X && this.h) X.jc_tape_free(this.h); this.h = 0; }
+}
+const METHOD = { dogleg: 0, lm: 1, bfgs: 1, newton: 2 };
+const METHOD_NAME = ['dogleg', 'lm', 'newton'];
+function withProblem(X, ref, x, cols, tids, fn) {
+  const bx = put(X, x, Float64Array), bc = put(X, cols, Uint32Array), be = put(X, tids, Uint32Array);
+  try { return fn(ref.handle(X), bx.p, x.length, bc.p, cols.length, be.p, tids.length); } finally { release(X, bx, bc, be); }
+}
+/** residuals and exact Jacobian (m × n) of tape equations `tids` over `cols` at the full vector x */
+export function tapeJacobian(ref, x, cols, tids) {
+  return rust(X => { count('tapeJacobian');
+    const r = result(X, withProblem(X, ref, x, cols, tids, (h, ...a) => X.jc_tape_jacobian(h, ...a)));
+    const m = tids.length;
+    return { r: r.subarray(0, m), J: r.subarray(m) };
+  });
+}
+/** runStrategy in Rust: { x (full vector), iters, converged, residual, used, fellBack } */
+export function tapeSolve(ref, x, cols, tids, strat) {
+  return rust(X => { count('tapeSolve');
+    const method = METHOD[strat.method] ?? 0, fallback = strat.fallback ? (METHOD[strat.fallback] ?? -1) : -1;
+    const n = withProblem(X, ref, x, cols, tids, (h, ...a) => X.jc_tape_solve(h, ...a, method, fallback, strat.maxIter ?? -1, strat.tau ?? 1e-3));
+    const r = result(X, n);
+    return { converged: !!r[0], iters: r[1], residual: r[2], used: METHOD_NAME[r[3]] ?? strat.method, fellBack: !!r[4], X: r.subarray(5) };
+  });
+}
+/** dragCluster in Rust; hx, hy are tape equations giving the dragged point */
+export function tapeDrag(ref, x, cols, tids, hx, hy, target, maxIter = 40) {
+  return rust(X => { count('tapeDrag');
+    const n = withProblem(X, ref, x, cols, tids, (h, ...a) => X.jc_tape_drag(h, ...a, hx, hy, target[0], target[1], maxIter));
+    const r = result(X, n);
+    return { iterations: r[0], residual: r[1], converged: !!r[2], X: r.subarray(3) };
+  });
+}
+export const liveTapes = () => compute()?.jc_tape_live() ?? 0;
+/** analyseCluster in Rust. groups: equations per constraint (priority order); ents: column-index sets per entity.
+ *  → { rank, groups: [{ added, coef: Float64Array | null }], free: Float64Array(n), entityDof: number[] } */
+export function tapeAnalyse(ref, x, cols, tids, groups, ents) {
+  return rust(X => {
+    count('tapeAnalyse');
+    const words = []; for (const s of ents) { words.push(s.length, ...s); }
+    const bg = put(X, groups, Uint32Array), bw = put(X, words, Uint32Array);
+    try {
+      const n = withProblem(X, ref, x, cols, tids, (h, ...a) => X.jc_tape_analyse(h, ...a, bg.p, groups.length, bw.p, words.length, ents.length));
+      const r = result(X, n);
+      let i = 1; const gs = [];
+      for (let g = 0; g < groups.length; g++) { const added = r[i++], k = r[i++]; gs.push({ added, coef: k ? r.slice(i, i + k) : null }); i += k; }
+      const free = r.slice(i, i + cols.length); i += cols.length;
+      return { rank: r[0], groups: gs, free, entityDof: Array.from(r.subarray(i, i + ents.length)) };
+    } finally { release(X, bg, bw); }
+  });
 }

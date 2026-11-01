@@ -2,8 +2,9 @@
 // Entity parameters: point (x, y) · line (ax, ay, bx, by) · circle (cx, cy, r) · arc (cx, cy, r, a0, a1)
 // · ellipse (cx, cy, rx, ry, phi) · spline (x0, y0, …) · rigid import (tx, ty, th). External entities are fixed.
 import { Quantity, coerce } from '../units.js';
-import { equations, ConstraintError, VALUE_KIND, measure } from './constraints.js';
+import { equations, ConstraintError, VALUE_KIND, measure, eqS } from './constraints.js';
 import { polar, sub, cross, len, sweepCCW, TAU } from './geom2d.js';
+import * as S from './sym.js';
 
 const SUBS = new Set(['start', 'end', 'mid', 'center']);
 
@@ -84,9 +85,10 @@ export class System {
     return null;
   }
   vars(...idx) { return idx.filter(i => !this.fixed[i]); }
-  ptH(ix, iy) { return { kind: 'point', vars: this.vars(ix, iy), get: x => [x[ix], x[iy]] }; }
-  scalarH(i) { return { kind: 'scalar', vars: this.vars(i), get: x => x[i] }; }
-  constPoint(p) { return { kind: 'point', vars: [], get: () => p, const: true }; }
+  // handles: get(x) evaluates; s is the same quantity as a sym.js expression (for taped equations)
+  ptH(ix, iy) { return { kind: 'point', vars: this.vars(ix, iy), get: x => [x[ix], x[iy]], s: [S.X(ix), S.X(iy)] }; }
+  scalarH(i) { return { kind: 'scalar', vars: this.vars(i), get: x => x[i], s: S.X(i) }; }
+  constPoint(p) { return { kind: 'point', vars: [], get: () => p, const: true, s: [S.K(p[0]), S.K(p[1])] }; }
   constLine(a, b) { return { kind: 'line', a: this.constPoint(a), b: this.constPoint(b), vars: [], const: true }; }
 
   entityHandle(e) {
@@ -95,7 +97,7 @@ export class System {
       case 'point': return { ...this.ptH(p.x, p.y), ent: e.id };
       case 'line': {
         const a = this.ptH(p.ax, p.ay), b = this.ptH(p.bx, p.by);
-        const mid = { kind: 'point', vars: [...a.vars, ...b.vars], get: x => [(x[p.ax] + x[p.bx]) / 2, (x[p.ay] + x[p.by]) / 2] };
+        const mid = { kind: 'point', vars: [...a.vars, ...b.vars], get: x => [(x[p.ax] + x[p.bx]) / 2, (x[p.ay] + x[p.by]) / 2], s: S.vmid(a.s, b.s) };
         return { kind: 'line', a, b, mid, vars: [...a.vars, ...b.vars], ent: e.id };
       }
       case 'circle': {
@@ -104,11 +106,11 @@ export class System {
       }
       case 'arc': {
         const c = this.ptH(p.cx, p.cy), r = this.scalarH(p.r), a0 = this.scalarH(p.a0), a1 = this.scalarH(p.a1);
-        const at = (fa) => ({ kind: 'point', vars: this.vars(p.cx, p.cy, p.r, ...fa.idx), get: x => polar([x[p.cx], x[p.cy]], x[p.r], fa.f(x)) });
+        const at = (fa) => ({ kind: 'point', vars: this.vars(p.cx, p.cy, p.r, ...fa.idx), get: x => polar([x[p.cx], x[p.cy]], x[p.r], fa.f(x)), s: S.polar(c.s, r.s, fa.s) });
         return {
           kind: 'arc', c, r, a0, a1, ent: e.id, vars: this.vars(p.cx, p.cy, p.r, p.a0, p.a1),
-          start: at({ idx: [p.a0], f: x => x[p.a0] }), end: at({ idx: [p.a1], f: x => x[p.a1] }),
-          mid: at({ idx: [p.a0, p.a1], f: x => x[p.a0] + sweepCCW(x[p.a0], x[p.a1]) / 2 }),
+          start: at({ idx: [p.a0], f: x => x[p.a0], s: a0.s }), end: at({ idx: [p.a1], f: x => x[p.a1], s: a1.s }),
+          mid: at({ idx: [p.a0, p.a1], f: x => x[p.a0] + sweepCCW(x[p.a0], x[p.a1]) / 2, s: S.add(a0.s, S.div(S.sweepCCW(a0.s, a1.s), 2)) }),
         };
       }
       case 'ellipse': {
@@ -225,7 +227,7 @@ export class System {
         rec.hs = rec.refs.map(r => this.handle(r));
         rec.v = this.resolveValue(rec);
         if (rec.driven) continue;
-        if (rec.type === 'coord') { const P = rec.hs[0], k = rec.opts.k, v = rec.v; rec.eqs = [{ vars: P.vars, f: x => P.get(x)[k] - v }]; }
+        if (rec.type === 'coord') { const P = rec.hs[0], k = rec.opts.k, v = rec.v; rec.eqs = [eqS(P.vars, S.sub(P.s[k], v))]; }
         else rec.eqs = equations(rec.type, rec.hs, rec.v, x0, rec.opts);
         rec.eqs = rec.eqs.filter(e => e.vars.length > 0 || Math.abs(e.f(x0)) > 1e-9);
       } catch (e) {

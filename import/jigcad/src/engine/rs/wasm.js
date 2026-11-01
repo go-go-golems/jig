@@ -50,6 +50,12 @@ export function loadCompute(opts = {}) {
 /** The exports while Rust is active, else null. */
 export const compute = () => X;
 export function disable(reason) { X = null; status.active = false; status.reason = reason; }
+/** Run fn with Rust switched off, then restore it (parity tests compare both paths in one process). */
+export function withJs(fn) {
+  const keep = X, active = status.active;
+  X = null; status.active = false;
+  try { return fn(); } finally { X = keep; status.active = active; }
+}
 /** A trap (RuntimeError) means the module state cannot be trusted: switch to JS for the rest of the session. */
 export function onTrap(e) {
   if (e instanceof WebAssembly.RuntimeError) { disable(`trap: ${e.message}`); return true; }

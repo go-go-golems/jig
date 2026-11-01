@@ -37,4 +37,22 @@ for (const [m, n] of [[8, 10], [24, 30], [60, 80]]) {
   const J = Float64Array.from({ length: m * n }, rnd), bv = Float64Array.from({ length: m }, rnd);
   row(`factorJ + solve ${m}×${n} (×200)`, time(() => { for (let k = 0; k < 200; k++) LA.factorJJS(J, m, n).solve(bv); }), time(() => { for (let k = 0; k < 200; k++) RS.factorSolve(J, m, n, bv); }));
 }
+// whole sketch solves (all clusters, conflict search, rank analysis) on real preset sketches: tape solver vs JS
+{
+  const W = await import('../../src/engine/worker.js');
+  const PG = await import('../../src/engine/program.js');
+  const SV = await import('../../src/engine/sketch/solver.js');
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const PD = new URL('../../content/presets/', import.meta.url).pathname;
+  for (const id of ['A-03', 'M-03', 'H-11']) {
+    const dir = PD + readdirSync(PD).find(d => d.startsWith(id));
+    const model = await W.runScript(readFileSync(dir + '/script.js', 'utf8'), { data: W.parseData(Object.fromEntries(readdirSync(dir).map(f => [f, readFileSync(dir + '/' + f, 'utf8')]))) });
+    const prog = PG.compile(model, {});
+    const systems = prog.P.parts.flatMap(p => [...p.res.sketches.values()].map(r => r.solved?.sys).filter(s => s && s.cons.some(c => c.eqs?.length)));
+    if (!systems.length) continue;
+    const m = systems.reduce((k, s) => k + s.cons.reduce((q, c) => q + (c.eqs?.length ?? 0), 0), 0), n = systems.reduce((k, s) => k + s.x.length, 0);
+    const run = () => { for (let r = 0; r < 20; r++) for (const s of systems) SV.solveSketch(s); };
+    row(`${id} sketch solve ×20 (${systems.length} sketches, ${m} eqs, ${n} params)`, time(() => RS.withJs(run)), time(run));
+  }
+}
 console.log(`\nmodule load ${RS.status.ms.toFixed(1)} ms · ${RS.status.bytes} bytes · live meshes ${RS.liveMeshes()}`);

@@ -5,19 +5,22 @@
 //! (valid until the next call). Negative returns mean failure; the message is at `jc_error_ptr()/jc_error_len()`.
 //! See ttmp/…/JIG-001-RUST-WASM design doc §6.2 and src/engine/rs/*.js for the JS side.
 
+pub mod analyse;
 pub mod gap;
 pub mod linalg;
 pub mod mem;
 pub mod mesh;
 pub mod orient;
 pub mod section;
+pub mod solve;
+pub mod tape;
 pub mod vec3;
 
 use mem::{set_error, set_result, slice};
 use mesh::{FaceGeo, TriMesh, GEO_STRIDE};
 
 /// ABI version: major * 1000 + minor. Bump major on breaking changes; the JS bridge checks it.
-pub const ABI_VERSION: u32 = 1_001;
+pub const ABI_VERSION: u32 = 1_003;
 
 #[no_mangle] pub extern "C" fn jc_version() -> u32 { ABI_VERSION }
 #[no_mangle] pub extern "C" fn jc_alloc(n: u32) -> *mut u8 { mem::alloc_bytes(n as usize) }
@@ -143,4 +146,89 @@ pub unsafe extern "C" fn jc_factor_solve(j: *const f64, m: u32, n: u32, b: *cons
 pub unsafe extern "C" fn jc_chol_solve(a: *const f64, n: u32, b: *const f64, mu: f64) -> i32 {
     let n = n as usize;
     match linalg::chol_solve(slice(a, n * n), n, slice(b, n), mu) { Some(x) => { set_result(x); 1 } None => 0 }
+}
+
+// ── residual tapes and the sketch solver (Phase 4b) ──────────────────────────
+
+/// Upload a tape: `ops` = 4 f64 per instruction (nins instructions), `starts` = neq + 1 offsets. Returns a handle.
+#[no_mangle]
+pub unsafe extern "C" fn jc_tape_new(ops: *const f64, nins: u32, starts: *const u32, neq: u32) -> i32 {
+    match tape::Tape::decode(slice(ops, nins as usize * 4), slice(starts, neq as usize + 1)) {
+        Ok(t) => tape::insert(t) as i32,
+        Err(e) => set_error(e),
+    }
+}
+#[no_mangle] pub extern "C" fn jc_tape_len(h: u32) -> i32 { tape::with(h, |t| t.count() as i32).unwrap_or_else(|| set_error("stale tape handle")) }
+#[no_mangle] pub extern "C" fn jc_tape_free(h: u32) -> i32 { tape::remove(h) as i32 }
+#[no_mangle] pub extern "C" fn jc_tape_live() -> u32 { tape::live() as u32 }
+
+unsafe fn problem_args(x: *const f64, nx: u32, cols: *const u32, ncols: u32, eqs: *const u32, neq: u32) -> (Vec<f64>, Vec<usize>, Vec<usize>) {
+    (slice(x, nx as usize).to_vec(), slice(cols, ncols as usize).iter().map(|&c| c as usize).collect(), slice(eqs, neq as usize).iter().map(|&e| e as usize).collect())
+}
+fn check(t: &tape::Tape, x: &[f64], cols: &[usize], eqs: &[usize]) -> bool { cols.iter().all(|&c| c < x.len()) && eqs.iter().all(|&e| e < t.count()) }
+
+/// Residuals and exact Jacobian of equations `eqs` over columns `cols`: result [r (m), J (m × n, row-major)].
+#[no_mangle]
+pub unsafe extern "C" fn jc_tape_jacobian(h: u32, x: *const f64, nx: u32, cols: *const u32, ncols: u32, eqs: *const u32, neq: u32) -> i32 {
+    let (xv, cv, ev) = problem_args(x, nx, cols, ncols, eqs, neq);
+    tape::with(h, |t| {
+        if !check(t, &xv, &cv, &ev) { return set_error("jc_tape_jacobian: index out of range"); }
+        let mut p = solve::Problem::new(t, xv, cv, ev);
+        let xc = p.get();
+        let mut out = p.res(&xc);
+        out.extend(p.jac(&xc));
+        set_result(out)
+    }).unwrap_or_else(|| set_error("stale tape handle"))
+}
+
+/// Solve one cluster (runStrategy). method/fallback: 0 dogleg · 1 lm · 2 newton · −1 none; max_iter ≤ 0 = default.
+/// Result: [converged, iters, residual, used, fellBack, x (full vector, nx)].
+#[no_mangle]
+pub unsafe extern "C" fn jc_tape_solve(h: u32, x: *const f64, nx: u32, cols: *const u32, ncols: u32, eqs: *const u32, neq: u32, method: i32, fallback: i32, max_iter: i32, tau: f64) -> i32 {
+    let (xv, cv, ev) = problem_args(x, nx, cols, ncols, eqs, neq);
+    tape::with(h, |t| {
+        if !check(t, &xv, &cv, &ev) { return set_error("jc_tape_solve: index out of range"); }
+        let mut p = solve::Problem::new(t, xv, cv, ev);
+        let x0 = p.get();
+        let (o, used, fell) = solve::run_strategy(&mut p, &x0, method, fallback, max_iter, tau);
+        let mut out = vec![o.converged as u8 as f64, o.iters as f64, o.residual, used as f64, fell as u8 as f64];
+        out.extend_from_slice(&p.x);
+        set_result(out)
+    }).unwrap_or_else(|| set_error("stale tape handle"))
+}
+
+/// Drag the point whose coordinates are tape equations hx, hy toward (tx, ty), keeping `eqs` satisfied.
+/// Result: [iterations, residual, converged, x (full vector, nx)].
+#[no_mangle]
+pub unsafe extern "C" fn jc_tape_drag(h: u32, x: *const f64, nx: u32, cols: *const u32, ncols: u32, eqs: *const u32, neq: u32, hx: u32, hy: u32, tx: f64, ty: f64, max_iter: u32) -> i32 {
+    let (xv, cv, ev) = problem_args(x, nx, cols, ncols, eqs, neq);
+    tape::with(h, |t| {
+        if !check(t, &xv, &cv, &ev) || hx as usize >= t.count() || hy as usize >= t.count() { return set_error("jc_tape_drag: index out of range"); }
+        let mut p = solve::Problem::new(t, xv, cv, ev);
+        let (it, fin) = solve::drag(&mut p, hx as usize, hy as usize, [tx, ty], max_iter as usize);
+        let mut out = vec![it as f64, fin.residual, (fin.converged || fin.residual <= solve::FEASIBLE) as u8 as f64];
+        out.extend_from_slice(&p.x);
+        set_result(out)
+    }).unwrap_or_else(|| set_error("stale tape handle"))
+}
+
+/// analyseCluster on the tape: `eqs` in priority order, `groups` = equations per constraint (ngroups),
+/// `ents` = column sets per entity as [len, cols…]* (nents). Result: see analyse::analyse.
+#[no_mangle]
+pub unsafe extern "C" fn jc_tape_analyse(h: u32, x: *const f64, nx: u32, cols: *const u32, ncols: u32, eqs: *const u32, neq: u32,
+    groups: *const u32, ngroups: u32, ents: *const u32, nents_words: u32, nents: u32) -> i32 {
+    let (xv, cv, ev) = problem_args(x, nx, cols, ncols, eqs, neq);
+    let gs: Vec<usize> = slice(groups, ngroups as usize).iter().map(|&g| g as usize).collect();
+    let words = slice(ents, nents_words as usize);
+    let mut es: Vec<Vec<usize>> = Vec::with_capacity(nents as usize);
+    let mut i = 0;
+    for _ in 0..nents { let k = words.get(i).copied().unwrap_or(0) as usize; i += 1; es.push(words.get(i..i + k).unwrap_or(&[]).iter().map(|&c| c as usize).collect()); i += k; }
+    if gs.iter().sum::<usize>() != ev.len() || es.iter().flatten().any(|&c| c >= cv.len()) { return set_error("jc_tape_analyse: bad groups or entity columns"); }
+    tape::with(h, |t| {
+        if !check(t, &xv, &cv, &ev) { return set_error("jc_tape_analyse: index out of range"); }
+        let mut p = solve::Problem::new(t, xv, cv, ev);
+        let xc = p.get();
+        let j = p.jac(&xc);
+        set_result(analyse::analyse(&j, p.m(), p.n(), &gs, &es))
+    }).unwrap_or_else(|| set_error("stale tape handle"))
 }
