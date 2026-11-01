@@ -1,0 +1,49 @@
+{
+  "id": "a01-bigger-clarify",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "multi-turn",
+    "clarify"
+  ],
+  "request": "Make the box bigger.",
+  "followUps": [
+    "80 by 50 mm footprint, same height and walls."
+  ],
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        80,
+        50,
+        30
+      ],
+      "tol": 0.01
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 21904.27,
+      "tol": 0.5
+    }
+  ],
+  "oracle": {
+    "turns": [
+      {
+        "steps": [],
+        "answer": "How much bigger: which dimensions?"
+      },
+      {
+        "steps": [
+          "files.edit('script.js', \"w: mm(60), d: mm(40)\", \"w: mm(80), d: mm(50)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+        ],
+        "answer": "Now 80 × 50 × 30 mm."
+      }
+    ]
+  }
+}

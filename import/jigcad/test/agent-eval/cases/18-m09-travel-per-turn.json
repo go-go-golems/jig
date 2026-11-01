@@ -1,0 +1,28 @@
+{
+  "id": "m09-travel-per-turn",
+  "preset": "M-09",
+  "mode": "read",
+  "tags": [
+    "question",
+    "assembly",
+    "gears"
+  ],
+  "request": "How far does the rack move for one full turn of the pinion?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "113([.,][01]\\d*)?\\s*mm"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return files.read('script.js').slice(0, 1200);"
+    ],
+    "answer": "π · m · z = π · 2 · 18 ≈ 113.1 mm per turn."
+  }
+}

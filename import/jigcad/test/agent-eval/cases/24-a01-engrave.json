@@ -1,0 +1,43 @@
+{
+  "id": "a01-engrave",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "multi-feature",
+    "text"
+  ],
+  "request": "Engrave the text BOX, 8 mm tall and 0.6 mm deep, into the outside of the bottom of the box.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "contains": "BOX"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "min": 15200,
+      "max": 15340
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        60,
+        40,
+        30
+      ],
+      "tol": 0.01
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \".shell(j.feat('body').endFace(), 'wall', { direction: 'in', id: 'shell' })\", \".shell(j.feat('body').endFace(), 'wall', { direction: 'in', id: 'shell' })\\n  .emboss(j.region.text('BOX', { size: 8 }), mm(0.6), { on: j.feat('body').startFace(), op: 'cut', id: 'label' })\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "BOX is cut 0.6 mm into the bottom face."
+  }
+}

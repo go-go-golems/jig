@@ -64,11 +64,22 @@ export function noteCode(note) {
   return hit ? hit[0] : 'interrupted';
 }
 
+/** Usage of several turns added up (the model name of the last). */
+export function sumUsage(list) {
+  if (!list.length) return null;
+  if (list.length === 1) return list[0];
+  const out = { ...list[list.length - 1] };
+  for (const k of ['input', 'cacheRead', 'cacheWrite', 'output', 'rounds', 'toolCalls']) out[k] = list.reduce((n, u) => n + (u[k] || 0), 0);
+  return out;
+}
+
 const stepSummary = s => ({ code: cut(s.code, STEP_TEXT), result: cut(s.result, STEP_TEXT), ms: s.ms, error: !!s.error, changed: !!s.changed });
 
 /**
  * Run one case. opts: { host, sample, tier, repeat, deadlineMs }.
- * → { case, tier, repeat, pass, outcome, timedOut, ms, toolCalls, usage, promptChars, checks, answer, note, steps, error? }
+ * c.followUps (optional) are further requests in the same thread; checks then judge the final state, the last answer
+ * and the steps of all turns.
+ * → { case, tier, repeat, pass, outcome, timedOut, ms, toolCalls, turns, usage, promptChars, checks, answer, answers?, note, steps, error? }
  */
 export async function runCase(c, { host, sample, tier = 'default', repeat = 1, deadlineMs = 300_000 }) {
   const base = { case: c.id, tier, repeat, mode: c.mode || 'auto', tags: c.tags || [] };
@@ -94,21 +105,32 @@ export async function runCase(c, { host, sample, tier = 'default', repeat = 1, d
     for (const s of turn?.steps || []) if (s.asking && s.resolve) s.resolve(true);
   }, 0);
   const t0 = performance.now();
+  // one request, or a conversation: followUps run as further turns of the same thread, each after the last finished
+  const requests = [c.request, ...(c.followUps || [])];
+  const usages = [];
   try {
-    await runTurn({ host, sample: cap.fn, thread, text: c.request, settings: { mode, tier, effort: c.effort || '' },
-      reference: host.reference(), signal: ctl.signal, onUpdate: mode === 'ask' ? approve : () => {} });
+    for (const text of requests) {
+      if (ctl.signal.aborted) break;
+      cap.usage = null;
+      await runTurn({ host, sample: cap.fn, thread, text, settings: { mode, tier, effort: c.effort || '' },
+        reference: host.reference(), signal: ctl.signal, onUpdate: mode === 'ask' ? approve : () => {} });
+      if (cap.usage) usages.push(cap.usage);
+    }
   } finally { clearTimeout(timer); }
   const ms = Math.round(performance.now() - t0);
   await new Promise(r => setTimeout(r, 0));   // let rejections of the turn's last step surface
-  const turn = thread.turns[thread.turns.length - 1];
+  const agentTurns = thread.turns.filter(t => t.role !== 'user');
+  const turn = agentTurns[agentTurns.length - 1];
+  const steps = agentTurns.flatMap(t => t.steps);
   // judge what the person would see after the turn: the final files (and overrides) compiled
   const program = await host.compile();
-  const checks = evaluate(c, { initialFiles, files: Object.fromEntries(host.files), program, turn, steps: turn.steps, truncatedNote: NOTES.truncated });
+  const checks = evaluate(c, { initialFiles, files: Object.fromEntries(host.files), program, turn, steps, truncatedNote: NOTES.truncated });
   return {
     ...base, pass: checks.every(x => x.pass), outcome: timedOut ? 'deadline' : noteCode(turn.note), timedOut, ms,
-    toolCalls: turn.steps.length, usage: cap.usage, promptChars: cap.promptChars, sampleError: cap.error,
+    toolCalls: steps.length, turns: agentTurns.length, usage: sumUsage(usages), promptChars: cap.promptChars, sampleError: cap.error,
     unhandledRejections: seen.count - unhandledBefore, ...(seen.count > unhandledBefore ? { lastUnhandled: seen.last } : {}),
-    checks, answer: turn.text, note: turn.note || null, steps: turn.steps.map(stepSummary),
+    checks, answer: turn.text, note: turn.note || null, steps: steps.map(stepSummary),
+    ...(agentTurns.length > 1 ? { answers: agentTurns.map(t => t.text) } : {}),
   };
 }
 
@@ -127,4 +149,20 @@ export async function runAll(cases, { host, sample, sampleFor = null, tiers = ['
       (rec.pass ? '' : ` · ${rec.checks.filter(x => !x.pass).map(x => `${x.kind}: ${x.detail}`).join(' | ') || rec.error || ''}`));
   }
   return out;
+}
+
+/**
+ * A sample function that replays a case's oracle (a known-good scripted turn, or one per request when the case has
+ * followUps: oracle.turns = [{ steps, answer }, …]) instead of asking a model.
+ */
+export function oracleSample(c) {
+  const turns = c.oracle?.turns || [c.oracle || {}];
+  let i = 0;
+  return async (_, opts) => {
+    const t = turns[Math.min(i++, turns.length - 1)];
+    for (const code of t.steps || []) await opts.tools[0].execute({ code }, { signal: opts.signal });
+    const text = t.answer || '';
+    opts.onText?.({ text, delta: text });
+    return { text, truncated: false, usage: { input: 1200, cacheRead: 1000, cacheWrite: 0, output: 50, rounds: (t.steps || []).length + 1, toolCalls: (t.steps || []).length } };
+  };
 }

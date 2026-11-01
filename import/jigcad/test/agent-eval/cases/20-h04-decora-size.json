@@ -1,0 +1,29 @@
+{
+  "id": "h04-decora-size",
+  "preset": "H-04",
+  "mode": "read",
+  "tags": [
+    "question",
+    "configs",
+    "units"
+  ],
+  "request": "How big is the plate in the US Decora configuration, in millimetres?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "69[.,]85",
+        "114[.,]3"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "const v = await check(files.read('script.js'), { config: 'us_decora' }); return v.metrics.bbox;"
+    ],
+    "answer": "69.85 × 114.3 mm (2.75 × 4.5 in), 7 mm deep."
+  }
+}

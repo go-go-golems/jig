@@ -1,0 +1,43 @@
+{
+  "id": "a01-mount-holes",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "multi-feature",
+    "holes"
+  ],
+  "request": "Add four 3.4 mm through holes in the floor for M3 screws, at x = ±22 mm and y = ±12 mm.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 15271.63,
+      "tol": 1
+    },
+    {
+      "kind": "metric",
+      "name": "faces",
+      "min": 23
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        60,
+        40,
+        30
+      ],
+      "tol": 0.01
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \".shell(j.feat('body').endFace(), 'wall', { direction: 'in', id: 'shell' })\", \".shell(j.feat('body').endFace(), 'wall', { direction: 'in', id: 'shell' })\\n  .hole([[-22, -12], [22, -12], [22, 12], [-22, 12]], j.hole.simple(mm(3.4), 'through'), { id: 'mount' })\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "Added four Ø3.4 mm through holes at (±22, ±12)."
+  }
+}

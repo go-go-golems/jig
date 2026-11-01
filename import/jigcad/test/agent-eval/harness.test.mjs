@@ -153,7 +153,7 @@ test('captureUsage keeps error usage; noteCode maps turn notes back to codes', a
 });
 
 // ── the case set: every case is well formed, and its oracle (a known-good turn) passes it ─────────────────────
-const { loadCases } = await import('../../tools/agent-eval/runner.mjs');
+const { loadCases, oracleSample } = await import('../../tools/agent-eval/runner.mjs');
 const { CHECKS } = await import('../../tools/agent-eval/checks.mjs');
 const CASES = loadCases(new URL('./cases/', import.meta.url).pathname);
 
@@ -167,12 +167,40 @@ test('cases are well formed', () => {
     assert.ok(c.request && c.checks?.length, `${c.id}: request and checks`);
     for (const ch of c.checks) assert.ok(CHECKS[ch.kind], `${c.id}: unknown check ${ch.kind}`);
     assert.ok(c.oracle, `${c.id}: oracle`);
+    if (c.followUps) assert.equal(c.oracle.turns?.length, c.followUps.length + 1, `${c.id}: one oracle turn per request`);
   }
 });
 
 test('every case passes with its oracle turn', async () => {
   for (const c of CASES) {
-    const r = await runCase(c, { host, sample: scripted(c.oracle.steps, c.oracle.answer) });
+    const r = await runCase(c, { host, sample: oracleSample(c) });
     assert.equal(r.pass, true, `${c.id}: ${r.error || r.checks.filter(x => !x.pass).map(x => `${x.kind}: ${x.detail}`).join(' | ')}`);
   }
 });
+
+// JIG-005: the harder cases have traps; the edit a hurried agent would make must fail them
+test('the harder cases reject the naive edit', async () => {
+  const byId = id => CASES.find(c => c.id === id);
+  const naive = {
+    'm07-wheel-30': "files.edit('script.js', 'teeth: 36', 'teeth: 30'); await run();",            // phase not adjusted → teeth collide
+    'h01-large': "files.edit('script.js', \".config('M')\", \".config('L')\"); await run();",        // the pot only, not the saucer
+    'a03-conflict': "files.edit('script.js', \".dim('l1', 'w')\", ''); await run();",               // drops the wrong dimension → 90 mm
+  };
+  for (const [id, code] of Object.entries(naive)) {
+    const r = await runCase(byId(id), { host, sample: scripted([code], 'done, 48 mm') });
+    assert.equal(r.pass, false, `${id} should fail: ${JSON.stringify(r.checks)}`);
+  }
+});
+
+test('followUps run as further turns of one thread; checks see the final state and every step', async () => {
+  const c = byIdOr('a01-undo-change');
+  const r = await runCase(c, { host, sample: oracleSample(c) });
+  assert.equal(r.turns, 2);
+  assert.equal(r.answers.length, 2);
+  assert.equal(r.toolCalls, 2);
+  assert.equal(r.usage.rounds, 4, 'usage adds up over turns');
+  // stopping after the first request leaves wall 2.4 and fails
+  const one = await runCase({ ...c, followUps: undefined }, { host, sample: oracleSample(c) });
+  assert.equal(one.pass, false);
+});
+function byIdOr(id) { return CASES.find(c => c.id === id); }

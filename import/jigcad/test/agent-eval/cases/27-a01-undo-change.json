@@ -1,0 +1,52 @@
+{
+  "id": "a01-undo-change",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "multi-turn"
+  ],
+  "request": "Set the wall thickness to 2.4 mm.",
+  "followUps": [
+    "Actually, put the wall back to what it was and make the box 35 mm tall instead."
+  ],
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "param",
+      "name": "wall",
+      "approx": 2,
+      "tol": 1e-06
+    },
+    {
+      "kind": "param",
+      "name": "h",
+      "approx": 35,
+      "tol": 1e-06
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 17229.93,
+      "tol": 0.1
+    }
+  ],
+  "oracle": {
+    "turns": [
+      {
+        "steps": [
+          "files.edit('script.js', \"wall: mm(2)\", \"wall: mm(2.4)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+        ],
+        "answer": "Wall is 2.4 mm."
+      },
+      {
+        "steps": [
+          "files.edit('script.js', \"wall: mm(2.4)\", \"wall: mm(2)\");\nfiles.edit('script.js', \"h: mm(30)\", \"h: mm(35)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+        ],
+        "answer": "Wall back at 2 mm, height 35 mm."
+      }
+    ]
+  }
+}

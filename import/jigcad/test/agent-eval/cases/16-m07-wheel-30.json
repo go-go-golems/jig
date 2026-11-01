@@ -1,0 +1,40 @@
+{
+  "id": "m07-wheel-30",
+  "preset": "M-07",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "assembly",
+    "gears",
+    "multi-feature"
+  ],
+  "request": "Change the wheel to 30 teeth. The pair must still mesh without the gears touching. Tell me the new centre distance.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "teeth:\\s*30"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 34129.47,
+      "tol": 1
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "\\b48(\\.0+)?\\s*mm"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \"teeth: 36\", \"teeth: 30\");\nfiles.edit('script.js', \"deg(180 / 36)\", \"deg(180 / 30)\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The wheel has 30 teeth; I also changed its phase to 180/30° so the teeth interleave. Centre distance is now 48 mm."
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "m07-ratio-centre",
+  "preset": "M-07",
+  "mode": "read",
+  "tags": [
+    "question",
+    "assembly",
+    "gears"
+  ],
+  "request": "What is the gear ratio of this pair, and how far apart are the two gear axes?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "\\b2\\s*:\\s*1\\b",
+        "\\b1\\s*:\\s*2\\b",
+        "ratio (of |is )?2\\b",
+        "2(\\.0)?\\s*(x|×)",
+        "twice",
+        "\\b2\\.0\\b"
+      ]
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "\\b54(\\.0+)?\\s*mm"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return files.read('script.js').slice(0, 900);"
+    ],
+    "answer": "The ratio is 2:1 (36/18) and the axes are 54 mm apart (m·(z1+z2)/2 = 2·54/2)."
+  }
+}

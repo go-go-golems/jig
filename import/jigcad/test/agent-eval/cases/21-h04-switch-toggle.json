@@ -1,0 +1,42 @@
+{
+  "id": "h04-switch-toggle",
+  "preset": "H-04",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "configs"
+  ],
+  "request": "I have a US toggle switch, not a Euro module. Make the plate for that.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "matches": "\\.config\\(\\s*['\"]us_toggle['\"]\\s*\\)"
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        69.85,
+        114.3,
+        7
+      ],
+      "tol": 0.01
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 17062.33,
+      "tol": 1
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \".config('eu86')\", \".config('us_toggle')\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "Switched to the us_toggle config: 69.85 × 114.3 mm with a 0.406 × 0.94 in opening."
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "id": "m08-hinge-clearance",
+  "preset": "M-08",
+  "mode": "read",
+  "tags": [
+    "question",
+    "assembly",
+    "fit"
+  ],
+  "request": "What clearance does the hinge use between pin and knuckles, and has that fit been calibrated for my printer?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "0[.,]4\\s*mm"
+      ]
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "uncalibrated",
+        "not (been |yet )?calibrated",
+        "isn't calibrated",
+        "is not calibrated",
+        "no calibration",
+        "not been measured",
+        "default"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return files.read('script.js').slice(0, 900);"
+    ],
+    "answer": "0.4 mm, the default print-in-place clearance; it is uncalibrated (fit.uncalibrated), so print a fit coupon to measure it."
+  }
+}

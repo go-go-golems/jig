@@ -1,0 +1,35 @@
+{
+  "id": "a01-no-holes",
+  "preset": "A-01",
+  "mode": "auto",
+  "tags": [
+    "refusal",
+    "question"
+  ],
+  "request": "Make the mounting holes 1 mm bigger.",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "any": [
+        "no (mounting )?holes",
+        "doesn't have",
+        "does not have",
+        "has no",
+        "there are no",
+        "isn't any",
+        "aren't any",
+        "not have any",
+        "no hole"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return files.read('script.js');"
+    ],
+    "answer": "The box has no mounting holes: it is an extrude and a shell. Tell me where you want holes and I can add them."
+  }
+}

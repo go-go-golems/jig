@@ -33,7 +33,7 @@ for (const [path, fix] of [['src/generated/content.json', 'node build.mjs'], ['v
 }
 
 const { createNodeEngine } = await import('./agent-eval/node-engine.mjs');
-const { loadCases, runAll } = await import('./agent-eval/runner.mjs');
+const { loadCases, runAll, oracleSample } = await import('./agent-eval/runner.mjs');
 const { summarise, markdown } = await import('./agent-eval/report.mjs');
 const { Host } = await import('../src/host/host.js');
 const { httpSample } = await import('../src/host/sample-http.js');
@@ -65,16 +65,10 @@ writeFileSync(join(out, 'meta.json'), JSON.stringify(meta, null, 2));
 console.log(`agent-eval: ${cases.length} cases × ${tiers.join(', ')} × ${o.repeat} → ${out}`);
 if (info) console.log(`backend: ${JSON.stringify(info.tiers)} · max rounds ${info.maxRounds} · engine ${engine.compute?.kind}`);
 
-// --oracle: each case's own known-good turn (no network)
-const oracleFor = c => async (turns, opts) => {
-  for (const code of c.oracle?.steps || []) await opts.tools[0].execute({ code }, { signal: opts.signal });
-  const text = c.oracle?.answer || '';
-  opts.onText?.({ text, delta: text });
-  return { text, truncated: false };
-};
+// --oracle: each case's own known-good turn(s) (no network)
 const records = await runAll(cases, {
   host, tiers, repeat: +o.repeat, deadlineMs: +o.deadline * 1000,
-  sample, sampleFor: o.oracle ? oracleFor : null,
+  sample, sampleFor: o.oracle ? oracleSample : null,
   onRecord: r => appendFileSync(jsonl, JSON.stringify(r) + '\n'),
   log: line => { if (!line.startsWith('…')) console.log(line); },
 });

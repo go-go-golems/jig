@@ -1,0 +1,34 @@
+{
+  "id": "h01-large",
+  "preset": "H-01",
+  "mode": "auto",
+  "tags": [
+    "edit",
+    "configs",
+    "multi-feature",
+    "print"
+  ],
+  "request": "Make the large size of the plant pot, with a saucer that fits it.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "notMatches": "\\.config\\(\\s*['\"]M['\"]\\s*\\)"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 189985.93,
+      "tol": 5
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.write('script.js', files.read('script.js').replaceAll(\".config('M')\", \".config('L')\"));\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "Both the pot and the saucer use config L now."
+  }
+}

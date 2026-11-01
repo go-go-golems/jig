@@ -1,0 +1,52 @@
+{
+  "id": "a03-conflict",
+  "preset": "A-03",
+  "mode": "auto",
+  "tags": [
+    "repair",
+    "sketch",
+    "diagnostics"
+  ],
+  "setup": [
+    {
+      "edit": {
+        "path": "script.js",
+        "find": ".dim('l2', 'd')",
+        "replace": ".dim('l2', 'd')\n  .dim('l1', 90)"
+      }
+    }
+  ],
+  "request": "The plate stopped working after my last edit. Fix it; the plate should stay 80 mm long.",
+  "checks": [
+    {
+      "kind": "compiles"
+    },
+    {
+      "kind": "file",
+      "path": "script.js",
+      "notMatches": "dim\\(\\s*'l1'\\s*,\\s*90\\s*\\)"
+    },
+    {
+      "kind": "metric",
+      "name": "volume",
+      "approx": 12672.77,
+      "tol": 0.1
+    },
+    {
+      "kind": "metric",
+      "name": "bbox",
+      "approx": [
+        80,
+        40,
+        4
+      ],
+      "tol": 0.01
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "files.edit('script.js', \".dim('l2', 'd')\\n  .dim('l1', 90)\", \".dim('l2', 'd')\");\nconst r = await run(); return { ok: r.ok, errors: r.errors };"
+    ],
+    "answer": "The new .dim('l1', 90) conflicted with .dim('l1', 'w') (80 mm); I removed it."
+  }
+}

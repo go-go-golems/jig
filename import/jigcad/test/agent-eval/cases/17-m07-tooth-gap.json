@@ -1,0 +1,28 @@
+{
+  "id": "m07-tooth-gap",
+  "preset": "M-07",
+  "mode": "read",
+  "tags": [
+    "question",
+    "assembly",
+    "gears"
+  ],
+  "request": "How much clearance is there between the pinion's and the wheel's teeth where they mesh?",
+  "checks": [
+    {
+      "kind": "unchanged"
+    },
+    {
+      "kind": "answer",
+      "matches": [
+        "0[.,]2\\d*\\s*mm"
+      ]
+    }
+  ],
+  "oracle": {
+    "steps": [
+      "return program.decisions ? 'see decisions' : null;"
+    ],
+    "answer": "About 0.2 mm (≈ 0.203 mm between pinion and wheel)."
+  }
+}
