@@ -30,7 +30,12 @@ export function loadOC(opts = {}) {
   if (!ocPromise) ocPromise = (async () => {
     const t0 = performance.now();
     const wasmBinary = await loadWasmBytes(opts);
-    oc = await initOC({ wasmBinary });
+    // OpenCascade's stdout (e.g. the STEP writer's "Statistics on Transfer" banner) is kept in a short ring buffer
+    // instead of flooding the console; stderr still reaches it as warnings.
+    const log = [];
+    const print = line => { log.push(String(line)); if (log.length > 200) log.splice(0, log.length - 200); };
+    oc = await initOC({ wasmBinary, print, printErr: line => { if (String(line).trim()) console.warn('[occt]', line); } });
+    oc.__log = log;
     oc.__loadMs = performance.now() - t0;
     return oc;
   })();

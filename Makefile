@@ -73,7 +73,7 @@ test-go:
 # oracle on the real engine, the engine core, and the engine on OpenCascade. The harness needs src/generated
 # (from `make web`).
 test-js: web
-	cd $(WEB) && node --test test/agent/*.test.mjs
+	cd $(WEB) && node --test test/agent/*.test.mjs test/ui/*.test.mjs
 	cd $(WEB) && node --test test/agent-eval/harness.test.mjs
 	cd $(WEB) && node test/engine-core/run.mjs
 	cd $(WEB) && node test/engine/run.mjs

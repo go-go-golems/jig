@@ -568,11 +568,19 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     },
     view,
     params,
-    async exportFile(format, options) {
-      const r = await host.export(format, options);
+    // exportFile(format, { save: true }) also hands the file to the page's save path (a browser download, or the
+    // runtime's downloads capability); the bytes never reach the model.
+    async exportFile(format, options = {}) {
+      const { save = false, ...rest } = options || {};
+      const r = await host.export(format, rest);
       const d = r && r.data;
       const bytes = d == null ? 0 : typeof d === 'string' ? new TextEncoder().encode(d).length : d.byteLength ?? d.size ?? 0;
-      return { format, filename: r && r.filename, mime: r && r.mime, bytes, report: r && r.report };
+      const out = { format, filename: r && r.filename, mime: r && r.mime, bytes, report: r && r.report };
+      if (save) {
+        if (typeof host.saveFile !== 'function') throw new Error('exportFile: this workbench cannot save files');
+        out.saved = !!(await host.saveFile({ filename: r.filename, data: d, mime: r.mime, report: r.report }));
+      }
+      return out;
     },
     presets,
     measure,

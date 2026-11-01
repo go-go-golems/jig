@@ -219,13 +219,23 @@ const EXPORTS = [
   { format: 'stl', title: 'STL', about: '.stl mesh of every body, for any slicer', text: true },
   { format: '3mf', title: '3MF', about: '.3mf with plates, settings and colours', text: false },
   { format: 'step', title: 'STEP', about: '.step B-rep, lossless (AP242)', text: true },
-  { format: 'ir', title: 'IR bundle', about: 'L0–L6 as text in one .json', text: true },
+  { format: 'svg', title: 'SVG', about: '.svg line drawing of the feature edges (isometric)', text: true },
+  { format: 'ir', title: 'IR bundle', about: '.zip of L0–L6 text, trace, params, graph and diagnostics', text: false },
   { format: 'script', title: 'Script', about: 'script.js with your edits', text: true },
 ];
 function ExportMenu({ host }) {
   const [cap, setCap] = useState(undefined);
   const [busy, setBusy] = useState(null);
   useEffect(() => { const t = setTimeout(() => downloads().then(setCap), 0); return () => clearTimeout(t); }, []);
+  // the agent's exportFile(format, { save: true }) saves through the same path as this menu
+  useEffect(() => {
+    host.saveFile = async ({ filename, data, mime, report }) => {
+      if (typeof data !== 'string' && /\.stl$/i.test(filename) && !(await downloads())) data = stlToASCII(data, host.program?.name);
+      const lossy = report?.approximated?.length ? ` (approximated: ${report.approximated.join(', ')})` : '';
+      return saveOrCopy(host, filename, data, lossy, mime);
+    };
+    return () => { delete host.saveFile; };
+  }, [host]);
   const run = async (x) => {
     setBusy(x.format);
     try {
@@ -234,7 +244,7 @@ function ExportMenu({ host }) {
       let data = r.data;
       // without file saving, a binary STL goes to the clipboard as ASCII STL
       if (x.format === 'stl' && typeof data !== 'string' && !(await downloads())) data = stlToASCII(data, host.program?.name);
-      await saveOrCopy(host, r.filename, data, lossy);
+      await saveOrCopy(host, r.filename, data, lossy, r.mime);
     } catch (e) {
       host.toast(`Export failed: ${e?.message || e}`, 'bad');
     } finally {
@@ -249,7 +259,7 @@ function ExportMenu({ host }) {
           <span class="t">{noSave && x.text ? `Copy ${x.title}` : x.title}</span><small>{noSave && !x.text ? 'binary: needs file saving, which is not available here' : x.about}</small>
         </button>
       ))}
-      <p class="note">{noSave ? 'Saving files is not available here: text formats are copied to the clipboard.' : 'You confirm each file before it is saved.'} Every export reports what it kept, approximated and dropped.</p>
+      <p class="note">{noSave ? 'Saving files is not available here: text formats are copied to the clipboard.' : cap && cap.kind === 'browser' ? 'Files go to your browser\'s downloads.' : 'You confirm each file before it is saved.'} Every export reports what it kept, approximated and dropped.</p>
     </Menu>
   );
 }

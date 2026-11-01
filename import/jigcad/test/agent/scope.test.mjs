@@ -130,3 +130,22 @@ test('presets: current, create from files or a copy, rename; files: rename and r
   assert.throws(() => ro.files.rename('a', 'b'), /read-only mode: files.rename is off/);
   assert.throws(() => ro.files.remove('a'), /read-only mode: files.remove is off/);
 });
+
+test('exportFile reports without saving, and saves through host.saveFile when asked', async () => {
+  const { labScope } = await import('../../src/agent/scope.js');
+  const { createMockHost } = await import('./mock-host.js');
+  const host = createMockHost();
+  await host.compile();
+  const saved = [];
+  host.export = async format => ({ data: new Uint8Array(134), filename: `box.${format}`, mime: 'model/stl', report: { kept: ['geometry'], approximated: [], dropped: [] } });
+  const s = labScope(host);
+  await assert.rejects(s.exportFile('stl', { save: true }), /cannot save files/);
+  host.saveFile = async f => { saved.push(f); return true; };
+  const quiet = await s.exportFile('stl');
+  assert.equal(quiet.bytes, 134); assert.equal(quiet.saved, undefined); assert.equal(saved.length, 0);
+  const r = await s.exportFile('stl', { save: true });
+  assert.equal(r.saved, true);
+  assert.equal(saved[0].filename, 'box.stl'); assert.equal(saved[0].data.byteLength, 134);
+  const ro = labScope(host, { readOnly: true });
+  assert.equal((await ro.exportFile('stl', { save: true })).saved, true, 'saving a file is allowed in read mode: it changes nothing');
+});

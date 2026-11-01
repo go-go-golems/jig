@@ -1,19 +1,40 @@
-// Saving files through the runtime's downloads capability (runtime-capabilities.md), with the clipboard as the
-// fallback for text. claude.use() is asked once, after the first script run; it resolves to null when not granted.
+// Saving files. Inside claude.ai the runtime's downloads capability saves them (runtime-capabilities.md): claude.use()
+// is asked once and resolves to null when not granted; the artifact frame cannot start downloads by itself, so then
+// text goes to the clipboard. Outside claude.ai (jigcad serve, a static host) the page saves with an ordinary
+// browser download: a Blob behind an object URL and a clicked <a download>.
 let downloadsPromise = null;
+
+/** The browser's own download: works in any top-level page or frame allowed to download. */
+export function browserDownloads(doc = globalThis.document) {
+  if (!doc || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function' || typeof Blob === 'undefined') return null;
+  return {
+    kind: 'browser',
+    async save({ filename, data, mime }) {
+      const blob = data instanceof Blob ? data : new Blob([data], { type: mime || (typeof data === 'string' ? 'text/plain' : 'application/octet-stream') });
+      const url = URL.createObjectURL(blob);
+      const a = doc.createElement('a');
+      a.href = url; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
+      doc.body.appendChild(a);
+      try { a.click(); } finally { a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+    },
+  };
+}
 
 export function downloads() {
   if (!downloadsPromise) downloadsPromise = new Promise(r => setTimeout(r, 0)).then(async () => {
-    try { return globalThis.claude?.use ? (await globalThis.claude.use('downloads')) || null : null; } catch { return null; }
+    if (globalThis.claude) {
+      try { return globalThis.claude.use ? (await globalThis.claude.use('downloads')) || null : null; } catch { return null; }
+    }
+    return browserDownloads();
   });
   return downloadsPromise;
 }
 
 /** Save `data` as `filename`, or copy it when saving is not available. Reports with a toast either way. */
-export async function saveOrCopy(host, filename, data, note = '') {
+export async function saveOrCopy(host, filename, data, note = '', mime = '') {
   const dl = await downloads();
   if (dl) {
-    try { await dl.save({ filename, data }); host.toast(`Saved ${filename}${note}`); return true; }
+    try { await dl.save({ filename, data, ...(mime ? { mime } : {}) }); host.toast(`${dl.kind === 'browser' ? 'Downloaded' : 'Saved'} ${filename}${note}`); return true; }
     catch (e) { host.toast(`${filename} was not saved: ${e?.message || 'the download was declined'}`, 'bad'); return false; }
   }
   if (typeof data === 'string') {
