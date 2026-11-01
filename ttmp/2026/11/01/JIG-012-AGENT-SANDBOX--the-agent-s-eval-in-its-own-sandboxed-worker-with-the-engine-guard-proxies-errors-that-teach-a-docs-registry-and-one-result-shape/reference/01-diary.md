@@ -217,3 +217,59 @@ intervals and keep a detailed diary as you work").
 ### Code review instructions
 - Start with `src/engine/guard.js`, `src/agent/hints.js`, then `guardScope` and `withHints` in `src/agent/evaltool.js`.
 - `node --test import/jigcad/test/agent/guard.test.mjs import/jigcad/test/agent/lint.test.mjs`; `make test-js`; `node import/jigcad/tools/preset-check.mjs --quiet`.
+
+**Commit (code):** a1d6890
+
+## Step 5: Phase 3, one documentation registry and help()
+
+The scope table in the lab reference is now generated from a registry, `src/agent/docs.js`. `help(x)` answers from
+the same registry for the scope, and from the language reference (`content/docs/reference.md`, parsed by bullet)
+for `j`, the units and the methods of the language's values. A test fails when a scope name has no record or a
+record names nothing. Guard messages end with `help('path')`, and that call answers. The prompt now says the step
+runs in a sandbox with the language in scope.
+
+Phase 2's measured batch ran in the background during this step, from the worktree frozen at a1d6890.
+
+### Prompt context
+
+**User prompt (verbatim):** see Step 1.
+
+**Assistant interpretation:** phase 3 of the plan (§8 and §11 of the guide).
+
+**Inferred user intent:** the reference, help and errors should never disagree, and every pointer in an error
+should lead somewhere real.
+
+### What I did
+- `src/agent/docs.js` (new): `SCOPE_DOCS` (one record per row: `names`, `sig`, `group`, `text`, `where`), `GROUPS`, `scopeDoc`, `scopeNames`, `scopeTable`, `renderReference`. New rows: the language (`j` and units; `data`, both sandbox) and `help`.
+- `src/agent/reference.md`: the table became `<!-- agent-scope -->`; the intro mentions `help(x)` and the guards. `src/agent/reference.js` (new) renders it. `host.js` and `panel.jsx` import the rendered reference.
+- `src/agent/langdocs.js` (new): `parseLangDocs(md)` reads the language reference's bullets into 198 j paths, 25 bare names, and methods by kind (section → kind: Sketches → sketch, Parts → part, …; part 37, quantity 32, sketch 29, selector 26, print job 20, …).
+- `src/agent/help.js` (new): `makeHelp({ scope, j, langMd, kinds })`. It answers `help()` (an overview by group), a scope path or a function by identity, a scope namespace, a `j` path or namespace (each member with its line), a unit, a method name, a value of the language (its methods with their lines), and the nearest names for anything unknown. `languageKinds` and `methodsByKind` replace the sample table hints.js used to build.
+- `src/engine/guard.js`: `HELP.on` (the sandbox sets it for its whole worker) or `opts.help` (the scope guards) adds `help('path') says what each does.`
+- `evaltool.js`: `help` on the page (records only; the language reference comes from `host.referenceDocs()`); `runner.js`: `help` with `j` and the language reference imported as text.
+- `prompt.js`: eval runs in a sandbox with its own engine; the language is in scope; `check()` compiles there; steps share nothing; `help(x)`; read the error before retrying.
+- `tools/agent-eval/failures.mjs`: `SCOPE_NAMES` comes from the registry; the guarded-name class matches `check().program.x`.
+- Tests: `test/agent/docs.test.mjs` (3): coverage both ways, the rendered table, help() answers. Browser check probes `help`, a guard and a hint → `various/04-browser-sandbox-check-phase3.txt`.
+
+### Why
+- The registry keeps the reference correct and makes each error's pointer real, even though models rarely call help (4 docs reads in 230 evals at factory-videos).
+
+### What worked
+- `make test-js`: 77 + 15 + 62 + 42 passing.
+- Browser (separate headless Chrome, temporary profile): `help('j.fit.hole')` answers in the iframe sandbox; guard message with `help('j.fit')`; `note: box is j.box.`; isolation unchanged (fetch, WebSocket, importScripts, storage refused; origin `null`).
+
+### What didn't work
+- First wiring imported `content/docs/reference.md` into `evaltool.js`: `node --test` has no `.md` loader (`TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".md"`). The page now reads the text from `host.referenceDocs()`. Only the sandbox runner imports the `.md`; it is loaded through `node-worker.mjs` (loader registered) or bundled.
+- `node build.mjs` directly: `Cannot find module '/opt/npm-tools/node_modules/esbuild/lib/main.js'`; `make web` sets `ESBUILD`.
+
+### What I learned
+- The language reference's one-bullet-per-name format was regular enough to parse: every unit in `bare` has a line (the test checks that).
+
+### What was tricky to build
+- Identity lookups: `help(files.read)` must recognise the tracked wrapper the step holds, not the original function. `help` is therefore built after `trackScope` and `guardScope`, over the final scope. `help(j.fit)` recognises the guard proxy, which is cached per namespace.
+
+### What warrants a second pair of eyes
+- I rebuilt `dist/` (`make web`) while the phase 2 batch was running against `jigcad serve --dist import/jigcad/dist`. The batch uses the server only for the model proxy and `look()` renders, and phase 3 changes neither. Recorded in case its look images differ.
+- `help` is not in scripts (the guide said "in the sandbox and in scripts"). In a script it has no reader: the agent reads compile results, and the guard's pointer in a compile error inside the sandbox leads to the agent's own `help`.
+
+### Code review instructions
+- `src/agent/docs.js`, `src/agent/help.js`, `src/agent/langdocs.js`; `node --test import/jigcad/test/agent/docs.test.mjs`.

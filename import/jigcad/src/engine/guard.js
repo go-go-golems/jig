@@ -16,6 +16,10 @@
 
 export const GUARDED = Symbol.for('jig.guarded');
 
+// whether the reader of a guard's message has help() (the agent's sandbox sets it for every compile in its worker;
+// the agent's scope guards pass opts.help): the message then ends with help('path')
+export const HELP = { on: false };
+
 // names asked for by the language, the console, test tools and serializers: never an error
 const PROBES = new Set([
   'then', 'catch', 'finally', 'toJSON', 'toString', 'valueOf', 'toLocaleString', 'constructor', 'prototype', '__proto__',
@@ -127,6 +131,7 @@ function missing(real, path, k, opts) {
   const h = opts.hint?.(path, k);
   if (h) msg += ` ${h}`;
   msg += ` (${path} has: ${listOf(names)})`;
+  if (opts.help || HELP.on) msg += ` help('${path}') says what each does.`;
   const e = new TypeError(msg);
   e.guard = { path, name: k, near, also };
   return e;

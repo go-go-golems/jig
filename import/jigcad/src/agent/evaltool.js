@@ -5,6 +5,7 @@ import { runInSandbox } from './sandbox/client.js';
 import { yaml, yamlInline } from './yaml.js';
 import { guard, closest } from '../engine/guard.js';
 import { hintsFor, lineOf } from './hints.js';
+import { makeHelp } from './help.js';
 
 export const EVAL_TIMEOUT_MS = 25000;
 export const RESULT_CUT = 9000;
@@ -102,6 +103,7 @@ export function guardScope(scope) {
     // data is the preset's files, not a namespace: data.x ?? fallback stays a question
     if (k === 'data' || !v || typeof v !== 'object' || Object.getPrototypeOf(v) !== Object.prototype) continue;
     scope[k] = guard(v, k, {
+      help: true,
       elsewhere: n => (where.get(n) ?? []).filter(ns => ns !== k),
       hint: (_, n) => {
         const own = top.has(n) ? [n] : closest(n, [...top].filter(t => typeof scope[t] === 'function'), 2);
@@ -171,6 +173,11 @@ export function withHints(text, { error, code, names, j = null, methods = null }
   return notes.length ? `${text}\n${notes.join('\n')}` : text;
 }
 
+/** The language reference's text (content/docs/reference.md) as the host has it, for help(); '' without one. */
+export function langReference(host) {
+  try { return (host.referenceDocs?.() ?? []).find(d => d.id === 'language')?.md ?? ''; } catch { return ''; }
+}
+
 /**
  * Run one step's code against a fresh scope.
  * → { text, error: boolean, ms, value, images: [{ mimeType, data }] (from look()) }
@@ -182,6 +189,7 @@ export async function runEval(host, code, { readOnly = false, timeoutMs = EVAL_T
   const images = [];
   const scope = guardScope(trackScope(labScope(host, { readOnly, console: con, images }), promises));
   delete scope.host;
+  scope.help = makeHelp({ scope, langMd: langReference(host) });
   const names = Object.keys(scope).filter(k => IDENT.test(k));
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const t0 = now();

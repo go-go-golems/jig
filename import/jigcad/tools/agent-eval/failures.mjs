@@ -4,19 +4,14 @@
 // a timeout, any other error), then reports per class the steps and runs affected, how many steps it took to recover
 // after a failed step, stuck loops (three or more failed steps in a row), and which scope names the code called.
 // Pattern from factory-videos' JSDRILL round report: coverage, failures per kind, evals to recover, stuck loops.
+import { scopeNames } from '../../src/agent/docs.js';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // The names the agent's eval scope offers (reference.md "The agent's eval scope"); coverage counts calls of these.
-export const SCOPE_NAMES = [
-  'files.list', 'files.read', 'files.grep', 'files.write', 'files.edit', 'files.rename', 'files.remove',
-  'run', 'check', 'program.summary', 'program.metrics', 'program.diagnostics', 'program.params', 'program.trace',
-  'program.decisions', 'program.graph', 'program.ir', 'program.bodies', 'program.print', 'why', 'faces', 'feature',
-  'sketch', 'measure.face', 'measure.edge', 'measure.bbox', 'measure.area', 'measure.distance', 'measure.angle',
-  'selection', 'select', 'view.get', 'view.set', 'look', 'params.list', 'params.get', 'params.set', 'params.clear',
-  'params.overrides', 'exportFile', 'presets.list', 'presets.current', 'presets.create', 'presets.load',
-  'presets.rename', 'lab.', 'help', 'j.',
-];
+export const SCOPE_NAMES = [...new Set(scopeNames()
+  .filter(n => !['console', 'log', 'data'].includes(n))
+  .map(n => n.startsWith('lab.') ? 'lab.' : n === 'j' ? 'j.' : n))];
 
 // scope functions that return promises (the engine answers them)
 const ASYNC = new Set(['run', 'check', 'why', 'faces', 'feature', 'sketch', 'look', 'measure.area', 'params.get', 'params.set', 'params.clear', 'presets.load', 'presets.create', 'exportFile', 'program.ir']);
@@ -36,7 +31,7 @@ export function classify(step) {
   if ((m = /^ReferenceError: ([\w$]+) is not defined/.exec(head))) return `not defined: ${m[1]}`;
   if ((m = /^TypeError: (?:Cannot read properties of (?:undefined|null)) \(reading '([^']+)'\)/.exec(head))) return `read of undefined: .${m[1]}`;
   if ((m = /^TypeError: (.+?) is not a function/.exec(head))) return `not a function: ${m[1].replace(/\(.*?\)/g, '()').replace(/^.*\./, '.')}`;
-  if ((m = /^TypeError: ([\w$.]+) does not exist/.exec(head))) return `guarded name: ${m[1]}`;
+  if ((m = /^TypeError: ([\w$.()]+) does not exist/.exec(head))) return `guarded name: ${m[1]}`;
   if (/NaN/.test(head.split('\n')[0]) && /^\w*Error/.test(head)) return 'NaN in an error';
   if (/^SyntaxError/.test(head)) return 'syntax error';
   if (step?.error || /^\w*Error:/.test(head)) return 'other error';

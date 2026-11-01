@@ -18,7 +18,7 @@ const LINE = /\(line (\d+)\)$/;
  *   code      the step's source
  *   names     the names in the step's scope
  *   j         the language namespace, when the step has it (the sandbox)
- *   methods   { kind: [method names] } of the language's values (sandbox), for "not a function"
+ *   methods   { kind: [method names] } of the language's values (help.js methodsByKind; sandbox)
  *   line      the step's line of the error (errorText's), or null
  */
 export function hintsFor({ error, text = '', code = '', names = [], j = null, methods = null, line = null }) {
@@ -78,20 +78,6 @@ function readOfUndefined(what, prop, code, line) {
     return `note: ${found} is ${what}${line ? ` on line ${line}` : ''}, so .${prop} cannot be read. Return ${found.split(/\??\./)[0]} to see what it holds.`;
   }
   return `note: a value was ${what} where .${prop} was read${line ? ` on line ${line}` : ''}.`;
-}
-
-/** { kind: [method names] } from sample values of the language (sandbox side: it has the engine). */
-export function methodTable(samples) {
-  const out = {};
-  for (const [kind, v] of Object.entries(samples)) {
-    if (!v || typeof v !== 'object') continue;
-    const names = new Set();
-    for (let o = Object.getPrototypeOf(v); o && o !== Object.prototype; o = Object.getPrototypeOf(o))
-      for (const k of Object.getOwnPropertyNames(o)) if (!['constructor', 'toString', 'toJSON', 'valueOf'].includes(k) && !k.startsWith('_') && typeof Object.getOwnPropertyDescriptor(o, k).value === 'function') names.add(k);
-    for (const k of Object.keys(v)) if (typeof v[k] === 'function' && !k.startsWith('_')) names.add(k);
-    out[kind] = [...names].sort();
-  }
-  return out;
 }
 
 /** The step's line of an error text ("… (line 3)") → 3, or null. */

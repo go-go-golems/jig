@@ -21,7 +21,7 @@ import { createEngine } from './engine.js';
 import { store } from './store.js';
 import { content } from './content.js';
 import { followLink } from './lab.js';
-import labReference from '../agent/reference.md';
+import labReference from '../agent/reference.js';
 
 const D = Math.PI / 180;
 export const NAMED_VIEWS = {

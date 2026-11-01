@@ -1,0 +1,18 @@
+start: {"ms":143.0999999642372,"compute":"rust"} 255 ms (first start includes fetching the bytes)
+j in scope: j.fit.hole(6 mm, press)
+check() live program: ok: true | volume: 15344.26542 | planes: 11
+sync files.read: 26
+program.summary (page state): box
+fetch refused: refused: Failed to fetch
+WebSocket refused: refused by CSP: connect-src
+importScripts refused: refused: NetworkError
+no localStorage: undefined
+no document: undefined
+indexedDB refused: refused: SecurityError
+origin: null
+parent unreachable: undefined
+help (phase 3): j.fit.hole(d, cls): modelled hole: d + 2·gap + hole compensation. Example: j.fit.hole(mm(3), 'slide') is 3.5 mm
+guard (phase 2): TypeError: j.fit.hol does not exist. Did you mean j.fit.hole? (j.fit has: calibrate, classes, coupon, gap, hole, pin, profile, profileRegister) help('j.fit') says what each does. (line 1)
+hint (phase 2): ReferenceError: box is not defined (line 1) | note: box is j.box. (In scope near it: bbox.)
+runaway loop: Error: eval timed out after 2 s; the sandbox restarted, so anything the step kept is gone
+after restart: 2 297 ms (includes the new engine)

@@ -14,8 +14,9 @@ import * as W from '../../engine/worker.js';
 import { compileStep, trackScope, guardScope, withHints, makeConsole, formatResult, markPromises, promiseNotes, cut } from '../evaltool.js';
 import { labScope, makeProgram, makeMeasure, makeQueries, compileResult, flatMetrics } from '../scope.js';
 import { listen, closePort } from './ports.js';
-import { guard } from '../../engine/guard.js';
-import { methodTable } from '../hints.js';
+import { guard, HELP } from '../../engine/guard.js';
+import { makeHelp, languageKinds, methodsByKind } from '../help.js';
+import langMd from '../../../content/docs/reference.md';
 
 const IDENT = /^[A-Za-z_$][\w$]*$/;
 let generation = 0;            // which check() made the engine's current Program
@@ -23,6 +24,7 @@ let generation = 0;            // which check() made the engine's current Progra
 /** Serve the control port of a sandbox worker. initDefaults go into init (Node passes nothing: it reads files). */
 export function serveControl(port, initDefaults = {}) {
   let ready = null;
+  HELP.on = true;   // every compile in this worker is read by the agent, who has help()
   listen(port, m => {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'init') {
@@ -100,23 +102,10 @@ function mirrorHost(ctx, callRaw) {
 
 const FILE_CHANGES = ['write', 'edit', 'rename', 'remove'];
 
-// the methods of the language's values, for "x.m is not a function" hints (made once per worker)
-let METHODS = null;
-function methods() {
-  if (METHODS) return METHODS;
-  const { j, bare } = W.lang();
-  const samples = {};
-  const take = (kind, f) => { try { samples[kind] = f(); } catch { /* not in this build */ } };
-  take('part', () => j.part('x'));
-  take('quantity', () => bare.mm(1));
-  take('sketch', () => j.sketch('s'));
-  take('region', () => j.region.rect(bare.mm(1), bare.mm(1)));
-  take('selector', () => j.sel.faces());
-  take('assembly', () => j.assembly('a'));
-  take('print job', () => j.print('p'));
-  take('design', () => j.design({}, () => j.part('x')));
-  return (METHODS = methodTable(samples));
-}
+// the language's value kinds and their methods, for help() and the "x.m is not a function" hints (once per worker)
+let KINDS = null;
+const kinds = () => (KINDS ??= languageKinds(W.lang().j, W.lang().bare));
+const methods = () => methodsByKind(kinds());
 
 /** One step: { code, api, ctx, readOnly } → { ok, text }. call(path, args) → { ok, value | error, ctx? }. */
 export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false }, call) {
@@ -174,6 +163,7 @@ export async function runStep({ code, api = [], ctx: ctx0 = {}, readOnly = false
   const tracked = guardScope(trackScope(scope, promises));
   tracked.console = con;
   tracked.log = con.log;
+  tracked.help = makeHelp({ scope: tracked, j, langMd, kinds: kinds() });
   const names = Object.keys(tracked).filter(k => IDENT.test(k));
   const before = new Set(Object.getOwnPropertyNames(globalThis));
   let value, error = null;

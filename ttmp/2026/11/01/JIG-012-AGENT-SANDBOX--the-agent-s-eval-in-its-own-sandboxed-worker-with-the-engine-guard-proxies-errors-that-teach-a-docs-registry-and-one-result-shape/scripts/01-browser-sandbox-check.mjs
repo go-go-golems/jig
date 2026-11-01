@@ -44,6 +44,9 @@ try {
     'indexedDB refused': "try { indexedDB.open('x'); return 'opened (bad)'; } catch (e) { return 'refused: ' + e.name; }",
     'origin': "return self.origin",
     'parent unreachable': "return typeof parent",
+    'help (phase 3)': "return help('j.fit.hole')",
+    'guard (phase 2)': "return j.fit.hol",
+    'hint (phase 2)': "return box(1, 1, 1)",
   };
   for (const [name, code] of Object.entries(steps)) {
     const r = await ev(`jigSandbox.run(${JSON.stringify(code)}).then(r => r.text)`);

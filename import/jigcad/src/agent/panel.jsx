@@ -3,7 +3,7 @@
 // its one tool is `eval` (evaltool.js); a whole turn is one sample() call (turn.js).
 import { useEffect, useLayoutEffect, useReducer, useRef } from 'preact/hooks';
 import css from './agent.css';
-import reference from './reference.md';
+import reference from './reference.js';
 import { runTurn, revertStep, newThread, archiveThread, ARCHIVE_MAX, load, save, trimThreads, OFF_TITLE, OFF_AT_LOAD, OFF_AT_SEND } from './turn.js';
 import { highlight } from './highlight.js';
 import { renderMarkdown } from './markdown.js';
