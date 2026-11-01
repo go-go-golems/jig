@@ -9,7 +9,7 @@
   ],
   "request": "Make the box bigger.",
   "followUps": [
-    "80 by 50 mm footprint, same height and walls."
+    "An 80 by 50 mm footprint. Keep the original 30 mm height and the 2 mm walls."
   ],
   "checks": [
     {

@@ -7,6 +7,19 @@ const fmt = v => (Array.isArray(v) ? `[${v.map(fmt).join(', ')}]` : typeof v ===
 const errorsOf = p => (p?.diagnostics || []).filter(d => d.level === 'error');
 
 /** Compare a number (or array of numbers) against { approx, tol } | { equals, tol } | { min, max }. */
+/**
+ * The answer as the person reads it: models often write numbers in LaTeX ($19.03\ \text{g}$, $2 \times 18$) and
+ * markdown (**54 mm**), which regexes over the raw text miss. Answer checks match this plain form (JIG-005).
+ */
+export function plainAnswer(t) {
+  return String(t)
+    .replace(/\\(?:text|mathrm|mathit|mathbf|operatorname)\{([^{}]*)\}/g, '$1')
+    .replace(/\\(?:times|cdot)/g, (m) => (m === '\\times' ? '×' : '·'))
+    .replace(/\{:\}/g, ':').replace(/\\approx/g, '≈').replace(/\\pi/g, 'π').replace(/\\(?:,|;|:|!| |quad|qquad)/g, ' ').replace(/~/g, ' ')
+    .replace(/\\[()[\]]/g, '').replace(/\$+/g, '').replace(/\*\*|__/g, '')
+    .replace(/[ \t]+/g, ' ');
+}
+
 export function compareValue(value, spec) {
   const tol = spec.tol ?? 1e-6;
   const one = (v, want) => typeof v === 'number' && Math.abs(v - want) <= tol;
@@ -64,7 +77,7 @@ export const CHECKS = {
     return [sk.dof === c.dof, `sketch ${c.id} dof ${sk.dof}, want ${c.dof}`];
   },
   answer(c, s) {
-    const text = s.turn?.text || '';
+    const text = plainAnswer(s.turn?.text || '');
     const bad = [];
     for (const p of [].concat(c.matches || [])) if (!rx(p).test(text)) bad.push(`missing /${p}/`);
     const any = [].concat(c.any || []);

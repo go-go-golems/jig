@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 
 register(new URL('../../tools/agent-eval/loader.mjs', import.meta.url).href);
-const { evaluate, compareValue } = await import('../../tools/agent-eval/checks.mjs');
+const { evaluate, compareValue, plainAnswer } = await import('../../tools/agent-eval/checks.mjs');
 const { wilson, summarise, markdown } = await import('../../tools/agent-eval/report.mjs');
 const { runCase, captureUsage, noteCode } = await import('../../tools/agent-eval/runner.mjs');
 const { createNodeEngine } = await import('../../tools/agent-eval/node-engine.mjs');
@@ -215,4 +215,12 @@ test('JIG-006: a case\'s images go with the first request only', async () => {
   const r = await runCase({ ...c, followUps: ['thanks'], oracle: { turns: [c.oracle, { steps: [], answer: 'ok' }] } }, { host, sample: spy });
   assert.deepEqual(seen, [1, 0]);
   assert.equal(r.pass, true, JSON.stringify(r.checks));
+});
+
+test('answer checks read LaTeX and markdown as plain text', () => {
+  assert.equal(plainAnswer('**Mass:** $19.03\\ \\text{g}$'), 'Mass: 19.03 g');
+  assert.equal(plainAnswer('$$\\pi \\cdot 2\\ \\text{mm} \\cdot 18 = 113.097\\ \\text{mm}$$'), 'π · 2 mm · 18 = 113.097 mm');
+  assert.equal(plainAnswer('ratio $2{:}1$'), 'ratio 2:1');
+  const st = { turn: { text: 'travel $113.097\\ \\text{mm}$' } };
+  assert.equal(evaluate({ checks: [{ kind: 'answer', matches: ['113([.,][01]\\d*)?\\s*mm'] }] }, st)[0].pass, true);
 });
