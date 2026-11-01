@@ -137,3 +137,16 @@ default) and `lunaroute/deepseek-4.1-flash` (complex), overridable with `--model
 panel uses `window.claude` when the page runs on claude.ai and the backend otherwise (`src/host/sample-http.js`).
 `go build -tags embed ./cmd/jigcad` embeds `dist/` into one binary. A non-loopback `--listen` requires `--token`
 (or `JIGCAD_TOKEN`); open `/?token=…` once to set the cookie. Go needs 1.26.6 or newer (`GOTOOLCHAIN=auto`).
+
+## 9. Agent evaluation (JIG-003)
+
+`node tools/agent-eval.mjs` runs the cases in `test/agent-eval/cases/*.json` through the real agent turn
+(`runTurn`, the eval tool, the lab scope) and the real `Host` on the real engine in one Node process, with model
+calls through `jigcad serve` (§8). Flags: `--tiers default,complex`, `--repeat n`, `--cases id,id`, `--out DIR`,
+`--deadline s`, `--compute rust|js`, `--oracle` (each case's known-good scripted turn, no network). Output:
+`results.jsonl` (one record per run: checks, outcome, tool calls, tokens incl. cached, time), `summary.md` (pass
+rates with 95 % Wilson intervals per tier) and `summary.json`; default directory `test/agent-eval/out/<stamp>/`.
+A case is `{ id, preset, mode: auto|read|ask, request, setup?, checks[], oracle: { steps, answer } }`; check kinds
+are listed in `tools/agent-eval/checks.mjs`. Every case must pass with its oracle
+(`node --test test/agent-eval/harness.test.mjs`). The Host takes `new Host({ engine })` for this
+(`tools/agent-eval/node-engine.mjs`); `tools/agent-eval/loader.mjs` loads `.json` and `.md` imports in Node.

@@ -453,3 +453,37 @@ node tools/agent-eval.mjs [--base http://127.0.0.1:8787/] [--tiers default,compl
 - `import/jigcad/test/agent/mock-host.js`, `scripted.js`, `sample-http.test.mjs`
 - `pkg/server/server.go` (`start`, `emit`), `pkg/sample/types.go` (`Usage`)
 - JIG-002 design doc and diary (the backend, the last-round note, prompt-cache measurements)
+
+## 11. Results: the first baseline (2026-10-31)
+
+Run: 14 cases × 2 tiers × 3 repeats = 84 turns, `jigcad serve` with 16 rounds, jig-compute active; 11.5 minutes.
+Files: `various/runs/2026-10-31-baseline/` (`results.jsonl`, `summary.md`, `summary.json`, `meta.json`); analysis
+script `scripts/01-run-analysis.py`.
+
+| Tier | Model | Passed | Pass rate (95 % CI) | Tools (mean / median / max) | Seconds (median / max) | Input tokens (mean) | Cached | Output tokens (mean) |
+|---|---|---|---|---|---|---|---|---|
+| default | glm-5.3-flash | 42/42 | 100 % (92–100 %) | 3.6 / 3 / 12 | 3.8 / 25.1 | 84,593 | 98 % | 638 |
+| complex | deepseek-4.1-flash | 42/42 | 100 % (92–100 %) | 5.0 / 3 / 17 | 8.1 / 47.2 | 114,314 | 96 % | 1,554 |
+
+Findings:
+
+1. **The case set is too easy to separate the models.** Both tiers passed every run, so the pass rate cannot
+   distinguish them; the 95 % interval's lower bound (92 %) is set by the run count, not by failures. The next cases
+   must be harder: multi-feature edits, gears and print jobs, assemblies, longer threads, and requests whose correct
+   answer is a refusal or a question back.
+2. **glm-5.3-flash is cheaper and faster on this set.** Median 3.8 s against 8.1 s, 2.4× fewer output tokens, and
+   fewer tool calls on questions (`a01-name-why` 2.3 against 10.7 tool calls; `s01-orientation` 1.3 against 4.7).
+   deepseek-4.1-flash used fewer tool calls on simple edits (2.0–2.7 against 3.3–4.3).
+3. **About one step in five misuses an async lab function.** 79 of 363 steps (22 %, both models) call `faces`,
+   `why`, `feature`, `sketch`, `check` or `run` without `await` (heuristic over the recorded step code). The model
+   then inspects a Promise, and several long runs spend their first rounds discovering this; 9 such promises later
+   rejected unhandled (5 runs). This is the clearest improvement target: either make the eval result say "this is
+   a Promise: add await" when a value or log is a pending promise, or state it prominently in the reference.
+4. **The round limit was reached once and the last-round note held.** deepseek's run of `a01-fillet-too-large`
+   used all 16 rounds (15 tool calls) and still produced a complete, correct answer in the tool-less last round.
+5. **Uncached input per turn is small.** Median uncached input is 939 tokens (glm) and 1,309 (deepseek); the prefix
+   cache served 96–98 % of all input. The 52 KB Reference costs time on the first call of a session, not per round.
+
+Next measurements: (a) the Promise hint in the eval result, judged by tool calls and seconds on this set; (b) a
+harder case set where pass rates fall below 100 %.
+

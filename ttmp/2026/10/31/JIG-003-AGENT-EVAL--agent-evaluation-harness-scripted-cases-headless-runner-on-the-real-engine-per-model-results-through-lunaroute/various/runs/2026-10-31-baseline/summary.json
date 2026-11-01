@@ -1,0 +1,340 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 42,
+      "passed": 42,
+      "p": 1,
+      "lo": 0.9161983874908382,
+      "hi": 1,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 3.619047619047619,
+      "rounds": 4.595238095238095,
+      "input": 84592.88095238095,
+      "cachedShare": 0.9754642755314601,
+      "output": 637.6666666666666,
+      "seconds": 5.271547619047619,
+      "outcomes": {
+        "ok": 42
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 42,
+      "passed": 42,
+      "p": 1,
+      "lo": 0.9161983874908382,
+      "hi": 1,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 5.023809523809524,
+      "rounds": 5.5476190476190474,
+      "input": 114313.73809523809,
+      "cachedShare": 0.9620840889640186,
+      "output": 1554.2619047619048,
+      "seconds": 12.53080952380952,
+      "outcomes": {
+        "ok": 42
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "a01-wall-edit",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.3333333333333335
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2.3333333333333335
+        }
+      }
+    },
+    {
+      "id": "a01-height-edit",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.3333333333333335
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "a01-footprint",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 4.333333333333333
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2.6666666666666665
+        }
+      }
+    },
+    {
+      "id": "a01-name-why",
+      "tags": [
+        "question",
+        "naming"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2.3333333333333335
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 10.666666666666666
+        }
+      }
+    },
+    {
+      "id": "a01-volume-readonly",
+      "tags": [
+        "question",
+        "read-only"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 1
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 1
+        }
+      }
+    },
+    {
+      "id": "a01-readonly-refuse",
+      "tags": [
+        "read-only",
+        "edit"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.6666666666666665
+        }
+      }
+    },
+    {
+      "id": "a01-whatif-mass",
+      "tags": [
+        "what-if",
+        "question"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 1.6666666666666667
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.6666666666666665
+        }
+      }
+    },
+    {
+      "id": "a01-wall3-fails",
+      "tags": [
+        "what-if",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 5.333333333333333
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 6
+        }
+      }
+    },
+    {
+      "id": "a01-fix-bug",
+      "tags": [
+        "repair",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2.6666666666666665
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a01-fillet-too-large",
+      "tags": [
+        "edit",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 6.666666666666667
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 10.333333333333334
+        }
+      }
+    },
+    {
+      "id": "a01-ask-wall",
+      "tags": [
+        "edit",
+        "ask"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3.6666666666666665
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 5
+        }
+      }
+    },
+    {
+      "id": "a03-dof-question",
+      "tags": [
+        "question",
+        "sketch"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 3
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 2.3333333333333335
+        }
+      }
+    },
+    {
+      "id": "a03-fix-dof",
+      "tags": [
+        "edit",
+        "sketch"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 8
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 12
+        }
+      }
+    },
+    {
+      "id": "s01-orientation",
+      "tags": [
+        "question",
+        "print"
+      ],
+      "byTier": {
+        "default": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 1.3333333333333333
+        },
+        "complex": {
+          "n": 3,
+          "passed": 3,
+          "fails": {},
+          "toolCalls": 4.666666666666667
+        }
+      }
+    }
+  ]
+}
