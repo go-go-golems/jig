@@ -160,3 +160,32 @@ diary, Step 8.
 
 ### What warrants a second pair of eyes
 - A tracked Promise is not a real `Promise` (it never was; JIG-004 made it a thenable). `x instanceof Promise` is false for it, as before.
+
+**Commit (code):** 309b8b9
+
+## Step 4: Phases 4 and 5, the rule in the docs; engine errors that say whose they are
+
+The registry now knows which names return a Promise (`awaited`). The scope table and `help()` write them as
+`await run()`, `await check(…)`, `await params.set(…)`. The reference opens the scope section with the rule, and
+the prompt states it in one sentence and writes its examples with `await`. A test ties the docs to the code: the
+awaited names must be exactly the calls the sandbox bridges to the page (minus file edits) plus `check`. An
+engine feature that fails with a JavaScript error now says whether the error came from a function in the script
+(with its line) or from inside the engine (kind `engine.bug`, with the first engine frames).
+
+### What I did
+- `src/agent/docs.js`: `awaited` on the rows of run, check, look, exportFile, params.set/clear, presets.load/create/rename, select, view.set, lab.follow; their signatures carry `await`; `awaitedNames()`. The `faces` row: `faces(selector?)` with selector values and "nothing for every face".
+- `src/agent/reference.md`: the rule, the awaited list, "`await` on a value is harmless", and the loud message, ahead of the sandbox paragraph.
+- `src/agent/prompt.js`: the rule and the awaited list after the tool description. "Then const r = await run() and read r.ok, r.errors"; "await check(variant)".
+- `tools/agent-eval/failures.mjs`: `ASYNC` = `awaitedNames()` plus the reads that were asynchronous before JIG-013 (old runs are still classified correctly).
+- `src/engine/compile.js`: for a `TypeError`, `ReferenceError` or `RangeError` without an engine kind, if the first stack frame is in `script.js` the message gets "(in a function of your script, script.js:N)". Otherwise the kind becomes `engine.bug`, the message gets the first three engine frames (`at fn (src/engine/file.js:line) ← …`), and the fix says to try another way and report it.
+- Test: `docs.test.mjs` "the awaited names are exactly the asynchronous ones"; `help('run')` starts with `await run()`.
+
+### What worked
+- `make test-js`: 85 + 15 + 62 + 42; presets 72/72; book 159 blocks, no problems.
+- A custom feature whose lambda reads `undefined.type`: `custom bad failed: Cannot read properties of undefined (reading 'type') (in a function of your script, script.js:1)`.
+
+### What didn't work
+- I could not trigger an engine-internal error on purpose to check the `engine.bug` branch. `.add(j.lib.magnet(), { at: { foo: 1 } })` compiled; `j.frame.on(j.sel.faces().where(…))` on a part gives a clean `ref.lost`. The branch is reviewed, not tested.
+
+### What warrants a second pair of eyes
+- The first-frame test for "your script" relies on the `//# sourceURL=script.js` that `runScript` appends. A lambda defined in a data file or in `call.js` would be reported as an engine bug.

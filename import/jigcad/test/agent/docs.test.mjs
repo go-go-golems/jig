@@ -57,3 +57,14 @@ test('help() answers from the registry and the language reference', async () => 
   // the page has the scope's records; the language is the sandbox's
   assert.match((await runEval(host, 'return help(files.read)')).text, /^files\.read/);
 });
+
+test('the awaited names are exactly the asynchronous ones (JIG-013): the bridged calls, check, and nothing else', async () => {
+  const { awaitedNames } = await import('../../src/agent/docs.js');
+  const { BRIDGED } = await import('../../src/agent/sandbox/serve.js');
+  // a bridged call crosses to the page, so it returns a Promise in the sandbox; file edits apply locally first
+  const async = new Set([...BRIDGED.filter(p => !p.startsWith('files.')), 'check']);
+  assert.deepEqual([...new Set(awaitedNames())].sort(), [...async].sort());
+  assert.ok(scopeTable().includes('`await run()`') && scopeTable().includes('`await check(variant?, options?)`'));
+  const host = await fresh();
+  assert.match((await runInSandbox(sb, host, "return help('run')")).text, /^await run\(\)/);
+});

@@ -4,7 +4,7 @@
 // a timeout, any other error), then reports per class the steps and runs affected, how many steps it took to recover
 // after a failed step, stuck loops (three or more failed steps in a row), and which scope names the code called.
 // Pattern from factory-videos' JSDRILL round report: coverage, failures per kind, evals to recover, stuck loops.
-import { scopeNames } from '../../src/agent/docs.js';
+import { scopeNames, awaitedNames } from '../../src/agent/docs.js';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -17,7 +17,9 @@ export const SCOPE_NAMES = [...new Set(scopeNames()
 const NAMESPACES = new Set(['program', 'files', 'measure', 'params', 'view', 'presets', 'lab', 'j', 'console']);
 
 // scope functions that return promises (the engine answers them)
-const ASYNC = new Set(['run', 'check', 'why', 'faces', 'feature', 'sketch', 'look', 'measure.area', 'params.get', 'params.set', 'params.clear', 'presets.load', 'presets.create', 'exportFile', 'program.ir']);
+// before JIG-013 the reads (why, faces, feature, sketch, measure.area, params.get, program.ir) returned Promises too:
+// recorded runs from then are still classified by them
+const ASYNC = new Set([...awaitedNames(), 'why', 'faces', 'feature', 'sketch', 'measure.area', 'params.get', 'program.ir']);
 
 /** The class of one step's result, or null when the step succeeded and carries no note. */
 export function classify(step) {

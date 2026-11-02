@@ -84,6 +84,16 @@ function compilePartIn(part, opts) {
         const e = e0 instanceof Error ? e0 : K.ocError(e0, `${f.type} ${f.id}`);
         const kind = e.kind ?? 'feature.failed';
         const d = { level: 'error', kind, at: f.id, message: e.kind ? e.message : `${f.type} ${f.id} failed: ${e.message}`, fix: e.fix, line: f.at?.line };
+        // a JavaScript error from inside the engine is a bug, not a mistake in the script: say so, and where (JIG-013)
+        if (!e.kind && !e.occt && (e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError)) {
+          const mine = /^\s+at .*script\.js:(\d+)/m.exec(String(e.stack ?? '').split('\n').slice(1, 2).join('\n'));
+          if (mine) d.message += ` (in a function of your script, script.js:${Math.max(1, +mine[1] - 1)})`;   // a lambda it passed
+          else {
+            d.kind = 'engine.bug';
+            d.message += ` (an error inside the engine, not in your script; ${engineFrames(e)})`;
+            d.fix = d.fix ?? 'try another way to write this feature (another placement or selector), and report it';
+          }
+        }
         diag(d); out.diagnostics.push(...fctx._diags);
         out.trace.push({ pass: `feature:${f.id}`, level: 'L4', ms: performance.now() - tf, cached: false, note: `failed: ${e.message}` });
         out.features.push({ id: f.id, type: f.type, auto: f.auto, failed: true, line: f.at?.line, key: fkey });
@@ -505,4 +515,11 @@ export function resolveInPart(res, d, type = 'frame') {
   const pc = res.pc;
   const ctx = makeFeatureCtx(pc, { id: 'port', type: 'port', args: [], opts: {} }, new Set(res.features.map(x => x.id)));
   return datum(d, res.state, pc, ctx, type);
+}
+
+// the first engine frames of an internal error, as 'at fn (file:line)', for engine.bug diagnostics
+function engineFrames(e) {
+  const frames = String(e?.stack ?? '').split('\n').filter(l => /^\s+at /.test(l)).slice(0, 3)
+    .map(l => l.trim().replace(/^at /, '').replace(/\(?(?:file|https?):\/\/[^)]*\/(src\/engine\/[^):]+:\d+)(?::\d+)?\)?/, '($1)'));
+  return frames.length ? `at ${frames.join(' ← ')}` : 'no stack';
 }
