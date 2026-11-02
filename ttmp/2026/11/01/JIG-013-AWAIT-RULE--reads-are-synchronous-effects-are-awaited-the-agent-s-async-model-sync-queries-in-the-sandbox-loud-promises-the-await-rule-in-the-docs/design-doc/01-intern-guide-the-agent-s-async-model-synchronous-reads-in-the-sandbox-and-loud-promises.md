@@ -55,8 +55,10 @@ The JIG-012 phase 2 batch (66 runs of 33 cases on two models) measured what is l
 | every other misuse class together | 20 | 12 |
 
 The calls left unawaited were `faces` 11, `check` 10, `run` 9, `params.get` 2, then `sketch`, `params.clear`,
-`view.set`, `feature` once each. It is the largest failure class, and the only one that grew between the
-baseline (25 runs) and phase 2 (29 runs): the notes and hints from JIG-012 help the next step, not the first.
+`view.set`, `feature` once each. It is the largest failure class, and the only one that did not shrink: the
+baseline had 31 such steps in 28 runs, phase 2 31 in 29 (both counted with the corrected classifier). The notes
+and hints from JIG-012 help the next step, not the first. (Corrected after the first draft, which quoted 25
+baseline runs from the old classifier.)
 
 ## 2. Why the model gets it wrong
 

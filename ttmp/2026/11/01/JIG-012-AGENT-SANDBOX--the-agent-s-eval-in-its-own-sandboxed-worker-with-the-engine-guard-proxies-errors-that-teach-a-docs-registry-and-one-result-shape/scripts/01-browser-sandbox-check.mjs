@@ -47,6 +47,9 @@ try {
     'help (phase 3)': "return help('j.fit.hole')",
     'guard (phase 2)': "return j.fit.hol",
     'hint (phase 2)': "return box(1, 1, 1)",
+    'sync read (JIG-013)': "const f = faces('%plane'); return [f instanceof Promise, f.length > 0, faces().length]",
+    'loud promise (JIG-013)': "const r = check(); return r.ok",
+    'settled return (JIG-013)': "return { ok: check().then(r => r.ok) }",
   };
   for (const [name, code] of Object.entries(steps)) {
     const r = await ev(`jigSandbox.run(${JSON.stringify(code)}).then(r => r.text)`);
