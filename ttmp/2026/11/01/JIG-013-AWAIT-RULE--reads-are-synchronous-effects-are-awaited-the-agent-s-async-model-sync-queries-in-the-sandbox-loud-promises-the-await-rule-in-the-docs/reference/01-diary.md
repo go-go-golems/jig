@@ -233,3 +233,48 @@ are fixed in this step.
 
 ### Code review instructions
 - `node tools/agent-eval/failures.mjs ttmp/…/JIG-013…/various/runs/2026-11-02-jig013/results.jsonl`; `node --test import/jigcad/test/agent/eval.test.mjs` (the `look()` overlays test).
+
+## Step 6: Follow-up, program queries and four messages (no ticket, at the user's request)
+
+**User prompt (verbatim):** "do 1, 2, no need for ticket". It answers my proposal of (1) the same queries on
+both `program` objects and (2) better messages for the largest "other error" groups.
+
+The workbench's `program` now answers `why`, `faces`, `feature`, `sketch` and `measure`, as `check()`'s program
+does. `faces()` accepts name patterns (`'shell/*'`). A feature-style name that matches nothing says so, with names
+like it. An unknown query token lists the grammar, and an unknown `%kind` is an error with the nearest kind
+instead of an empty match. A failed `files.edit` points at the same text with other spacing, or at the most
+similar line. `const files = files.list()` gets a note that the `const` hides a scope name. Commit cbab0c6. One
+verification batch ran from a worktree frozen at cbab0c6 (one repeat, 70 runs; `various/runs/2026-11-02-followup/`,
+report `various/03-failures-followup.md`).
+
+### What I did
+- `src/agent/scope.js`: `program = { ...makeProgram(host), ...makeQueries(host), measure }`; `nearestLine(text, find)` for `files.edit` (whitespace-squashed containment, else trigram similarity ≥ 0.45 on the first line of `find`).
+- `src/engine/program.js`: `faces()` matches `*` patterns against persistent names; a text that looks like a name (`feature/…`) and matches nothing throws with `_someNames()`.
+- `src/engine/select.js`: the unknown-token message lists the grammar; `KINDS` and the unknown-kind error with `closest()`.
+- `src/agent/hints.js`: `Cannot access 'x' before initialization`: a scope name hidden by a const, or a use before its declaration.
+- `src/agent/docs.js`: a row for `program.why/faces/feature/sketch/measure`; the `faces` row names patterns. `content/docs/reference.md`: name patterns and the error for unknown kinds.
+- Test: one test in `sandbox.test.mjs` covers each behaviour. `make test-js` 87 + 15 + 62 + 42; presets 72/72; book 159 blocks. The stricter kind check breaks nothing: the presets, guides and book use only `%circle`, `%plane`, `%cylinder`.
+
+### What worked
+Per class, JIG-013 batch (140 runs) against this batch (70 runs):
+
+| error | JIG-013 | follow-up | next step ok (follow-up) |
+|---|---:|---:|---:|
+| `program.faces/why/…` does not exist | 5 | 0 | — |
+| unknown selector token or kind | 12 | 3 | 3 |
+| a const hides a scope name / use before declaration | 7 | 2 | 1 |
+| `files.edit` text not found | 8 | 9 | 6 |
+- The first three groups shrank, also per run. Edit misses did not, which is expected: the new message helps the next step, and the model still guesses the text first. Recovery after an edit miss was 6 of 9, as before (6 of 8).
+
+### What didn't work
+- Pass rate: 64/70 (default 33/35, complex 31/35), against 136/140 in the JIG-013 batch. All six failures are cases that have failed before, in one batch or another: `h04-switch-toggle`, `w02-a01-engrave-negative`, `a01-magnet-pocket`, `u01-cat-magnet-pin`, `m07-tooth-gap` (answer check), `a01-no-holes` (the agent changed a file it was asked not to). Five of the six runs ended at the 16-round limit (12 runs reached it in this batch, against 10 in 140 runs before). The complex model explores alternatives until its rounds run out. None of the failing runs failed on one of the new messages.
+- The default tier had 2 `authentication_error`s from the model backend in runs that passed.
+- `RangeError: Offset is outside the bounds of the DataView` and `Cannot convert undefined or null to object`: both in the agent's own code (parsing STL bytes from `j.export.stl` by hand; `Object.keys(prog.measure)` on a `j.compile()` result), not engine errors.
+
+### What I learned
+- One repeat cannot tell this batch's 64/70 from the previous 136/140. The hard cases flip between batches, and the round limit decides most of them.
+- `(await check()).program` from an earlier `check()` refused 3 times. A step that compares two variants holds both programs, and only the last one answers. Keeping the last few `check()` programs in slots would fix that.
+
+### What should be done in the future
+- Keep the last N check programs alive (slots `check-1` … `check-4`) so variant comparisons work.
+- Look at the round limit for the complex tier, or at how its turns spend rounds, before adding harder cases.

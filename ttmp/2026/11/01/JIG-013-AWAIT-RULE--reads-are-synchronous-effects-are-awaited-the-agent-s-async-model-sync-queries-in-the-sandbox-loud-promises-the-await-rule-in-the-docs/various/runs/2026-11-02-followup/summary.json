@@ -1,0 +1,820 @@
+{
+  "tiers": [
+    "default",
+    "complex"
+  ],
+  "byTier": [
+    {
+      "tier": "default",
+      "n": 35,
+      "passed": 33,
+      "p": 0.9428571428571428,
+      "lo": 0.8139261926062996,
+      "hi": 0.984187170385956,
+      "model": "lunaroute/glm-5.3-flash",
+      "toolCalls": 4.914285714285715,
+      "rounds": 5.771428571428571,
+      "input": 119233.37142857142,
+      "cachedShare": 0.898816438734314,
+      "output": 1198.5428571428572,
+      "seconds": 13.950571428571433,
+      "outcomes": {
+        "ok": 33,
+        "authentication_error": 2
+      }
+    },
+    {
+      "tier": "complex",
+      "n": 35,
+      "passed": 31,
+      "p": 0.8857142857142857,
+      "lo": 0.7404820521187976,
+      "hi": 0.9546489414551025,
+      "model": "lunaroute/deepseek-4.1-flash",
+      "toolCalls": 7.485714285714286,
+      "rounds": 8.085714285714285,
+      "input": 193240.77142857143,
+      "cachedShare": 0.919902883552968,
+      "output": 4053.0285714285715,
+      "seconds": 38.19922857142857,
+      "outcomes": {
+        "ok": 35
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "a01-wall-edit",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "a01-height-edit",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 5
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "a01-footprint",
+      "tags": [
+        "edit",
+        "params"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "a01-name-why",
+      "tags": [
+        "question",
+        "naming"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 7
+        }
+      }
+    },
+    {
+      "id": "a01-volume-readonly",
+      "tags": [
+        "question",
+        "read-only"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 1
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "a01-readonly-refuse",
+      "tags": [
+        "read-only",
+        "edit"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    },
+    {
+      "id": "a01-whatif-mass",
+      "tags": [
+        "what-if",
+        "question"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 1
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 1
+        }
+      }
+    },
+    {
+      "id": "a01-wall3-fails",
+      "tags": [
+        "what-if",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 7
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 7
+        }
+      }
+    },
+    {
+      "id": "a01-fix-bug",
+      "tags": [
+        "repair",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    },
+    {
+      "id": "a01-fillet-too-large",
+      "tags": [
+        "edit",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "a01-ask-wall",
+      "tags": [
+        "edit",
+        "ask"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a03-dof-question",
+      "tags": [
+        "question",
+        "sketch"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a03-fix-dof",
+      "tags": [
+        "edit",
+        "sketch"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "s01-orientation",
+      "tags": [
+        "question",
+        "print"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 5
+        }
+      }
+    },
+    {
+      "id": "m07-ratio-centre",
+      "tags": [
+        "question",
+        "assembly",
+        "gears"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "m07-wheel-30",
+      "tags": [
+        "edit",
+        "assembly",
+        "gears",
+        "multi-feature"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 6
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 12
+        }
+      }
+    },
+    {
+      "id": "m07-tooth-gap",
+      "tags": [
+        "question",
+        "assembly",
+        "gears"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "answer": 1
+          },
+          "toolCalls": 15
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 22
+        }
+      }
+    },
+    {
+      "id": "m09-travel-per-turn",
+      "tags": [
+        "question",
+        "assembly",
+        "gears"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 1
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    },
+    {
+      "id": "m08-hinge-clearance",
+      "tags": [
+        "question",
+        "assembly",
+        "fit"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 10
+        }
+      }
+    },
+    {
+      "id": "h04-decora-size",
+      "tags": [
+        "question",
+        "configs",
+        "units"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        }
+      }
+    },
+    {
+      "id": "h04-switch-toggle",
+      "tags": [
+        "edit",
+        "configs"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "file": 1,
+            "metric": 2
+          },
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "h01-large",
+      "tags": [
+        "edit",
+        "configs",
+        "multi-feature",
+        "print"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 7
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 9
+        }
+      }
+    },
+    {
+      "id": "a01-mount-holes",
+      "tags": [
+        "edit",
+        "multi-feature",
+        "holes"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a01-engrave",
+      "tags": [
+        "edit",
+        "multi-feature",
+        "text"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 10
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "a03-conflict",
+      "tags": [
+        "repair",
+        "sketch",
+        "diagnostics"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 6
+        }
+      }
+    },
+    {
+      "id": "a01-no-holes",
+      "tags": [
+        "refusal",
+        "question"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "unchanged": 1
+          },
+          "toolCalls": 8
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    },
+    {
+      "id": "a01-undo-change",
+      "tags": [
+        "edit",
+        "multi-turn"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "a01-bigger-clarify",
+      "tags": [
+        "edit",
+        "multi-turn",
+        "clarify"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 9
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "v01-s01-describe",
+      "tags": [
+        "visual",
+        "question",
+        "look"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 2
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 8
+        }
+      }
+    },
+    {
+      "id": "v02-a01-engrave-front",
+      "tags": [
+        "visual",
+        "edit",
+        "text",
+        "look"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "v03-a01-footprint-drawing",
+      "tags": [
+        "visual",
+        "edit",
+        "image"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        }
+      }
+    },
+    {
+      "id": "w01-a01-hole-misses",
+      "tags": [
+        "repair",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        },
+        "complex": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 3
+        }
+      }
+    },
+    {
+      "id": "w02-a01-engrave-negative",
+      "tags": [
+        "edit",
+        "text",
+        "diagnostics",
+        "warnings"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 4
+        },
+        "complex": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "file": 1,
+            "metric": 1
+          },
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "a01-magnet-pocket",
+      "tags": [
+        "edit",
+        "library",
+        "fit"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 8
+        },
+        "complex": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "metric": 2
+          },
+          "toolCalls": 15
+        }
+      }
+    },
+    {
+      "id": "u01-cat-magnet-pin",
+      "tags": [
+        "create",
+        "preset",
+        "library",
+        "fit"
+      ],
+      "byTier": {
+        "default": {
+          "n": 1,
+          "passed": 1,
+          "fails": {},
+          "toolCalls": 15
+        },
+        "complex": {
+          "n": 1,
+          "passed": 0,
+          "fails": {
+            "metric": 2,
+            "file": 1
+          },
+          "toolCalls": 17
+        }
+      }
+    }
+  ]
+}
