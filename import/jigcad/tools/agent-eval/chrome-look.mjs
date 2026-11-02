@@ -64,7 +64,8 @@ const PAGE_READY = `(async () => {
 })()`;
 const pageRender = a => `(async (a) => {
   const h = globalThis.jigHost;
-  if (a.presetId && (!h.preset || h.preset.id !== a.presetId)) { if (!(await h.loadPreset(a.presetId))) throw new Error('no preset ' + a.presetId); }
+  // a preset the agent made (U-…) exists only in the Node host: the files below are what count (JIG-013)
+  if (a.presetId && (!h.preset || h.preset.id !== a.presetId)) { if (!(await h.loadPreset(a.presetId)) && !a.files) throw new Error('no preset ' + a.presetId); }
   for (const p of [...h.files.keys()]) if (!(p in a.files) && typeof h.deleteFile === 'function') h.deleteFile(p);
   for (const [p, t] of Object.entries(a.files)) if (h.files.get(p) !== t) { if (h.files.has(p)) h.setFile(p, t); else h.addFile(p, t); }
   h.resetOverrides();

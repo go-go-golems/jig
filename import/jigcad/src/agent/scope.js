@@ -680,7 +680,14 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     if (name != null && !LOOK_VIEWS.includes(name)) throw new Error('look: the view is axo, front, side or plan');
     const px = (v, d) => Math.max(64, Math.min(1600, Math.round(Number(v) || d)));
     const width = px(o.width, 640), height = px(o.height, width * 3 / 4);
-    const shot = await host.renderView({ view: name || null, width, height, overlays: o.overlays || null });
+    // overlays as a list, or as { dims: true, grid: false } over the person's current ones, as view.set takes them
+    let overlays = o.overlays || null;
+    if (overlays && typeof overlays === 'object' && !Array.isArray(overlays) && !(overlays instanceof Set)) {
+      const cur = new Set(host.view && host.view.overlays ? host.view.overlays : []);
+      for (const [k, on] of Object.entries(overlays)) on ? cur.add(k) : cur.delete(k);
+      overlays = [...cur];
+    } else if (overlays instanceof Set) overlays = [...overlays];
+    const shot = await host.renderView({ view: name || null, width, height, overlays });
     images.push({ mimeType: shot.mimeType, data: shot.data });
     const kb = Math.round(shot.data.length * 3 / 4 / 1024);
     return `image ${images.length}: ${shot.view} view, ${shot.width} × ${shot.height} px, ${kb} KB, attached after the tool results`;

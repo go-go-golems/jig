@@ -189,3 +189,47 @@ engine feature that fails with a JavaScript error now says whether the error cam
 
 ### What warrants a second pair of eyes
 - The first-frame test for "your script" relies on the `//# sourceURL=script.js` that `runScript` appends. A lambda defined in a data file or in `call.js` would be reported as an engine bug.
+
+**Commit (code):** 8c0f856; e6a2562 (browser check, guide correction). Pushed to origin/main at the user's request ("push the jig repo too"); that push included the running batch's partial `results.jsonl`, replaced by the complete file in this step's commit.
+
+## Step 5: The measured batch, and what it found
+
+The batch ran from the worktree frozen at 8c0f856, with two repeats per case (`--tiers default,complex
+--repeat 2 --look chrome`, 140 runs; `various/runs/2026-11-02-jig013/`, report `various/02-failures-jig013.md`).
+It passed 136/140. The class this ticket targeted, unawaited promises, went from 49 steps in 38 runs to none.
+Reading the failing steps found two problems outside the class. `look()` refused overlays written as an object,
+the form `view.set` takes. The harness's Chrome renderer could not draw a preset the agent had just created. Both
+are fixed in this step.
+
+### What worked
+| | baseline | JIG-012 phase 2 | JIG-012 phases 3–5 | JIG-013 |
+|---|---:|---:|---:|---:|
+| runs | 66 | 66 | 70 | 140 (2 repeats) |
+| passed | 64 | 63 (1 auth error) | 68 | 136 |
+| failed steps | 18 % | 16 % | 15 % (69 of 450) | 11 % (87 of 774) |
+| runs with a misuse error | 24 % | 18 % | 16 % | 15 % (21) |
+| runs with an unawaited promise | 28 (31 steps) | 29 (31) | 38 (49) | 0 (0) |
+| stuck loops | 2 | 1 | 1 | 2 |
+| never recovered | 5 | 1 | 0 | 3 |
+- Fewer tool calls per run: default 4.3 (was 5.2), complex 6.8 (was 7.6). `help` was called 12 times.
+- The four failures:
+  - `default #1 a01-mount-holes`: volume 15267.3, expected 15271.6 ± 1. The same miss as in the phase 2 batch: the agent's holes differ slightly from the request.
+  - `default #2 a01-fillet-too-large`: the agent left a 25 mm fillet that the engine refuses (`fillet.tooLarge`).
+  - `complex #1 h04-switch-toggle`: wrong volume (21301, expected 17062).
+  - `complex #1 u01-cat-magnet-pin`: 15 tool calls spent exploring ear fillets; it never created the preset (the final files are D-03's).
+
+### What didn't work
+- `look(view, { overlays: { dims: true } })` failed 5 times with `Error: TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))`. The reference documents the object form for `view.set`, and `look` passed the object on as if it were a list. `look()` now takes a list, or `{ name: on }` over the person's current overlays.
+- In three of the four `u01-cat-magnet-pin` runs, every `look()` after `presets.create` failed with `Error: Error: no preset U-01` (also `U-02`, `U-03`). The harness's Chrome page loads the preset by id before applying the Node host's files, and a preset the agent made exists only in the Node host. The page now goes on with the files when the id is unknown. Checked: rendering `presetId: 'U-99'` with A-01's files gives a 320 × 240 plan view. This affected only the harness; in the browser, `look()` draws the page's own state.
+- `j.compile(null)` leaked `Cannot read properties of null (reading 'constructor')` (2 steps). It now throws `j.compile: give a part, sketch, assembly, print job or design (got null)`.
+- Correction to Step 1: there I called unawaited promises "the only class that grew". With the corrected classifier, the baseline had 28 runs (31 steps), not 25, so the class was flat from the baseline to phase 2 and rose only in the last JIG-012 batch, partly because calls on `check()`'s program were tracked from then on. The guide was corrected in e6a2562.
+
+### What I learned
+- Removing the asynchrony removed the class entirely: no step in 140 runs used a Promise as a value or left one unawaited. The loud-promise error never fired, because the reads it would have caught are values now and the awaited calls were awaited.
+- The remaining failures are engineering judgment (sizes, fillets, a selector that picks the wrong face) and one exploration that ran out of steps, not API misuse.
+
+### What warrants a second pair of eyes
+- "never recovered" rose from 0 to 3 in twice as many runs; two stuck loops in 140 runs (one in the cat case, one in `w01-a01-hole-misses`). Not investigated further.
+
+### Code review instructions
+- `node tools/agent-eval/failures.mjs ttmp/…/JIG-013…/various/runs/2026-11-02-jig013/results.jsonl`; `node --test import/jigcad/test/agent/eval.test.mjs` (the `look()` overlays test).

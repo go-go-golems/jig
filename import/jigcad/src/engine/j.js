@@ -37,7 +37,10 @@ export function makeJ() {
     design, param: { ...(core.param ?? {}), ...param }, search, objective, metric, evaluate, stage,
     laws, law, structure, gen,
     inspect: inspectApi, export: exportTo,
-    compile: (m, o) => compileModel(m, o).keep(),
+    compile: (m, o) => {
+      if (!m || typeof m !== 'object') throw new TypeError(`j.compile: give a part, sketch, assembly, print job or design (got ${m === null ? 'null' : typeof m})`);
+      return compileModel(m, o).keep();
+    },
     hash: x => x?.data?.hash ?? 'h:' + hashValue(x),
     diff: (a, b) => diffModels(a, b),
     load: new Proxy({}, { get: (_, k) => () => { throw new Error(`j.load.${String(k)}: loading files is an effect not supported in this build; put data files in the preset and read them from \`data\``); } }),

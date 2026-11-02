@@ -218,3 +218,12 @@ test('the eval tool returns images with its text so the adapter can send them', 
   const plain = await tool.execute({ code: 'return 1' });
   assert.equal(plain, '1', 'a step without images returns its text as before');
 });
+
+test('look() takes overlays as a list or as { name: on } over the person\'s, like view.set (JIG-013)', async () => {
+  const { host, calls } = drawingHost();
+  host.view = { ...(host.view || {}), overlays: new Set(['grid']) };
+  await runEval(host, "return await look('plan', { overlays: { dims: true, grid: false } })");
+  assert.deepEqual(calls[0].overlays, ['dims']);
+  await runEval(host, "return await look('plan', { overlays: ['edges'] })");
+  assert.deepEqual(calls[1].overlays, ['edges']);
+});
