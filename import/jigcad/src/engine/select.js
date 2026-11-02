@@ -1,5 +1,6 @@
 // Selectors (README §4.4): lazy, immutable query values resolved at L4 against named bodies.
 // Resolution returns { kind, items: [{ body, index, name }], chain: [strings], fragile, notes }.
+import { closest } from './guard.js';
 import * as K from './kernel.js';
 
 const V = K.V;
@@ -114,9 +115,13 @@ export function parseQuery(q) {
     const t = next();
     if (t === '(') { const e = orE(); next(); return e; }
     if (!t) throw new Error(`selector: unexpected end of '${q}'`);
-    if (t[0] === '%') return { op: 'type', t: t.slice(1).toLowerCase() };
+    if (t[0] === '%') {
+      const k = t.slice(1).toLowerCase();
+      if (!KINDS.includes(k)) { const near = closest(k, KINDS, 2); throw new Error(`selector: unknown kind '${t}' in '${q}'.${near.length ? ` Did you mean ${near.map(n => '%' + n).join(' or ')}?` : ''} Kinds: %plane %cylinder %cone %sphere %torus %bspline (faces), %line %circle %arc %ellipse (edges)`); }
+      return { op: 'type', t: k };
+    }
     if ('+-|#<>'.includes(t[0])) return { op: t[0], dir: parseDir(t[0] === '+' || t[0] === '-' ? t : t.slice(1)) };
-    throw new Error(`selector: unknown token '${t}' in '${q}'`);
+    throw new Error(`selector: unknown token '${t}' in '${q}'. A query is made of %plane %cylinder %line %circle (kind), +Z -Z (normal points along), |Z (parallel), #Z (perpendicular), >Z <Z (farthest, nearest along), any axis or (x,y,z), joined with and, or, not; a face name such as 'body/end' or a pattern 'shell/*' also works`);
   }
   const e = orE();
   if (pos < t2.length) throw new Error(`selector: unexpected '${t2[pos]}' in '${q}'`);
@@ -155,6 +160,8 @@ function evalQuery(ast, cands, kind) {
   return rec(ast);
 }
 const union = (a, b) => { const s = new Set(a); return [...a, ...b.filter(x => !s.has(x))]; };
+// the kinds a %kind query can name (typeMatch); anything else is an error, not an empty match
+const KINDS = ['plane', 'cylinder', 'cone', 'sphere', 'torus', 'bspline', 'spline', 'line', 'circle', 'arc', 'ellipse', 'bezier', 'other'];
 function typeMatch(g, t) {
   if (t === 'line') return g.kind === 'line';
   if (t === 'circle') return g.kind === 'circle';

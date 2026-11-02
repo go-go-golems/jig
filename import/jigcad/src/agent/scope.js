@@ -6,6 +6,30 @@ export const READONLY = ['files.write', 'files.edit', 'files.rename', 'files.rem
 
 // argument checks with messages that name the call (JIG-012 phase 2; test/agent/lint.test.mjs)
 const kindOf = v => v === null ? 'null' : v === undefined ? 'nothing' : Array.isArray(v) ? 'an array' : typeof v === 'object' ? 'an object' : typeof v === 'string' ? (v ? `"${v.slice(0, 40)}"` : 'empty text') : `${typeof v} ${String(v)}`;
+// where the text an edit looked for nearly is: the same text with other spacing, or the line most like its first line
+function nearestLine(text, find) {
+  const squash = t => t.replace(/\s+/g, ' ').trim();
+  const lines = text.split('\n');
+  const want = squash(find);
+  if (want && squash(text).includes(want)) {
+    const first = squash(find.split('\n').find(l => l.trim()) || '');
+    const i = lines.findIndex(l => first && squash(l).includes(first.slice(0, 40)));
+    return `; it is there with other spacing or line breaks${i >= 0 ? ` (from line ${i + 1})` : ''}: copy it from files.read`;
+  }
+  const first = squash(find.split('\n').find(l => l.trim()) || '').slice(0, 120);
+  if (first.length < 4) return '';
+  let best = -1, score = 0;
+  const grams = t => { const g = new Set(); for (let k = 0; k + 3 <= t.length; k++) g.add(t.slice(k, k + 3)); return g; };
+  const a = grams(first);
+  lines.forEach((l, i) => {
+    const b = grams(squash(l).slice(0, 200));
+    let both = 0; for (const x of a) if (b.has(x)) both++;
+    const sc = both / Math.max(1, Math.max(a.size, b.size));
+    if (sc > score) { score = sc; best = i; }
+  });
+  return score >= 0.45 ? `; the line most like it is ${best + 1}: ${lines[best].trim().slice(0, 120)}` : '';
+}
+
 export function textArg(verb, v, what, example) {
   if (typeof v === 'string' && v) return v;
   throw new TypeError(`${verb}: give ${what} as text, such as ${example} (got ${kindOf(v)})`);
@@ -101,7 +125,7 @@ function makeFiles(host) {
       if (typeof find !== 'string' || !find) throw new Error('edit: give the exact text to find, as a string');
       if (typeof replace !== 'string') throw new Error('edit: the replacement must be a string');
       const n = countOf(text, find);
-      if (n === 0) throw new Error(`edit: text not found in ${path} (it must match exactly, including spaces)`);
+      if (n === 0) throw new Error(`edit: text not found in ${path} (it must match exactly, including spaces)${nearestLine(text, find)}`);
       if (n > 1) throw new Error(`edit: text occurs ${n} times in ${path}; include more context so it is unique`);
       const at = text.indexOf(find);
       const next = text.slice(0, at) + replace + text.slice(at + find.length);
@@ -512,8 +536,9 @@ export function labScope(host, { readOnly = false, console: con, images = null }
   const guard = name => { if (readOnly) throw new Error(`read-only mode: ${name} is off`); };
 
   const files = makeFiles(host);
-  const program = makeProgram(host);
   const measure = makeMeasure(host);
+  // the page's program answers the same queries as check()'s (JIG-013 follow-up): program.faces(…) is faces(…)
+  const program = { ...makeProgram(host), ...makeQueries(host), measure };
   const lab = makeLab(host, guard);
 
   async function run() {

@@ -208,8 +208,13 @@ export class Program {
     let s = sel instanceof FeatureRef ? sel.faces() : sel;
     if (typeof s === 'string') {
       const hits = [];
-      for (const p of this.P.parts) for (const b of p.res.state.bodies) b.names.forEach((n, i) => { if (n === s || n.replace(/#[a-z0-9]+$/, '') === s) hits.push(this._record({ body: b, index: i, name: n }, 'faces')); });
+      // a persistent name, or a name pattern with * ('shell/*', 'shell/inner*') (JIG-013 follow-up)
+      const glob = s.includes('*') && /[/\w]/.test(s.replace(/\*/g, '')) ? new RegExp('^' + s.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$') : null;
+      for (const p of this.P.parts) for (const b of p.res.state.bodies) b.names.forEach((n, i) => { if (n === s || n.replace(/#[a-z0-9]+$/, '') === s || (glob && glob.test(n))) hits.push(this._record({ body: b, index: i, name: n }, 'faces')); });
       if (hits.length) return opts.names ? hits.map(r => r.name) : hits;
+      if (glob) throw new Error(`faces: no face name matches '${s}'; names are like ${this._someNames(s)}`);
+      // text with a feature-style name ('shell/inner') that matches nothing is a name, not a query
+      if (/^[A-Za-z_][\w-]*\//.test(s)) throw new Error(`faces: no face named '${s}'; names like it: ${this._someNames(s)}`);
       s = selFaces(s);
     }
     if (!(s instanceof Selector)) throw new Error(`faces: expected a selector, query text or face name, got ${String(sel)}`);
@@ -217,6 +222,15 @@ export class Program {
     const r = resolveSel(s, env);
     const recs = r.items.map(c => this._record(c, r.kind));
     return opts.names ? recs.map(x => x.name) : recs;
+  }
+  // a few face names, those sharing the feature prefix of `like` first, for messages
+  _someNames(like = '') {
+    const all = [];
+    for (const p of this.P.parts) for (const b of p.res.state.bodies) all.push(...b.names);
+    const head = String(like).split('/')[0];
+    const near = all.filter(n => n.split('/')[0] === head);
+    const pick = (near.length ? near : all).slice(0, 6);
+    return pick.length ? pick.map(n => `'${n}'`).join(', ') + ((near.length || all.length) > pick.length ? ', …' : '') : 'none (nothing compiled)';
   }
   _record(c, kind) {
     const bodyId = this.data.bodies.find(b => b.name === c.body.id && this.P.parts.find(p => p.name === b.part)?.res.state.bodies.includes(c.body))?.id ?? c.body.id;

@@ -122,3 +122,16 @@ test('loud promises, awaited return values, finished pending calls (JIG-013 phas
   assert.match(await run(host, 'return program.summary().bbox ?? faces(\'>Z\')[0].center[2]'), /25/);
   host.setFile('script.js', before);
 });
+
+test('follow-up: program answers queries; name patterns; selector grammar; edit near-misses; a scope name hidden by const', async () => {
+  const host = await fresh();
+  assert.equal(await run(host, "return program.faces('%plane').length === faces('%plane').length && program.why('>Z').kind === why('>Z').kind && typeof program.measure.bbox === 'function'"), 'true');
+  assert.equal(await run(host, "return faces('body/*').length === faces().filter(f => f.name.startsWith('body/')).length && faces('body/*').length > 0"), 'true');
+  assert.match(await run(host, "return faces('shell/nope*')"), /no face name matches 'shell\/nope\*'; names are like 'shell\//);
+  assert.match(await run(host, "return faces('shell/inner')"), /no face named 'shell\/inner'; names like it: 'shell\//);
+  assert.match(await run(host, "return faces('%plan and >Z')"), /unknown kind '%plan' in '%plan and >Z'\. Did you mean %plane\?/);
+  assert.match(await run(host, "return faces('@Z')"), /A query is made of %plane %cylinder .* joined with and, or, not; a face name such as 'body\/end' or a pattern 'shell\/\*' also works/);
+  assert.match(await run(host, "files.edit('script.js', 'wall:  mm(2)', 'wall: mm(3)')"), /it is there with other spacing or line breaks \(from line \d+\): copy it from files\.read/);
+  assert.match(await run(host, "files.edit('script.js', \".shell(j.feat('body').endFace(), 'wal', { id: 'shell' })\", 'x')"), /the line most like it is \d+: \.shell\(j\.feat\('body'\)\.endFace\(\), 'wall'/);
+  assert.match(await run(host, 'const files = files.list(); return files'), /note: files is a name of this step's scope, and a const or let files in this step hides it from the step's first line\. Use another name/);
+});

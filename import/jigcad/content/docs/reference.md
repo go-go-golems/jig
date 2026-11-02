@@ -230,7 +230,7 @@ Faces and edges are named by genealogy: `<feature>/<role>[<source>]`, as in `bod
 - `.expect(n | [min, max])` ✓: a count assertion; a mismatch is the error `ref.expect`. Example: `.edges('|Z').expect(4)`.
 - `j.isSelector(x)` ✓: test. Example: `j.isSelector(j.sel.faces())`.
 
-The query language is CadQuery's: `+Z` (normal points +Z), `|Z` (parallel), `#Z` (perpendicular), `>Z` and `<Z` (farthest and nearest along Z), `%plane %cylinder %line %circle`, any axis or `(x,y,z)`, combined with `and`, `or`, `not`. Predicates in `where`: edges have `convex`, `concave`, `smooth`, `length`, `radius`, `dir`, `center`; faces have `normal`, `area`, `center`, `radius`, `axis`.
+Where a query is text (`faces('…')` in the agent's scope, `j.sel.faces('…')`), a persistent name such as `'body/end'` and a name pattern with `*` such as `'shell/*'` also work in the agent's `faces()`; a kind or token the language does not have is an error that lists what it has. The query language is CadQuery's: `+Z` (normal points +Z), `|Z` (parallel), `#Z` (perpendicular), `>Z` and `<Z` (farthest and nearest along Z), `%plane %cylinder %line %circle`, any axis or `(x,y,z)`, combined with `and`, `or`, `not`. Predicates in `where`: edges have `convex`, `concave`, `smooth`, `length`, `radius`, `dir`, `center`; faces have `normal`, `area`, `center`, `radius`, `axis`.
 
 ## Holes
 

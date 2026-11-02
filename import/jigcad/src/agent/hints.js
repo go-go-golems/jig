@@ -28,7 +28,11 @@ export function hintsFor({ error, text = '', code = '', names = [], j = null, me
   if (error?.guard) return out;   // a guard's message already says it all
 
   let m;
-  if (error?.name === 'ReferenceError' && (m = /^(\w+|\$\w*) is not defined$/.exec(msg))) {
+  if (error?.name === 'ReferenceError' && (m = /^Cannot access '([\w$]+)' before initialization$/.exec(msg))) {
+    out.push(names.includes(m[1])
+      ? `note: ${m[1]} is a name of this step's scope, and a const or let ${m[1]} in this step hides it from the step's first line. Use another name: const list = ${m[1]}…`
+      : `note: ${m[1]} is used before the line that declares it (const or let): move the declaration up.`);
+  } else if (error?.name === 'ReferenceError' && (m = /^(\w+|\$\w*) is not defined$/.exec(msg))) {
     out.push(notDefined(m[1], names, j));
   } else if (error?.name === 'TypeError' && (m = /^(.+)\.(\w+) is not a function$/.exec(msg))) {
     const h = notAMethod(m[1], m[2], methods ?? {}, promised);
