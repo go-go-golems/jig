@@ -8,7 +8,7 @@
 - [x] Phase 4: docs (registry async flag, table, help, reference rule, prompt, failures.mjs ASYNC from the registry)
 - [x] Phase 5: engine messages (faces() lists every face; JS errors in features carry their stack)
 - [x] Phase 6: batch --repeat 2 from a frozen worktree; failure report; compare with JIG-012 batches
-- [ ] Obsidian vault report (deep dive), committed and pushed
+- [x] Obsidian vault report (deep dive), committed and pushed
 
 ## Done
 
