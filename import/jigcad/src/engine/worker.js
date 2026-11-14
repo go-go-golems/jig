@@ -180,6 +180,8 @@ function answer(P, method, a) {
     case 'find': return P.find(a[0]);
     case 'genealogy': return P.genealogy(a[0]);
     case 'body': return P.body(a[0]);
+    case 'kine': if (!P.kine) throw new Error('kine: only an assembly compiles to a kine program'); return P.kine(a[0] ?? {});
+    case 'dragPose': if (!P.dragPose) throw new Error('drag: only an assembly has a pose to drag'); return P.dragPose(a[0] ?? {});
   }
   throw new Error(`unknown call method '${method}'`);
 }

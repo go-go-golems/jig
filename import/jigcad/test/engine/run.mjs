@@ -758,6 +758,192 @@ await test('42 a blend that would drop another feature is refused; mesh interfer
   return `tangent fillet refused naming the crank; peg ${gap(clear)} clear, ${gap(hit)} with a 1 mm root fillet`;
 });
 
+// ── mechanisms (assembly spec v0.1): joints solved together, mobility by rank, drives, couplings, studies ──
+await test('43 mechanism: slider-crank closes its loop; Kutzbach −2, rank 17, stroke 2r', async () => {
+  const p = await compile('43-slider-crank.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, M = A.mobility;
+  assert(A.assembled && M.kutzbach === -2 && M.rank === 17 && M.dof === 1 && M.redundant === 3 && M.left === 0, `mobility ${JSON.stringify(M)}`);
+  assert(p.metrics.assemblyDOF.value === 1, 'assemblyDOF 1');
+  assert(['main', 'pin', 'wrist', 'guide'].every(id => M.redundantJoints.includes(id)), `redundant joints ${M.redundantJoints}`);
+  assert(p.diagnostics.some(d => d.kind === 'asm.redundant' && d.level === 'info'), 'asm.redundant info');
+  const st = A.studies.cycle, z = t => -15.5 * Math.cos(t) - Math.sqrt(3600 - (15.5 * Math.sin(t)) ** 2);
+  let worst = 0; for (const row of st.rows) worst = Math.max(worst, Math.abs(row.clamp - z(row.q)));
+  assert(worst < 1e-9, `clamp vs closed form ${worst}`);
+  const stroke = A.reports.find(r => r.name === 'stroke').value, rise = A.reports.find(r => r.name === 'rise at 30°').value;
+  assert(near(stroke, 31, 1e-9) && Math.abs(rise - 2.5792323) < 1e-6, `stroke ${stroke}, rise ${rise}`);
+  assert(st.extrema.clamp.min.at === 0 && st.extrema.clamp.max.at === 180 && st.gaps.length === 0 && st.jump == null, 'extremes at 0° and 180°, no gaps');
+  const slider = p.bodies.find(b => b.part === 'slider');
+  assert(near(slider.transform[13], z(Math.PI / 6), 1e-9, 1e-9), `slider placed at θ = 30°: ${slider.transform[13]}`);
+  // a joint value given as an override drives the joint, as a joint param always has
+  const q = await compile('43-slider-crank.js', { options: { override: { main: '90 deg' } } });
+  const s2 = q.bodies.find(b => b.part === 'slider');
+  assert(near(s2.transform[13], -Math.sqrt(3600 - 15.5 ** 2), 1e-9, 1e-9), `override main = 90°: ${s2.transform[13]}`);
+  return `rank 17 of 18, stroke ${stroke.toFixed(6)} mm, rise ${rise.toFixed(4)} mm, clamp within ${worst.toExponential(1)} mm`;
+});
+await test('44 mechanism: take-up four-bar against its closed form; hints choose the closure', async () => {
+  const p = await compile('44-take-up.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, st = A.studies.cycle;
+  assert(A.mobility.dof === 1 && A.mobility.redundant === 3, 'M 1, r 3');
+  const r = 15.5, b = 42.625, c = 36.8125, k = 67.8125 / b, D = [-14.53125, 29.0625];
+  const rig = t => { const Ap = [r * Math.sin(t), -r * Math.cos(t)], ex = D[0] - Ap[0], ey = D[1] - Ap[1], d = Math.hypot(ex, ey), a = (b * b - c * c + d * d) / (2 * d), h = Math.sqrt(b * b - a * a);
+    const B = [Ap[0] + (a * ex - h * ey) / d, Ap[1] + (a * ey + h * ex) / d]; return [Ap[0] + k * (B[0] - Ap[0]), Ap[1] + k * (B[1] - Ap[1])]; };
+  let worst = 0; for (const row of st.rows) { const E = rig(row.q); worst = Math.max(worst, Math.hypot(row.eye[0] - E[0], row.eye[1] - E[1])); }
+  assert(worst < 1e-6, `eye vs closed form ${worst}`);
+  assert(Math.abs(st.extrema.eyeY.min.at - 138.5) < 0.6 && Math.abs(st.extrema.eyeY.max.at - 250.5) < 0.6, `eye lowest ${st.extrema.eyeY.min.at}, highest ${st.extrema.eyeY.max.at}`);
+  assert(Math.abs(st.extrema.mu.min.value - 23.26) < 0.05, `smallest transmission angle ${st.extrema.mu.min.value}`);
+  // the other hints assemble the crossed closure, with no error: only a reading tells
+  const x = await compile(script('44-take-up.js').replace(".hint('pin', deg(66)).hint('rock', deg(-132))", ".hint('pin', deg(-120)).hint('rock', deg(-60))"));
+  assert(errs(x).length === 0 && x.assembly.joints.find(j => j.id === 'elbow').value < 0, 'crossed closure, elbow negative');
+  return `eye within ${worst.toExponential(1)} mm over ${st.rows.length} poses, lowest ${st.extrema.eyeY.min.at}°, μ ≥ ${st.extrema.mu.min.value.toFixed(1)}°`;
+});
+await test('45 mechanism: coaxial bearings are redundant; misaligned they conflict', async () => {
+  const p = await compile('45-bearings.js');
+  const M = p.assembly.mobility;
+  assert(errs(p).length === 0 && M.kutzbach === -4 && M.rank === 5 && M.dof === 1 && M.redundant === 5, `mobility ${JSON.stringify(M)}`);
+  const q = await compile(script('45-bearings.js').replace('const e = 0', 'const e = 0.05'));
+  const c = q.diagnostics.find(d => d.kind === 'asm.conflict');
+  assert(c && c.level === 'error' && !q.assembly.assembled, 'asm.conflict error');
+  assert(JSON.stringify([...q.assembly.conflicts].sort()) === '["back","front"]', `conflicting set ${q.assembly.conflicts}`);
+  assert(Math.abs(q.assembly.residual - 0.05 / 60) < 1e-6, `residual is the tilt, ${q.assembly.residual}`);
+  return `K −4, rank 5, r 5; misaligned: ${q.assembly.conflicts.join(' + ')}, residual ${q.assembly.residual.toExponential(2)} rad`;
+});
+await test('46 mechanism: a coupling is one equation; sweep runs a joint through its limits', async () => {
+  const p = await compile('46-couple.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, hook = A.joints.find(j => j.id === 'hookShaft');
+  assert(near(hook.value, 180, 1e-9, 1e-7) || near(hook.value, -180, 1e-9, 1e-7), `hook at 2·30 + 120 = 180°: ${hook.value}`);
+  assert(A.mobility.dof === 2 && A.mobility.left === 0 && A.mobility.drives === 2, `two free motions, both used: ${JSON.stringify(A.mobility)}`);
+  const sw = A.studies['sweep:main'];
+  assert(sw && sw.rows.length === 19 && sw.from === 0 && near(sw.to, 90), 'sweep over the limits, 18 steps');
+  const ev = sw.events.find(e => e.name === 'hook past 180°');
+  assert(ev && Math.abs(ev.at - 30) < 0.01, `event at ${ev?.at}`);
+  return `hook ${hook.value.toFixed(3)}°, sweep ${sw.rows.length} poses, event at ${ev.at.toFixed(4)}°`;
+});
+
+await test('47 mechanism: compiled to a kine program (four-bar, slider-crank, the exported module)', async () => {
+  await compile('44-take-up.js');
+  const tu = await call('kine', {});
+  assert(/'solve\.fourBar'/.test(tu.source) && /a: 15\.5, b: 42\.625, c: 36\.8125, d: 32\.49286\d*, branch: 1/.test(tu.source), `four-bar node: ${tu.notes}`);
+  assert(tu.observe.includes('asm/p_lever_eye.world') && /\.joint\('j_main'/.test(tu.source), 'skeleton joints and observed port frames');
+  await compile('43-slider-crank.js');
+  const sc = await call('kine', {});
+  assert(/'jig\.sliderCrank'/.test(sc.source) && /a: 15\.5, L: 60, e: 0, branch: 1/.test(sc.source), `slider-crank node: ${sc.notes}`);
+  const ex = await exp('kine', {});
+  assert(ex.filename.endsWith('.kine.mjs') && /export default function program/.test(ex.data), 'module text');
+  const mod = await import('data:text/javascript,' + encodeURIComponent(ex.data));
+  const ops = {}, T = { angle: 'angle', length: 'length' };
+  mod.jigOps({ register: (name, spec) => { ops[name] = spec; } }, T);
+  const z = t => -15.5 * Math.cos(t) - Math.sqrt(3600 - (15.5 * Math.sin(t)) ** 2);
+  let worst = 0;
+  for (let i = 0; i < 360; i++) { const t = i * Math.PI / 180, r = ops['jig.sliderCrank'].evaluate({ crank: t }, { a: 15.5, L: 60, e: 0, branch: 1 }); worst = Math.max(worst, Math.abs(Math.abs(r.x) - Math.abs(z(t)))); }
+  assert(worst < 1e-9, `jig.sliderCrank against the closed form: ${worst}`);
+  // a loop with no closed form here: a table
+  await compile('44-take-up.js');
+  const tb = await call('kine', { closedForm: false, samples: 360 });
+  assert(/'jig\.table'/.test(tb.source) && tb.notes[0].includes('table'), 'table fallback');
+  return `${tu.notes[0]}; ${sc.notes[0]}; module ${(ex.data.length / 1024).toFixed(1)} KiB`;
+});
+
+await test('48 mechanism: gear and rack couplings take the ratio from the teeth and its sign from the axes', async () => {
+  const p = await compile('48-gears.js');
+  assert(errs(p).length === 0 && !p.diagnostics.some(d => d.kind === 'asm.gearMesh'), JSON.stringify(p.diagnostics.filter(d => d.level !== 'info')));
+  const A = p.assembly, J = id => A.joints.find(j => j.id === id).value;
+  const gear = A.couples.find(c => c.kind === 'gear'), rack = A.couples.find(c => c.kind === 'rack');
+  assert(near(gear.ratio, -0.6, 1e-12) && near(rack.ratio, 9, 1e-12), `ratios ${gear.ratio}, ${rack.ratio}`);
+  assert(near(J('w'), -12, 1e-9, 1e-7) && near(J('r'), 9 * Math.PI / 6, 1e-9, 1e-9), `w ${J('w')}°, r ${J('r')} mm`);
+  assert(A.mobility.dof === 3 && A.mobility.left === 0, `mobility ${JSON.stringify(A.mobility)}`);
+  // turned values: the wheel follows the pinion past 180° without a jump, the rack keeps going
+  const rows = A.studies.turn.rows, wrapD = d => ((d + 540) % 360) - 180;
+  const jump = Math.max(...rows.slice(1).map((r, i) => Math.abs(wrapD(r.wheel - rows[i].wheel))));
+  assert(jump < 3 + 1e-9 && near(A.reports[0].value, -156, 1e-9, 1e-7) && near(rows[rows.length - 1].rack, 18 * Math.PI, 1e-9, 1e-7), `step ${jump}°, wheel at 270° ${A.reports[0].value}, rack ${rows[rows.length - 1].rack}`);
+  assert(p.decisions.some(d => d.kind === 'couple' && /18:30 teeth, external mesh; axes 24\.000 mm apart/.test(d.reason)), 'decision names the teeth');
+  // the wheel's joint the other way round: the ratio's sign follows; the axes 1 mm too far: the mesh says so
+  const q = await compile(script('48-gears.js').replace("'frame:w', 'wheel:axis'", "'wheel:axis', 'frame:w'"));
+  assert(near(q.assembly.couples.find(c => c.kind === 'gear').ratio, 0.6, 1e-12), 'reversed joint: +0.6');
+  const far = await compile(script('48-gears.js').replace('j.pt(24, 0, 0)', 'j.pt(25, 0, 0)'));
+  const gm = far.diagnostics.find(d => d.kind === 'asm.gearMesh');
+  assert(gm && /centre distance 25\.000 mm ≠ 24\.000 mm/.test(gm.message) && /24\.000 mm apart/.test(gm.fix), `gear mesh warning: ${gm?.message}`);
+  const bad = await compile(script('48-gears.js').replace(".couple(j.couple.rack('rack', 'pinion'))", ".couple(j.couple.gear('wheel', 'frame'))"));
+  assert(bad.diagnostics.some(d => d.kind === 'asm.couple' && /frame is fixed/.test(d.message)), 'a fixed component cannot be coupled');
+  // kine: the rack is a length from the angle input
+  await compile('48-gears.js');
+  const k = await call('kine', {});
+  assert(/'jig\.linear'.*factor: 9, offset: 0, unit: 'length'/.test(k.source) && /e\.scale\(e\.read\('theta'\), -0\.6\)/.test(k.source), 'kine nodes');
+  return `ratios ${gear.ratio} and ${rack.ratio} mm/rad; wheel ${J('w').toFixed(3)}°, rack ${J('r').toFixed(4)} mm; step ≤ ${jump.toFixed(2)}°`;
+});
+
+await test('49 mechanism: interference over a study (gap at every pose, overlap volume where they collide)', async () => {
+  const p = await compile('49-interference.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const st = p.assembly.studies.mesh, c = st.clearance?.[0];
+  assert(c && c.samples === 11 && c.overlaps.length === 0 && c.min.value > 0.1 && c.min.value < 0.3, `clearance ${JSON.stringify(c)}`);
+  assert(st.keys.includes('gap pinion–wheel') && st.rows.every(r => typeof r['gap pinion–wheel'] === 'number'), 'a gap column');
+  assert(near(p.assembly.reports[0].value, c.min.value), 'report reads the clearance');
+  assert(p.trace.some(t => t.pass === 'interference:mesh') && !p.trace.some(t => t.pass === 'interference'), 'the study check replaces the one at the pose');
+  // half a wheel pitch out of phase: they overlap all along, with a volume
+  const q = await compile(script('49-interference.js').replace('const phase = 6', 'const phase = 0').replace('steps: 10', 'steps: 4'));
+  const e = q.diagnostics.find(d => d.kind === 'asm.interference');
+  const qc = q.assembly.studies.mesh.clearance[0];
+  assert(e?.level === 'warning' && q.ok !== false && /overlap from 10° to 30° in study mesh \(worst \d+\.\d+ mm³ at \d+°\)/.test(e.message), `error: ${e?.message}`);
+  assert(qc.worst.volume > 1 && q.assembly.studies.mesh.rows.every(r => r['overlap pinion–wheel'] > 1), `volumes ${q.assembly.studies.mesh.rows.map(r => r['overlap pinion–wheel'])}`);
+  return `closest ${c.min.value.toFixed(3)} mm at ${c.min.at.toFixed(0)}°; out of phase: worst ${qc.worst.volume.toFixed(2)} mm³ at ${qc.worst.at.toFixed(0)}°`;
+});
+
+await test('50 mechanism: drag to pose (the nearest pose the joints allow, pinned by overrides on the joints that hold it)', async () => {
+  await compile('43-slider-crank.js');
+  const a = await call('dragPose', { ref: 'crank:pin', to: [15.5, 0, 6], reset: true });
+  assert(a.ok && a.overrides.main === '90 deg' && Math.hypot(a.at[0] - 15.5, a.at[1], a.at[2] - 6) < 1e-6, `pin to 90°: ${JSON.stringify(a.overrides)} ${a.at}`);
+  const b = await call('dragPose', { ref: 'slider:wrist', to: [0, -30, 6] });
+  assert(b.ok && Math.abs(b.at[1] + 44.5) < 1e-4, `above top dead centre the wrist stops at −44.5: ${b.at}`);
+  const c = await call('dragPose', { ref: 'crank:pin', to: [-30, 40, 6] });
+  const want = [-30, 40].map(v => v * 15.5 / 50);
+  assert(c.ok && Math.hypot(c.at[0] - want[0], c.at[1] - want[1]) < 1e-3, `out of reach: the nearest point ${c.at}`);
+  assert(c.transforms.crank.length === 16 && c.ports.some(p => p.ref === 'crank:pin') && c.joints.find(j => j.id === 'main'), 'the pose to draw');
+  // the dragged pose compiles to the same place
+  const p = await compile('43-slider-crank.js', { options: { override: a.overrides } });
+  assert(near(p.assembly.joints.find(j => j.id === 'main').value, 90, 1e-9, 1e-9), 'override pins it');
+  // undriven (M = 1 left): the first joint that adds to the rank holds the pose
+  await compile(script('44-take-up.js').replace(".drive('main', deg(0))", ''));
+  const d = await call('dragPose', { ref: 'lever:eye', to: [0, 60, 0], reset: true });
+  assert(d.ok && Object.keys(d.overrides).join() === 'main', `holds: ${JSON.stringify(d.overrides)}`);
+  // gears: the wheel's pitch point to 90° turns the pinion through the coupling (−0.6 · p + 6° = 90°)
+  await compile('48-gears.js');
+  const g = await call('dragPose', { ref: 'wheel:pitch', to: [24, 15, 0], reset: true });
+  assert(g.ok && g.overrides.p === '-140 deg', `pinion ${JSON.stringify(g.overrides)}`);
+  return `pin → ${a.overrides.main}; wrist stops at ${b.at[1].toFixed(3)}; undriven holds ${Object.keys(d.overrides)}; gears ${g.overrides.p}`;
+});
+
+await test('51 mechanism: a closure with a port turned half a turn is a conflict; an unreachable study start is a gap; kine keeps the ground placement', async () => {
+  // two rigid joints between the same bodies, the second port turned 180° about z: the dot-product equations hold
+  // (x·y = 0 for x and −x), so only the sign check stops it
+  const plates = (q) => `const blk = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 30, 10, { center: true }).profiles(), mm(4), { id: 'body' })
+    const f = blk('frame').port('a', j.frame({ origin: j.pt(-10, 0, 4), x: j.dir('+X'), z: j.dir('+Z') })).port('b', j.frame({ origin: j.pt(10, 0, 4), x: j.dir('+X'), z: j.dir('+Z') }))
+    const p = blk('plate').port('a', j.frame({ origin: j.pt(-10, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })).port('b', j.frame({ origin: j.pt(10, 0, 0), ${q} }))
+    return j.assembly('two rigid').add('frame', f, { ground: true }).add('plate', p)
+      .joint('one', j.joint.rigid(), 'frame:a', 'plate:a').joint('two', j.joint.rigid(), 'frame:b', 'plate:b')`;
+  const ok = await compile(plates("x: j.dir('+X'), z: j.dir('+Z')"));
+  assert(ok.assembly.assembled && ok.assembly.mobility.redundant === 6 && !errs(ok).length, `aligned: redundant ${ok.assembly.mobility.redundant}`);
+  const bad = await compile(plates("x: j.dir('-X'), z: j.dir('+Z')"));
+  const c = bad.diagnostics.find(d => d.kind === 'asm.conflict');
+  assert(!bad.assembly.assembled && c && /half a turn/.test(c.message) && bad.assembly.conflicts.includes('two'), `flipped: ${c?.message} ${bad.assembly.conflicts}`);
+  const zflip = await compile(plates("x: j.dir('+X'), z: j.dir('-Z')").replace(/j\.joint\.rigid\(\)/g, 'j.joint.revolute()'));
+  assert(!zflip.assembly.assembled && zflip.diagnostics.some(d => d.kind === 'asm.conflict'), 'a revolute closing with its z reversed');
+  // a study that starts where the joints cannot go: the first row is a gap, not a pose at another value
+  const pinned = await compile(plates("x: j.dir('+X'), z: j.dir('+Z')")
+    .replace(".joint('one', j.joint.rigid(), 'frame:a', 'plate:a')", ".joint('one', j.joint.slider(), 'frame:a', 'plate:a')")
+    + `.study('push', { drive: 'one', from: mm(1), to: mm(2), steps: 2 })`);
+  const rows = pinned.assembly.studies.push.rows;
+  assert(rows.length === 3 && rows.every(r => !r.ok) && pinned.diagnostics.some(d => d.kind === 'asm.unreachable'), `rows ${JSON.stringify(rows.map(r => [r.x, r.ok]))}`);
+  // kine: a ground placed 100 mm along x carries the skeleton with it
+  await compile(script('43-slider-crank.js').replace("{ ground: true }", "{ ground: true, at: j.tx.move(100, 0, 0) }"));
+  const k = await call('kine', {});
+  assert(/\.joint\('b_frame', j => j\.at\(\[100, 0, 0\]\)\.orient\(\[0, 0, 0, 1\]\)\.fixed\(\)\)/.test(k.source) && /\.joint\('j_main', j => j\.parent\('b_frame'\)/.test(k.source), 'ground root');
+  assert(k.observe.includes('asm/b_frame.world') && k.observe.includes('asm/p_frame_main.world'), 'ground frames observed');
+  return `${c.message.slice(0, 60)}…; study rows ${rows.map(r => r.ok).join('/')}`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

@@ -221,3 +221,9 @@ input[type=range]:active::-webkit-slider-thumb { width: 7px; }
 input[type=range]:hover::-moz-range-thumb { width: 7px; }
 input[type=range]:active::-moz-range-thumb { width: 7px; }
 input[type=range]:disabled { opacity: 0.4; cursor: default; }
+
+/* Mechanism view: mobility pills, joints, study plots */
+.mechview .mechpills { gap: 6px; flex-wrap: wrap; }
+.mechview .studyplot { display: block; max-width: 760px; cursor: ew-resize; margin: 4px 0; }
+.mechview tr.failrow td { color: var(--accent); }
+.mechview input[type=range] { width: 160px; }

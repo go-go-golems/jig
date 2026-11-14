@@ -6,7 +6,7 @@
 // In a sketch's own view a click picks a constraint (its glyph, its dimension) or an entity, and the pointer
 // previews the mark under it (host.setHover); a point drags (solveSketch) once the pointer has moved 4 px.
 import { draw, OVERLAYS, DEFAULT_OVERLAYS, activeSketch, drawHover } from './sheet.js';
-import { normView, nearestView, unprojectPlane, VIEWS, ZOOM_MIN, ZOOM_MAX } from './camera.js';
+import { normView, nearestView, unprojectPlane, proj, VIEWS, ZOOM_MIN, ZOOM_MAX } from './camera.js';
 import { onTheme, loadFonts, text, K } from './theme.js';
 import { pickEdge } from './lines.js';
 import { handles, hitMark, drawSketchHover, pickOf } from './sketch.js';
@@ -42,7 +42,8 @@ export function createStage(element, host = {}, options = {}) {
     raf = 0; if (dead) return;
     if (!W || !H) size();
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
-    last = draw(canvas, program, view, { width: W, height: H, dpr, overlays: on, selection, sketches: solved, sheet: options.sheet || (host.preset && host.preset.id) || 'J-01', colorsFrom: element, dragging: drag && drag.ref });
+    last = draw(canvas, posedProgram(), view, { width: W, height: H, dpr, overlays: on, selection, sketches: solved, sheet: options.sheet || (host.preset && host.preset.id) || 'J-01', colorsFrom: element, dragging: drag && drag.ref,
+      pose: posed && posed.pose, fitBox: heldFit && heldFit.name === (program && program.name) && view.name !== 'sketch' ? heldFit.box : null });
     // a sketch keeps the fit it was first drawn with, so solves and drags do not move the camera
     if (last.sketchView && !view.sketchFit && last.cam.fit) view = normView({ ...view, sketchFit: last.cam.fit });
     paintLayer();
@@ -54,6 +55,11 @@ export function createStage(element, host = {}, options = {}) {
     if (!last) return;
     if (hover && on.has('names')) drawHover(lctx, last.C, last, hover);
     if (sketchHover && last.sketchLayout && !samePick(sketchHover, selection)) drawSketchHover(lctx, last.C, last.sketchLayout, sketchHover);
+    if (poseHandle) {
+      const C = last.C, q = poseHandle.at;
+      lctx.strokeStyle = C.blue; lctx.lineWidth = 1.5; lctx.beginPath(); lctx.arc(q[0], q[1], 6, 0, 7); lctx.stroke();
+      text(lctx, C, pdrag && pdrag.moved && posed ? `${poseHandle.ref} · ${Object.entries(posed.overrides || {}).map(([k, v]) => `${k} ${v}`).join(', ')}` : `${poseHandle.ref} · drag to pose`, q[0] + 9, q[1] - 11, { size: K.labelSm, col: C.blue, bg: C.stage });
+    }
     if (hoverHandle && last.sketch) {
       const C = last.C, q = hoverHandle.at;
       lctx.fillStyle = C.blue; lctx.fillRect(q[0] - 3, q[1] - 3, 6, 6);
@@ -82,8 +88,53 @@ export function createStage(element, host = {}, options = {}) {
     if (!quiet) pushView();
   }
   function squareUp() {
+    heldFit = null;
     if (view.name === 'sketch') setView({ yaw: 0, pitch: 0, pan: [0, 0], zoom: 1, sketchFit: null, scale: null, target: null });
     else setView({ name: last ? nearestView(last.cam) : view.name, yaw: 0, pitch: 0, pan: [0, 0], zoom: 1, scale: null, target: null });
+  }
+
+  // ---- drag to pose (an assembly): the port origins of moving components are handles; a drag asks the engine for
+  // the pose the joints allow nearest the pointer (host.call('dragPose')), draws it at once, and on release pins it
+  // with overrides on the joints that hold it (the drives first), which compiles it for good
+  let posed = null, pdrag = null, poseHandle = null, heldFit = null;
+  function posedProgram() {
+    if (!posed || !program || !program.assembly) return program;
+    const A = program.assembly, byId = new Map((posed.joints || []).map(j => [j.id, j]));
+    const origins = Object.fromEntries(Object.entries(posed.pose || {}).map(([id, T]) => [id, [T[12], T[13], T[14]]]));
+    return { ...program, assembly: { ...A, ports: posed.ports || A.ports, origins: { ...(A.origins || {}), ...origins }, measures: {},
+      joints: (A.joints || []).map(j => { const q = byId.get(j.id); return q ? { ...j, value: q.value, at: q.at, atB: q.atB, axis: q.axis } : j; }) } };
+  }
+  function poseHandleAt(x, y) {
+    const A = program && program.kind === 'assembly' && program.assembly;
+    if (!A || !last || last.sketchView || !on.has('joints') || !host.call || A.assembled === false) return null;
+    const fixed = new Set(A.fixed || []), ports = (posed && posed.ports) || A.ports || [];
+    let best = null, bd = 9;
+    for (const pt of ports) {
+      if (fixed.has(String(pt.ref).split(':')[0])) continue;
+      const q = proj(last.cam, pt.o), d = Math.hypot(q[0] - x, q[1] - y);
+      if (d < bd) { bd = d; best = { ref: pt.ref, o: pt.o, at: q }; }
+    }
+    return best;
+  }
+  async function poseStep() {
+    if (!pdrag || pdrag.busy || !pdrag.pending) return;
+    const d = pdrag, to = d.pending; d.pending = null; d.busy = true;
+    try {
+      const r = await host.call('dragPose', { ref: d.ref, to, reset: !d.started });
+      d.started = true;
+      if (r && r.ok && !dead && pdrag === d) { posed = { pose: r.transforms, ports: r.ports, joints: r.joints, overrides: r.overrides }; poseHandle = { ref: d.ref, at: proj(last.cam, r.at) }; d.result = r; invalidate(); }
+    } catch (e) { if (host.toast) host.toast(`Drag: ${e.message || e}`, 'error'); }
+    d.busy = false;
+    if (d.pending && pdrag === d) requestAnimationFrame(poseStep);
+    else if (d.done) commitPose(d);
+  }
+  function commitPose(d) {
+    if (d.committed) return; d.committed = true;
+    if (pdrag === d) pdrag = null;
+    const ov = d.result && d.result.overrides;
+    if (heldFit) heldFit.keep = 1;
+    if (ov && host.setOverride) for (const [id, v] of Object.entries(ov)) host.setOverride(id, v);
+    canvas.style.cursor = 'default'; invalidate();
   }
 
   // ---- program and selection
@@ -91,6 +142,9 @@ export function createStage(element, host = {}, options = {}) {
   // an over-constrained sketch fails the compile, and its conflict is what the sketch view has to show
   function setProgram(raw) {
     program = shown(raw); solved.clear(); hover = null; hoverHandle = null;
+    if (!pdrag) { posed = null; poseHandle = null; }
+    // the fit held through a drag lasts for the compile the drag asked for, then the camera fits again
+    if (heldFit && !pdrag) { if (heldFit.keep > 0 && heldFit.name === (program && program.name)) heldFit.keep--; else heldFit = null; }
     if (raw && raw.ok === false && raw !== program) for (const s of raw.sketches || []) if (s && s.id) solved.set(s.id, s);
     if (program && program.kind === 'sketch' && program.sketches && program.sketches.length) {
       if (view.name !== 'sketch' || !program.sketches.some(s => s.id === view.sketch)) view = normView({ ...view, name: 'sketch', sketch: program.sketches[0].id, pan: [0, 0], sketchFit: null });
@@ -173,6 +227,14 @@ export function createStage(element, host = {}, options = {}) {
     if (e.button > 2) return;
     const [x, y] = local(e);
     canvas.setPointerCapture && canvas.setPointerCapture(e.pointerId);
+    const ph = e.button === 0 && !e.shiftKey ? poseHandleAt(x, y) : null;
+    if (ph) {
+      const c = last.cam.c;
+      pdrag = { ref: ph.ref, o: ph.o, n: [c[0], c[1], c[2]], x, y, moved: false, busy: false, pending: null, started: false, done: false };
+      if (!heldFit || heldFit.name !== program.name) heldFit = { name: program.name, box: last.scene.fitBox, keep: 0 };   // the camera stays put
+      poseHandle = ph; canvas.style.cursor = 'move'; paintLayer();
+      return;
+    }
     const h = e.button === 0 && !e.shiftKey ? handleAt(x, y) : null;
     if (h && host.solveSketch) {
       drag = { sketch: h.sketch, ref: h.ref, entity: h.entity, pending: null, busy: false, x, y, moved: false };
@@ -184,6 +246,14 @@ export function createStage(element, host = {}, options = {}) {
   }
   function onMove(e) {
     const [x, y] = local(e);
+    if (pdrag) {
+      if (!pdrag.moved) { if (Math.hypot(x - pdrag.x, y - pdrag.y) < THRESHOLD) return; pdrag.moved = true; }
+      // the pointer on the plane through the grabbed port, facing the viewer
+      const to = unprojectPlane(last.cam, x, y, pdrag.o, pdrag.n); if (!to) return;
+      pdrag.pending = to;
+      if (!pdrag.busy) requestAnimationFrame(poseStep);
+      return;
+    }
     if (drag) {
       const sk = last && last.sketch; if (!sk) return;
       if (!drag.moved) { if (Math.hypot(x - drag.x, y - drag.y) < THRESHOLD) return; drag.moved = true; setSheetHover(null); }
@@ -202,6 +272,9 @@ export function createStage(element, host = {}, options = {}) {
       return;
     }
     // hover
+    const ph = poseHandleAt(x, y);
+    if (ph) { poseHandle = ph; hover = null; canvas.style.cursor = 'move'; paintLayer(); return; }
+    if (poseHandle) { poseHandle = null; paintLayer(); }
     const h = handleAt(x, y);
     if (h && host.solveSketch) { hoverHandle = h; hover = null; setSheetHover(null); canvas.style.cursor = 'move'; paintLayer(); return; }
     hoverHandle = null;
@@ -229,6 +302,12 @@ export function createStage(element, host = {}, options = {}) {
     else if (pickOf(sk, selection)) { if (host.select) host.select(null); else setSelection(null); }
   }
   function onUp(e) {
+    if (pdrag) {
+      const d = pdrag; d.done = true;
+      if (!d.moved) { pdrag = null; canvas.style.cursor = 'default'; return; }
+      if (d.busy || d.pending) { if (!d.busy) poseStep(); return; }   // the last solve commits when it lands
+      commitPose(d); return;
+    }
     if (drag) {
       const d = drag;
       if (!d.moved) { drag = null; canvas.style.cursor = 'default'; if (last && last.sketch && last.sketchLayout) clickSketch(...local(e), d); return; }
@@ -255,7 +334,7 @@ export function createStage(element, host = {}, options = {}) {
     setView({ zoom: z1, pan: [view.pan[0] + ax / s0 - ax / s1, view.pan[1] + ay / s0 - ay / s1] }, true);
     clearTimeout(wheelT); wheelT = setTimeout(pushView, 150);
   }
-  const onLeave = () => { if (!down && !drag) { hover = null; hoverHandle = null; setSheetHover(null); paintLayer(); } };
+  const onLeave = () => { if (!down && !drag && !pdrag) { hover = null; hoverHandle = null; poseHandle = null; setSheetHover(null); paintLayer(); } };
   const onDbl = () => squareUp();
   const onCtx = e => e.preventDefault();
   canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointermove', onMove);

@@ -9,6 +9,7 @@ import { sceneOf, sceneFacts, sketchToWorld, sameBody } from './scene.js';
 import { buffers, projectInstance, rasterInstance, paperImage, hatchImage, coverTriangles } from './raster.js';
 import { lineWork } from './lines.js';
 import { drawGrid, drawGroundLine, drawBed, dimensionTo, arrow, label, scaleBar, titleBlock, gridSteps } from './furniture.js';
+import { drawMechanism } from './mechanism-marks.js';
 import { drawSketch, sketchCam, sketchStatus } from './sketch.js';
 
 // the overlay switches: key, label, about (the Show menu reads them); on by default where `on`
@@ -22,6 +23,7 @@ export const OVERLAYS = [
   { key: 'bed', label: 'Bed', about: 'the printer bed and the parts on its plates', on: true },
   { key: 'normals', label: 'Normals', about: 'face normals as arrows', on: false },
   { key: 'dof', label: 'DOF', about: 'free degrees of freedom in a sketch', on: true },
+  { key: 'joints', label: 'Joints', about: 'an assembly’s joints, port frames, free motions and measured paths', on: true },
 ];
 export const DEFAULT_OVERLAYS = OVERLAYS.filter(o => o.on).map(o => o.key);
 const KIND = { part: 'PART', sketch: 'SKETCH', assembly: 'ASSEMBLY', print: 'PRINT', design: 'DESIGN', region: 'REGION' };
@@ -78,9 +80,9 @@ export function draw(canvas, program, viewIn, o = {}) {
 
   const sk = activeSketch(program, view, o.sketches);
   // a thumbnail of a print job shows its first plate's items where the plate puts them, without the bed
-  const scene = thumb ? sceneOf(program, { bed: !!(program && program.print), bedBox: false, plates: 1 }) : sceneOf(program, { bed: has('bed') });
+  const scene = thumb ? sceneOf(program, { bed: !!(program && program.print), bedBox: false, plates: 1 }) : sceneOf(program, { bed: has('bed'), pose: o.pose });
   const sketchView = !!(sk && view.name === 'sketch');
-  const cam = sketchView ? sketchCam(sk, view, W, H) : thumb ? tightCam(view, scene, W, H) : viewCam(view.name === 'sketch' ? { ...view, name: 'axo' } : view, scene.fitBox, W, H);
+  const cam = sketchView ? sketchCam(sk, view, W, H) : thumb ? tightCam(view, scene, W, H) : viewCam(view.name === 'sketch' ? { ...view, name: 'axo' } : view, o.fitBox || scene.fitBox, W, H);   // o.fitBox: held through a drag
   const faint = sketchView && scene.instances.length ? 0.4 : 1;
   const state = { width: W, height: H, k, cam, scene, C, view, sketch: sk, sketchView, overlays: on, buf: null, lw: null };
 
@@ -158,6 +160,7 @@ export function draw(canvas, program, viewIn, o = {}) {
   if (!sketchView && !thumb) {
     if (has('normals')) drawNormals(ctx, C, state);
     if (has('dims') && scene.instances.length) drawBoxDims(ctx, C, state);
+    if (has('joints') && program?.kind === 'assembly') drawMechanism(ctx, C, state, program);
     // plate labels when there is more than one plate: outside each bed's front-left corner
     if (scene.bed && scene.bed.plates.length > 1 && cam.planar) for (const pl of scene.bed.plates) {
       const band = Math.min(10, Math.max(3, (scene.bed.x1 - scene.bed.x0) * 0.025));

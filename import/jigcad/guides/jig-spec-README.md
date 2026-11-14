@@ -365,16 +365,38 @@ j.assembly(name?)
   .ground(id) .joint(id, kind, a, b, opts) .rigidGroup(ids)
   .pattern(compId, pattern) .mirror(compId, plane) .replace(id, part | (current) => part)
   .printInPlace(ids, { clearance: 'printInPlace', pose: { [jointId]: value } })   // one print, fit-class gaps, printed in a chosen pose
-  .sweep(jointId, { steps: 36 })                    // move a joint through its range and check swept interference
-  .couple(j.couple.gear(portA, portB, { ratio? }) | j.couple.rack(portR, portS) | j.couple.belt(portA, portB, { ratio? }))
-                                                    // motion-lite; ratio is derived from the gears' teeth when omitted
-// joint values are parameters named by joint id: asm.override({ hinge: deg(90) })
-  .explode(steps) .solver(slot)                     // default: Newton on SE(3) with Lie-algebra updates
-  .interference({ clearance: mm(0) })
+  .sweep(jointId, { steps: 36 })                    // move a joint through its range (a study 'sweep:<id>'); with
+                                                    // .interference() and no study named, each sweep is checked
+  .couple(j.couple.gear(a, b, { ratio?, offset?, joints? }) | j.couple.rack(rack, pinion) | j.couple.belt(a, b, { ratio?, crossed? }))
+                                                    // a, b: 'pinion' or 'pinion:axis'. The joint that turns each gear is
+                                                    // found (through rigid joints to its shaft); the ratio is zA/zB from
+                                                    // the teeth, its sign from the axes (external −, internal and belt +);
+                                                    // a rack moves r·θ along its slider. Checked at the solved pose against
+                                                    // j.inspect.gearMesh (asm.gearMesh); both joints on one carrier
+// joint values are parameters named by joint id: asm.override({ hinge: deg(90) }); a joint with a value is driven
+  .drive(jointId, value) .hint(jointId, value)      // drive: one equation value = v; hint: where the start pose puts it
+  .couple(id, jointA, jointB, { ratio, offset })    // value(B) = ratio · value(A) + offset: a gear train as one equation,
+                                                    // on turned values (a 0.6 ratio does not jump when A passes 180°)
+  .measure(name, m => m.point('comp:port') | m.axis(ref) | m.angle(a, b) | m.distance(a, b) | m.joint(id))
+  .event(name, row => bool) .study(name, { drive, from, to, steps })   // sweep a drive by continuation; events bisected
+  .report(name, ({ studies, measures, mobility, joints }) => number, { unit, digits })   // studies.x.range/at/row/extrema
+  .explode(steps) .solver(slot)                     // default: Newton on SE(3) with Lie-algebra updates (mechanism.js):
+                                                    // all joints at once from a spanning-tree start; mobility 6n − rank J,
+                                                    // Kutzbach 6n − Σc and redundant equations beside it; conflicts as a
+                                                    // minimal set; prog.data.assembly holds joints, mobility, studies
+  .interference(ids?, { study?, pairs?, every?, within: mm(5), clearance?, volume: true, exact: false })
+                                                    // without a study: the gaps at this pose. With one: the gap at every
+                                                    // sampled pose (a 'gap a–b' column, plotted), where they overlap the
+                                                    // shared volume V(a ∩ b) = V(a) + V(b) − V(a ∪ b) and the worst pose;
+                                                    // studies.x.clearance(a, b) → { min, overlaps, worst }
 // a, b: 'lid:hinge' (component:port) | j.on('lid', sel) | j.frame.on(j.on('lid', sel))
-j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()
+j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()   // .fixed = .rigid, .prismatic = .slider
        // each is a subgroup of SE(3) with DOF 0, 1, 1, 2, 3, 3, 0 (snap is rigid once engaged)
 prog.occurrence('lid') prog.dof() prog.joint(id) prog.bom({ group: 'part' | 'flat' }) prog.sweep(jointId)
+prog.kine(o)                                        // the solved mechanism as a kine program (export format 'kine')
+prog.dragPose({ ref: 'comp:port', to: [x, y, z] })  // drag to pose: the nearest pose the joints allow (drives released,
+                                                    // couplings kept), its transforms, and the overrides that pin it;
+                                                    // the stage drags port origins of moving components (Joints overlay)
 ```
 
 ### 4.11 `fit`

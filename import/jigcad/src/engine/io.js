@@ -1,6 +1,7 @@
 // Exports (README §4.14): STL (binary), STEP (OpenCascade writer through the Emscripten FS), 3MF (own store-only
 // ZIP with CRC-32), SVG of a view, and the IR bundle. Every export returns a lowering report.
 import { getOC } from './oc.js';
+import { kineModule } from './kine.js';
 import * as K from './kernel.js';
 import { meshBody } from './mesh.js';
 
@@ -177,10 +178,16 @@ export function exportAs(prog, format, opts = {}) {
     case '3mf': case 'tmf': return tmf(prog, opts);
     case 'svg': return svg(prog, opts);
     case 'ir': return irBundle(prog, opts);
+    case 'kine': {
+      if (!prog.kine) throw new Error('kine export: only an assembly compiles to a kine program');
+      const c = prog.kine(opts);
+      return { data: kineModule(c), filename: `${prog.data?.name ?? 'assembly'}.kine.mjs`, mime: 'text/javascript',
+        report: { kept: ['spanning tree as a skeleton', 'loops as solve nodes', 'couplings', 'port frames'], approximated: c.notes.filter(n => n.includes('table')), dropped: ['geometry', 'measures (re-read them on the observed frames)'] } };
+    }
   }
   throw new Error(`unknown export format '${format}'`);
 }
 export const exportTo = {
-  stl: (p, o) => stl(p, o), step: (p, o) => step(p, o), tmf: (p, o) => tmf(p, o), svg: (p, o) => svg(p, o), ir: p => irBundle(p),
+  stl: (p, o) => stl(p, o), step: (p, o) => step(p, o), tmf: (p, o) => tmf(p, o), svg: (p, o) => svg(p, o), ir: p => irBundle(p), kine: (p, o) => exportAs(p, 'kine', o),
   to: (fmt, p, o) => exportAs(p, fmt, o),
 };

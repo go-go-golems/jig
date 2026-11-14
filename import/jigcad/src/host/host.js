@@ -41,6 +41,7 @@ export const OVERLAYS = [
   { key: 'bed', label: 'Bed', about: 'the printer bed and the parts on its plates', on: true },
   { key: 'normals', label: 'Normals', about: 'face normals as arrows', on: false },
   { key: 'dof', label: 'DOF', about: 'free degrees of freedom in a sketch', on: true },
+  { key: 'joints', label: 'Joints', about: 'an assembly’s joints, port frames, free motions and measured paths', on: true },
 ];
 const DEFAULT_OVERLAYS = OVERLAYS.filter(o => o.on).map(o => o.key);
 // host.view: { name, yaw, pitch (orbit offsets from the named view, rad), zoom (1 = the part fits the sheet),

@@ -13,6 +13,7 @@ export const VIEWS = [
   { id: 'graph', title: 'Graph', about: 'features by level and what feeds them' },
   { id: 'ir', title: 'IR', about: 'the compiled program as text' },
   { id: 'trace', title: 'Trace', about: 'compile passes and decisions' },
+  { id: 'mechanism', title: 'Mechanism', about: 'an assembly’s joints, mobility, drives and studies' },
   { id: 'experiments', title: 'Experiments', about: 'design searches, headless' },
   { id: 'presets', title: 'Presets', about: 'every preset on the shelf' },
 ];
@@ -24,24 +25,25 @@ export const RELATED = {
   code: ['notes', 'agent'], notes: ['code', 'docs'], agent: ['code', 'notes'], docs: ['notes', 'book', 'reference'], book: ['notes', 'docs'],
   reference: ['docs', 'notes'], stage: ['params', 'graph'], params: ['trace', 'graph', 'experiments'], graph: ['ir', 'params'],
   ir: ['graph', 'trace'], trace: ['params', 'ir'], experiments: ['params', 'trace'], presets: ['notes', 'docs', 'book'],
+  mechanism: ['params', 'trace'],
 };
 
 const tile = (views, active) => ({ t: 'tile', views, active: active ?? views[0] });
 const split = (dir, kids, sizes) => ({ t: 'split', dir, kids, sizes });
 const READING = ['notes', 'code', 'agent', 'docs', 'book', 'reference'];
-const PANELS = ['params', 'trace', 'graph', 'ir', 'experiments'];
+const PANELS = ['params', 'mechanism', 'trace', 'graph', 'ir', 'experiments'];
 
 export const LAYOUTS = [
   { id: 'code-stage', title: 'Code beside the stage', about: 'reading and code left; the stage over the panels',
     tree: split('row', [tile(READING), split('col', [tile(['stage']), tile(PANELS)], [0.68, 0.32])], [0.36, 0.64]) },
   { id: 'stage-first', title: 'Stage first', about: 'the stage over params and trace; everything else right',
-    tree: split('row', [split('col', [tile(['stage']), tile(['params', 'trace'])], [0.66, 0.34]), tile([...READING, 'graph', 'ir', 'experiments'], 'code')], [0.64, 0.36]) },
+    tree: split('row', [split('col', [tile(['stage']), tile(['params', 'mechanism', 'trace'])], [0.66, 0.34]), tile([...READING, 'graph', 'ir', 'experiments'], 'code')], [0.64, 0.36]) },
   { id: 'program', title: 'The program: code, graph, IR', about: 'three columns: code, the graph and IR, the stage',
-    tree: split('row', [tile(['code', 'notes', 'agent', 'docs', 'book', 'reference']), tile(['graph', 'ir']), split('col', [tile(['stage']), tile(['params', 'trace', 'experiments'])], [0.52, 0.48])], [0.34, 0.33, 0.33]) },
+    tree: split('row', [tile(['code', 'notes', 'agent', 'docs', 'book', 'reference']), tile(['graph', 'ir']), split('col', [tile(['stage']), tile(['params', 'mechanism', 'trace', 'experiments'])], [0.52, 0.48])], [0.34, 0.33, 0.33]) },
   { id: 'notes', title: 'Reading the notes', about: 'the notes and the shelf left; the stage over the rest',
     tree: split('row', [tile(['notes', 'presets', 'docs', 'book', 'reference']), split('col', [tile(['stage']), tile(['params', 'code', 'agent', 'trace', 'graph', 'ir', 'experiments'])], [0.62, 0.38])], [0.46, 0.54]) },
   { id: 'experiments', title: 'Experiments and traces', about: 'code left; experiments and params over the trace',
-    tree: split('row', [tile(READING, 'code'), split('col', [tile(['experiments', 'params']), tile(['trace', 'stage', 'graph', 'ir'], 'stage')], [0.5, 0.5])], [0.4, 0.6]) },
+    tree: split('row', [tile(READING, 'code'), split('col', [tile(['experiments', 'params', 'mechanism']), tile(['trace', 'stage', 'graph', 'ir'], 'stage')], [0.5, 0.5])], [0.4, 0.6]) },
   { id: 'book', title: 'Reading the book', about: 'half and half: the book, and the stage over the rest',
     tree: split('row', [tile(['book', 'notes', 'docs', 'reference']), split('col', [tile(['stage']), tile(['params', 'code', 'agent', 'trace', 'graph', 'ir', 'experiments'])], [0.62, 0.38])], [0.5, 0.5]) },
   { id: 'shelf', title: 'The shelf', about: 'every preset left; the stage over the notes and code',
