@@ -185,10 +185,13 @@ export function solveAssembly(asm, opts, compilePart) {
   const assembled = S.assemble(scriptDrives);
   const mobility = S.analyse();
   let conflicts = [];
-  const residual = S.residual;
+  const residual = S.residual, flipped = assembled ? [] : [...(S.flipped ?? [])];
   if (!assembled) {
     const keep = S.pose; conflicts = S.conflictSet(); S.pose = keep;
-    diagnostics.push({ level: 'error', kind: 'asm.conflict', at: conflicts[0] ?? 'joints', message: `the joints cannot all hold (largest residual ${residual < 0.01 ? residual.toExponential(2) : residual.toFixed(3)})`, fix: conflicts.length ? `these conflict: ${conflicts.join(', ')}; check their ports, or remove one` : 'check the ports' });
+    const why = flipped.length && residual <= 1e-8
+      ? `the joints close only with ${flipped.join(', ')} turned half a turn: ${flipped.length > 1 ? 'their' : 'its'} ports meet with ${flipped.length > 1 ? 'an axis' : 'the axis'} reversed`
+      : `the joints cannot all hold (largest residual ${residual < 0.01 ? residual.toExponential(2) : residual.toFixed(3)})`;
+    diagnostics.push({ level: 'error', kind: 'asm.conflict', at: conflicts[0] ?? flipped[0] ?? 'joints', message: why, fix: conflicts.length ? `these conflict: ${conflicts.join(', ')}; check their ports (z with z, x with x), or remove one` : 'check the ports' });
   } else {
     if (mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.redundant', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation${mobility.redundant > 1 ? 's repeat' : ' repeats'} the others (Kutzbach ${mobility.kutzbach}, rank says ${mobility.dof})`, fix: mobility.redundantJoints.length ? `${mobility.redundantJoints.join(', ')}: their axes must stay exactly aligned in the real parts` : undefined });
     if (mobility.left > 0 && mobility.drives > 0) diagnostics.push({ level: 'warning', kind: 'asm.underconstrained', at: 'joints', message: `${mobility.left} free motion${mobility.left > 1 ? 's' : ''} left after the drives`, fix: 'drive or couple another joint' });

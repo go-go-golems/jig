@@ -915,6 +915,35 @@ await test('50 mechanism: drag to pose (the nearest pose the joints allow, pinne
   return `pin → ${a.overrides.main}; wrist stops at ${b.at[1].toFixed(3)}; undriven holds ${Object.keys(d.overrides)}; gears ${g.overrides.p}`;
 });
 
+await test('51 mechanism: a closure with a port turned half a turn is a conflict; an unreachable study start is a gap; kine keeps the ground placement', async () => {
+  // two rigid joints between the same bodies, the second port turned 180° about z: the dot-product equations hold
+  // (x·y = 0 for x and −x), so only the sign check stops it
+  const plates = (q) => `const blk = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 30, 10, { center: true }).profiles(), mm(4), { id: 'body' })
+    const f = blk('frame').port('a', j.frame({ origin: j.pt(-10, 0, 4), x: j.dir('+X'), z: j.dir('+Z') })).port('b', j.frame({ origin: j.pt(10, 0, 4), x: j.dir('+X'), z: j.dir('+Z') }))
+    const p = blk('plate').port('a', j.frame({ origin: j.pt(-10, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })).port('b', j.frame({ origin: j.pt(10, 0, 0), ${q} }))
+    return j.assembly('two rigid').add('frame', f, { ground: true }).add('plate', p)
+      .joint('one', j.joint.rigid(), 'frame:a', 'plate:a').joint('two', j.joint.rigid(), 'frame:b', 'plate:b')`;
+  const ok = await compile(plates("x: j.dir('+X'), z: j.dir('+Z')"));
+  assert(ok.assembly.assembled && ok.assembly.mobility.redundant === 6 && !errs(ok).length, `aligned: redundant ${ok.assembly.mobility.redundant}`);
+  const bad = await compile(plates("x: j.dir('-X'), z: j.dir('+Z')"));
+  const c = bad.diagnostics.find(d => d.kind === 'asm.conflict');
+  assert(!bad.assembly.assembled && c && /half a turn/.test(c.message) && bad.assembly.conflicts.includes('two'), `flipped: ${c?.message} ${bad.assembly.conflicts}`);
+  const zflip = await compile(plates("x: j.dir('+X'), z: j.dir('-Z')").replace(/j\.joint\.rigid\(\)/g, 'j.joint.revolute()'));
+  assert(!zflip.assembly.assembled && zflip.diagnostics.some(d => d.kind === 'asm.conflict'), 'a revolute closing with its z reversed');
+  // a study that starts where the joints cannot go: the first row is a gap, not a pose at another value
+  const pinned = await compile(plates("x: j.dir('+X'), z: j.dir('+Z')")
+    .replace(".joint('one', j.joint.rigid(), 'frame:a', 'plate:a')", ".joint('one', j.joint.slider(), 'frame:a', 'plate:a')")
+    + `.study('push', { drive: 'one', from: mm(1), to: mm(2), steps: 2 })`);
+  const rows = pinned.assembly.studies.push.rows;
+  assert(rows.length === 3 && rows.every(r => !r.ok) && pinned.diagnostics.some(d => d.kind === 'asm.unreachable'), `rows ${JSON.stringify(rows.map(r => [r.x, r.ok]))}`);
+  // kine: a ground placed 100 mm along x carries the skeleton with it
+  await compile(script('43-slider-crank.js').replace("{ ground: true }", "{ ground: true, at: j.tx.move(100, 0, 0) }"));
+  const k = await call('kine', {});
+  assert(/\.joint\('b_frame', j => j\.at\(\[100, 0, 0\]\)\.orient\(\[0, 0, 0, 1\]\)\.fixed\(\)\)/.test(k.source) && /\.joint\('j_main', j => j\.parent\('b_frame'\)/.test(k.source), 'ground root');
+  assert(k.observe.includes('asm/b_frame.world') && k.observe.includes('asm/p_frame_main.world'), 'ground frames observed');
+  return `${c.message.slice(0, 60)}…; study rows ${rows.map(r => r.ok).join('/')}`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

@@ -224,7 +224,14 @@ export function toKine(S, info = {}, o = {}) {
   const sk = [], observe = [];
   const portFrame = (P) => ({ o: P.o, R: cols(P.x, P.y, P.z) });
   const jid = (id) => `j_${ident(id)}`, bid = (bi) => `b_${ident(bodies[bi].id)}`;
-  const parentOf = (bi) => (bi === ground ? null : bid(bi));
+  // every fixed body (the ground and any component placed by `at` alone) is a fixed root at its world placement,
+  // so a ground that is moved or turned carries the whole skeleton with it
+  for (const [bi, b] of bodies.entries()) {
+    if (!b.ground) continue;
+    sk.push(`    .joint('${bid(bi)}', j => j.at(${vec(b.t)}).orient(${vec(quat(b.R))}).fixed())`);
+    observe.push(`asm/${bid(bi)}.world`);
+  }
+  const parentOf = (bi) => bid(bi);
   for (const e of edges) {
     const jn = S.jointById.get(e.id), Pp = e.childIsB ? jn.A : jn.B, Pc = e.childIsB ? jn.B : jn.A;
     const pf = portFrame(Pp), cf = portFrame(Pc), sign = e.childIsB ? 1 : -1;
@@ -238,7 +245,6 @@ export function toKine(S, info = {}, o = {}) {
     observe.push(`asm/${bid(e.child)}.world`);
   }
   for (const [bi, b] of bodies.entries()) {
-    if (bi === ground) continue;
     for (const [name, pm] of Object.entries(b.ports || {})) {
       if (!pm) continue;
       const p = frameOfMatrix(pm);
@@ -251,7 +257,7 @@ export function toKine(S, info = {}, o = {}) {
     `  .input('theta', p => p.${inType}().initial(${num(S.drives.get(input))}))`,
     ...lines,
     `  .skeleton('asm', s => s`, ...sk, '  )', ')'].join('\n');
-  return { source, observe, notes, input, bodies: bodies.map((b, i) => ({ id: b.id, ground: i === ground, frame: i === ground ? null : `asm/${bid(i)}.world` })) };
+  return { source, observe, notes, input, bodies: bodies.map((b, i) => ({ id: b.id, ground: !!b.ground, frame: `asm/${bid(i)}.world` })) };
 }
 
 // a self-contained ES module: the program (a function of kine's { kine, E, T }), the two ops it may use, the

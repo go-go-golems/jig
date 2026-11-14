@@ -195,9 +195,24 @@ export class MechanismSolver {
       r = normInf(F);
     }
     this.iterations = it; this.residual = r;
-    const ok = r <= (o.accept ?? 1e-8);
+    // a zero residual on a flipped closure is not a solution (see flips)
+    this.flipped = r <= (o.accept ?? 1e-8) ? this.flips() : [];
+    const ok = r <= (o.accept ?? 1e-8) && !this.flipped.length;
     if (ok) this.settle();
     return ok;
+  }
+  // The axis and twist equations are dot products that also vanish for a half turn: z_a · x_b = z_a · y_b = 0 holds
+  // for z_b = −z_a, and x_a · y_b = 0 for x_b = −x_a. A joint's ports must meet aligned (z with z, and x with x where
+  // the twist is fixed), so a closure that satisfies the equations with a reversed axis is rejected here.
+  flips() {
+    const out = [];
+    for (const jn of this.joints) {
+      if (!jn.on) continue;
+      const P = PRIMITIVES[jn.kind], a = this.world(jn.A), b = this.world(jn.B);
+      if (P.includes('axis') && dot(a.Z, b.Z) < 0) out.push(jn.id);
+      else if (P.includes('twist') && dot(a.X, b.X) < 0) out.push(jn.id);
+    }
+    return out;
   }
   // the starting pose: a spanning tree from the ground (and any other fixed) bodies; each tree joint at its drive,
   // hint, coupled value or seed. Driven, hinted and coupled joints place their bodies first.
@@ -399,11 +414,13 @@ export function runStudy(S, st, measures, events) {
   const home = S.pose, homeDrives = new Map(S.drives);
   const rows = [], gaps = [];
   if (!S.drives.has(id)) S.drives.set(id, S.value(jn));
-  S.driveTo({ [id]: from });
+  // the start: when continuation cannot reach `from`, driveTo leaves the drive at the last value it reached, so the
+  // first row is a gap rather than a pose at some other drive value
+  const reached = S.driveTo({ [id]: from });
   let prev = null, jump = null;
   for (let k = 0; k <= steps; k++) {
     const q = from + (to - from) * k / steps, failing = rows.length && !rows[rows.length - 1].ok;
-    const ok = k === 0 ? S.solve() : S.driveTo({ [id]: q }, failing ? { depth: 1, maxIter: 25 } : {});
+    const ok = k === 0 ? reached && S.solve() : S.driveTo({ [id]: q }, failing ? { depth: 1, maxIter: 25 } : {});
     const row = { x: q * k2u, q, ok };
     if (ok) Object.assign(row, S.read(measures)); else gaps.push(q * k2u);
     const now = S.bodies.map((b) => b.t.slice());

@@ -10,7 +10,9 @@ const unitText = (u) => (u === '°' ? 'deg' : u || '');
 
 export function MechanismView({ host }) {
   useHost(host, ['program', 'overrides']);
-  const program = host.program?.ok !== false ? host.program : host.lastGood ?? host.program;
+  // a compile that fails on the joints (a conflict) still carries its assembly, and the conflict is what to show;
+  // the last good program only stands in when the compile failed before an assembly was solved
+  const program = host.program?.ok !== false || host.program?.assembly ? host.program : host.lastGood ?? host.program;
   const A = program?.assembly;
   if (!A) {
     return (
