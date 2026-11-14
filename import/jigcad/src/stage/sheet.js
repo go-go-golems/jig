@@ -80,9 +80,9 @@ export function draw(canvas, program, viewIn, o = {}) {
 
   const sk = activeSketch(program, view, o.sketches);
   // a thumbnail of a print job shows its first plate's items where the plate puts them, without the bed
-  const scene = thumb ? sceneOf(program, { bed: !!(program && program.print), bedBox: false, plates: 1 }) : sceneOf(program, { bed: has('bed') });
+  const scene = thumb ? sceneOf(program, { bed: !!(program && program.print), bedBox: false, plates: 1 }) : sceneOf(program, { bed: has('bed'), pose: o.pose });
   const sketchView = !!(sk && view.name === 'sketch');
-  const cam = sketchView ? sketchCam(sk, view, W, H) : thumb ? tightCam(view, scene, W, H) : viewCam(view.name === 'sketch' ? { ...view, name: 'axo' } : view, scene.fitBox, W, H);
+  const cam = sketchView ? sketchCam(sk, view, W, H) : thumb ? tightCam(view, scene, W, H) : viewCam(view.name === 'sketch' ? { ...view, name: 'axo' } : view, o.fitBox || scene.fitBox, W, H);   // o.fitBox: held through a drag
   const faint = sketchView && scene.instances.length ? 0.4 : 1;
   const state = { width: W, height: H, k, cam, scene, C, view, sketch: sk, sketchView, overlays: on, buf: null, lw: null };
 

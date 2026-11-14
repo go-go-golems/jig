@@ -891,6 +891,30 @@ await test('49 mechanism: interference over a study (gap at every pose, overlap 
   return `closest ${c.min.value.toFixed(3)} mm at ${c.min.at.toFixed(0)}°; out of phase: worst ${qc.worst.volume.toFixed(2)} mm³ at ${qc.worst.at.toFixed(0)}°`;
 });
 
+await test('50 mechanism: drag to pose (the nearest pose the joints allow, pinned by overrides on the joints that hold it)', async () => {
+  await compile('43-slider-crank.js');
+  const a = await call('dragPose', { ref: 'crank:pin', to: [15.5, 0, 6], reset: true });
+  assert(a.ok && a.overrides.main === '90 deg' && Math.hypot(a.at[0] - 15.5, a.at[1], a.at[2] - 6) < 1e-6, `pin to 90°: ${JSON.stringify(a.overrides)} ${a.at}`);
+  const b = await call('dragPose', { ref: 'slider:wrist', to: [0, -30, 6] });
+  assert(b.ok && Math.abs(b.at[1] + 44.5) < 1e-4, `above top dead centre the wrist stops at −44.5: ${b.at}`);
+  const c = await call('dragPose', { ref: 'crank:pin', to: [-30, 40, 6] });
+  const want = [-30, 40].map(v => v * 15.5 / 50);
+  assert(c.ok && Math.hypot(c.at[0] - want[0], c.at[1] - want[1]) < 1e-3, `out of reach: the nearest point ${c.at}`);
+  assert(c.transforms.crank.length === 16 && c.ports.some(p => p.ref === 'crank:pin') && c.joints.find(j => j.id === 'main'), 'the pose to draw');
+  // the dragged pose compiles to the same place
+  const p = await compile('43-slider-crank.js', { options: { override: a.overrides } });
+  assert(near(p.assembly.joints.find(j => j.id === 'main').value, 90, 1e-9, 1e-9), 'override pins it');
+  // undriven (M = 1 left): the first joint that adds to the rank holds the pose
+  await compile(script('44-take-up.js').replace(".drive('main', deg(0))", ''));
+  const d = await call('dragPose', { ref: 'lever:eye', to: [0, 60, 0], reset: true });
+  assert(d.ok && Object.keys(d.overrides).join() === 'main', `holds: ${JSON.stringify(d.overrides)}`);
+  // gears: the wheel's pitch point to 90° turns the pinion through the coupling (−0.6 · p + 6° = 90°)
+  await compile('48-gears.js');
+  const g = await call('dragPose', { ref: 'wheel:pitch', to: [24, 15, 0], reset: true });
+  assert(g.ok && g.overrides.p === '-140 deg', `pinion ${JSON.stringify(g.overrides)}`);
+  return `pin → ${a.overrides.main}; wrist stops at ${b.at[1].toFixed(3)}; undriven holds ${Object.keys(d.overrides)}; gears ${g.overrides.p}`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

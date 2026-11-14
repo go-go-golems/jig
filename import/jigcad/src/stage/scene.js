@@ -131,7 +131,7 @@ function bedFrame(print, items) {
   return centred ? { x0: -bx / 2, y0: -by / 2, x1: bx / 2, y1: by / 2, h: bz } : { x0: 0, y0: 0, x1: bx, y1: by, h: bz };
 }
 
-// sceneOf(program, { bed, bedBox, plates }) → { instances, faceBase, faceCount, box, fitBox (what the camera fits), floorZ, bed, volume }
+// sceneOf(program, { bed, bedBox, plates, pose }) → { instances, faceBase, faceCount, box, fitBox (what the camera fits), floorZ, bed, volume }
 export function sceneOf(program, o = {}) {
   const bodies = (program && program.bodies || []).filter(hasMesh);
   const byId = new Map(bodies.map((b, i) => [b.id, i]));
@@ -157,7 +157,9 @@ export function sceneOf(program, o = {}) {
     }
     bed.printer = print.printer || null;
   } else {
-    bodies.forEach((b, bi) => instances.push({ body: b, bi, M: b.transform || null, plate: null }));
+    // o.pose: component id → transform, while a drag poses an assembly ahead of its compile
+    const posed = b => (o.pose && o.pose[String(b.id).split('/')[0]]) || null;
+    bodies.forEach((b, bi) => instances.push({ body: b, bi, M: posed(b) || b.transform || null, plate: null }));
   }
   let base = 0;
   const box = emptyBox();

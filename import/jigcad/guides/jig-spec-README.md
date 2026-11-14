@@ -393,6 +393,10 @@ j.assembly(name?)
 j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()   // .fixed = .rigid, .prismatic = .slider
        // each is a subgroup of SE(3) with DOF 0, 1, 1, 2, 3, 3, 0 (snap is rigid once engaged)
 prog.occurrence('lid') prog.dof() prog.joint(id) prog.bom({ group: 'part' | 'flat' }) prog.sweep(jointId)
+prog.kine(o)                                        // the solved mechanism as a kine program (export format 'kine')
+prog.dragPose({ ref: 'comp:port', to: [x, y, z] })  // drag to pose: the nearest pose the joints allow (drives released,
+                                                    // couplings kept), its transforms, and the overrides that pin it;
+                                                    // the stage drags port origins of moving components (Joints overlay)
 ```
 
 ### 4.11 `fit`

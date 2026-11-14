@@ -8,5 +8,5 @@
 - [x] Stage overlays: port triads, joint glyphs, free-motion arrows, point traces (the Joints overlay)
 - [x] Interference over a study (gap per pose, overlap volume, Mechanism view band and table)
 - [x] Compile to kine: prog.kine(), the worker call 'kine', and the 'kine' export (an .mjs module)
-- [ ] Drag to pose on the stage
+- [x] Drag to pose on the stage (prog.dragPose, port handles, overrides on release)
 - [ ] Higher pairs (v0.2): cam follower, pin in slot, tooth contact

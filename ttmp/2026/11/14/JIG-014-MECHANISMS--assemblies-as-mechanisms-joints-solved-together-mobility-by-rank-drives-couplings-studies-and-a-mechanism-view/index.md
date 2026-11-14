@@ -82,14 +82,27 @@ residual = the tilt 0.05/60 rad), a 2:1 coupling with a sweep and an event. Test
   `gap a–b` and `overlap a–b` columns; `studies.x.clearance(a, b)` gives { min, overlaps, worst }. An overlap is a
   warning, not an error, so the assembly still compiles and the Mechanism view shows the band and the table.
 
+## Drag to pose
+
+With the Joints overlay on, the port origins of moving components are handles on the stage. A drag sends the
+pointer's point (on the plane through the port, facing the viewer) to `prog.dragPose` (worker call `dragPose`):
+`MechanismSolver.drag` releases the drives, keeps joints and couplings, and alternates a least-squares step toward the
+target (joint rows weighted 1e3) with a minimum-norm solve back onto the joints, keeping a step only when the port
+ends nearer; out of reach, the port stops at the nearest pose (the slider-crank's wrist at top dead centre). The stage
+draws the returned transforms at once with the camera's fit held; on release, `holds()` names the joints that pin the
+pose (the drives, then tree joints while each adds to the rank) and the stage sets them as overrides, which compiles
+the pose for good.
+
 ## Tests
 
-`test/engine/run.mjs` 48: the 18:30 pair and a rack (ratios −0.6 and 9 mm/rad, the wheel's step ≤ 3° across 180°,
+`test/engine/run.mjs` 50: drag to pose (the crank pin to 90°, the wrist stopping at −44.5 mm, the nearest point out
+of reach, an undriven four-bar held by `main`, the wheel's pitch point turning the pinion to −140°).
+48: the 18:30 pair and a rack (ratios −0.6 and 9 mm/rad, the wheel's step ≤ 3° across 180°,
 a reversed joint flips the sign, axes 1 mm too far give `asm.gearMesh`, a fixed gear is refused, the kine source).
 49: one tooth pitch in 11 poses keeps 0.200 mm; half a wheel pitch out of phase overlaps from 10° to 30°, worst
 14.37 mm³ at 20°.
 
 ## Not built here
 
-Higher pairs (cam, pin in slot, tooth contact), drag to pose on the stage, gear couplings across a turning carrier
+Higher pairs (cam, pin in slot, tooth contact), gear couplings across a turning carrier
 (planetary trains: couple the joint values relative to the arm by hand), bevel gears.

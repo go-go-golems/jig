@@ -313,6 +313,52 @@ export class MechanismSolver {
     for (let k = 1; k <= steps; k++) if (!go((k - 1) / steps, k / steps, 0)) { setAt((k - 1) / steps); this.solve(); return false; }
     return true;
   }
+  // drag to pose (spec M8, as in sketch drag): move a port's origin toward a target with the drives released and the
+  // joints and couplings kept. Least squares with the joint rows weighted, then a minimum-norm solve back onto the
+  // joints, so the pose is the closest one the joints allow. → true when the joints hold
+  drag(ref, target, o = {}) {
+    const P = this.port(ref);
+    if (!P) throw new Error(`drag: no port '${ref}'`);
+    if (this.bodies[P.bi].ground) return false;
+    const saved = this.drives, start = this.pose, w = o.weight ?? 1e3;
+    this.drives = new Map();
+    const dist = () => len(sub(this.world(P).P, target));
+    // a step along the joints' tangent space (least squares, joint rows weighted), then back onto them; a step is
+    // kept when the port ends nearer the target, else halved
+    let ok = this.solve({ maxIter: 60 }), d0 = dist();
+    for (let it = 0; ok && it < (o.iters ?? 40) && d0 > 1e-7; it++) {
+      const { F, J } = this.system('all'), p = this.world(P), d = sub(p.P, target);
+      const rows = F.map((f) => f * w), Jw = J.map((g) => g.map((x) => x * w));
+      for (let k = 0; k < 3; k++) { const e = [0, 0, 0]; e[k] = 1; const g = new Array(this.n).fill(0); this.addW(g, P.bi, cross(p.r, e)); this.addV(g, P.bi, e); Jw.push(g); rows.push(d[k]); }
+      const dx = minNormStep(Jw, rows, this.n), p0 = this.pose;
+      let k = 1, moved = false;
+      for (let h = 0; h < 10; h++) {
+        this.apply(dx, k);
+        if (this.solve({ maxIter: 40 }) && dist() < d0 - 1e-12) { moved = true; break; }
+        this.pose = p0; k /= 2;
+      }
+      if (!moved) break;
+      const d1 = dist(); if (d0 - d1 < 1e-11) { d0 = d1; break; } d0 = d1;
+    }
+    this.drives = saved;
+    if (!ok) this.pose = start;
+    return ok;
+  }
+  // the joints whose values pin this pose: the drives, then tree joints in order while each adds to the rank
+  holds() {
+    const saved = this.drives, ids = [...saved.keys()];
+    this.drives = new Map(ids.map((id) => [id, this.uvalue(this.jointById.get(id))]));
+    let rk = this.rank(this.system('all').J);
+    for (const jn of this.joints) {
+      if (rk >= this.n) break;
+      if (!HAS_VALUE.has(jn.kind) || this.drives.has(jn.id) || this.couples.some((c) => c.b === jn.id)) continue;
+      this.drives.set(jn.id, this.uvalue(jn));
+      const r2 = this.rank(this.system('all').J);
+      if (r2 > rk) { rk = r2; ids.push(jn.id); } else this.drives.delete(jn.id);
+    }
+    this.drives = saved;
+    return ids.map((id) => { const jn = this.jointById.get(id), v = this.uvalue(jn); return { id, value: v, unit: jn.kind === 'slider' ? 'mm' : 'deg', shown: jn.kind === 'slider' ? v : v * 180 / Math.PI }; });
+  }
   reader() {
     const S = this, ref = (r) => { const P = S.port(r); if (!P) throw new Error(`measure: no port '${r}'`); return S.world(P); };
     const ax = (w, k) => (k === 'z' ? w.Z : k === 'y' ? w.Y : w.X);

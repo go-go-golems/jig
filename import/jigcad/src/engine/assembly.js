@@ -93,6 +93,23 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
   prog.bom = () => info.bom; prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
   // compile the solved mechanism to a kine program (spec M7): { source, observe, notes, input }
   prog.kine = (ko = {}) => { if (!mech?.solver) throw new Error('kine: no solved mechanism'); return toKine(mech.solver, info, ko); };
+  // drag to pose: { ref: 'comp:port', to: [x, y, z] } → the pose the joints allow nearest the target, the component
+  // transforms and port frames to draw it, and the joint values (overrides) that pin it. Drags chain from the last
+  // dragged pose; { reset: true } starts again from the compiled one.
+  let dragged = null;
+  prog.dragPose = ({ ref, to, reset } = {}) => {
+    const S = mech?.solver; if (!S || !mech.assembled) throw new Error('drag: no assembled mechanism');
+    const home = S.pose;
+    if (dragged && !reset) S.pose = dragged;
+    try {
+      const ok = S.drag(ref, to);
+      const T = S.transforms(), ids = [...comp.keys()];
+      const out = { ok, transforms: Object.fromEntries(ids.map((id, i) => [id, T[i]])), ports: S.portFrames(), joints: S.jointValues(),
+        overrides: Object.fromEntries(S.holds().map(h => [h.id, `${+h.shown.toFixed(4)} ${h.unit}`])), at: S.world(S.port(ref)).P };
+      if (ok) dragged = S.pose;
+      return out;
+    } finally { S.pose = home; }
+  };
   return prog;
 }
 // Compile the components and solve the joints (opts.forPrint: joints at the print pose).
