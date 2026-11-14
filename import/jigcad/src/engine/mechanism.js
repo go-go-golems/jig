@@ -322,12 +322,18 @@ export class MechanismSolver {
   }
   jointValues() {
     return this.joints.map((jn) => {
-      const v = this.value(jn), a = this.world(jn.A);
+      const v = this.value(jn), a = this.world(jn.A), b = this.world(jn.B);
       return { id: jn.id, kind: jn.kind, a: jn.A.ref, b: jn.B.ref, equations: jn.c, value: v == null ? null : jn.kind === 'slider' ? v : v * 180 / Math.PI, unit: v == null ? '' : jn.kind === 'slider' ? 'mm' : '°',
-        driven: this.drives.has(jn.id), tree: this.tree?.has(jn.id) ?? false, at: a.P, axis: a.Z };
+        driven: this.drives.has(jn.id), tree: this.tree?.has(jn.id) ?? false, at: a.P, atB: b.P, axis: a.Z };
     });
   }
   transforms() { return this.bodies.map((b) => matrixOfPose(b)); }
+  // world frames of the ports the joints use, for the stage's triads
+  portFrames() {
+    const seen = new Map();
+    for (const jn of this.joints) for (const P of [jn.A, jn.B]) if (!seen.has(P.ref)) { const w = this.world(P); seen.set(P.ref, { ref: P.ref, o: w.P, x: w.X, z: w.Z }); }
+    return [...seen.values()];
+  }
 }
 
 // sweep a drive by continuation and record the measures: { rows, keys, events, gaps, jump, extrema }

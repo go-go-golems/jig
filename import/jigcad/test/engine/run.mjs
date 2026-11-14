@@ -822,6 +822,30 @@ await test('46 mechanism: a coupling is one equation; sweep runs a joint through
   return `hook ${hook.value.toFixed(3)}°, sweep ${sw.rows.length} poses, event at ${ev.at.toFixed(4)}°`;
 });
 
+await test('47 mechanism: compiled to a kine program (four-bar, slider-crank, the exported module)', async () => {
+  await compile('44-take-up.js');
+  const tu = await call('kine', {});
+  assert(/'solve\.fourBar'/.test(tu.source) && /a: 15\.5, b: 42\.625, c: 36\.8125, d: 32\.49286\d*, branch: 1/.test(tu.source), `four-bar node: ${tu.notes}`);
+  assert(tu.observe.includes('asm/p_lever_eye.world') && /\.joint\('j_main'/.test(tu.source), 'skeleton joints and observed port frames');
+  await compile('43-slider-crank.js');
+  const sc = await call('kine', {});
+  assert(/'jig\.sliderCrank'/.test(sc.source) && /a: 15\.5, L: 60, e: 0, branch: 1/.test(sc.source), `slider-crank node: ${sc.notes}`);
+  const ex = await exp('kine', {});
+  assert(ex.filename.endsWith('.kine.mjs') && /export default function program/.test(ex.data), 'module text');
+  const mod = await import('data:text/javascript,' + encodeURIComponent(ex.data));
+  const ops = {}, T = { angle: 'angle', length: 'length' };
+  mod.jigOps({ register: (name, spec) => { ops[name] = spec; } }, T);
+  const z = t => -15.5 * Math.cos(t) - Math.sqrt(3600 - (15.5 * Math.sin(t)) ** 2);
+  let worst = 0;
+  for (let i = 0; i < 360; i++) { const t = i * Math.PI / 180, r = ops['jig.sliderCrank'].evaluate({ crank: t }, { a: 15.5, L: 60, e: 0, branch: 1 }); worst = Math.max(worst, Math.abs(Math.abs(r.x) - Math.abs(z(t)))); }
+  assert(worst < 1e-9, `jig.sliderCrank against the closed form: ${worst}`);
+  // a loop with no closed form here: a table
+  await compile('44-take-up.js');
+  const tb = await call('kine', { closedForm: false, samples: 360 });
+  assert(/'jig\.table'/.test(tb.source) && tb.notes[0].includes('table'), 'table fallback');
+  return `${tu.notes[0]}; ${sc.notes[0]}; module ${(ex.data.length / 1024).toFixed(1)} KiB`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

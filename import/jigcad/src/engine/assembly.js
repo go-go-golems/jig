@@ -8,6 +8,7 @@ import { meshBody } from './mesh.js';
 import { resolveInPart } from './compile.js';
 import { MechanismSolver, runStudy, studyApi, equationCount } from './mechanism.js';
 import { q as quantity } from './units.js';
+import { toKine } from './kine.js';
 
 const V = K.V;
 const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, planar: 3, ball: 3, snap: 0 };
@@ -63,7 +64,9 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
   const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
   const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId })),
     joints: o.joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b, limits: j.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value), equations: equationCount(j.kind),
-      value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false })),
+      value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false,
+      at: values.get(j.id)?.at ?? null, atB: values.get(j.id)?.atB ?? null, axis: values.get(j.id)?.axis ?? null })),
+    ports: mech?.ports ?? [], origins: mech?.origins ?? {}, fixed: mech?.ground ?? [],
     mobility: mob, assembled: mech?.assembled ?? true, conflicts: mech?.conflicts ?? [], residual: mech?.residual ?? 0,
     drives: mech?.drives ?? {}, couples: (o.couples ?? []).filter(c => !c.unsupported).map(c => ({ id: c.id, a: c.a, b: c.b, ratio: num(c.ratio), offset: num(c.offset) })),
     measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [],
@@ -72,6 +75,8 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
     extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace,
     extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
   prog.bom = () => info.bom; prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
+  // compile the solved mechanism to a kine program (spec M7): { source, observe, notes, input }
+  prog.kine = (ko = {}) => { if (!mech?.solver) throw new Error('kine: no solved mechanism'); return toKine(mech.solver, info, ko); };
   return prog;
 }
 // Compile the components and solve the joints (opts.forPrint: joints at the print pose).
@@ -194,7 +199,8 @@ export function solveAssembly(asm, opts, compilePart) {
     return out;
   };
   const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
-  const mech = { mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S };
+  const mech = { mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
+    ports: S.portFrames(), origins: Object.fromEntries(S.bodies.map((b) => [b.id, b.t.slice()])), ground: S.bodies.filter((b) => b.ground).map((b) => b.id) };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
   // distance unless { exact: true } (printInPlace or interference options) asks for B-rep everywhere.

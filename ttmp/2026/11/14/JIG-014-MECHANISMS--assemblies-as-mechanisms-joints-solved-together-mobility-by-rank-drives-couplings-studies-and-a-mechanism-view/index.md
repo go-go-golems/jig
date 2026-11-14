@@ -54,6 +54,17 @@ closed form, an override driving the crank), take-up four-bar (eye within 3e-12 
 poses, the crossed closure from other hints), coaxial bearings (r = 5; misaligned 0.05 mm: front + back conflict,
 residual = the tilt 0.05/60 rad), a 2:1 coupling with a sweep and an event. Tests 01–42 pass unchanged.
 
+## The stage and kine
+
+- The Joints overlay (\`src/stage/mechanism-marks.js\`, on by default; presets that list their overlays opt in):
+  frames of the ports the joints use, a glyph per joint with its solved value, the free motions (an arc about a
+  rotation's axis, else velocity arrows), and the paths of point measures over each study.
+- \`src/engine/kine.js\` compiles the solved mechanism to a kine program: the spanning tree as a skeleton, a planar
+  four-bar as kine's \`solve.fourBar\`, a planar slider-crank as \`jig.sliderCrank\`, any other loop as a
+  \`jig.table\` (cubic Hermite, fourth-order tangents), couplings as derived expressions. \`prog.kine(o)\`, the
+  worker call \`kine\` and the export format \`kine\` (a self-contained \`.mjs\` with the program, its two ops and
+  the frames to observe). In the book the compiled lockstitch head matches the hand-written rig to 8e-13 mm.
+
 ## Not built here
 
 Couplings between ports (`j.couple.gear(portA, portB)` with the ratio from the teeth), higher pairs (cam, pin in

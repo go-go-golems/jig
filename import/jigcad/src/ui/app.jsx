@@ -222,6 +222,7 @@ const EXPORTS = [
   { format: 'step', title: 'STEP', about: '.step B-rep, lossless (AP242)', text: true },
   { format: 'svg', title: 'SVG', about: '.svg line drawing of the feature edges (isometric)', text: true },
   { format: 'ir', title: 'IR bundle', about: '.zip of L0–L6 text, trace, params, graph and diagnostics', text: false },
+  { format: 'kine', title: 'kine program', about: '.mjs kine program compiled from an assembly’s mechanism', text: true },
   { format: 'script', title: 'Script', about: 'script.js with your edits', text: true },
 ];
 function ExportMenu({ host }) {
