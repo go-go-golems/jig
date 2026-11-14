@@ -12,6 +12,7 @@ import { ParamsView } from './views/params.jsx';
 import { GraphView } from './views/graph.jsx';
 import { IRView } from './views/ir.jsx';
 import { TraceView } from './views/trace.jsx';
+import { MechanismView } from './views/mechanism.jsx';
 import { NotesView } from './views/notes.jsx';
 import { DocsView, ReferenceView } from './views/docs.jsx';
 import { BookView } from './views/book.jsx';
@@ -22,7 +23,7 @@ import { shelf } from './presets.js';
 
 const COMPONENTS = {
   notes: NotesView, code: CodeView, agent: AgentView, docs: DocsView, book: BookView, reference: ReferenceView,
-  stage: StageView, params: ParamsView, graph: GraphView, ir: IRView, trace: TraceView, experiments: ExperimentsView,
+  stage: StageView, params: ParamsView, graph: GraphView, ir: IRView, trace: TraceView, mechanism: MechanismView, experiments: ExperimentsView,
   presets: PresetsView,
 };
 

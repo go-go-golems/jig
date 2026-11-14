@@ -1,0 +1,18 @@
+// A coupling: a hook shaft turned twice per crank turn, 120° ahead (gears known to mesh, as one equation),
+// and a sweep of the crank through its limits.
+const disc = (name, rr) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).circle('c', rr).profiles(), mm(5), { id: 'body' })
+  .port('axis', j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') }))
+  .port('point', j.frame({ origin: j.pt(rr - 1, 0, 5), x: j.dir('+X'), z: j.dir('+Z') }))
+const frame = j.part('frame')
+  .extrude(j.sketch('b', { on: j.plane.offset(j.plane.XY, -4) }).rect('r', 120, 50, { center: true }).profiles(), mm(4), { id: 'plate' })
+  .port('shaft', j.frame({ origin: j.pt(-30, 0, 0), x: j.dir('+X'), z: j.dir('+Z') }))
+  .port('hook', j.frame({ origin: j.pt(30, 0, 0), x: j.dir('+X'), z: j.dir('+Z') }))
+return j.assembly('geared')
+  .add('frame', frame, { ground: true }).add('crank', disc('crank', 15)).add('hook', disc('hook', 14))
+  .joint('main', j.joint.revolute({ limits: [deg(0), deg(90)] }), 'frame:shaft', 'crank:axis')
+  .joint('hookShaft', j.joint.revolute(), 'frame:hook', 'hook:axis')
+  .drive('main', deg(30))
+  .couple('gears', 'main', 'hookShaft', { ratio: 2, offset: deg(120) })
+  .measure('hookAngle', m => m.joint('hookShaft'))
+  .event('hook past 180°', w => w.hookAngle < 0)
+  .sweep('main', { steps: 18 })

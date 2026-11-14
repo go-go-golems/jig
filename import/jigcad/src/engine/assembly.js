@@ -6,11 +6,14 @@ import { frameOf, matOf } from './adapt.js';
 import { mobility, meshGap, meshTris } from './inspect.js';
 import { meshBody } from './mesh.js';
 import { resolveInPart } from './compile.js';
+import { MechanismSolver, runStudy, studyApi, equationCount } from './mechanism.js';
+import { q as quantity } from './units.js';
 
 const V = K.V;
 const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, planar: 3, ball: 3, snap: 0 };
 const GROUP = { rigid: '{e}', revolute: 'SO(2)', slider: 'ℝ', cylindrical: 'SO(2)×ℝ', planar: 'SE(2)', ball: 'SO(3)', snap: '{e} once engaged' };
 export const joint = Object.fromEntries(Object.keys(DOF).map(k => [k, (o = {}) => Object.freeze({ kind: k, group: GROUP[k], dof: DOF[k], ...o })]));
+joint.prismatic = joint.slider; joint.fixed = joint.rigid;   // the assembly spec's names (spec v0.1)
 
 class Assembly {
   constructor(name, o) { this.name = name; this.o = o; Object.freeze(this); }
@@ -26,6 +29,19 @@ class Assembly {
   joint(id, kind, a, b, opts = {}) { return this._w({ joints: [...this.o.joints, { id, ...(typeof kind === 'string' ? joint[kind](opts) : kind), a, b, opts }] }); }
   printInPlace(ids, o = {}) { return this._w({ pip: { ids, ...o } }); }
   sweep(jointId, o = {}) { return this._w({ sweeps: [...(this.o.sweeps ?? []), { jointId, ...o }] }); }
+  // mechanisms (spec v0.1): a drive fixes a joint value, a hint seeds the start pose, a couple ties two joint values
+  // (gears, belts); measures read the pose, events mark where a reading flips, studies sweep a drive, reports turn
+  // studies into numbers
+  drive(jointId, value) { return this._w({ drives: { ...(this.o.drives ?? {}), [jointId]: value } }); }
+  hint(jointId, value) { return this._w({ hints: { ...(this.o.hints ?? {}), [jointId]: value } }); }
+  couple(id, a, b, o = {}) {
+    if (typeof id !== 'string') return this._w({ couples: [...(this.o.couples ?? []), { unsupported: true, spec: id, at: callerLine() }] });
+    return this._w({ couples: [...(this.o.couples ?? []), { id, a, b, ratio: o.ratio ?? 1, offset: o.offset ?? 0 }] });
+  }
+  measure(name, fn) { return this._w({ measures: [...(this.o.measures ?? []), { name, fn }] }); }
+  event(name, fn) { return this._w({ events: [...(this.o.events ?? []), { name, fn }] }); }
+  study(name, o = {}) { return this._w({ studies: [...(this.o.studies ?? []), { name, ...o }] }); }
+  report(name, fn, o = {}) { return this._w({ reports: [...(this.o.reports ?? []), { name, fn, unit: o.unit ?? '', digits: o.digits ?? 3 }] }); }
   explode(steps) { return this._w({ explode: steps }); }
   interference(o = {}) { return this._w({ interference: o }); }
   use(...fns) { let a = this; for (const f of fns.flat()) a = typeof f === 'function' ? f(a) ?? a : a; return a; }
@@ -39,14 +55,22 @@ export function assembly(name = 'assembly') { return new Assembly(name, { compon
 
 function compileAssembly(asm, opts, { compilePart, finalize }) {
   const t0 = performance.now();
-  const { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId } = solveAssembly(asm, opts, compilePart);
+  const { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech } = solveAssembly(asm, opts, compilePart);
   const o = asm.o;
-  const mob = mobility({ components: [...comp.keys()], joints: o.joints });
-  const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id })), joints: o.joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b, limits: j.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value) })), mobility: mob,
+  // the count (Grübler–Kutzbach, from the joint kinds alone) and, beside it, what the solver found
+  const mob = { ...mobility({ components: [...comp.keys()], joints: o.joints }), ...(mech?.mobility ?? {}) };
+  if (mech?.mobility) { mob.solverDOF = mech.mobility.dof; mob.note = mech.mobility.redundant ? `${mech.mobility.redundant} joint equation(s) repeat the others: ${mech.mobility.redundantJoints.join(', ')} must stay exactly aligned in the real parts` : 'no joint equation repeats another'; }
+  const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
+  const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId })),
+    joints: o.joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b, limits: j.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value), equations: equationCount(j.kind),
+      value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false })),
+    mobility: mob, assembled: mech?.assembled ?? true, conflicts: mech?.conflicts ?? [], residual: mech?.residual ?? 0,
+    drives: mech?.drives ?? {}, couples: (o.couples ?? []).filter(c => !c.unsupported).map(c => ({ id: c.id, a: c.a, b: c.b, ratio: num(c.ratio), offset: num(c.offset) })),
+    measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [],
     bom: [...comp.values()].map(x => ({ item: x.c.item.name, id: x.c.id, qty: x.c.opts.qty ?? 1, kind: 'printed' })) };
   const prog = finalize({ kind: 'assembly', name: asm.name, parts, t0, opts, assembly: info, occurrences, placements,
     extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace,
-    extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact' } } });
+    extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
   prog.bom = () => info.bom; prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
   return prog;
 }
@@ -69,46 +93,108 @@ export function solveAssembly(asm, opts, compilePart) {
     parts.push({ name: c.id, part: c.item, res });
   }
   const groundId = o.ground ?? o.components.find(c => c.opts.ground)?.id ?? o.components[0]?.id;
-  const placed = new Set([groundId]);
-  for (const [id, x] of comp) if (x.c.opts.at != null || id === groundId) placed.add(id);
-  // joints: place b relative to a through ports: T_b = T_a · F_a · J(value) · F_b⁻¹
-  const placed0 = new Set(placed);
-  const jointMat = (jn, value) => jn.kind === 'revolute' ? K.matRotate([0, 0, 1], value) : jn.kind === 'slider' ? K.matTranslate(0, 0, value) : K.IDENTITY;
-  // the print pose: joints at their pose values (params elsewhere), for the print-in-place check
-  const solvePose = pose => {
-    const T = new Map([...comp].map(([id, x]) => [id, x.T0])), pl = new Set(placed0);
-    for (const jn of o.joints) {
-      const [ca, pa] = String(jn.a).split(':'), [cb, pb] = String(jn.b).split(':');
-      const A = comp.get(ca), B = comp.get(cb); if (!A || !B) continue;
-      const Fa = portMatrix(A, pa, [], jn.id), Fb = portMatrix(B, pb, [], jn.id);
-      const limits = jn.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value);
-      const v = pose[jn.id] !== undefined ? num(pose[jn.id]) : values[jn.id] !== undefined ? num(values[jn.id]) : limits ? limits[0] : 0;
-      const J = jointMat(jn, v);
-      if (!pl.has(cb) || pl.has(ca)) { T.set(cb, K.matMul(T.get(ca), K.matMul(Fa, K.matMul(J, K.matInverse(Fb))))); pl.add(cb); }
-      else { T.set(ca, K.matMul(T.get(cb), K.matMul(Fb, K.matMul(K.matInverse(J), K.matInverse(Fa))))); pl.add(ca); }
-    }
-    return T;
+  // the joints, solved together (mechanism.js). A joint whose value is given (a param or override named by its id,
+  // the print pose, or .drive) is driven; any other starts at its first limit, or 0, and is free.
+  const rad = v => num(v);
+  const limitsOf = jn => jn.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value);
+  const portsOf = new Map();                       // component id → { port name → 4×4 }
+  const wantPort = (cid, pname, at) => {
+    const X = comp.get(cid); if (!X || !pname) return;
+    const m = portsOf.get(cid) ?? new Map(); portsOf.set(cid, m);
+    if (!m.has(pname)) m.set(pname, portMatrix(X, pname, at ? diagnostics : [], at));
   };
+  const joints = [];
   for (const jn of o.joints) {
     const [ca, pa] = String(jn.a).split(':'), [cb, pb] = String(jn.b).split(':');
-    const A = comp.get(ca), B = comp.get(cb);
-    if (!A || !B) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: unknown component ${!A ? ca : cb}` }); continue; }
-    const Fa = portMatrix(A, pa, diagnostics, jn.id), Fb = portMatrix(B, pb, diagnostics, jn.id);
-    const limits = jn.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value);
-    // a print job places the assembly in its print pose; on screen a joint param (a slider) wins
+    if (!comp.get(ca) || !comp.get(cb)) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: unknown component ${!comp.get(ca) ? ca : cb}` }); continue; }
+    const before = diagnostics.length;
+    wantPort(ca, pa, jn.id); wantPort(cb, pb, jn.id);
+    if (diagnostics.length > before) continue;
+    joints.push({ id: jn.id, kind: jn.kind, a: `${ca}:${pa}`, b: `${cb}:${pb}`, limits: limitsOf(jn), src: jn });
+  }
+  // every port of every component is readable by measures (resolved lazily; failures stay quiet here)
+  for (const [cid, X] of comp) for (const pt of X.c.item.meta?.ports ?? []) wantPort(cid, pt.name, null);
+  const jointed = new Set(joints.flatMap(j => [j.a.split(':')[0], j.b.split(':')[0]]));
+  const driveOf = (jn) => {
     const posed = o.pip?.pose?.[jn.id] !== undefined, usePose = posed && (opts.forPrint || values[jn.id] === undefined);
-    let value = usePose ? num(o.pip.pose[jn.id]) : values[jn.id] !== undefined ? num(values[jn.id]) : limits ? limits[0] : 0;
-    const J = jn.kind === 'revolute' ? K.matRotate([0, 0, 1], value) : jn.kind === 'slider' ? K.matTranslate(0, 0, value) : K.IDENTITY;
-    // move whichever side is not yet placed
-    if (!placed.has(cb) || placed.has(ca)) { B.T = K.matMul(A.T, K.matMul(Fa, K.matMul(J, K.matInverse(Fb)))); placed.add(cb); }
-    else { A.T = K.matMul(B.T, K.matMul(Fb, K.matMul(K.matInverse(J), K.matInverse(Fa)))); placed.add(ca); }
-    occurrences.push({ id: cb, joint: jn.id, value: jn.kind === 'revolute' ? `${(value * 180 / Math.PI).toFixed(1)}°` : `${value} mm`, txText: txText(B.T) });
-    decisions.push({ at: jn.id, kind: 'joint', chose: `${jn.kind} at ${jn.kind === 'revolute' ? (value * 180 / Math.PI).toFixed(1) + '°' : value + ' mm'}`, alternatives: [], reason: usePose ? 'print pose' : values[jn.id] !== undefined ? 'override' : 'first limit (default pose)' });
+    if (usePose) return { v: rad(o.pip.pose[jn.id]), why: 'print pose' };
+    if (values[jn.id] !== undefined) return { v: rad(values[jn.id]), why: 'override' };
+    if (o.drives?.[jn.id] !== undefined) return { v: rad(o.drives[jn.id]), why: 'drive' };
+    return null;
+  };
+  const drives = new Map(), seeds = new Map(), why = new Map();
+  for (const j of joints) { const d = driveOf(j.src); if (d) { drives.set(j.id, d.v); why.set(j.id, d.why); } else seeds.set(j.id, j.limits ? j.limits[0] : 0); }
+  for (const c of o.couples ?? []) if (c.unsupported) diagnostics.push({ level: 'warning', kind: 'asm.unsupported', at: c.at ? `line ${c.at}` : 'couple', message: 'couple(j.couple.gear(…)) between ports is not built yet; use couple(id, jointA, jointB, { ratio, offset })' });
+  const S = new MechanismSolver({
+    bodies: [...comp].map(([id, x]) => ({ id, ground: id === groundId || (x.c.opts.at != null && !jointed.has(id)), T0: x.T0, ports: Object.fromEntries(portsOf.get(id) ?? []) })),
+    joints, drives, seeds,
+    hints: new Map(Object.entries(o.hints ?? {}).map(([k, v]) => [k, rad(v)])),
+    couples: (o.couples ?? []).filter(c => !c.unsupported).map(c => ({ id: c.id, a: c.a, b: c.b, ratio: num(c.ratio), offset: rad(c.offset) })),
+  });
+  diagnostics.push(...S.diags);
+  const ts = performance.now();
+  const scriptDrives = new Map(Object.entries(o.drives ?? {}).map(([k, v]) => [k, rad(v)]));
+  const assembled = S.assemble(scriptDrives);
+  const mobility = S.analyse();
+  let conflicts = [];
+  const residual = S.residual;
+  if (!assembled) {
+    const keep = S.pose; conflicts = S.conflictSet(); S.pose = keep;
+    diagnostics.push({ level: 'error', kind: 'asm.conflict', at: conflicts[0] ?? 'joints', message: `the joints cannot all hold (largest residual ${residual < 0.01 ? residual.toExponential(2) : residual.toFixed(3)})`, fix: conflicts.length ? `these conflict: ${conflicts.join(', ')}; check their ports, or remove one` : 'check the ports' });
+  } else {
+    if (mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.redundant', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation${mobility.redundant > 1 ? 's repeat' : ' repeats'} the others (Kutzbach ${mobility.kutzbach}, rank says ${mobility.dof})`, fix: mobility.redundantJoints.length ? `${mobility.redundantJoints.join(', ')}: their axes must stay exactly aligned in the real parts` : undefined });
+    if (mobility.left > 0 && mobility.drives > 0) diagnostics.push({ level: 'warning', kind: 'asm.underconstrained', at: 'joints', message: `${mobility.left} free motion${mobility.left > 1 ? 's' : ''} left after the drives`, fix: 'drive or couple another joint' });
+  }
+  trace.push({ pass: 'mechanism', level: 'L5', ms: performance.now() - ts, cached: false, note: `${joints.length} joints, ${S.n} coordinates, rank ${mobility.rank}, mobility ${mobility.dof}${mobility.drives ? `, ${mobility.drives} drive(s)` : ''}; residual ${residual.toExponential(1)}, ${S.how}` });
+  // readings, studies and reports (not for a print job's pose)
+  const measures = o.measures ?? [], studies = {};
+  let measured = {}, reports = [];
+  if (assembled && !opts.forPrint) {
+    measured = S.read(measures);
+    const studyList = [...(o.studies ?? []), ...(o.sweeps ?? []).map(sw => {
+      const L = joints.find(j => j.id === sw.jointId)?.limits;
+      return { name: `sweep:${sw.jointId}`, drive: sw.jointId, from: L ? L[0] : 0, to: L ? L[1] : 2 * Math.PI, steps: sw.steps ?? 36 };
+    })];
+    for (const st of studyList) {
+      const tq = performance.now();
+      const jn = S.jointById.get(st.drive);
+      const full = jn && jn.kind !== 'slider' ? 2 * Math.PI : 10;
+      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps: st.steps ?? 360 }, measures, o.events ?? []);
+      studies[st.name] = res;
+      if (res.error) diagnostics.push({ level: 'error', kind: 'asm.study', at: st.name, message: res.error });
+      if (res.gaps?.length) diagnostics.push({ level: 'warning', kind: 'asm.unreachable', at: st.name, message: `${res.gaps.length} of ${res.rows.length} drive values cannot be reached (${+res.gaps[0].toFixed(1)}…${+res.gaps[res.gaps.length - 1].toFixed(1)} ${res.unit})`, fix: 'the loop cannot close there: change a length, or drive another joint' });
+      if (res.jump != null) diagnostics.push({ level: 'warning', kind: 'asm.branchJump', at: st.name, message: `a component jumped at ${res.jump.toFixed(1)}${res.unit}: the solution changed branch`, fix: 'use more steps, or a hint that starts on the other branch' });
+      trace.push({ pass: `study:${st.name}`, level: 'L5', ms: performance.now() - tq, cached: false, note: `${res.rows.length} poses, ${res.events.length} event(s)` });
+    }
+    const api = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, studyApi(v)]));
+    reports = (o.reports ?? []).map(r => { let value = null, error = null; try { value = r.fn({ studies: api, measures: measured, mobility, joints: S.jointValues() }); } catch (e) { error = e.message; } return { name: r.name, value: typeof value === 'number' ? value : value == null ? null : String(value), unit: r.unit, digits: r.digits, error }; });
+    for (const r of reports) if (r.error) diagnostics.push({ level: 'error', kind: 'asm.report', at: r.name, message: r.error });
+    if (S.measureError) diagnostics.push({ level: 'warning', kind: 'asm.measure', at: 'measure', message: S.measureError });
+  }
+  const T = S.transforms();
+  [...comp.keys()].forEach((id, i) => { comp.get(id).T = T[i]; });
+  const jv = S.jointValues();
+  for (const j of jv) {
+    const X = comp.get(j.b.split(':')[0]);
+    const shown = j.value == null ? j.kind : `${j.value.toFixed(j.unit === 'mm' ? 3 : 1)}${j.unit === 'mm' ? ' mm' : '°'}`;
+    occurrences.push({ id: j.b.split(':')[0], joint: j.id, value: shown, txText: txText(X.T) });
+    decisions.push({ at: j.id, kind: 'joint', chose: `${j.kind} at ${shown}`, alternatives: [], reason: why.get(j.id) ?? (!j.tree ? 'solved: closes a loop' : mobility.left === 0 && assembled ? 'solved from the drives' : 'first limit (default pose)') });
   }
   for (const [id, x] of comp) {
     for (const b of x.res.state.bodies) placements[`${id}/${b.id}`] = x.T;
     if (!occurrences.find(oc => oc.id === id)) occurrences.unshift({ id, ground: id === groundId, txText: txText(x.T) });
   }
+  // a pose with other joint values (the print pose), solved from this one
+  const solvePose = pose => {
+    const home = S.pose, homeDrives = new Map(S.drives);
+    for (const [id, v] of Object.entries(pose)) if (S.jointById.has(id)) S.drives.set(id, rad(v));
+    S.solve();
+    const Tp = S.transforms(), out = new Map([...comp.keys()].map((id, i) => [id, Tp[i]]));
+    S.pose = home; S.drives = homeDrives;
+    return out;
+  };
+  const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
+  const mech = { mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
   // distance unless { exact: true } (printInPlace or interference options) asks for B-rep everywhere.
@@ -148,9 +234,10 @@ export function solveAssembly(asm, opts, compilePart) {
     }
     trace.push({ pass: 'interference', level: 'L5', ms: performance.now() - ti, cached: false, note: `${nExact} exact, ${nMesh} mesh, ${nBox} box-separated pairs${Tpose ? '; print pose' : ''}` });
   }
-  return { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId };
+  return { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech };
 }
-const num = v => typeof v === 'number' ? v * (Math.abs(v) <= 2 * Math.PI ? 1 : 1) : v?.value ?? Number(v);
+// a joint value: a number (rad or mm), a quantity, or quantity text such as '90 deg' (an override typed in the params view)
+const num = v => { if (typeof v === 'number') return v; if (typeof v === 'string') { try { return quantity(v).value; } catch { return NaN; } } return v?.value ?? Number(v); };
 const worldBox = (bb, T) => K.bboxUnion([[0, 1].flatMap(i => [0, 1].flatMap(j => [0, 1].map(k => K.matApply(T, [bb[i][0], bb[j][1], bb[k][2]]))))].map(ps => [[0, 1, 2].map(d => Math.min(...ps.map(p => p[d]))), [0, 1, 2].map(d => Math.max(...ps.map(p => p[d])))]));
 // a component's `at`: a transform or frame, possibly with param expressions (resolved over the part's params)
 function atMatrix(res, at) {

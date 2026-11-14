@@ -758,6 +758,70 @@ await test('42 a blend that would drop another feature is refused; mesh interfer
   return `tangent fillet refused naming the crank; peg ${gap(clear)} clear, ${gap(hit)} with a 1 mm root fillet`;
 });
 
+// ── mechanisms (assembly spec v0.1): joints solved together, mobility by rank, drives, couplings, studies ──
+await test('43 mechanism: slider-crank closes its loop; Kutzbach −2, rank 17, stroke 2r', async () => {
+  const p = await compile('43-slider-crank.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, M = A.mobility;
+  assert(A.assembled && M.kutzbach === -2 && M.rank === 17 && M.dof === 1 && M.redundant === 3 && M.left === 0, `mobility ${JSON.stringify(M)}`);
+  assert(p.metrics.assemblyDOF.value === 1, 'assemblyDOF 1');
+  assert(['main', 'pin', 'wrist', 'guide'].every(id => M.redundantJoints.includes(id)), `redundant joints ${M.redundantJoints}`);
+  assert(p.diagnostics.some(d => d.kind === 'asm.redundant' && d.level === 'info'), 'asm.redundant info');
+  const st = A.studies.cycle, z = t => -15.5 * Math.cos(t) - Math.sqrt(3600 - (15.5 * Math.sin(t)) ** 2);
+  let worst = 0; for (const row of st.rows) worst = Math.max(worst, Math.abs(row.clamp - z(row.q)));
+  assert(worst < 1e-9, `clamp vs closed form ${worst}`);
+  const stroke = A.reports.find(r => r.name === 'stroke').value, rise = A.reports.find(r => r.name === 'rise at 30°').value;
+  assert(near(stroke, 31, 1e-9) && Math.abs(rise - 2.5792323) < 1e-6, `stroke ${stroke}, rise ${rise}`);
+  assert(st.extrema.clamp.min.at === 0 && st.extrema.clamp.max.at === 180 && st.gaps.length === 0 && st.jump == null, 'extremes at 0° and 180°, no gaps');
+  const slider = p.bodies.find(b => b.part === 'slider');
+  assert(near(slider.transform[13], z(Math.PI / 6), 1e-9, 1e-9), `slider placed at θ = 30°: ${slider.transform[13]}`);
+  // a joint value given as an override drives the joint, as a joint param always has
+  const q = await compile('43-slider-crank.js', { options: { override: { main: '90 deg' } } });
+  const s2 = q.bodies.find(b => b.part === 'slider');
+  assert(near(s2.transform[13], -Math.sqrt(3600 - 15.5 ** 2), 1e-9, 1e-9), `override main = 90°: ${s2.transform[13]}`);
+  return `rank 17 of 18, stroke ${stroke.toFixed(6)} mm, rise ${rise.toFixed(4)} mm, clamp within ${worst.toExponential(1)} mm`;
+});
+await test('44 mechanism: take-up four-bar against its closed form; hints choose the closure', async () => {
+  const p = await compile('44-take-up.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, st = A.studies.cycle;
+  assert(A.mobility.dof === 1 && A.mobility.redundant === 3, 'M 1, r 3');
+  const r = 15.5, b = 42.625, c = 36.8125, k = 67.8125 / b, D = [-14.53125, 29.0625];
+  const rig = t => { const Ap = [r * Math.sin(t), -r * Math.cos(t)], ex = D[0] - Ap[0], ey = D[1] - Ap[1], d = Math.hypot(ex, ey), a = (b * b - c * c + d * d) / (2 * d), h = Math.sqrt(b * b - a * a);
+    const B = [Ap[0] + (a * ex - h * ey) / d, Ap[1] + (a * ey + h * ex) / d]; return [Ap[0] + k * (B[0] - Ap[0]), Ap[1] + k * (B[1] - Ap[1])]; };
+  let worst = 0; for (const row of st.rows) { const E = rig(row.q); worst = Math.max(worst, Math.hypot(row.eye[0] - E[0], row.eye[1] - E[1])); }
+  assert(worst < 1e-6, `eye vs closed form ${worst}`);
+  assert(Math.abs(st.extrema.eyeY.min.at - 138.5) < 0.6 && Math.abs(st.extrema.eyeY.max.at - 250.5) < 0.6, `eye lowest ${st.extrema.eyeY.min.at}, highest ${st.extrema.eyeY.max.at}`);
+  assert(Math.abs(st.extrema.mu.min.value - 23.26) < 0.05, `smallest transmission angle ${st.extrema.mu.min.value}`);
+  // the other hints assemble the crossed closure, with no error: only a reading tells
+  const x = await compile(script('44-take-up.js').replace(".hint('pin', deg(66)).hint('rock', deg(-132))", ".hint('pin', deg(-120)).hint('rock', deg(-60))"));
+  assert(errs(x).length === 0 && x.assembly.joints.find(j => j.id === 'elbow').value < 0, 'crossed closure, elbow negative');
+  return `eye within ${worst.toExponential(1)} mm over ${st.rows.length} poses, lowest ${st.extrema.eyeY.min.at}°, μ ≥ ${st.extrema.mu.min.value.toFixed(1)}°`;
+});
+await test('45 mechanism: coaxial bearings are redundant; misaligned they conflict', async () => {
+  const p = await compile('45-bearings.js');
+  const M = p.assembly.mobility;
+  assert(errs(p).length === 0 && M.kutzbach === -4 && M.rank === 5 && M.dof === 1 && M.redundant === 5, `mobility ${JSON.stringify(M)}`);
+  const q = await compile(script('45-bearings.js').replace('const e = 0', 'const e = 0.05'));
+  const c = q.diagnostics.find(d => d.kind === 'asm.conflict');
+  assert(c && c.level === 'error' && !q.assembly.assembled, 'asm.conflict error');
+  assert(JSON.stringify([...q.assembly.conflicts].sort()) === '["back","front"]', `conflicting set ${q.assembly.conflicts}`);
+  assert(Math.abs(q.assembly.residual - 0.05 / 60) < 1e-6, `residual is the tilt, ${q.assembly.residual}`);
+  return `K −4, rank 5, r 5; misaligned: ${q.assembly.conflicts.join(' + ')}, residual ${q.assembly.residual.toExponential(2)} rad`;
+});
+await test('46 mechanism: a coupling is one equation; sweep runs a joint through its limits', async () => {
+  const p = await compile('46-couple.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, hook = A.joints.find(j => j.id === 'hookShaft');
+  assert(near(hook.value, 180, 1e-9, 1e-7) || near(hook.value, -180, 1e-9, 1e-7), `hook at 2·30 + 120 = 180°: ${hook.value}`);
+  assert(A.mobility.dof === 2 && A.mobility.left === 0 && A.mobility.drives === 2, `two free motions, both used: ${JSON.stringify(A.mobility)}`);
+  const sw = A.studies['sweep:main'];
+  assert(sw && sw.rows.length === 19 && sw.from === 0 && near(sw.to, 90), 'sweep over the limits, 18 steps');
+  const ev = sw.events.find(e => e.name === 'hook past 180°');
+  assert(ev && Math.abs(ev.at - 30) < 0.01, `event at ${ev?.at}`);
+  return `hook ${hook.value.toFixed(3)}°, sweep ${sw.rows.length} poses, event at ${ev.at.toFixed(4)}°`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

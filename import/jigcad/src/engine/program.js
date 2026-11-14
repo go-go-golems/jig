@@ -121,6 +121,7 @@ export function finalize({ kind, name, parts, t0, opts, sharedParams = null, job
   const P = { kind, name, parts, job, assembly, occurrences, print, decisions, sketches, bodiesData, hash, fitName: fitCtx?.name ?? 'default', fitRows, printerCtx: opts.printerCtx ?? job?.printerCtx ?? null, metricsFlat: flat };
   const ir = irText(P);
   const data = { ok: !diagnostics.some(d => d.level === 'error' && d.kind !== 'print.bedFit' && d.fatal), hash, kind, name, summary, metrics: m, diagnostics, trace, decisions, params, graph, sketches, bodies: bodiesData.map(stripBody), print, ir };
+  if (assembly) data.assembly = assembly;   // components, joints with their solved values, mobility, studies, reports (plain data)
   data.ok = !diagnostics.some(d => d.level === 'error');
   const program = new Program(P, data);
   return program;

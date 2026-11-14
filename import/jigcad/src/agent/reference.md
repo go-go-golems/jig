@@ -42,7 +42,7 @@ Faces are named by genealogy: `body/side[base.l1]`, `body/end`, `body/start`, `f
 
 ### Assemblies, fit and printing
 
-`j.assembly(name).add(id, part, { at, ground }) .joint(id, j.joint.revolute(), a, b) .printInPlace(ids)`. Fit classes per side: press 0.05, snug 0.10, slide 0.20, free 0.30, print-in-place 0.40 mm (`j.fit.gap('slide')`, `j.fit.hole(d, 'snug')`). `j.print(name, { printer, material, parts: [part] }) .orient('auto' | '+Z' | fn) .supports({…}) .slice({ layer, walls, infill })`. `j.material('PLA' | 'PETG' | …)`, `j.rules.fdm`.
+`j.assembly(name).add(id, part, { at, ground }) .joint(id, j.joint.revolute(), a, b) .printInPlace(ids)`; joints that close a loop are solved together, and `.drive(id, deg(30)) .hint(id, v) .couple(id, jointA, jointB, { ratio }) .measure(name, m => m.point('comp:port')) .study(name, { drive }) .report(name, s => s.studies.name.range('m'))` make it a mechanism (mobility by rank and studies in the Mechanism view). Fit classes per side: press 0.05, snug 0.10, slide 0.20, free 0.30, print-in-place 0.40 mm (`j.fit.gap('slide')`, `j.fit.hole(d, 'snug')`). `j.print(name, { printer, material, parts: [part] }) .orient('auto' | '+Z' | fn) .supports({…}) .slice({ layer, walls, infill })`. `j.material('PLA' | 'PETG' | …)`, `j.rules.fdm`.
 
 ### The Program
 

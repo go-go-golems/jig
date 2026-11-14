@@ -368,11 +368,19 @@ j.assembly(name?)
   .sweep(jointId, { steps: 36 })                    // move a joint through its range and check swept interference
   .couple(j.couple.gear(portA, portB, { ratio? }) | j.couple.rack(portR, portS) | j.couple.belt(portA, portB, { ratio? }))
                                                     // motion-lite; ratio is derived from the gears' teeth when omitted
-// joint values are parameters named by joint id: asm.override({ hinge: deg(90) })
-  .explode(steps) .solver(slot)                     // default: Newton on SE(3) with Lie-algebra updates
+// joint values are parameters named by joint id: asm.override({ hinge: deg(90) }); a joint with a value is driven
+  .drive(jointId, value) .hint(jointId, value)      // drive: one equation value = v; hint: where the start pose puts it
+  .couple(id, jointA, jointB, { ratio, offset })    // value(B) = ratio · value(A) + offset: a gear train as one equation
+  .measure(name, m => m.point('comp:port') | m.axis(ref) | m.angle(a, b) | m.distance(a, b) | m.joint(id))
+  .event(name, row => bool) .study(name, { drive, from, to, steps })   // sweep a drive by continuation; events bisected
+  .report(name, ({ studies, measures, mobility, joints }) => number, { unit, digits })   // studies.x.range/at/row/extrema
+  .explode(steps) .solver(slot)                     // default: Newton on SE(3) with Lie-algebra updates (mechanism.js):
+                                                    // all joints at once from a spanning-tree start; mobility 6n − rank J,
+                                                    // Kutzbach 6n − Σc and redundant equations beside it; conflicts as a
+                                                    // minimal set; prog.data.assembly holds joints, mobility, studies
   .interference({ clearance: mm(0) })
 // a, b: 'lid:hinge' (component:port) | j.on('lid', sel) | j.frame.on(j.on('lid', sel))
-j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()
+j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()   // .fixed = .rigid, .prismatic = .slider
        // each is a subgroup of SE(3) with DOF 0, 1, 1, 2, 3, 3, 0 (snap is rigid once engaged)
 prog.occurrence('lid') prog.dof() prog.joint(id) prog.bom({ group: 'part' | 'flat' }) prog.sweep(jointId)
 ```
