@@ -12,7 +12,7 @@ import { hashValue } from './hash.js';
 import { printer, print, preset } from './print.js';
 import { rules, rule, check } from './rules.js';
 import { lib } from './lib.js';
-import { assembly, joint } from './assembly.js';
+import { assembly, joint, couple } from './assembly.js';
 import { design, param, search, objective, metric, evaluate, stage } from './explore.js';
 import { laws, law, structure, gen } from './laws.js';
 import { exportTo } from './io.js';
@@ -33,7 +33,7 @@ export function makeJ() {
     sel, feat, on, hole, fit, stack, material,
     region: core.region ?? kRegion,
     sketch3d: core.sketch3d ?? kSketch3d,
-    printer, print, preset, rules, rule, check, lib, assembly, joint,
+    printer, print, preset, rules, rule, check, lib, assembly, joint, couple,
     design, param: { ...(core.param ?? {}), ...param }, search, objective, metric, evaluate, stage,
     laws, law, structure, gen,
     inspect: inspectApi, export: exportTo,

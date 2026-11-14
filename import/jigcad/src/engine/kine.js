@@ -62,6 +62,10 @@ export function jigOps(registry, T) {
       const p1 = at(k), p2 = at(k + 1), m1 = slope(k), m2 = slope(k + 1), t2 = t * t, t3 = t2 * t;
       return { value: (2 * t3 - 3 * t2 + 1) * p1 + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2 + (t3 - t2) * m2 };
     } });
+  // a coupling between an angle and a length (a rack on a pinion): factor · value + offset, in the given unit
+  registry.register('jig.linear', { pure: true, foldable: true,
+    infer(i, a) { if (Object.keys(i).join() !== 'value') throw new Error('jig.linear reads value'); return { value: a.unit === 'length' ? T.length : T.angle }; },
+    evaluate({ value }, { factor, offset }) { return { value: factor * value + offset }; } });
   return registry;
 }
 
@@ -103,7 +107,9 @@ export function toKine(S, info = {}, o = {}) {
     // couplings: value(b) = ratio · value(a) + offset
     for (const c of S.couples) if (ref.has(c.a) && !ref.has(c.b)) {
       lines.push(`  // coupling ${c.id}: ${c.b} = ${num(c.ratio)} · ${c.a} + ${num(c.offset)}`);
-      lines.push(`  .derive('${ident(c.b)}', e => ${plus(sc(`e.read('${ref.get(c.a)}')`, c.ratio), c.offset, tOf(S.jointById.get(c.b)))})`);
+      const ta = tOf(S.jointById.get(c.a)), tb = tOf(S.jointById.get(c.b));
+      if (ta === tb) lines.push(`  .derive('${ident(c.b)}', e => ${plus(sc(`e.read('${ref.get(c.a)}')`, c.ratio), c.offset, tb)})`);
+      else lines.push(`  .node('${ident(c.b)}', 'jig.linear', n => n.read('value', '${ref.get(c.a)}').attrs({ factor: ${num(c.ratio)}, offset: ${num(c.offset)}, unit: '${tb}' }))`);
       ref.set(c.b, `${ident(c.b)}.value`); progress = true;
     }
     for (const [li, L] of loops.entries()) {

@@ -56,17 +56,40 @@ residual = the tilt 0.05/60 rad), a 2:1 coupling with a sweep and an event. Test
 
 ## The stage and kine
 
-- The Joints overlay (\`src/stage/mechanism-marks.js\`, on by default; presets that list their overlays opt in):
+- The Joints overlay (`src/stage/mechanism-marks.js`, on by default; presets that list their overlays opt in):
   frames of the ports the joints use, a glyph per joint with its solved value, the free motions (an arc about a
   rotation's axis, else velocity arrows), and the paths of point measures over each study.
-- \`src/engine/kine.js\` compiles the solved mechanism to a kine program: the spanning tree as a skeleton, a planar
-  four-bar as kine's \`solve.fourBar\`, a planar slider-crank as \`jig.sliderCrank\`, any other loop as a
-  \`jig.table\` (cubic Hermite, fourth-order tangents), couplings as derived expressions. \`prog.kine(o)\`, the
-  worker call \`kine\` and the export format \`kine\` (a self-contained \`.mjs\` with the program, its two ops and
+- `src/engine/kine.js` compiles the solved mechanism to a kine program: the spanning tree as a skeleton, a planar
+  four-bar as kine's `solve.fourBar`, a planar slider-crank as `jig.sliderCrank`, any other loop as a
+  `jig.table` (cubic Hermite, fourth-order tangents), couplings as derived expressions. `prog.kine(o)`, the
+  worker call `kine` and the export format `kine` (a self-contained `.mjs` with the program, its two ops and
   the frames to observe). In the book the compiled lockstitch head matches the hand-written rig to 8e-13 mm.
+
+## Gear couplings and interference over a study
+
+- `couple(j.couple.gear(a, b))`, `j.couple.rack(rack, pinion)` and `j.couple.belt(a, b, { ratio })` find the joint
+  that turns each component (through rigid joints to its shaft), take the ratio from the teeth (`meta.sets.gear`)
+  and its sign from the axes of a provisional pose: ratio = k · zA/zB · sA · sB · sign(nA · nB), k = −1 for an
+  external mesh, +1 internal or belt, s = ±1 for the gear on the joint's b or a side. A rack moves sP · sR ·
+  (nP × (P − C)) · d per radian. At the solved pose the axes are checked against `j.inspect.gearMesh`
+  (`asm.gearMesh`: centre distance, pitch-line distance, rack alignment).
+- Couplings now hold on turned values: a coupled angular joint's value is unwrapped from the last solved pose
+  (`MechanismSolver.uvalue`, `settle`), so an 18:30 pair does not jump 216° when the pinion passes 180°.
+- kine: a coupling between an angle and a length (a rack) compiles to the op `jig.linear`.
+- `.interference(ids, { study })` checks every sampled pose of a study (or every sweep, when no study is named):
+  the gap per pair from the display meshes (`meshGapNear`: only triangles inside both boxes grown by the reach,
+  1 mm first), and where they overlap the shared volume V(a ∩ b) from one OCCT Common (`K.commonVolume`). Rows get
+  `gap a–b` and `overlap a–b` columns; `studies.x.clearance(a, b)` gives { min, overlaps, worst }. An overlap is a
+  warning, not an error, so the assembly still compiles and the Mechanism view shows the band and the table.
+
+## Tests
+
+`test/engine/run.mjs` 48: the 18:30 pair and a rack (ratios −0.6 and 9 mm/rad, the wheel's step ≤ 3° across 180°,
+a reversed joint flips the sign, axes 1 mm too far give `asm.gearMesh`, a fixed gear is refused, the kine source).
+49: one tooth pitch in 11 poses keeps 0.200 mm; half a wheel pitch out of phase overlaps from 10° to 30°, worst
+14.37 mm³ at 20°.
 
 ## Not built here
 
-Couplings between ports (`j.couple.gear(portA, portB)` with the ratio from the teeth), higher pairs (cam, pin in
-slot, tooth contact), interference over a study, port and joint glyphs and free-motion arrows on the stage, and
-compiling a mechanism to kine (prototyped in the book: `book/web/jiglite-kine.js`).
+Higher pairs (cam, pin in slot, tooth contact), drag to pose on the stage, gear couplings across a turning carrier
+(planetary trains: couple the joint values relative to the arm by hand), bevel gears.

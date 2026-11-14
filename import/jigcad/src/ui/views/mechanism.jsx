@@ -65,6 +65,19 @@ export function MechanismView({ host }) {
             })}</tbody>
           </table>
         </div>
+        {(A.couples || []).length > 0 && (
+          <div class="block">
+            <header><h2>Couplings</h2><span class="sub">one equation each: value(b) = ratio · value(a) + offset; for gears the ratio comes from the teeth and its sign from the axes</span></header>
+            <table class="rt">
+              <thead><tr><th>coupling</th><th>kind</th><th>equation</th></tr></thead>
+              <tbody>{A.couples.map((c) => {
+                const ja = (A.joints || []).find((j) => j.id === c.a), jb = (A.joints || []).find((j) => j.id === c.b);
+                const ru = jb?.unit === 'mm' && ja?.unit !== 'mm' ? ' mm/rad' : '', off = jb?.unit === 'mm' ? `${fmt(c.offset, 3)} mm` : `${fmt(c.offset * 180 / Math.PI, 3)}°`;
+                return <tr key={c.id}><td class="code-cell">{c.id}</td><td>{c.kind}</td><td class="code-cell">{c.b} = {fmt(c.ratio, 6)}{ru} · {c.a}{c.offset ? ` + ${off}` : ''}</td></tr>;
+              })}</tbody>
+            </table>
+          </div>
+        )}
         {(A.reports || []).length > 0 && (
           <div class="block">
             <header><h2>Reports</h2><span class="sub">numbers computed from the studies</span></header>
@@ -110,12 +123,21 @@ function StudyBlock({ st, A, host }) {
         let lo = Math.min(...ok.map((r) => r[k])), hi = Math.max(...ok.map((r) => r[k]));
         if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
         const Y = (v) => H - 16 - (v - lo) / (hi - lo) * (H - 28);
-        const path = st.rows.map((r, i) => (r.ok && typeof r[k] === 'number' ? `${i && st.rows[i - 1].ok ? 'L' : 'M'}${X(r.x).toFixed(1)} ${Y(r[k]).toFixed(1)}` : '')).join('');
+        // join the numbers across poses that were not sampled; break at an unreachable pose or a reading out of reach (null)
+        let last = -1;
+        const path = st.rows.map((r, i) => {
+          if (!(r.ok && typeof r[k] === 'number')) { if (!r.ok || r[k] === null) last = -1; return ''; }
+          const cmd = last >= 0 ? 'L' : 'M'; last = i;
+          return `${cmd}${X(r.x).toFixed(1)} ${Y(r[k]).toFixed(1)}`;
+        }).join('');
         const e = st.extrema?.[k];
+        const pair = (st.clearance || []).find((c) => c.key === k || c.volumeKey === k);
+        const step = (x1 - x0) / Math.max(1, st.rows.length - 1) * (pair?.every || 1);
         return (
           <svg key={k} class="studyplot" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${k} against ${st.drive}`} onClick={go}>
             <rect x={x0} y={12} width={x1 - x0} height={H - 28} fill="none" stroke="var(--rule, #ccc)" />
             {(st.gaps || []).map((g, i) => <rect key={i} x={X(g) - (x1 - x0) / st.rows.length / 2} y={12} width={(x1 - x0) / st.rows.length} height={H - 28} fill="var(--accent)" opacity="0.12" />)}
+            {(pair?.overlaps || []).map(([a, b], i) => <rect key={`o${i}`} x={Math.max(x0, X(a) - step / 2)} y={12} width={Math.min(x1, X(b) + step / 2) - Math.max(x0, X(a) - step / 2)} height={H - 28} fill="var(--accent)" opacity="0.16"><title>{`${pair.a} and ${pair.b} overlap from ${fmt(a, 1)} to ${fmt(b, 1)}${st.unit}`}</title></rect>)}
             {(st.events || []).map((ev, i) => <line key={i} x1={X(ev.at)} x2={X(ev.at)} y1={12} y2={H - 16} stroke="var(--accent)" stroke-width="1"><title>{`${ev.name} ${ev.rising ? '↑' : '↓'} at ${fmt(ev.at, 3)}${st.unit}`}</title></line>)}
             <path d={path} fill="none" stroke="var(--ink)" stroke-width="1.4" />
             {e && <><circle cx={X(e.min.at)} cy={Y(e.min.value)} r="2.6" fill="var(--ink)" /><circle cx={X(e.max.at)} cy={Y(e.max.value)} r="2.6" fill="var(--ink)" /></>}
@@ -129,6 +151,20 @@ function StudyBlock({ st, A, host }) {
           </svg>
         );
       })}
+      {st.clearance?.length > 0 && (
+        <table class="rt">
+          <thead><tr><th>pair</th><th>closest</th><th>at</th><th>overlap</th><th>worst</th></tr></thead>
+          <tbody>{st.clearance.map((c) => (
+            <tr key={c.key} class={c.overlaps.length ? 'failrow' : ''}>
+              <td>{c.a} – {c.b}</td>
+              <td class="num">{c.min ? `${fmt(c.min.value, 3)} mm` : `≥ ${fmt(c.within, 1)} mm`}</td>
+              <td class="num">{c.min ? `${fmt(c.min.at, 1)}${st.unit}` : ''}</td>
+              <td>{c.overlaps.length ? c.overlaps.map(([a, b]) => (a === b ? `${fmt(a, 1)}${st.unit}` : `${fmt(a, 1)}–${fmt(b, 1)}${st.unit}`)).join(', ') : 'none'}</td>
+              <td class="num">{c.worst ? `${fmt(c.worst.volume, 2)} mm³ at ${fmt(c.worst.at, 1)}${st.unit}` : ''}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
     </div>
   );
 }

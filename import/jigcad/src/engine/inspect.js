@@ -156,7 +156,29 @@ export function meshGap(A, B, maxD) {
   return meshGapJS(recs(A), recs(B), maxD);
 }
 const recs = t => (RS.isSoup(t) ? t.records() : t);
-export function meshGapJS(A, B, maxD) {
+// The gap between two meshes when only gaps up to maxD matter (a pose of a study): only triangles inside both
+// boxes grown by maxD can hold the closest points or a crossing, so the JS path tests those; containment is
+// tested on the whole meshes.
+export function meshGapNear(A, B, maxD) {
+  if (RS.isSoup(A) && RS.isSoup(B)) { const d = RS.meshGap(A, B, maxD); if (d !== undefined) return d; }
+  const a = recs(A), b = recs(B);
+  if (!a.length || !b.length) return Infinity;
+  const box = T => { const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]; for (const t of T) for (const p of [t.a, t.b, t.c]) for (let d = 0; d < 3; d++) { if (p[d] < lo[d]) lo[d] = p[d]; if (p[d] > hi[d]) hi[d] = p[d]; } return [lo, hi]; };
+  const ba = box(a), bb = box(b);
+  // small gaps first: the grid's cells are as large as the reach, so a 5 mm reach is ~20× slower than 1 mm
+  const pass = r => {
+    const lo = [0, 1, 2].map(d => Math.max(ba[0][d], bb[0][d]) - r), hi = [0, 1, 2].map(d => Math.min(ba[1][d], bb[1][d]) + r);
+    if ([0, 1, 2].some(d => lo[d] > hi[d])) return Infinity;
+    const near = T => T.filter(t => [0, 1, 2].every(d => Math.max(t.a[d], t.b[d], t.c[d]) >= lo[d] && Math.min(t.a[d], t.b[d], t.c[d]) <= hi[d]));
+    const A2 = near(a), B2 = near(b);
+    return A2.length && B2.length ? meshGapJS(A2, B2, r, { inside: false }) : Infinity;
+  };
+  let best = pass(Math.min(1, maxD));
+  if (!Number.isFinite(best) && maxD > 1) best = pass(maxD);
+  if (best > 1e-9 && (inside(a[0].a, b) || inside(b[0].a, a))) best = 0;
+  return best;
+}
+export function meshGapJS(A, B, maxD, o = {}) {
   const h = Math.max(maxD, 0.25), key = (i, j, k) => `${i},${j},${k}`;
   const grid = tris => { const g = new Map(); tris.forEach((t, n) => {
     const lo = [0, 1, 2].map(d => Math.floor((Math.min(t.a[d], t.b[d], t.c[d]) - maxD) / h)), hi = [0, 1, 2].map(d => Math.floor((Math.max(t.a[d], t.b[d], t.c[d]) + maxD) / h));
@@ -196,7 +218,7 @@ export function meshGapJS(A, B, maxD) {
   // run it even when no vertex came near: a thin part straight through a web has all its vertices far away
   if (best > 1e-9 && (cross(A, B) || cross(B, A))) best = 0;
   // one mesh wholly inside the other crosses nothing: a ray from one vertex crosses the other an odd number of times
-  if (best > 1e-9 && A.length && B.length && (inside(A[0].a, B) || inside(B[0].a, A))) best = 0;
+  if (o.inside !== false && best > 1e-9 && A.length && B.length && (inside(A[0].a, B) || inside(B[0].a, A))) best = 0;
   return best <= maxD ? best : Infinity;
 }
 function inside(p, T) {

@@ -846,6 +846,51 @@ await test('47 mechanism: compiled to a kine program (four-bar, slider-crank, th
   return `${tu.notes[0]}; ${sc.notes[0]}; module ${(ex.data.length / 1024).toFixed(1)} KiB`;
 });
 
+await test('48 mechanism: gear and rack couplings take the ratio from the teeth and its sign from the axes', async () => {
+  const p = await compile('48-gears.js');
+  assert(errs(p).length === 0 && !p.diagnostics.some(d => d.kind === 'asm.gearMesh'), JSON.stringify(p.diagnostics.filter(d => d.level !== 'info')));
+  const A = p.assembly, J = id => A.joints.find(j => j.id === id).value;
+  const gear = A.couples.find(c => c.kind === 'gear'), rack = A.couples.find(c => c.kind === 'rack');
+  assert(near(gear.ratio, -0.6, 1e-12) && near(rack.ratio, 9, 1e-12), `ratios ${gear.ratio}, ${rack.ratio}`);
+  assert(near(J('w'), -12, 1e-9, 1e-7) && near(J('r'), 9 * Math.PI / 6, 1e-9, 1e-9), `w ${J('w')}°, r ${J('r')} mm`);
+  assert(A.mobility.dof === 3 && A.mobility.left === 0, `mobility ${JSON.stringify(A.mobility)}`);
+  // turned values: the wheel follows the pinion past 180° without a jump, the rack keeps going
+  const rows = A.studies.turn.rows, wrapD = d => ((d + 540) % 360) - 180;
+  const jump = Math.max(...rows.slice(1).map((r, i) => Math.abs(wrapD(r.wheel - rows[i].wheel))));
+  assert(jump < 3 + 1e-9 && near(A.reports[0].value, -156, 1e-9, 1e-7) && near(rows[rows.length - 1].rack, 18 * Math.PI, 1e-9, 1e-7), `step ${jump}°, wheel at 270° ${A.reports[0].value}, rack ${rows[rows.length - 1].rack}`);
+  assert(p.decisions.some(d => d.kind === 'couple' && /18:30 teeth, external mesh; axes 24\.000 mm apart/.test(d.reason)), 'decision names the teeth');
+  // the wheel's joint the other way round: the ratio's sign follows; the axes 1 mm too far: the mesh says so
+  const q = await compile(script('48-gears.js').replace("'frame:w', 'wheel:axis'", "'wheel:axis', 'frame:w'"));
+  assert(near(q.assembly.couples.find(c => c.kind === 'gear').ratio, 0.6, 1e-12), 'reversed joint: +0.6');
+  const far = await compile(script('48-gears.js').replace('j.pt(24, 0, 0)', 'j.pt(25, 0, 0)'));
+  const gm = far.diagnostics.find(d => d.kind === 'asm.gearMesh');
+  assert(gm && /centre distance 25\.000 mm ≠ 24\.000 mm/.test(gm.message) && /24\.000 mm apart/.test(gm.fix), `gear mesh warning: ${gm?.message}`);
+  const bad = await compile(script('48-gears.js').replace(".couple(j.couple.rack('rack', 'pinion'))", ".couple(j.couple.gear('wheel', 'frame'))"));
+  assert(bad.diagnostics.some(d => d.kind === 'asm.couple' && /frame is fixed/.test(d.message)), 'a fixed component cannot be coupled');
+  // kine: the rack is a length from the angle input
+  await compile('48-gears.js');
+  const k = await call('kine', {});
+  assert(/'jig\.linear'.*factor: 9, offset: 0, unit: 'length'/.test(k.source) && /e\.scale\(e\.read\('theta'\), -0\.6\)/.test(k.source), 'kine nodes');
+  return `ratios ${gear.ratio} and ${rack.ratio} mm/rad; wheel ${J('w').toFixed(3)}°, rack ${J('r').toFixed(4)} mm; step ≤ ${jump.toFixed(2)}°`;
+});
+
+await test('49 mechanism: interference over a study (gap at every pose, overlap volume where they collide)', async () => {
+  const p = await compile('49-interference.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const st = p.assembly.studies.mesh, c = st.clearance?.[0];
+  assert(c && c.samples === 11 && c.overlaps.length === 0 && c.min.value > 0.1 && c.min.value < 0.3, `clearance ${JSON.stringify(c)}`);
+  assert(st.keys.includes('gap pinion–wheel') && st.rows.every(r => typeof r['gap pinion–wheel'] === 'number'), 'a gap column');
+  assert(near(p.assembly.reports[0].value, c.min.value), 'report reads the clearance');
+  assert(p.trace.some(t => t.pass === 'interference:mesh') && !p.trace.some(t => t.pass === 'interference'), 'the study check replaces the one at the pose');
+  // half a wheel pitch out of phase: they overlap all along, with a volume
+  const q = await compile(script('49-interference.js').replace('const phase = 6', 'const phase = 0').replace('steps: 10', 'steps: 4'));
+  const e = q.diagnostics.find(d => d.kind === 'asm.interference');
+  const qc = q.assembly.studies.mesh.clearance[0];
+  assert(e?.level === 'warning' && q.ok !== false && /overlap from 10° to 30° in study mesh \(worst \d+\.\d+ mm³ at \d+°\)/.test(e.message), `error: ${e?.message}`);
+  assert(qc.worst.volume > 1 && q.assembly.studies.mesh.rows.every(r => r['overlap pinion–wheel'] > 1), `volumes ${q.assembly.studies.mesh.rows.map(r => r['overlap pinion–wheel'])}`);
+  return `closest ${c.min.value.toFixed(3)} mm at ${c.min.at.toFixed(0)}°; out of phase: worst ${qc.worst.volume.toFixed(2)} mm³ at ${qc.worst.at.toFixed(0)}°`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

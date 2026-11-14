@@ -159,14 +159,19 @@ export class MechanismSolver {
         if (!c.on) continue;
         const ja = this.jointById.get(c.a), jb = this.jointById.get(c.b), g = row(), ga = row();
         this.valueGrad(jb, g); this.valueGrad(ja, ga); for (let i = 0; i < n; i++) g[i] -= c.ratio * ga[i];
-        const f = this.value(jb) - c.ratio * this.value(ja) - c.offset;
-        F.push(jb.kind === 'slider' && ja.kind === 'slider' ? f : wrap(f)); J.push(g); tag.push(`couple ${c.id}`);
+        // on turned values (unwrapped from the last solved pose): a ratio of 0.6 must not jump when one shaft passes 180°
+        const f = this.uvalue(jb) - c.ratio * this.uvalue(ja) - c.offset;
+        const linear = (!ANGULAR.has(ja.kind) || ja.unw != null) && (!ANGULAR.has(jb.kind) || jb.unw != null);
+        F.push(linear ? f : wrap(f)); J.push(g); tag.push(`couple ${c.id}`);
       }
     }
     return { F, J, tag };
   }
-  get pose() { return this.bodies.map((b) => ({ R: b.R.map((r) => r.slice()), t: b.t.slice() })); }
-  set pose(p) { p.forEach((q, i) => { this.bodies[i].R = q.R.map((r) => r.slice()); this.bodies[i].t = q.t.slice(); }); }
+  get pose() { const p = this.bodies.map((b) => ({ R: b.R.map((r) => r.slice()), t: b.t.slice() })); p.unw = this.joints.map((jn) => jn.unw); return p; }
+  set pose(p) { p.forEach((q, i) => { this.bodies[i].R = q.R.map((r) => r.slice()); this.bodies[i].t = q.t.slice(); }); if (p.unw) p.unw.forEach((u, i) => { this.joints[i].unw = u; }); }
+  // a coupled angular joint's value counted in turns: unwrapped from the value at the last solved pose
+  uvalue(jn) { const v = this.value(jn); return ANGULAR.has(jn.kind) && jn.unw != null ? jn.unw + wrap(v - jn.unw) : v; }
+  settle() { for (const c of this.couples) for (const id of [c.a, c.b]) { const jn = this.jointById.get(id); if (ANGULAR.has(jn.kind)) jn.unw = this.uvalue(jn); } }
   apply(dx, k = 1) {
     for (const b of this.bodies) {
       if (b.off < 0) continue;
@@ -190,7 +195,9 @@ export class MechanismSolver {
       r = normInf(F);
     }
     this.iterations = it; this.residual = r;
-    return r <= (o.accept ?? 1e-8);
+    const ok = r <= (o.accept ?? 1e-8);
+    if (ok) this.settle();
+    return ok;
   }
   // the starting pose: a spanning tree from the ground (and any other fixed) bodies; each tree joint at its drive,
   // hint, coupled value or seed. Driven, hinted and coupled joints place their bodies first.
@@ -206,6 +213,7 @@ export class MechanismSolver {
       return this.seeds.get(id) ?? 0;
     };
     this.tree = new Set(); this.treeEdges = [];
+    for (const jn of this.joints) jn.unw = null;
     for (;;) {
       const jn = order.find((q) => known.has(q.A.bi) !== known.has(q.B.bi));
       if (!jn) break;
@@ -218,9 +226,10 @@ export class MechanismSolver {
         const b = this.world(jn.B), Rb = cols(b.X, b.Y, b.Z), Ra = mm(Rb, tr(T)), oa = sub(b.P, mv(Ra, [0, 0, s]));
         const A = this.bodies[jn.A.bi]; A.R = mm(Ra, tr(cols(jn.A.x, jn.A.y, jn.A.z))); A.t = sub(oa, mv(A.R, jn.A.o)); known.add(jn.A.bi);
       }
-      this.tree.add(jn.id);
+      this.tree.add(jn.id); if (ANGULAR.has(jn.kind)) jn.unw = v;
       this.treeEdges.push({ id: jn.id, parent: ka ? jn.A.bi : jn.B.bi, child: ka ? jn.B.bi : jn.A.bi, childIsB: ka });
     }
+    for (const c of this.couples) for (const id of [c.a, c.b]) { const jn = this.jointById.get(id); if (ANGULAR.has(jn.kind) && jn.unw == null) jn.unw = this.value(jn); }
     this.start = this.pose;
   }
   // place and close. A drive far from where the walk puts its loop can leave Gauss–Newton in a local minimum,
@@ -358,6 +367,7 @@ export function runStudy(S, st, measures, events) {
       if (med != null && row.move > 1 && row.move > 8 * Math.max(med, 1e-6) && jump == null) jump = q * k2u;
     }
     rows.push(row); prev = ok ? now : prev;
+    if (ok && st.onRow) st.onRow(k, row);
   }
   const evs = [];
   for (const ev of events) {
@@ -385,6 +395,7 @@ export function runStudy(S, st, measures, events) {
 export function studyApi(st) {
   return { ...st,
     range: (name) => { const e = st.extrema[name]; return e ? e.max.value - e.min.value : null; },
+    clearance: (a, b) => st.clearance?.find((c) => (c.a === a && c.b === b) || (c.a === b && c.b === a)) ?? null,
     at: (name, x) => { const r = st.rows.reduce((b, q) => (Math.abs(q.x - x) < Math.abs(b.x - x) ? q : b), st.rows[0]); return r?.[name] ?? null; },
     row: (x) => st.rows.reduce((b, q) => (Math.abs(q.x - x) < Math.abs(b.x - x) ? q : b), st.rows[0]) };
 }

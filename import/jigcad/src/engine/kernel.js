@@ -362,6 +362,21 @@ export function distance(a, b) {
   try { return d.IsDone() ? { value: d.Value(), inner: d.InnerSolution() } : { value: Infinity, inner: false }; } finally { d.delete(); }
 }
 
+// The volume two solids share, V(a ∩ b) = V(a) + V(b) − V(a ∪ b): the interference law, from one Common.
+export function commonVolume(a, b) {
+  const oc = getOC();
+  const r = scope();
+  try {
+    const mk = r(new oc.BRepAlgoAPI_Common());
+    mk.SetArguments(r(arrayToList([a]))); mk.SetTools(r(arrayToList([b])));
+    mk.SetRunParallel?.(false);
+    mk.Build(r(new oc.Message_ProgressRange()));
+    if (!mk.IsDone() || mk.HasErrors?.()) throw new Error('common volume: the boolean failed');
+    const s = r(mk.Shape());
+    return volumeProps(s).volume;
+  } finally { r.free(); }
+}
+
 // Transform a shape (copy geometry). Face/edge order is preserved by the copy.
 export function transformShape(shape, m) {
   const oc = getOC();
