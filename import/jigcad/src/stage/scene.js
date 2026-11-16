@@ -158,7 +158,7 @@ export function sceneOf(program, o = {}) {
     bed.printer = print.printer || null;
   } else {
     // o.pose: component id → transform, while a drag poses an assembly ahead of its compile
-    const posed = b => (o.pose && o.pose[String(b.id).split('/')[0]]) || null;
+    const posed = b => (o.pose && o.pose[b.part ?? String(b.id).slice(0, String(b.id).lastIndexOf('/'))]) || null;
     bodies.forEach((b, bi) => instances.push({ body: b, bi, M: posed(b) || b.transform || null, plate: null }));
   }
   let base = 0;

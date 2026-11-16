@@ -523,3 +523,10 @@ function engineFrames(e) {
     .map(l => l.trim().replace(/^at /, '').replace(/\(?(?:file|https?):\/\/[^)]*\/(src\/engine\/[^):]+:\d+)(?::\d+)?\)?/, '($1)'));
   return frames.length ? `at ${frames.join(' ← ')}` : 'no stack';
 }
+
+// The items a selector picks in a compiled part, as a feature would see them (joint ends picked on geometry)
+export function selectInPart(res, sel) {
+  const ctx = makeFeatureCtx(res.pc, { id: 'port', type: 'port', args: [], opts: {} }, new Set(res.features.map(x => x.id)));
+  const r = ctx.resolve(sel, res.state, 'port');
+  return { ...r, diags: ctx._diags };
+}

@@ -58,7 +58,8 @@ export function createStage(element, host = {}, options = {}) {
     if (poseHandle) {
       const C = last.C, q = poseHandle.at;
       lctx.strokeStyle = C.blue; lctx.lineWidth = 1.5; lctx.beginPath(); lctx.arc(q[0], q[1], 6, 0, 7); lctx.stroke();
-      text(lctx, C, pdrag && pdrag.moved && posed ? `${poseHandle.ref} · ${Object.entries(posed.overrides || {}).map(([k, v]) => `${k} ${v}`).join(', ')}` : `${poseHandle.ref} · drag to pose`, q[0] + 9, q[1] - 11, { size: K.labelSm, col: C.blue, bg: C.stage });
+      const stop = posed ? [posed.limits.length ? `at the limit of ${posed.limits.map(k => k.replace(/\.(value|slide)$/, '')).join(', ')}` : '', posed.contacts.length ? `stopped by contact ${posed.contacts.join(', ')}` : ''].filter(Boolean).join(' · ') : '';
+      text(lctx, C, pdrag && pdrag.moved && posed ? `${poseHandle.ref} · ${Object.entries(posed.overrides || {}).map(([k, v]) => `${k} ${v}`).join(', ')}${stop ? ` · ${stop}` : ''}` : `${poseHandle.ref} · drag to pose`, q[0] + 9, q[1] - 11, { size: K.labelSm, col: C.blue, bg: C.stage });
     }
     if (hoverHandle && last.sketch) {
       const C = last.C, q = hoverHandle.at;
@@ -122,7 +123,7 @@ export function createStage(element, host = {}, options = {}) {
     try {
       const r = await host.call('dragPose', { ref: d.ref, to, reset: !d.started });
       d.started = true;
-      if (r && r.ok && !dead && pdrag === d) { posed = { pose: r.transforms, ports: r.ports, joints: r.joints, overrides: r.overrides }; poseHandle = { ref: d.ref, at: proj(last.cam, r.at) }; d.result = r; invalidate(); }
+      if (r && r.ok && !dead && pdrag === d) { posed = { pose: r.transforms, ports: r.ports, joints: r.joints, overrides: r.overrides, limits: r.limits || [], contacts: r.contacts || [] }; poseHandle = { ref: d.ref, at: proj(last.cam, r.at) }; d.result = r; invalidate(); }
     } catch (e) { if (host.toast) host.toast(`Drag: ${e.message || e}`, 'error'); }
     d.busy = false;
     if (d.pending && pdrag === d) requestAnimationFrame(poseStep);

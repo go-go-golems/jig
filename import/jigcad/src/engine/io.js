@@ -86,6 +86,7 @@ export function stl(prog, opts = {}) {
 }
 
 export function step(prog, opts = {}) {
+  if (prog.structure && !opts.flat) return stepAssembly(prog, opts);
   const oc = getOC();
   const r = K.scope();
   try {
@@ -102,6 +103,52 @@ export function step(prog, opts = {}) {
     oc.FS.unlink(fname);
     return { data: text, filename: `${prog.data.name}.step`, mime: 'model/step',
       report: { kept: [`exact B-rep (${bodies.length} solid${bodies.length === 1 ? '' : 's'})`, 'units (mm)'], approximated: [], dropped: ['persistent names', 'plates', 'slicer settings', 'fit provenance', 'parametric history'] } };
+  } finally { r.free(); }
+}
+
+// An assembly as STEP with its product structure (XCAF): one product per part, shared by every component that uses
+// it, one per subassembly, each component placed in its parent's frame, everything named. FreeCAD, Fusion and
+// Onshape open it as an assembly tree. ({ flat: true } writes the old single compound.)
+function stepAssembly(prog, opts = {}) {
+  const oc = getOC();
+  const r = K.scope();
+  const st = prog.structure();
+  try {
+    const doc = r(new oc.TDocStd_Document(r(new oc.TCollection_ExtendedString('XmlXCAF', true))));
+    const tool = oc.XCAFDoc_DocumentTool.ShapeTool(doc.Main());
+    const name = (label, text) => oc.TDataStd_Name.Set(label, r(new oc.TCollection_ExtendedString(String(text), true)));
+    const protos = new Map();                  // a part's compiled result → its product label
+    let nParts = 0, nSubs = 0, nComps = 0;
+    const place = (Tparent, T) => { const t = r(K.trsfFromMatrix(K.matMul(K.matInverse(Tparent), T))); return r(new oc.TopLoc_Location(t)); };
+    const add = (parent, Tparent, n) => {
+      let label;
+      if (n.kind === 'part') {
+        label = protos.get(n.res);
+        if (!label) {
+          const shapes = n.res.state.bodies.map(b => b.shape);
+          const shape = shapes.length === 1 ? shapes[0] : r(K.makeCompound(shapes));
+          label = tool.AddShape(shape, false, true); name(label, n.name); protos.set(n.res, label); nParts++;
+        }
+      } else {
+        label = tool.NewShape(); name(label, n.name); nSubs++;
+        for (const c of n.children) add(label, n.T, c);
+      }
+      const inst = tool.AddComponent(parent, label, place(Tparent, n.T)); nComps++;
+      name(inst, n.id.slice(n.id.lastIndexOf('/') + 1));
+    };
+    const top = tool.NewShape(); name(top, st.name);
+    for (const c of st.children) add(top, K.IDENTITY, c);
+    tool.UpdateAssemblies();
+    const w = r(new oc.STEPCAFControl_Writer());
+    w.SetNameMode(true);
+    // Perform transfers and writes one file (Transfer with a file prefix, even an empty one, writes the parts as
+    // external documents)
+    const fname = `/jig_${Date.now()}_${Math.floor(Math.random() * 1e6)}.step`;
+    if (!w.Perform(doc, fname, r(new oc.Message_ProgressRange()))) throw new Error('STEP write failed');
+    const text = oc.FS.readFile(fname, { encoding: 'utf8' });
+    oc.FS.unlink(fname);
+    return { data: text, filename: `${prog.data.name}.step`, mime: 'model/step',
+      report: { kept: [`exact B-rep (${nParts} part${nParts === 1 ? '' : 's'})`, `product structure: ${nComps} component${nComps === 1 ? '' : 's'}${nSubs ? `, ${nSubs} subassembl${nSubs === 1 ? 'y' : 'ies'}` : ''}`, 'names', 'units (mm)'], approximated: [], dropped: ['joints and their values (STEP has no kinematics here)', 'persistent face names', 'parametric history'] } };
   } finally { r.free(); }
 }
 
