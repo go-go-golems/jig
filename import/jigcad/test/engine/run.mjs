@@ -989,6 +989,44 @@ return j.assembly('box')
   return `held at 110°, ${lim.length} study rows past it, drag stops at ${a.overrides.h}; contact at ${c.overrides.h}`;
 });
 
+await test('54 assembly: joint ends picked on geometry (a bore’s axis, a planar face) and as-built joints', async () => {
+  const p = await compile('54-geometry-joints.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const M = p.assembly.measures;
+  assert(Math.hypot(M.bore[0] - 20, M.bore[1], M.bore[2] - 5) < 1e-9 && Math.hypot(M.tip[0] - 20, M.tip[1] - 40, M.tip[2] - 9) < 1e-9, `bores ${M.bore}, tip ${M.tip}`);
+  const d = p.decisions.filter(x => x.kind === 'port').map(x => x.reason);
+  assert(/plate: its axis, at the end of its length \(5 mm\)/.test(d[0]) && /arm: its axis, at the start of its length \(4 mm\)/.test(d[1]), d.join(' / '));
+  assert(p.assembly.joints[0].a.startsWith("j.frame.on(j.on('plate'"), `shown as ${p.assembly.joints[0].a}`);
+  // two planar faces meet face to face: the lid on the box, centred
+  const m = await compile(`const box = j.part('box').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 60, 40, { center: true }).profiles(), mm(20), { id: 'body' })
+const lid = j.part('lid').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 50, 30, { center: true }).profiles(), mm(3), { id: 'body' })
+return j.assembly('mate')
+  .add('box', box, { ground: true }).add('lid', lid)
+  .joint('seat', j.joint.rigid(), j.on('box', j.sel.faces('>Z')), j.on('lid', j.sel.faces('<Z')))
+  .measure('lidTop', m => m.point('lid', [0, 0, 3]))
+`);
+  assert(errs(m).length === 0 && Math.hypot(...m.assembly.measures.lidTop.map((v, i) => v - [0, 0, 23][i])) < 1e-9, `lid top ${m.assembly.measures.lidTop}`);
+  // as built: the arm stays where its \`at\` put it, the joint frame is the plate's bore; a value turns it about that axis
+  const asBuilt = `const plate = j.part('plate').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 60, 30, { center: true }).circle('h', 3, { at: [20, 0] }).profiles(), mm(5), { id: 'body' })
+const arm = j.part('arm').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 50, 10, { center: true }).circle('h', 3, { at: [-20, 0] }).profiles(), mm(4), { id: 'body' })
+  .port('tip', j.frame({ origin: j.pt(20, 0, 4), x: j.dir('+X'), z: j.dir('+Z') }))
+return j.assembly('as built')
+  .add('plate', plate, { ground: true }).add('arm', arm, { at: j.tx.move(40, 0, 5) })
+  .joint('hinge', j.joint.revolute({ asBuilt: j.on('plate', j.sel.faces('%cylinder')) }), 'plate', 'arm')
+  .measure('tip', m => m.point('arm:tip'))
+`;
+  const a = await compile(asBuilt);
+  assert(errs(a).length === 0 && near(a.assembly.joints[0].value, 0, 1e-9, 1e-9) && Math.hypot(...a.assembly.measures.tip.map((v, i) => v - [60, 0, 9][i])) < 1e-9, `as built: ${a.assembly.joints[0].value}, tip ${a.assembly.measures.tip}`);
+  const b = await compile(asBuilt, { options: { override: { hinge: '90 deg' } } });
+  assert(Math.hypot(...b.assembly.measures.tip.map((v, i) => v - [20, 40, 9][i])) < 1e-9, `turned: tip ${b.assembly.measures.tip}`);
+  // ends that cannot be joints
+  const bare = await compile(asBuilt.replace('j.joint.revolute({ asBuilt: j.on(\'plate\', j.sel.faces(\'%cylinder\')) })', 'j.joint.revolute()'));
+  assert(bare.diagnostics.some(x => x.kind === 'joint.unsolved' && /names a component without a port/.test(x.message)), 'a bare component needs as-built');
+  const none = await compile(script('54-geometry-joints.js').replace("j.on('arm', j.sel.faces('%cylinder'))", "j.on('arm', j.sel.faces('%cone'))"));
+  assert(none.diagnostics.some(x => x.kind === 'joint.unsolved' && /picks nothing on arm/.test(x.message)), 'a selector that picks nothing');
+  return `bores at ${M.bore.map(v => +v.toFixed(3))}; lid top z ${m.assembly.measures.lidTop[2]}; as built tip ${a.assembly.measures.tip}`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

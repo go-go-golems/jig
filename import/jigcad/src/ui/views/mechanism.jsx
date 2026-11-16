@@ -2,14 +2,16 @@
 // each joint with its solved value (a slider sets it as an override, which drives it), the conflicting set when the
 // joints cannot hold, the free motions, the reports, and one plot per study measure with its extremes, its events and
 // a cursor at the drive's current value. A click on a plot moves the drive there.
+import { useState } from 'preact/hooks';
 import { useHost } from '../common.jsx';
 import { num } from '../format.js';
+import { endFromSelection, jointCode, insertJoint, nextJointId, JOINT_KINDS } from '../joint-insert.js';
 
 const fmt = (v, d = 3) => (v == null || !Number.isFinite(v) ? '—' : +v.toFixed(d) + '');
 const unitText = (u) => (u === '°' ? 'deg' : u || '');
 
 export function MechanismView({ host }) {
-  useHost(host, ['program', 'overrides']);
+  useHost(host, ['program', 'overrides', 'selection']);
   // a compile that fails on the joints (a conflict) still carries its assembly, and the conflict is what to show;
   // the last good program only stands in when the compile failed before an assembly was solved
   const program = host.program?.ok !== false || host.program?.assembly ? host.program : host.lastGood ?? host.program;
@@ -67,6 +69,7 @@ export function MechanismView({ host }) {
             })}</tbody>
           </table>
         </div>
+        <PickJoint host={host} program={program} />
         {(A.couples || []).length > 0 && (
           <div class="block">
             <header><h2>Couplings</h2><span class="sub">one equation each: value(b) = ratio · value(a) + offset; for gears the ratio comes from the teeth and its sign from the axes</span></header>
@@ -168,6 +171,46 @@ function StudyBlock({ st, A, host }) {
           ))}</tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+// a joint from two picks on the sheet: select a face or an edge, set it as an end, pick the kind, insert the line
+function PickJoint({ host, program }) {
+  const [ends, setEnds] = useState({ a: null, b: null });
+  const [kind, setKind] = useState('revolute');
+  const [asBuilt, setAsBuilt] = useState(false);
+  const [note, setNote] = useState('');
+  const cur = endFromSelection(host.selection, program);
+  const id = nextJointId(program);
+  const line = ends.a && ends.b ? jointCode({ id, kind, a: ends.a, b: ends.b, asBuilt }) : null;
+  const use = (side) => { setEnds({ ...ends, [side]: cur }); setNote(''); };
+  const insert = () => {
+    const src = host.files.get('script.js') ?? '';
+    const out = insertJoint(src, line);
+    if (out == null) { setNote('no .joint( or .add( call in script.js to put it after: copy the line instead'); return; }
+    host.setFile('script.js', out); setEnds({ a: null, b: null }); setNote(`inserted ${id}; compiling`);
+    if (host.scheduleCompile) host.scheduleCompile(0); else host.compile?.();     // as Run would
+  };
+  const copy = () => { try { navigator.clipboard.writeText(line); setNote('copied'); } catch { setNote('the clipboard is not available here'); } };
+  const endRow = (side, label) => (
+    <tr key={side}><td>{label}</td><td class="code-cell">{ends[side] ? `${ends[side].comp} · ${ends[side].name}` : <span class="dim">—</span>}</td>
+      <td><button class="tabact" disabled={!cur} title={cur ? `use ${cur.comp} · ${cur.name}` : 'select a face or an edge of a component on the sheet first'} onClick={() => use(side)}>use selection</button></td></tr>
+  );
+  return (
+    <div class="block">
+      <header><h2>Joint from the sheet</h2><span class="sub">select a face or an edge on the sheet (a bore or a pin gives its axis, a circular edge its centre, a planar face its centre and normal) and set it as an end</span></header>
+      <table class="rt"><tbody>{endRow('a', 'end a')}{endRow('b', 'end b')}</tbody></table>
+      <p class="mechpills">
+        <label>kind <select value={kind} onChange={(e) => setKind(e.currentTarget.value)}>{JOINT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+        <label title="keep both components where their `at` puts them: the joint frame is read from end a"><input type="checkbox" checked={asBuilt} onChange={(e) => setAsBuilt(e.currentTarget.checked)} /> as built</label>
+      </p>
+      {line && <pre class="code-cell pickline">{line}</pre>}
+      <p class="mechpills">
+        <button class="tabact" disabled={!line} onClick={insert}>insert into script.js</button>
+        <button class="tabact" disabled={!line} onClick={copy}>copy</button>
+        {note && <span class="dim">{note}</span>}
+      </p>
     </div>
   );
 }

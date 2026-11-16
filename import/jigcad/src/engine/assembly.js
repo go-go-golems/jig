@@ -2,10 +2,11 @@
 // rigid/revolute/slider joints as placement constraints, print-in-place gap checks, BOM, mobility.
 import * as K from './kernel.js';
 import { callerLine } from './part.js';
-import { frameOf, matOf } from './adapt.js';
+import { frameOf, matOf, orthoFrame } from './adapt.js';
 import { mobility, meshGap, meshGapNear, meshTris } from './inspect.js';
 import { meshBody } from './mesh.js';
-import { resolveInPart } from './compile.js';
+import { resolveInPart, selectInPart } from './compile.js';
+import { isDeferred } from './geom.js';
 import { MechanismSolver, runStudy, studyApi, equationCount } from './mechanism.js';
 import { q as quantity } from './units.js';
 import { toKine } from './kine.js';
@@ -77,7 +78,7 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
   const { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech } = solveAssembly(asm, opts, compilePart);
   const o = asm.o;
   // the count (Grübler–Kutzbach, from the joint kinds alone) and, beside it, what the solver found
-  const mob = { ...mobility({ components: [...comp.keys()], joints: o.joints }), ...(mech?.mobility ?? {}) };
+  const mob = { ...mobility({ components: [...comp.keys()], joints: mech?.jointRefs ?? [] }), ...(mech?.mobility ?? {}) };
   if (mech?.mobility) { mob.solverDOF = mech.mobility.dof; mob.note = mech.mobility.redundant ? `${mech.mobility.redundant} joint equation(s) repeat the others: ${mech.mobility.redundantJoints.join(', ')} must stay exactly aligned in the real parts` : 'no joint equation repeats another'; }
   const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
   const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId })),
@@ -153,13 +154,51 @@ export function solveAssembly(asm, opts, compilePart) {
     if (!m.has(pname)) m.set(pname, portMatrix(X, pname, at ? diagnostics : [], at));
   };
   const joints = [];
+  // a joint end picked on geometry, or the frame of an as-built joint, becomes a port named '@<joint>.<a|b>'
+  const setPort = (cid, pname, m) => { const mp = portsOf.get(cid) ?? new Map(); portsOf.set(cid, mp); mp.set(pname, m); };
+  const endFrame = (e, side, jid) => {     // → a 4×4 in the component's own frame, or null (diagnostic pushed)
+    const X = comp.get(e.comp);
+    if (e.port) { wantPort(e.comp, e.port, jid); return portsOf.get(e.comp)?.get(e.port) ?? null; }
+    try {
+      const g = geometryFrame(X, e.sel, e.opts, side);
+      for (const d of g.diags) diagnostics.push({ ...d, at: jid });
+      decisions.push({ at: `${jid}.${side}`, kind: 'port', chose: g.what, alternatives: [], reason: `joint end picked on ${e.comp}: ${g.rule}` });
+      return g.m;
+    } catch (err) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jid, message: `joint ${jid}: ${err.message}`, fix: err.fix }); return null; }
+  };
   for (const jn of o.joints) {
-    const [ca, pa] = String(jn.a).split(':'), [cb, pb] = String(jn.b).split(':');
-    if (!comp.get(ca) || !comp.get(cb)) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: unknown component ${!comp.get(ca) ? ca : cb}` }); continue; }
+    const ea = parseEnd(jn.a), eb = parseEnd(jn.b);
+    const bad = [ea, eb].find(e => e.error);
+    if (bad) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: ${bad.error}` }); continue; }
+    if (!comp.get(ea.comp) || !comp.get(eb.comp)) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: unknown component ${!comp.get(ea.comp) ? ea.comp : eb.comp}` }); continue; }
+    const asBuilt = jn.asBuilt ?? jn.opts?.asBuilt;
     const before = diagnostics.length;
-    wantPort(ca, pa, jn.id); wantPort(cb, pb, jn.id);
-    if (diagnostics.length > before) continue;
-    joints.push({ id: jn.id, kind: jn.kind, a: `${ca}:${pa}`, b: `${cb}:${pb}`, limits: limitsOf(jn), slideLimits: slideLimitsOf(jn), src: jn });
+    let pa = ea.port, pb = eb.port;
+    if (asBuilt) {
+      // as built (Fusion's As-Built Joint): one joint frame in the world, read where the components already sit
+      // (their `at`), so the joint holds at value 0 without moving them
+      const eo = asBuilt === true ? null : parseEnd(asBuilt);
+      if (eo?.error) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: asBuilt: ${eo.error}` }); continue; }
+      const src = eo ?? (ea.port || ea.sel ? ea : eb.port || eb.sel ? eb : null);
+      if (!src) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: an as-built joint needs a frame: a port or geometry on one end, or asBuilt: j.on(…)`, fix: `j.joint.${jn.kind}({ asBuilt: j.on('${ea.comp}', j.sel.faces(…)) })` }); continue; }
+      if (!comp.get(src.comp)) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: unknown component ${src.comp}` }); continue; }
+      const local = endFrame(src, src === eb ? 'b' : 'a', jn.id);
+      if (!local || diagnostics.length > before) continue;
+      const W = K.matMul(comp.get(src.comp).T0, local);
+      pa = `@${jn.id}`; pb = `@${jn.id}`;
+      setPort(ea.comp, pa, K.matMul(K.matInverse(comp.get(ea.comp).T0), W));
+      setPort(eb.comp, pb, K.matMul(K.matInverse(comp.get(eb.comp).T0), W));
+    } else {
+      for (const [e, side] of [[ea, 'a'], [eb, 'b']]) {
+        if (!e.port && !e.sel) { diagnostics.push({ level: 'error', kind: 'joint.unsolved', at: jn.id, message: `joint ${jn.id}: '${e.comp}' names a component without a port`, fix: `'${e.comp}:<port>', j.on('${e.comp}', selector), or an as-built joint: j.joint.${jn.kind}({ asBuilt: true })` }); continue; }
+        if (e.port) { wantPort(e.comp, e.port, jn.id); continue; }
+        const m = endFrame(e, side, jn.id); if (!m) continue;
+        const name = `@${jn.id}.${side}`; setPort(e.comp, name, m);
+        if (side === 'a') pa = name; else pb = name;
+      }
+      if (diagnostics.length > before) continue;
+    }
+    joints.push({ id: jn.id, kind: jn.kind, a: `${ea.comp}:${pa}`, b: `${eb.comp}:${pb}`, limits: limitsOf(jn), slideLimits: slideLimitsOf(jn), asBuilt: !!asBuilt, src: jn });
   }
   // every port of every component is readable by measures (resolved lazily; failures stay quiet here)
   for (const [cid, X] of comp) for (const pt of X.c.item.meta?.ports ?? []) wantPort(cid, pt.name, null);
@@ -172,7 +211,7 @@ export function solveAssembly(asm, opts, compilePart) {
     return null;
   };
   const drives = new Map(), seeds = new Map(), why = new Map();
-  for (const j of joints) { const d = driveOf(j.src); if (d) { drives.set(j.id, d.v); why.set(j.id, d.why); } else seeds.set(j.id, j.limits ? j.limits[0] : 0); }
+  for (const j of joints) { const d = driveOf(j.src); if (d) { drives.set(j.id, d.v); why.set(j.id, d.why); } else seeds.set(j.id, j.asBuilt ? (j.limits ? Math.min(j.limits[1], Math.max(j.limits[0], 0)) : 0) : j.limits ? j.limits[0] : 0); }
   // a drive past a joint's limit is held at the limit (as Fusion holds a joint at its motion limit)
   const shownV = (j, v) => (j.kind === 'slider' ? `${+v.toFixed(3)} mm` : `${+(v * 180 / Math.PI).toFixed(3)}°`);
   for (const j of joints) {
@@ -283,7 +322,7 @@ export function solveAssembly(asm, opts, compilePart) {
     return out;
   };
   const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
-  const mech = { couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
+  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
     ports: S.portFrames(), origins: Object.fromEntries(S.bodies.map((b) => [b.id, b.t.slice()])), ground: S.bodies.filter((b) => b.ground).map((b) => b.id) };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
@@ -509,7 +548,7 @@ function pairOverlap(A, B, TA, TB) {
 const limitsOf = jn => jn.limits?.map(x => typeof x === 'number' ? (jn.kind === 'slider' ? x : x * Math.PI / 180) : num(x));
 const slideLimitsOf = jn => jn.slideLimits?.map(x => typeof x === 'number' ? x : num(x)) ?? null;
 // a joint end as text: 'comp:port', or a selector or frame on a component
-const refText = r => (typeof r === 'string' ? r : r?.root?.type === 'on' ? `j.on('${r.root.comp}', …)` : String(r));
+const refText = r => (typeof r === 'string' ? r : r?.root?.type === 'on' ? String(r) : isDeferred(r) && r.args?.[0]?.root?.type === 'on' ? `j.frame.on(${String(r.args[0])})` : String(r));
 
 // the component pairs of the contact sets, each pair once
 function contactPairs(sets, ids) {
@@ -519,4 +558,68 @@ function contactPairs(sets, ids) {
     for (let i = 0; i < list.length; i++) for (let k = i + 1; k < list.length; k++) { const key = [list[i], list[k]].sort().join('|'); if (!seen.has(key)) { seen.add(key); out.push([list[i], list[k]]); } }
   }
   return out;
+}
+
+// a joint end: 'comp:port' | 'comp' (as-built) | j.on(comp, sel) | j.frame.on(j.on(comp, sel), { flip, at, offset })
+function parseEnd(ref) {
+  if (typeof ref === 'string') { const i = ref.indexOf(':'); return i < 0 ? { comp: ref, port: null } : { comp: ref.slice(0, i), port: ref.slice(i + 1) }; }
+  if (ref?.root?.type === 'on') return { comp: ref.root.comp, sel: ref.root.sel, opts: {} };
+  if (isDeferred(ref) && ref.type === 'frame' && ref.op === 'on' && ref.args[0]?.root?.type === 'on') {
+    const o = { ...(ref.args[1] ?? {}) };
+    o.flip = ref.chain.filter(c => c[0] === 'flip').length % 2 === 1;
+    const off = ref.chain.filter(c => c[0] === 'offset').reduce((a, c) => a + num(c[1]), 0) + (o.offset != null ? num(o.offset) : 0);
+    o.offset = off;
+    return { comp: ref.args[0].root.comp, sel: ref.args[0].root.sel, opts: o };
+  }
+  return { error: `a joint end is 'component:port', j.on(component, selector) or j.frame.on(j.on(…), { flip, at, offset }); got ${String(ref)}` };
+}
+// Ports from geometry (Fusion's joint origins): the frame a picked face, edge or vertex gives, in the component's
+// own frame. A cylinder (a bore, a pin) gives its axis, the origin mid-way along it (at: 'start' | 'end' for its
+// ends); a circular edge its centre and axis; a straight edge its middle and direction; a planar face its centre and
+// normal — outward on the joint's a end, inward on its b end, so two picked faces meet face to face; a vertex its
+// point. An axis has no sign of its own, so it points along +Z, else +Y, else +X; x follows the frame rule
+// (horizontal where it can be). { flip: true } turns the frame half a turn about x; { offset } moves it along z.
+function geometryFrame(X, sel, o = {}, side = 'a') {
+  const r = selectInPart(X.res, sel);
+  const diags = (r.diags ?? []).map(d => ({ ...d }));
+  if (!r.items.length) throw Object.assign(new Error(`${sel} picks nothing on ${X.c.id}`), { fix: 'check the selector with prog.why(…)' });
+  const c = r.items[0], V = K.V;
+  const canon = d => { const u = V.unit(d); const k = Math.abs(u[2]) > 1e-9 ? u[2] : Math.abs(u[1]) > 1e-9 ? u[1] : u[0]; return k < 0 ? V.neg(u) : u; };
+  const along = (A, d, pts) => { const ts = pts.map(p => V.dot(V.sub(p, A), d)); return [Math.min(...ts), Math.max(...ts)]; };
+  let origin, z, what, rule;
+  if (r.kind === 'faces') {
+    const fi = c.body.faceInfo(c.index);
+    if (fi.kind === 'plane') {
+      origin = fi.center; z = side === 'b' ? V.neg(fi.normal) : fi.normal;
+      what = `planar face ${c.name}`; rule = `its centre, the ${side === 'b' ? 'inward' : 'outward'} normal (the ${side} end)`;
+    } else if (fi.axis && (fi.kind === 'cylinder' || fi.kind === 'cone')) {
+      const A = fi.axis.origin; z = canon(fi.axis.dir);
+      // every face picked on the same axis counts (a cylinder split at its seam is two faces)
+      const same = r.items.filter(q => { const f = q.body.faceInfo(q.index); return f.axis && Math.abs(Math.abs(V.dot(V.unit(f.axis.dir), z)) - 1) < 1e-9 && V.len(V.cross(V.sub(f.axis.origin, A), z)) < 1e-6; });
+      const pts = [];
+      for (const q of same) q.body.edgeFaces.forEach((fs, e) => { if (fs.includes(q.index)) { const ei = q.body.edgeInfo(e); pts.push(ei.a, ei.b, ei.mid); } });
+      const [t0, t1] = pts.length ? along(A, z, pts) : [0, 0];
+      const t = o.at === 'start' ? t0 : o.at === 'end' ? t1 : (t0 + t1) / 2;
+      origin = V.add(A, V.mul(z, t));
+      what = `${fi.kind} ${c.name}${same.length > 1 ? ` (+${same.length - 1} on its axis)` : ''}, r ${+fi.axis.radius.toFixed(4)} mm`;
+      rule = `its axis, at the ${o.at === 'start' ? 'start' : o.at === 'end' ? 'end' : 'middle'} of its length (${+(t1 - t0).toFixed(3)} mm)`;
+      if (r.items.length > same.length) diags.push({ level: 'warning', kind: 'joint.ambiguous', message: `${sel} picks ${r.items.length} faces on ${X.c.id}; the first one's axis is used`, fix: 'pick one face' });
+    } else if (fi.kind === 'sphere' && fi.axis) {
+      origin = fi.axis.origin; z = [0, 0, 1]; what = `sphere ${c.name}`; rule = 'its centre';
+    } else throw Object.assign(new Error(`${c.name} on ${X.c.id} is ${fi.kind}: a joint end needs a planar face, a cylinder, a cone, a sphere, an edge or a vertex`), { fix: 'pick a planar face, a bore or a circular edge' });
+  } else if (r.kind === 'edges') {
+    const ei = c.body.edgeInfo(c.index);
+    if (ei.axis) { origin = ei.axis.origin; z = canon(ei.axis.dir); what = `circular edge ${c.name}, r ${+ei.axis.radius.toFixed(4)} mm`; rule = 'its centre and axis'; }
+    else if (ei.dir) { z = canon(ei.dir); const [p, q] = V.dot(V.sub(ei.b, ei.a), z) >= 0 ? [ei.a, ei.b] : [ei.b, ei.a]; origin = o.at === 'start' ? p : o.at === 'end' ? q : ei.mid; what = `straight edge ${c.name}`; rule = `its ${o.at === 'start' ? 'start' : o.at === 'end' ? 'end' : 'middle'}, along it`; }
+    else throw Object.assign(new Error(`${c.name} on ${X.c.id} is a ${ei.kind} edge: a joint end needs a straight or circular edge`), { fix: 'pick a straight or circular edge' });
+    if (r.items.length > 1) diags.push({ level: 'warning', kind: 'joint.ambiguous', message: `${sel} picks ${r.items.length} edges on ${X.c.id}; the first is used`, fix: 'pick one edge' });
+  } else if (r.kind === 'vertices') {
+    origin = c.body.vertexPoint(c.index); z = [0, 0, 1]; what = `vertex ${c.name}`; rule = 'its point';
+  } else throw new Error(`${sel} picks ${r.kind} on ${X.c.id}: a joint end needs a face, an edge or a vertex`);
+  if (o.flip) z = V.neg(z);
+  const f = orthoFrame(origin, null, z);
+  let fr = f;
+  if (o.flip) { const g = orthoFrame(origin, null, V.neg(z)); fr = { origin: f.origin, x: g.x, y: V.neg(g.y), z: f.z }; }   // half a turn about x
+  if (o.offset) fr = { ...fr, origin: V.add(fr.origin, V.mul(fr.z, o.offset)) };
+  return { m: K.frameMatrix(fr), what, rule: rule + (o.flip ? ', flipped' : '') + (o.offset ? `, ${o.offset} mm along z` : ''), diags };
 }
