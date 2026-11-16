@@ -1027,6 +1027,38 @@ return j.assembly('as built')
   return `bores at ${M.bore.map(v => +v.toFixed(3))}; lid top z ${m.assembly.measures.lidTop[2]}; as built tip ${a.assembly.measures.tip}`;
 });
 
+await test('55 assembly: subassemblies (flexible and rigid), a nested bill of materials, STEP with its product structure', async () => {
+  const p = await compile('55-subassemblies.js');
+  assert(errs(p).length === 0 && !p.diagnostics.some(d => d.level === 'warning'), JSON.stringify(p.diagnostics.filter(d => d.level !== 'info')));
+  const A = p.assembly, J = id => A.joints.find(j => j.id === id)?.value;
+  assert(A.components.map(c => c.id).join() === 'frame,arm,drive/base,drive/wheel,bracket/p1,bracket/p2' && A.components.find(c => c.id === 'drive/wheel').sub === 'drive', 'components under their subassembly');
+  // flexible: its joint is the parent's, coupled 2:1 to the parent's arm; its root stays where its `at` puts it
+  assert(near(J('drive/spin'), 60, 1e-9, 1e-7) && A.subassemblies.find(s => s.id === 'drive').fixed && !A.joints.some(j => /rigid/.test(j.id)), `spin ${J('drive/spin')}`);
+  const mk = A.measures.mark;
+  assert(Math.hypot(mk[0] - (40 + 10 * Math.cos(Math.PI / 3)), mk[1] - 10 * Math.sin(Math.PI / 3), mk[2] - 6) < 1e-9 && near(A.reports.find(r => r.name === 'drive/markNow').value, 10 * Math.sin(Math.PI / 3)), `mark ${mk}`);
+  // rigid: solved on its own (tilt 20°), its study and report under its id, moved as one body by the parent's swing
+  assert(near(A.reports.find(r => r.name === 'bracket/drop').value, 20, 1e-6) && A.studies['bracket/fold']?.rows.length === 10, 'the bracket study');
+  const q = await compile('55-subassemblies.js', { options: { override: { swing: '90 deg', 'bracket/tilt': '45 deg' } } });
+  const p2 = q.assembly.measures.p2, s = Math.SQRT1_2 * 10;
+  assert(Math.hypot(p2[0], p2[1] - (20 + 10 + s), p2[2] - (2 + 3 - s)) < 1e-9, `p2 after a swing of 90° and a tilt of 45°: ${p2}`);
+  // without the parent's swing joint, the rigid bracket stays where it is placed
+  const free = await compile(script('55-subassemblies.js').replace("  .joint('swing', j.joint.revolute(), 'frame:pivot', 'bracket/p1:pivot')\n", '').replace(".drive('swing', deg(0))", ''));
+  assert(errs(free).length === 0 && free.assembly.subassemblies.find(x => x.id === 'bracket').fixed, 'a rigid subassembly no joint holds is fixed');
+  // the bill of materials nests; flat lists the six parts
+  await compile('55-subassemblies.js');
+  const flat = await call('bom', { group: 'flat' });
+  assert(flat.length === 6 && flat.every(r => r.kind === 'printed') && flat[5].id === 'bracket/p2', `flat bom ${flat.map(r => r.id)}`);
+  assert(A.bom.length === 4 && A.bom[2].kind === 'assembly' && A.bom[2].children.length === 2 && A.bom[3].flexible === false, 'nested bom');
+  // STEP: an assembly tree (one product per part and per subassembly, components placed), the same solids
+  await compile('55-subassemblies.js', { options: { override: { swing: '90 deg' } } });
+  const ex = await exp('step', {});
+  const prods = (ex.data.match(/PRODUCT\('([^']*)'/g) || []).map(x => x.slice(9, -1));
+  const nauo = (ex.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length;
+  assert(['machine', 'wheel drive', 'bracket', 'frame', 'p2'].every(n => prods.includes(n)) && prods.length === 9 && nauo === 8 && !/DOCUMENT/.test(ex.data), `products ${prods}, ${nauo} usages`);
+  assert(/product structure: 8 components, 2 subassemblies/.test(ex.report.kept.join()), ex.report.kept.join('; '));
+  return `spin ${J('drive/spin').toFixed(1)}°, bracket drop ${A.reports.find(r => r.name === 'bracket/drop').value.toFixed(3)} mm; STEP ${prods.length} products, ${nauo} usages`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

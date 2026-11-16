@@ -47,6 +47,15 @@ export function MechanismView({ host }) {
             {asmDiags.map((d, i) => <p key={i} class={d.level === 'error' ? 'fail' : 'dim'}><b>{d.kind}</b> {d.message}{d.fix ? <> · <i>{d.fix}</i></> : null}</p>)}
           </div>
         )}
+        {(A.subassemblies || []).length > 0 && (
+          <div class="block">
+            <header><h2>Subassemblies</h2><span class="sub">a rigid one is solved on its own and moves as one body; a flexible one's joints move in this solve</span></header>
+            <table class="rt"><tbody>{A.subassemblies.map((sa) => (
+              <tr key={sa.id}><td class="code-cell">{sa.id}</td><td>{sa.flexible ? 'flexible' : 'rigid'}</td>
+                <td class="dim">{(A.components || []).filter((c) => c.sub === sa.id).length} components · root {sa.root}{sa.fixed ? ' (fixed: no joint here holds it)' : ''}</td></tr>
+            ))}</tbody></table>
+          </div>
+        )}
         <div class="block">
           <header><h2>Joints</h2><span class="sub">{(A.joints || []).length} joints; a value set here drives its joint (an override named by the joint's id)</span></header>
           <table class="rt">
