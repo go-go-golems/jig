@@ -944,6 +944,51 @@ await test('51 mechanism: a closure with a port turned half a turn is a conflict
   return `${c.message.slice(0, 60)}…; study rows ${rows.map(r => r.ok).join('/')}`;
 });
 
+await test('52 mechanism: a pin-slot joint (a Scotch yoke: the yoke moves r·cos θ, the pin slides r·sin θ in its slot)', async () => {
+  const p = await compile('52-pin-slot.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, pin = A.joints.find(j => j.id === 'pin'), guide = A.joints.find(j => j.id === 'guide');
+  assert(pin.kind === 'pinSlot' && pin.equations === 4 && A.mobility.dof === 1 && A.mobility.left === 0, `pin ${pin.kind} ${pin.equations}, mobility ${JSON.stringify(A.mobility)}`);
+  assert(near(guide.value, 12 * Math.cos(Math.PI / 6), 1e-9, 1e-9) && near(pin.slide, 6, 1e-9, 1e-9) && near(pin.value, -60, 1e-9, 1e-7), `guide ${guide.value}, slide ${pin.slide}, angle ${pin.value}`);
+  const worst = Math.max(...A.studies.turn.rows.map(r => Math.abs(r.yokeX - 12 * Math.cos(r.q))));
+  assert(near(A.reports[0].value, 24, 1e-9, 1e-9) && worst < 1e-8, `stroke ${A.reports[0].value}, worst ${worst}`);
+  const k = await call('kine', {});
+  assert(/'jig\.table'/.test(k.source), `kine: ${k.notes}`);
+  // a measure named like a study column is refused
+  const q = await compile(script('52-pin-slot.js').replace("measure('yokeX'", "measure('x'"));
+  assert(q.diagnostics.some(d => d.kind === 'asm.measure' && /cannot be called 'x'/.test(d.message)), 'reserved measure name');
+  return `stroke ${A.reports[0].value.toFixed(6)} mm, slide ${pin.slide.toFixed(3)} mm at 30°, closed form within ${worst.toExponential(1)}`;
+});
+
+await test('53 mechanism: joint limits hold drives, studies and drags; a contact set stops a drag', async () => {
+  const p = await compile('53-limits.js');
+  const held = p.diagnostics.find(d => d.kind === 'asm.limit' && d.at === 'h');
+  assert(held && /driven to 140°, past its limit 110°/.test(held.message) && near(p.assembly.joints[0].value, 110, 1e-9, 1e-9), `held: ${held?.message} ${p.assembly.joints[0].value}`);
+  const st = p.assembly.studies.open, lim = st.rows.filter(r => r.limit === 'h');
+  assert(lim.length === 7 && Math.round(lim[0].x) === 120 && st.rows.filter(r => r.ok).length === 12 && !st.gaps.length, `limited rows ${lim.map(r => r.x)}`);
+  assert(p.diagnostics.some(d => d.kind === 'asm.limit' && d.at === 'open' && /7 of 19 drive values put h past its limit/.test(d.message)), 'study diagnostic');
+  const a = await call('dragPose', { ref: 'lid:front', to: [0, 60, -10], reset: true });
+  assert(a.ok && a.overrides.h === '110 deg' && a.limits.includes('h.value'), `drag to the limit: ${JSON.stringify(a.overrides)} ${a.limits}`);
+  const b = await call('dragPose', { ref: 'lid:front', to: [0, -20, 0] });
+  assert(b.ok && b.overrides.h === '0 deg', `back to the lower limit: ${JSON.stringify(b.overrides)}`);
+  // a stop block in the lid's way, in a contact set with the lid: the drag stops before the limit
+  await compile(`const plate = (name, w, d) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', w, d, { center: true }).profiles(), mm(3), { id: 'body' })
+const box = plate('box', 60, 40).port('hinge', j.frame({ origin: j.pt(0, 20, 3), x: j.dir('+Y'), z: j.dir('-X') }))
+const lid = plate('lid', 60, 40).port('hinge', j.frame({ origin: j.pt(0, 20, 0), x: j.dir('+Y'), z: j.dir('-X') }))
+  .port('front', j.frame({ origin: j.pt(0, -20, 3), x: j.dir('+X'), z: j.dir('+Z') }))
+const stop = j.part('stop').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 10, 6, { center: true }).profiles(), mm(10), { id: 'body' })
+return j.assembly('box')
+  .add('box', box, { ground: true }).add('lid', lid).add('stop', stop, { at: j.tx.move(0, 30, 30) })
+  .joint('h', j.joint.revolute({ limits: [deg(0), deg(110)] }), 'box:hinge', 'lid:hinge')
+  .drive('h', deg(30))
+  .contact(['lid', 'stop'])
+`);
+  const c = await call('dragPose', { ref: 'lid:front', to: [0, 60, -10], reset: true });
+  const deg = parseFloat(c.overrides.h);
+  assert(c.ok && deg > 90 && deg < 100 && c.contacts.join() === 'lid–stop' && !c.limits.length, `contact: ${JSON.stringify(c.overrides)} ${c.contacts}`);
+  return `held at 110°, ${lim.length} study rows past it, drag stops at ${a.overrides.h}; contact at ${c.overrides.h}`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

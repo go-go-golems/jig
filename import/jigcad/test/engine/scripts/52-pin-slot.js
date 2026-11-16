@@ -1,0 +1,21 @@
+// A Scotch yoke: the crank's pin runs in a slot across the yoke (a pin-slot joint: it turns about the pin's axis
+// and slides along the slot), and the yoke slides on the frame, so it moves r·cos θ.
+const r = 12
+const bar = (name, l, w, t) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', l, w, { center: true }).profiles(), mm(t), { id: 'body' })
+const crank = bar('crank', 2 * r + 8, 8, 4)
+  .port('axis', j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') }))
+  .port('pin', j.frame({ origin: j.pt(r, 0, 4), x: j.dir('+X'), z: j.dir('+Z') }))
+const yoke = bar('yoke', 10, 3 * r, 4)
+  .port('guide', j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+Y'), z: j.dir('+X') }))
+  .port('slot', j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+Y'), z: j.dir('+Z') }))
+const frame = bar('frame', 80, 50, 2).port('main', j.frame({ origin: j.pt(0, 0, 2), x: j.dir('+X'), z: j.dir('+Z') }))
+  .port('guide', j.frame({ origin: j.pt(0, 0, 6), x: j.dir('+Y'), z: j.dir('+X') }))
+return j.assembly('scotch yoke')
+  .add('frame', frame, { ground: true }).add('crank', crank).add('yoke', yoke)
+  .joint('main', j.joint.revolute(), 'frame:main', 'crank:axis')
+  .joint('guide', j.joint.slider({ limits: [mm(-20), mm(20)] }), 'frame:guide', 'yoke:guide')
+  .joint('pin', j.joint.pinSlot({ slideLimits: [mm(-15), mm(15)] }), 'yoke:slot', 'crank:pin')
+  .drive('main', deg(30))
+  .measure('yokeX', m => m.joint('guide'))
+  .study('turn', { drive: 'main', from: deg(0), to: deg(360), steps: 72 })
+  .report('stroke', s => s.studies.turn.range('yokeX'), { unit: 'mm' })

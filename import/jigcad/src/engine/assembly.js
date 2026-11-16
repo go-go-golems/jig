@@ -12,8 +12,8 @@ import { toKine } from './kine.js';
 import { gearSpecOf, meshReport } from './gears.js';
 
 const V = K.V;
-const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, planar: 3, ball: 3, snap: 0 };
-const GROUP = { rigid: '{e}', revolute: 'SO(2)', slider: 'ℝ', cylindrical: 'SO(2)×ℝ', planar: 'SE(2)', ball: 'SO(3)', snap: '{e} once engaged' };
+const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, pinSlot: 2, planar: 3, ball: 3, snap: 0 };
+const GROUP = { rigid: '{e}', revolute: 'SO(2)', slider: 'ℝ', cylindrical: 'SO(2)×ℝ', pinSlot: 'SO(2)×ℝ (slide ⟂ axis)', planar: 'SE(2)', ball: 'SO(3)', snap: '{e} once engaged' };
 export const joint = Object.fromEntries(Object.keys(DOF).map(k => [k, (o = {}) => Object.freeze({ kind: k, group: GROUP[k], dof: DOF[k], ...o })]));
 joint.prismatic = joint.slider; joint.fixed = joint.rigid;   // the assembly spec's names (spec v0.1)
 // couplings between gear components (README §4.10): the joints that turn them are found, and the ratio and its
@@ -61,6 +61,8 @@ class Assembly {
   // interference(ids?, { study?, pairs?, every?, within?, clearance?, volume?, exact? }): with a study, every
   // sampled pose of it is checked; overlaps report the shared volume V(a ∩ b) = V(a) + V(b) − V(a ∪ b)
   interference(ids, o = {}) { return this._w({ interference: Array.isArray(ids) ? { ...o, ids } : { ...(ids ?? {}) } }); }
+  // contact sets (Fusion's term): a drag stops where two of these components would touch; no ids: every component
+  contact(ids) { return this._w({ contacts: [...(this.o.contacts ?? []), { ids: Array.isArray(ids) ? ids : null }] }); }
   use(...fns) { let a = this; for (const f of fns.flat()) a = typeof f === 'function' ? f(a) ?? a : a; return a; }
   with(fn) { return fn(this) ?? this; }
   get components() { return this.o.components.map(c => ({ id: c.id })); }
@@ -79,9 +81,10 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
   if (mech?.mobility) { mob.solverDOF = mech.mobility.dof; mob.note = mech.mobility.redundant ? `${mech.mobility.redundant} joint equation(s) repeat the others: ${mech.mobility.redundantJoints.join(', ')} must stay exactly aligned in the real parts` : 'no joint equation repeats another'; }
   const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
   const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId })),
-    joints: o.joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b, limits: j.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value), equations: equationCount(j.kind),
+    joints: o.joints.map(j => ({ id: j.id, kind: j.kind, a: refText(j.a), b: refText(j.b), limits: limitsOf(j), slideLimits: slideLimitsOf(j), equations: equationCount(j.kind),
+      slide: values.get(j.id)?.slide ?? null,
       value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false,
-      at: values.get(j.id)?.at ?? null, atB: values.get(j.id)?.atB ?? null, axis: values.get(j.id)?.axis ?? null })),
+      at: values.get(j.id)?.at ?? null, atB: values.get(j.id)?.atB ?? null, axis: values.get(j.id)?.axis ?? null, slideAxis: values.get(j.id)?.slideAxis ?? null })),
     ports: mech?.ports ?? [], origins: mech?.origins ?? {}, fixed: mech?.ground ?? [],
     mobility: mob, assembled: mech?.assembled ?? true, conflicts: mech?.conflicts ?? [], residual: mech?.residual ?? 0,
     drives: mech?.drives ?? {}, couples: mech?.couples ?? [],
@@ -102,10 +105,19 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
     const home = S.pose;
     if (dragged && !reset) S.pose = dragged;
     try {
-      const ok = S.drag(ref, to);
+      // contact sets: a step that makes a new pair touch is not taken (pairs already touching may move apart)
+      const order = [...comp.keys()], pairs = contactPairs(asm.o.contacts, order);
+      let blocked = null, stoppedBy = null;
+      if (pairs.length) {
+        const touching = () => { const T = S.transforms(); return pairs.filter(([a, b]) => pairGap(comp.get(a), comp.get(b), T[order.indexOf(a)], T[order.indexOf(b)], 0.05, false) < 1e-6).map(p => p.join('–')); };
+        const before = new Set(touching());
+        blocked = () => { const now = touching().filter(k => !before.has(k)); if (now.length) stoppedBy = now; return now.length > 0; };
+      }
+      const ok = S.drag(ref, to, { blocked });
       const T = S.transforms(), ids = [...comp.keys()];
       const out = { ok, transforms: Object.fromEntries(ids.map((id, i) => [id, T[i]])), ports: S.portFrames(), joints: S.jointValues(),
-        overrides: Object.fromEntries(S.holds().map(h => [h.id, `${+h.shown.toFixed(4)} ${h.unit}`])), at: S.world(S.port(ref)).P };
+        overrides: Object.fromEntries(S.holds().map(h => [h.id, `${+h.shown.toFixed(4)} ${h.unit}`])), at: S.world(S.port(ref)).P,
+        limits: S.limited ?? [], contacts: stoppedBy ?? [] };
       if (ok) dragged = S.pose;
       return out;
     } finally { S.pose = home; }
@@ -134,7 +146,6 @@ export function solveAssembly(asm, opts, compilePart) {
   // the joints, solved together (mechanism.js). A joint whose value is given (a param or override named by its id,
   // the print pose, or .drive) is driven; any other starts at its first limit, or 0, and is free.
   const rad = v => num(v);
-  const limitsOf = jn => jn.limits?.map(x => typeof x === 'number' ? x * Math.PI / 180 : x.value);
   const portsOf = new Map();                       // component id → { port name → 4×4 }
   const wantPort = (cid, pname, at) => {
     const X = comp.get(cid); if (!X || !pname) return;
@@ -148,7 +159,7 @@ export function solveAssembly(asm, opts, compilePart) {
     const before = diagnostics.length;
     wantPort(ca, pa, jn.id); wantPort(cb, pb, jn.id);
     if (diagnostics.length > before) continue;
-    joints.push({ id: jn.id, kind: jn.kind, a: `${ca}:${pa}`, b: `${cb}:${pb}`, limits: limitsOf(jn), src: jn });
+    joints.push({ id: jn.id, kind: jn.kind, a: `${ca}:${pa}`, b: `${cb}:${pb}`, limits: limitsOf(jn), slideLimits: slideLimitsOf(jn), src: jn });
   }
   // every port of every component is readable by measures (resolved lazily; failures stay quiet here)
   for (const [cid, X] of comp) for (const pt of X.c.item.meta?.ports ?? []) wantPort(cid, pt.name, null);
@@ -162,6 +173,13 @@ export function solveAssembly(asm, opts, compilePart) {
   };
   const drives = new Map(), seeds = new Map(), why = new Map();
   for (const j of joints) { const d = driveOf(j.src); if (d) { drives.set(j.id, d.v); why.set(j.id, d.why); } else seeds.set(j.id, j.limits ? j.limits[0] : 0); }
+  // a drive past a joint's limit is held at the limit (as Fusion holds a joint at its motion limit)
+  const shownV = (j, v) => (j.kind === 'slider' ? `${+v.toFixed(3)} mm` : `${+(v * 180 / Math.PI).toFixed(3)}°`);
+  for (const j of joints) {
+    const d = drives.get(j.id); if (d == null || !j.limits) continue;
+    const [lo, hi] = j.limits, c = Math.min(hi, Math.max(lo, d));
+    if (Math.abs(c - d) > 1e-9) { drives.set(j.id, c); diagnostics.push({ level: 'warning', kind: 'asm.limit', at: j.id, message: `${j.id} is driven to ${shownV(j, d)}, past its limit ${shownV(j, c)}: held at the limit`, fix: 'drive it inside its limits, or widen them' }); }
+  }
   for (const c of o.couples ?? []) if (c.unsupported) diagnostics.push({ level: 'error', kind: 'asm.couple', at: c.at ? `line ${c.at}` : 'couple', message: 'couple takes (id, jointA, jointB, { ratio, offset }) or a coupling between gears: j.couple.gear(a, b), j.couple.rack(rack, pinion), j.couple.belt(a, b)' });
   const S = new MechanismSolver({
     bodies: [...comp].map(([id, x]) => ({ id, ground: id === groundId || (x.c.opts.at != null && !jointed.has(id)), T0: x.T0, ports: Object.fromEntries(portsOf.get(id) ?? []) })),
@@ -195,10 +213,18 @@ export function solveAssembly(asm, opts, compilePart) {
   } else {
     if (mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.redundant', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation${mobility.redundant > 1 ? 's repeat' : ' repeats'} the others (Kutzbach ${mobility.kutzbach}, rank says ${mobility.dof})`, fix: mobility.redundantJoints.length ? `${mobility.redundantJoints.join(', ')}: their axes must stay exactly aligned in the real parts` : undefined });
     if (mobility.left > 0 && mobility.drives > 0) diagnostics.push({ level: 'warning', kind: 'asm.underconstrained', at: 'joints', message: `${mobility.left} free motion${mobility.left > 1 ? 's' : ''} left after the drives`, fix: 'drive or couple another joint' });
+    // the pose closes but puts a joint past its limit (a loop joint, or a start value the hints chose)
+    for (const v of S.limitViolations()) {
+      const show = x => (v.part === 'slide' || v.jn.kind === 'slider' ? `${+x.toFixed(3)} mm` : `${+(x * 180 / Math.PI).toFixed(2)}°`);
+      diagnostics.push({ level: 'warning', kind: 'asm.limit', at: v.id, message: `${v.id}${v.part === 'slide' ? ' slides' : ' sits'} at ${show(v.value)}, past its limit ${show(v.bound)}`, fix: 'move the drive, hint the joint inside its limits, or widen them' });
+    }
   }
   trace.push({ pass: 'mechanism', level: 'L5', ms: performance.now() - ts, cached: false, note: `${joints.length} joints, ${S.n} coordinates, rank ${mobility.rank}, mobility ${mobility.dof}${mobility.drives ? `, ${mobility.drives} drive(s)` : ''}; residual ${residual.toExponential(1)}, ${S.how}` });
   // readings, studies and reports (not for a print job's pose)
-  const measures = o.measures ?? [], studies = {};
+  // a study row keeps its own x (drive value), q, ok, move and limit: a measure by one of those names would overwrite it
+  const RESERVED = new Set(['x', 'q', 'ok', 'move', 'limit']);
+  for (const m of o.measures ?? []) if (RESERVED.has(m.name)) diagnostics.push({ level: 'error', kind: 'asm.measure', at: m.name, message: `a measure cannot be called '${m.name}': study rows use that name`, fix: `rename it, e.g. '${m.name}1'` });
+  const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {};
   let measured = {}, reports = [];
   if (assembled && !opts.forPrint) {
     measured = S.read(measures);
@@ -222,6 +248,7 @@ export function solveAssembly(asm, opts, compilePart) {
         trace.push({ pass: `interference:${st.name}`, level: 'L5', ms: performance.now() - tc, cached: false, note: `${c.pairs.length} pair(s) over ${c.samples} poses; ${c.booleans} overlap volume(s)` });
       }
       if (res.error) diagnostics.push({ level: 'error', kind: 'asm.study', at: st.name, message: res.error });
+      if (res.limited?.length) { const ids = [...new Set(res.limited.flatMap(l => l.ids.split(', ')))]; diagnostics.push({ level: 'warning', kind: 'asm.limit', at: st.name, message: `${res.limited.length} of ${res.rows.length} drive values put ${ids.join(', ')} past ${ids.length > 1 ? 'their limits' : 'its limit'} (${+res.limited[0].at.toFixed(1)}…${+res.limited[res.limited.length - 1].at.toFixed(1)} ${res.unit})`, fix: 'keep the study inside the limits, or widen them' }); }
       if (res.gaps?.length) diagnostics.push({ level: 'warning', kind: 'asm.unreachable', at: st.name, message: `${res.gaps.length} of ${res.rows.length} drive values cannot be reached (${+res.gaps[0].toFixed(1)}…${+res.gaps[res.gaps.length - 1].toFixed(1)} ${res.unit})`, fix: 'the loop cannot close there: change a length, or drive another joint' });
       if (res.jump != null) diagnostics.push({ level: 'warning', kind: 'asm.branchJump', at: st.name, message: `a component jumped at ${res.jump.toFixed(1)}${res.unit}: the solution changed branch`, fix: 'use more steps, or a hint that starts on the other branch' });
       trace.push({ pass: `study:${st.name}`, level: 'L5', ms: performance.now() - tq, cached: false, note: `${res.rows.length} poses, ${res.events.length} event(s)` });
@@ -476,4 +503,20 @@ function pairOverlap(A, B, TA, TB) {
     try { v += K.commonVolume(sa, sb); } finally { sa.delete(); sb.delete(); }
   }
   return v;
+}
+
+// limits: numbers are degrees for an angle and millimetres for a slide; quantities carry their own unit
+const limitsOf = jn => jn.limits?.map(x => typeof x === 'number' ? (jn.kind === 'slider' ? x : x * Math.PI / 180) : num(x));
+const slideLimitsOf = jn => jn.slideLimits?.map(x => typeof x === 'number' ? x : num(x)) ?? null;
+// a joint end as text: 'comp:port', or a selector or frame on a component
+const refText = r => (typeof r === 'string' ? r : r?.root?.type === 'on' ? `j.on('${r.root.comp}', …)` : String(r));
+
+// the component pairs of the contact sets, each pair once
+function contactPairs(sets, ids) {
+  const seen = new Set(), out = [];
+  for (const c of sets ?? []) {
+    const list = (c.ids ?? ids).filter(id => ids.includes(id));
+    for (let i = 0; i < list.length; i++) for (let k = i + 1; k < list.length; k++) { const key = [list[i], list[k]].sort().join('|'); if (!seen.has(key)) { seen.add(key); out.push([list[i], list[k]]); } }
+  }
+  return out;
 }

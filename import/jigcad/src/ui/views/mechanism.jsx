@@ -59,7 +59,7 @@ export function MechanismView({ host }) {
                   <td>{j.kind}</td>
                   <td class="dim">{j.a} → {j.b}</td>
                   <td class="num">{j.equations}</td>
-                  <td class="num">{has ? `${fmt(j.value, angular ? 2 : 3)} ${j.unit}` : '—'}{j.driven ? <span class="dim"> driven</span> : null}</td>
+                  <td class="num">{has ? `${fmt(j.value, angular ? 2 : 3)} ${j.unit}` : '—'}{j.slide != null ? <span class="dim">{` · slide ${fmt(j.slide, 3)} mm`}</span> : null}{j.driven ? <span class="dim"> driven</span> : null}{j.limits ? <span class="dim" title="limits">{` [${j.limits.map((x) => fmt(angular ? x * 180 / Math.PI : x, 1)).join(', ')}]`}</span> : null}</td>
                   <td>{has ? <input type="range" min={lo} max={hi} step={angular ? 1 : 0.5} value={j.value} aria-label={`Value of ${j.id}`} onInput={(e) => setJoint(j, +e.currentTarget.value)} /> : null}</td>
                   <td><button class="tabact" disabled={!over} title="back to the code's value" aria-label={`Reset ${j.id}`} onClick={() => setJoint(j, null)}>{over ? '↺' : ''}</button></td>
                 </tr>
@@ -119,7 +119,7 @@ function StudyBlock({ st, A, host }) {
   };
   return (
     <div class="block">
-      <header><h2>Study {st.name}</h2><span class="sub">{st.drive} from {fmt(st.from, 1)} to {fmt(st.to, 1)}{st.unit}, {st.rows.length} poses{st.gaps?.length ? `, ${st.gaps.length} unreachable` : ''}{st.events?.length ? `, ${st.events.length} event(s)` : ''}</span></header>
+      <header><h2>Study {st.name}</h2><span class="sub">{st.drive} from {fmt(st.from, 1)} to {fmt(st.to, 1)}{st.unit}, {st.rows.length} poses{st.gaps?.length ? `, ${st.gaps.length} unreachable` : ''}{st.limited?.length ? `, ${st.limited.length} past a limit` : ''}{st.events?.length ? `, ${st.events.length} event(s)` : ''}</span></header>
       {keys.map((k) => {
         const ok = st.rows.filter((r) => r.ok && typeof r[k] === 'number');
         let lo = Math.min(...ok.map((r) => r[k])), hi = Math.max(...ok.map((r) => r[k]));
@@ -139,6 +139,7 @@ function StudyBlock({ st, A, host }) {
           <svg key={k} class="studyplot" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${k} against ${st.drive}`} onClick={go}>
             <rect x={x0} y={12} width={x1 - x0} height={H - 28} fill="none" stroke="var(--rule, #ccc)" />
             {(st.gaps || []).map((g, i) => <rect key={i} x={X(g) - (x1 - x0) / st.rows.length / 2} y={12} width={(x1 - x0) / st.rows.length} height={H - 28} fill="var(--accent)" opacity="0.12" />)}
+            {(st.limited || []).map((l, i) => <rect key={`l${i}`} x={X(l.at) - (x1 - x0) / st.rows.length / 2} y={12} width={(x1 - x0) / st.rows.length} height={H - 28} fill="var(--ink-2, #666)" opacity="0.10"><title>{`${l.ids} past its limit at ${fmt(l.at, 1)}${st.unit}`}</title></rect>)}
             {(pair?.overlaps || []).map(([a, b], i) => <rect key={`o${i}`} x={Math.max(x0, X(a) - step / 2)} y={12} width={Math.min(x1, X(b) + step / 2) - Math.max(x0, X(a) - step / 2)} height={H - 28} fill="var(--accent)" opacity="0.16"><title>{`${pair.a} and ${pair.b} overlap from ${fmt(a, 1)} to ${fmt(b, 1)}${st.unit}`}</title></rect>)}
             {(st.events || []).map((ev, i) => <line key={i} x1={X(ev.at)} x2={X(ev.at)} y1={12} y2={H - 16} stroke="var(--accent)" stroke-width="1"><title>{`${ev.name} ${ev.rising ? '↑' : '↓'} at ${fmt(ev.at, 3)}${st.unit}`}</title></line>)}
             <path d={path} fill="none" stroke="var(--ink)" stroke-width="1.4" />
