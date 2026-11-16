@@ -325,13 +325,17 @@ The orientation decision reads like `lexicographic: support 0 mm³ → bed conta
 - `.joint(id, kind, 'a:port', 'b:port')` ✓ (joint ends must be ports): join two ports. Example: `.joint('h', j.joint.revolute(), 'base:hinge', 'lid:hinge')`.
 - `.printInPlace(ids, { clearance, pose })` ✓: one print with fit-class gaps, in a pose. Example: `.printInPlace(['base', 'lid'], { pose: { h: deg(180) } })`.
 - `.ground .interference .sweep .explode .params .configs .override .use .with` ✓: more assembly settings. Example: `.ground('base')`.
-- `j.joint.rigid revolute slider cylindrical planar ball snap` ✓: joints with DOF 0, 1, 1, 2, 3, 3, 0. Example: `j.joint.revolute({ limits: [deg(0), deg(180)] })`.
+- `j.joint.rigid revolute slider cylindrical pinSlot planar ball snap` ✓: joints with DOF 0, 1, 1, 2, 2, 3, 3, 0; limits hold (drives, studies, drags). Example: `j.joint.revolute({ limits: [deg(0), deg(180)] })`.
 - `.drive(jointId, value) .hint(jointId, value)` ✓: a drive fixes a joint's value (one equation); a hint only seeds the start pose, so it picks a loop's branch. Example: `.drive('main', deg(30)).hint('pin', deg(180))`.
 - `.couple(id, jointA, jointB, { ratio, offset })` ✓: value(B) = ratio · value(A) + offset, on turned values. Example: `.couple('hook', 'main', 'hookShaft', { ratio: 2 })`.
 - `j.couple.gear(a, b) .rack(rack, pinion) .belt(a, b, { ratio })` ✓: a coupling between gear components; the ratio comes from the teeth and its sign from the axes; checked against the gears' mesh. Example: `.couple(j.couple.gear('pinion', 'wheel'))`.
 - `.measure(name, m => …) .event(name, row => bool) .study(name, { drive, from, to, steps }) .report(name, s => …, { unit })` ✓: readings of the pose, crossings, a sweep by continuation, numbers from studies. Example: `.measure('z', m => m.point('slider:wrist')[2]).study('cycle', { drive: 'main' })`.
 - `.interference(ids, { study })` ✓: with a study, the gap at every pose and the overlap volume where parts collide. Example: `.interference(['rod', 'frame'], { study: 'cycle' })`.
-- nested assemblies ✗.
+- `.add(id, assembly, { at, flexible })` ✓: a subassembly; its components are `'<id>/<comp>'`; rigid by default (solved on its own, moved as one body), `flexible: true` brings its joints into this solve. Example: `.add('hook', hookDrive, { at: j.tx.move(40, 0, 0), flexible: true })`.
+- `j.on(comp, sel)` as a joint end ✓: a bore's axis, a circular edge's centre, a planar face (faces meet face to face); `j.frame.on(j.on(…), { flip, at, offset })` adjusts it. Example: `.joint('pin', j.joint.revolute(), j.on('plate', j.sel.faces('%cylinder')), j.on('arm', j.sel.faces('%cylinder')))`.
+- `j.joint.revolute({ asBuilt: true })` ✓: an as-built joint: the components stay where their `at` puts them. Example: `.joint('h', j.joint.revolute({ asBuilt: j.on('base', j.sel.faces('%cylinder')) }), 'base', 'arm')`.
+- `j.joint.pinSlot({ limits, slideLimits })` ✓: turns about z and slides along x. Example: `.joint('pin', j.joint.pinSlot(), 'yoke:slot', 'crank:pin')`.
+- `.contact(ids)` ✓: a contact set; a drag stops where two of them would touch. Example: `.contact(['lid', 'stop'])`.
 
 ## The Program and exports
 
