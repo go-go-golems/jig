@@ -7,23 +7,33 @@ import { mm, gram, isQuantity } from './units.js';
 import { meshReport } from './gears.js';
 
 const V = K.V;
+// density g/cm³, cost usd/kg, modulus (Young's) GPa, nu Poisson's ratio, strength MPa (the stress a stress check
+// holds the part to: tensile strength of a printed part in its weak direction for the plastics, yield for the
+// metals), glassTransition °C, shrink fraction. Typical handbook values, not a datasheet: give your material's own
+// with j.material('PLA').with({ strength: MPa(45) }).
 export const MATERIALS = {
-  PLA: { density: 1.24, cost: 22, modulus: 3.5, allowableStrain: 0.02, glassTransition: 60, shrink: 0.003, color: 'white' },
-  PETG: { density: 1.27, cost: 24, modulus: 2.1, allowableStrain: 0.025, glassTransition: 80, shrink: 0.004 },
-  ABS: { density: 1.04, cost: 22, modulus: 2.3, allowableStrain: 0.025, glassTransition: 105, shrink: 0.007 },
-  ASA: { density: 1.07, cost: 28, modulus: 2.2, allowableStrain: 0.025, glassTransition: 100, shrink: 0.006 },
-  PP: { density: 0.9, cost: 35, modulus: 1.3, allowableStrain: 0.1, glassTransition: -10, shrink: 0.015 },
-  'TPU-95A': { density: 1.21, cost: 35, modulus: 0.03, allowableStrain: 0.5, glassTransition: -30, shrink: 0.005 },
-  'PA-CF': { density: 1.15, cost: 70, modulus: 6.0, allowableStrain: 0.015, glassTransition: 70, shrink: 0.003 },
-  'resin-standard': { density: 1.18, cost: 40, modulus: 2.0, allowableStrain: 0.01, glassTransition: 55, shrink: 0.02 },
+  PLA: { density: 1.24, cost: 22, modulus: 3.5, nu: 0.36, strength: 50, allowableStrain: 0.02, glassTransition: 60, shrink: 0.003, color: 'white' },
+  PETG: { density: 1.27, cost: 24, modulus: 2.1, nu: 0.38, strength: 45, allowableStrain: 0.025, glassTransition: 80, shrink: 0.004 },
+  ABS: { density: 1.04, cost: 22, modulus: 2.3, nu: 0.35, strength: 35, allowableStrain: 0.025, glassTransition: 105, shrink: 0.007 },
+  ASA: { density: 1.07, cost: 28, modulus: 2.2, nu: 0.35, strength: 40, allowableStrain: 0.025, glassTransition: 100, shrink: 0.006 },
+  PP: { density: 0.9, cost: 35, modulus: 1.3, nu: 0.42, strength: 25, allowableStrain: 0.1, glassTransition: -10, shrink: 0.015 },
+  'TPU-95A': { density: 1.21, cost: 35, modulus: 0.03, nu: 0.48, strength: 30, allowableStrain: 0.5, glassTransition: -30, shrink: 0.005 },
+  'PA-CF': { density: 1.15, cost: 70, modulus: 6.0, nu: 0.35, strength: 70, allowableStrain: 0.015, glassTransition: 70, shrink: 0.003 },
+  'resin-standard': { density: 1.18, cost: 40, modulus: 2.0, nu: 0.38, strength: 45, allowableStrain: 0.01, glassTransition: 55, shrink: 0.02 },
+  // metals, for machined and bought parts (structural steel, 304 stainless, 6061-T6 aluminium)
+  steel: { density: 7.85, cost: 2, modulus: 200, nu: 0.29, strength: 250, allowableStrain: 0.00125, glassTransition: null, shrink: 0 },
+  stainless: { density: 8.0, cost: 6, modulus: 193, nu: 0.29, strength: 215, allowableStrain: 0.0011, glassTransition: null, shrink: 0 },
+  aluminium: { density: 2.7, cost: 5, modulus: 69, nu: 0.33, strength: 275, allowableStrain: 0.004, glassTransition: null, shrink: 0 },
 };
+MATERIALS.aluminum = MATERIALS.aluminium;
 class Material {
   constructor(name, props) { this.name = name; Object.assign(this, props); Object.freeze(this); }
   with(patch) { const p = { ...this }; for (const [k, v] of Object.entries(patch)) p[k] = isQuantity(v) ? qNum(k, v) : v; return new Material(this.name, p); }
   get isMaterial() { return true; }
   toString() { return `material '${this.name}'`; }
 }
-const qNum = (k, v) => k === 'cost' ? (v.dims?.money ? v.value * 1000 : v.value) : k === 'density' ? v.value * 1000 : v.value;
+// a quantity given to .with() in the table's own units: modulus GPa, strength MPa, density g/cm³, cost usd/kg
+const qNum = (k, v) => k === 'cost' ? (v.dims?.money ? v.value * 1000 : v.value) : k === 'density' ? v.value * 1000 : k === 'modulus' ? v.in('GPa') : k === 'strength' ? v.in('MPa') : v.value;
 export function material(m) {
   if (m?.isMaterial) return m;
   const name = typeof m === 'string' ? m : 'PLA';

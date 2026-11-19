@@ -25,6 +25,7 @@ export function compile(model, opts = {}) {
   if (value?.isDesign) { const prog = compile(value.defaultModel(), opts); prog.data.kind = 'design'; prog.data.design = { params: Object.fromEntries(Object.entries(value.params).map(([k, p]) => [k, { kind: p.kind, default: String(p.def) }])) }; return prog; }
   if (value?.isPrintJob) return value.compile(opts, { compilePart, finalize });
   if (value?.isAssembly) return value.compile(opts, { compilePart, finalize });
+  if (value?.isFeaStudy) return value.compile(opts, { compilePart, finalize });
   if (value instanceof Part) {
     const res = compilePart(value, opts);
     const prog = finalize({ kind: 'part', name: value.name, parts: [{ name: value.name, part: value, res }], t0, opts });
@@ -36,7 +37,7 @@ export function compile(model, opts = {}) {
   }
   if (value?.isSketch || (value?.solve && value?.profiles)) return compileSketchOnly(value, opts, t0);
   if (value?.isRegion) { const prog = compile(mkPart('region').extrude(value, 1, { id: 'region' }), opts); prog.data.kind = 'region'; return prog; }
-  throw new Error(`the script must return a part, sketch, assembly, print job, design or shape (got ${value === undefined ? 'undefined' : typeof value === 'object' ? value.constructor?.name : typeof value})`);
+  throw new Error(`the script must return a part, sketch, assembly, print job, stress study, design or shape (got ${value === undefined ? 'undefined' : typeof value === 'object' ? value.constructor?.name : typeof value})`);
 }
 
 function compileSketchOnly(sk, opts, t0) {

@@ -79,6 +79,13 @@ function copyAssets() {
   const fdir = join(ROOT, 'guides/stage/fonts');
   for (const f of readdirSync(fdir)) if (f.endsWith('.woff2') || f === 'OFL.txt' || f === 'fonts.css') cpSync(join(fdir, f), join(ROOT, 'dist/fonts', f));
   if (existsSync(join(ROOT, 'src/index.html'))) cpSync(join(ROOT, 'src/index.html'), join(ROOT, 'dist/index.html'));
+  // the stress study's modules (tools/fea-wasm/build.sh), when they have been built: CalculiX and TetGen as ES
+  // modules with their wasm, served as .js beside the worker (fea/backends.js finds them there)
+  const fea = V('fea');
+  if (existsSync(join(fea, 'ccx.mjs')) || existsSync(join(fea, 'tetgen.mjs'))) {
+    mkdirSync(join(ROOT, 'dist/fea'), { recursive: true });
+    for (const n of ['ccx', 'tetgen']) if (existsSync(join(fea, `${n}.mjs`))) { cpSync(join(fea, `${n}.mjs`), join(ROOT, `dist/fea/${n}.js`)); cpSync(join(fea, `${n}.wasm`), join(ROOT, `dist/fea/${n}.wasm`)); }
+  }
 }
 
 async function run() {

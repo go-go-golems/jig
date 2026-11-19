@@ -9,7 +9,8 @@ import { SketchInspector, pickLabel } from './sketch-inspector.jsx';
 
 /** A persistent name that wraps only after "/" and "[". */
 export const Name = ({ text }) => String(text).split(/(?<=[/[])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
-const KEY_METRICS = ['volume', 'mass', 'area', 'bbox', 'height', 'printTime', 'filament', 'cost'];
+// a stress study's answer first (a part without one has none of these)
+const KEY_METRICS = ['safetyFactor', 'stress', 'displacement', 'volume', 'mass', 'area', 'bbox', 'height', 'printTime', 'filament', 'cost'];
 const HIDDEN_METRICS = ['features', 'faces', 'bodies', 'sketchDOF', 'sketches'];
 
 const VIEW_OPTS = [

@@ -209,6 +209,23 @@ export function exportCurrent(format, options = {}) {
   return { data: r.data, filename: r.filename, mime: r.mime, report: r.report };
 }
 
+// The stress study of the current Program, solved (fea.js): the compile returned it pending, the host asks for the
+// solve as a second step so the part shows while CalculiX runs. → { patch, hash }: the fields the solve changes, which
+// the host lays over the program it already has. Not the whole Program: its meshes went to the page with the compile's
+// reply (transferred, so detached here), and sending them again would copy megabytes for nothing. The stress field is
+// a copy, so the reply's transfer leaves the worker's own (and the result cache's) intact.
+export const FEA_PATCH = ['ok', 'fea', 'metrics', 'summary', 'diagnostics', 'decisions', 'trace'];
+export async function solveFea(o = {}) {
+  if (!current) throw new Error('nothing compiled yet');
+  if (!current.fea) throw new Error('fea: the current program is not a stress study');
+  await current.fea(o);
+  const D = current.data, patch = {};
+  for (const k of FEA_PATCH) if (k in D) patch[k] = D[k];
+  const s = D.fea?.surface;
+  if (s) patch.fea = { ...D.fea, surface: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, ArrayBuffer.isView(v) ? v.slice() : v])) };
+  return { patch, hash: D.hash ?? null };
+}
+
 export async function run(code, files) {
   if (!J) await init();
   const data = files ? parseData(files) : currentScope?.data ?? {};
@@ -231,6 +248,7 @@ export async function handle(msg) {
       case 'call': result = { value: await call(msg.method, msg.args) }; break;
       case 'solveSketch': result = solveSketch(msg.sketchId, msg.drag); break;
       case 'export': result = exportCurrent(msg.format, msg.options); break;
+      case 'fea': result = await solveFea(msg.options); break;
       case 'run': result = { value: toPlain(await run(msg.code, msg.files)) }; break;
       case 'stats': result = { cache: featureCache.size, freed: gc(), compute: computeInfo(), meshes: RS.liveMeshes(), tapes: RS.liveTapes(), rustCalls: { ...RS.counters } }; break;
       default: throw new Error(`unknown op '${op}'`);

@@ -21,6 +21,24 @@ make lint         # golangci-lint (pinned) and gofmt
 Requirements: Go (see `go.mod`), Node 24 with npm (only to install esbuild into `.bin/`), and optionally Rust with
 the `wasm32-unknown-unknown` target for jig-compute.
 
+### Run a stress study
+
+Build the TetGen and CalculiX WASM modules on Linux using the prerequisites in
+[`build.sh`](import/jigcad/tools/fea-wasm/build.sh), or unpack a matching solver archive into `import/jigcad/vendor/`
+so its `fea/` directory contains both `.mjs` and `.wasm` pairs and `SHA256SUMS`.
+
+```bash
+WORK="$PWD/import/jigcad/vendor/fea/build" \
+  bash import/jigcad/tools/fea-wasm/build.sh import/jigcad/vendor/fea
+(cd import/jigcad/vendor/fea && sha256sum -c SHA256SUMS)
+make web
+go run ./cmd/jigcad serve --no-models --dist import/jigcad/dist
+```
+
+If you unpacked an archive, start with the checksum command. Open the workbench at `http://127.0.0.1:8787/`,
+paste the [cantilever example](import/jigcad/test/engine/scripts/52-fea-cantilever.js) into `script.js`, and click
+**Run**. The Stage shows stress and displacement after the solve. Omit `--no-models` to use the agent with Pi.
+
 ## Layout
 
 - `cmd/jigcad`: the CLI (`jigcad serve`).
