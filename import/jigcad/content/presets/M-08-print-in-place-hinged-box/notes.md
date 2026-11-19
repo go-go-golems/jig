@@ -2,7 +2,7 @@
 
 A 60 × 40 mm box whose base and lid print side by side, already joined by a five-knuckle pin hinge, with no assembly afterwards: snap the first layer free and the lid swings over to close. The idea it teaches: a print-in-place mechanism is an assembly checked in the pose it prints in. The script builds the two halves as parts, joins them with a revolute joint and asks `.printInPlace()` for every gap between them.
 
-> **Try it.** [Swing the lid to 120°](lab:param/hinge=120), then [almost close it](lab:param/hinge=170). [Open the trace](lab:show/trace) and find the `gap` decision: 0.400 mm between base and lid as printed. [Select a knuckle of the base](lab:select/hinge/knuckle1).
+> **Try it.** [Swing the lid to 120°](lab:joint/hinge=120), then [almost close it](lab:joint/hinge=170). [Open the trace](lab:show/trace) and find the `gap` decision: 0.400 mm between base and lid as printed. [Select a knuckle of the base](lab:select/hinge/knuckle1).
 
 ## The hinge
 

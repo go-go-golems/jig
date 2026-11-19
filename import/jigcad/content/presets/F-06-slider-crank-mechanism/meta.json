@@ -1,0 +1,16 @@
+{
+  "id": "F-06",
+  "title": "Slider-crank mechanism",
+  "group": "FEA",
+  "order": 6,
+  "difficulty": "advanced",
+  "about": "The full four-part needle-bar assembly behind the slider-crank rod stress study.",
+  "view": "axo",
+  "zoom": 1.25,
+  "overlays": "dims,names,joints",
+  "stageLink": {
+    "preset": "F-05",
+    "label": "View rod stress study"
+  },
+  "tries": "Scrub the crank angle in Mechanism | Compare the pin and wrist loads | Open the rod stress study"
+}

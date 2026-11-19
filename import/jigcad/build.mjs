@@ -36,7 +36,7 @@ function collectContent() {
     const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
     const files = {};
     for (const f of readdirSync(dir)) if (!['meta.json'].includes(f)) files[f] = readFileSync(join(dir, f), 'utf8');
-    out.presets.push({ ...meta, id: meta.id ?? id, files });
+    out.presets.push({ ...meta, id: meta.id ?? id, slug: id, files });
   }
   const bdir = join(ROOT, 'content/book');
   if (existsSync(bdir)) for (const f of readdirSync(bdir).sort()) if (f.endsWith('.md'))

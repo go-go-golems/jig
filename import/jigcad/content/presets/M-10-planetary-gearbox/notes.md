@@ -2,7 +2,7 @@
 
 A Ø99 mm planetary gearbox: an 18-tooth sun turned by a knob, three 18-tooth planets on a carrier, and a 54-tooth ring pressed into a base. Four turns of the knob turn the carrier once. The idea it teaches: tooth counts in a planetary set are not free. The ring must have z_sun + 2 z_planet teeth, and the planets fit evenly only when (z_sun + z_ring) / n is a whole number. The script checks both before it builds anything.
 
-> **Try it.** [Select the knob's 45° underside](lab:select/knob/side[knob.half.2]), shaped so the sun prints standing on its teeth. [Turn the first planet back to 0°](lab:param/planet1=0) and [look from above](lab:view/stage?view=plan): its teeth now sit on the sun's. [Open the graph](lab:show/graph) to see seven parts and five joints.
+> **Try it.** [Select the knob's 45° underside](lab:select/knob/side[knob.half.2]), shaped so the sun prints standing on its teeth. [Turn the first planet back to 0°](lab:joint/planet1=0) and [look from above](lab:view/stage?view=plan): its teeth now sit on the sun's. [Open the graph](lab:show/graph) to see seven parts and five joints.
 
 ## The numbers
 
