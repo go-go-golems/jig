@@ -74,7 +74,7 @@ test-go:
 # (from `make web`).
 test-js: web
 	cd $(WEB) && node --test test/agent/*.test.mjs test/ui/*.test.mjs
-	cd $(WEB) && node --test test/agent-eval/harness.test.mjs
+	cd $(WEB) && node --test test/agent-eval/harness.test.mjs test/agent-eval/fea.test.mjs
 	cd $(WEB) && node test/engine-core/run.mjs
 	cd $(WEB) && node test/engine/run.mjs
 

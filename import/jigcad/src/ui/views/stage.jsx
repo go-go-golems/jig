@@ -9,7 +9,8 @@ import { SketchInspector, pickLabel } from './sketch-inspector.jsx';
 
 /** A persistent name that wraps only after "/" and "[". */
 export const Name = ({ text }) => String(text).split(/(?<=[/[])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
-const KEY_METRICS = ['volume', 'mass', 'area', 'bbox', 'height', 'printTime', 'filament', 'cost'];
+// a stress study's answer first (a part without one has none of these)
+const KEY_METRICS = ['safetyFactor', 'stress', 'displacement', 'volume', 'mass', 'area', 'bbox', 'height', 'printTime', 'filament', 'cost'];
 const HIDDEN_METRICS = ['features', 'faces', 'bodies', 'sketchDOF', 'sketches'];
 
 const VIEW_OPTS = [
@@ -18,7 +19,7 @@ const VIEW_OPTS = [
 ];
 
 export function StageView({ host }) {
-  useHost(host, ['view', 'selection', 'program', 'compiling']);
+  useHost(host, ['view', 'selection', 'program', 'compiling', 'preset']);
   const el = useRef(null);
   const [fallback, setFallback] = useState(false);
   const [overlays, setOverlays] = useState(OVERLAYS);
@@ -45,12 +46,16 @@ export function StageView({ host }) {
   // explicit or constrained: the compile records it as a decision (kind 'sketch.mode') per sketch
   const modeOf = id => (good?.decisions || []).find(d => d.kind === 'sketch.mode' && d.at === id)?.chose;
   const pick = sk && isSketchPick(host.selection) && host.selection.sketch === sk.id ? host.selection : null;
+  const related = host.preset?.stageLink;
 
   return (
     <div class="tabbody stage">
       <div class="stagewrap">
         <div class="toolbar">
           <Seg label="View" options={VIEW_OPTS} value={v.name} onChange={name => host.setView({ name, ...squareView(), zoom: v.zoom ?? 1, sketch: null })} />
+          {related && host.findPreset(related.preset) && (
+            <button class="btn sm" onClick={() => host.loadPreset(related.preset)}>{related.label}</button>
+          )}
           {sketches.length > 0 && (
             <Menu btnClass={`btn sm ${v.name === 'sketch' ? 'on' : ''}`} menuClass="sketches" title="Open a sketch in its own plane, or show sketches in the 3D views"
               label={<>{v.name === 'sketch' ? <>Sketch <b>{sk?.id}</b></> : 'Sketch'} <span class="dim">{shown.size ? `${shown.size} shown · ` : ''}{sketches.length}</span> ▾</>}>

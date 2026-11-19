@@ -333,7 +333,37 @@ export class Host {
     this.emit('compiling', false);
     this.emit('program', program);
     this.emit('files', this.files);
+    // a stress study compiles to its part and a pending solve: show the part now, the stress when CalculiX is done
+    if (program.fea?.status === 'pending') this.solveFea(seq);
     return program;
+  }
+  /** Solve the current program's stress study (the engine's op 'fea'); the result replaces the program unless a
+   *  newer compile came in meanwhile. */
+  solveFea(seq = this._seq) {
+    // one solve per compile: the agent's fea.result() and the compile's own call share it
+    if (this._fea?.seq === seq) return this._fea.promise;
+    const promise = this._solveFea(seq);
+    this._fea = { seq, promise };
+    return promise;
+  }
+  async _solveFea(seq) {
+    this.solving = true;
+    this.emit('solving', true);
+    try {
+      const reply = await this.engine.request('fea', {});
+      if (seq !== this._seq || !this.program || !(reply?.patch || reply?.program)) return null;
+      // the solve's fields over the program this compile gave (its meshes are already here)
+      const program = { ...this.program, ...(reply.patch ?? reply.program), roundTripMs: this.program.roundTripMs, ms: this.program.ms };
+      this.program = program;
+      if (program.ok !== false) this.lastGood = program;
+      this.emit('program', program);
+      return program;
+    } catch (err) {
+      if (seq === this._seq) this.toast?.(`the stress study failed: ${err.message}`);
+      return null;
+    } finally {
+      if (seq === this._seq) { this.solving = false; this.emit('solving', false); }
+    }
   }
   /** Compile a variant without changing host state (book figures, thumbnails, the agent's what-ifs).
    *  files: { path: text } (or a Map, or the text of script.js) laid over the open files unless options.merge is

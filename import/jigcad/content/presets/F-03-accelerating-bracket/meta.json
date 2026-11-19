@@ -1,0 +1,11 @@
+{
+  "id": "F-03",
+  "title": "Accelerating bracket",
+  "group": "FEA",
+  "order": 3,
+  "difficulty": "medium",
+  "about": "A mounted aluminium arm under a 25 g base acceleration, solved with the JavaScript reference solver.",
+  "view": "axo",
+  "overlays": "dims,names,stress",
+  "tries": "Switch the solver from js to ccx and compare results | Change the acceleration from 25 g to 50 g"
+}

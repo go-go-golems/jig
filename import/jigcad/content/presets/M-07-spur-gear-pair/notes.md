@@ -2,7 +2,7 @@
 
 An 18-tooth pinion driving a 36-tooth wheel, 2:1, on a printed base whose two pegs stand exactly 54 mm apart. Turn the pinion twice and the wheel turns once. The idea it teaches: the centre distance of a gear pair is not a dimension you choose. It follows from the module and the tooth counts, a = m (z₁ + z₂) / 2, and here `j.inspect.gearMesh` computes it and the base is built from its answer.
 
-> **Try it.** [Look at it from above](lab:view/stage?view=plan) to see the teeth in mesh. [Turn the wheel back to 0°](lab:param/wheel=0): a wheel tooth now points straight at a pinion tooth, and the interference check fails. [Set it to 5°](lab:param/wheel=5), half a tooth, and the gap is back.
+> **Try it.** [Look at it from above](lab:view/stage?view=plan) to see the teeth in mesh. [Turn the wheel back to 0°](lab:joint/wheel=0): a wheel tooth now points straight at a pinion tooth, and the interference check fails. [Set it to 5°](lab:joint/wheel=5), half a tooth, and the gap is back.
 
 ## How it is built
 

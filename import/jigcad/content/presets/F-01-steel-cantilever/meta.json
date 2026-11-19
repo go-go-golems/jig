@@ -1,0 +1,11 @@
+{
+  "id": "F-01",
+  "title": "Steel cantilever",
+  "group": "FEA",
+  "order": 1,
+  "difficulty": "easy",
+  "about": "A clamped beam with a tip load, a displacement limit and adaptive mesh refinement.",
+  "view": "axo",
+  "overlays": "dims,names,stress",
+  "tries": "Double the tip load and compare the displacement | Increase the load to 50 N and inspect mesh refinement | Increase the load to 60 N and check the displacement limit"
+}

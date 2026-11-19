@@ -650,11 +650,37 @@ export function labScope(host, { readOnly = false, console: con, images = null }
     },
   };
 
+  // the stress study of the open program (JIG-015): its result, solved first if the solve is still to come
+  // a stress study's answer (spec v0.2, layer 6): the compile returns the part with the solve to come; these wait for it
+  const feaSolved = async name => {
+    let p = prog(host, name);
+    if (p.kind !== 'fea' || !p.fea) throw new Error(`${name}: the open program is not a stress study; script.js returns j.fea(name, { part, material }) with its fixtures and loads`);
+    if (p.fea.status === 'pending' && typeof host.solveFea === 'function') p = (await host.solveFea()) || host.program || p;
+    return p;
+  };
+  const fea = {
+    async result() {
+      const p = await feaSolved('fea.result');
+      const f = p.fea, findings = p.diagnostics.filter(d => String(d.kind).startsWith('fea.')).map(d => ({ level: d.level, kind: d.kind, at: d.at, message: d.message, fix: d.fix }));
+      if (f.status !== 'solved') return { status: f.status, error: f.error ?? null, findings };
+      return { status: f.status, solver: f.solver, material: f.material?.name, strength: f.strength, margin: f.margin, safetyFactor: f.safetyFactor,
+        peak: f.peak, gauss: f.gauss, displacement: f.displacement, mesh: f.mesh, applied: f.applied, reaction: f.reaction, balance: f.balance,
+        checks: f.checks, pose: f.pose, findings, faces: (f.faces || []).slice(0, 12).map(x => ({ name: x.name, max: x.max, mean: x.mean })) };
+    },
+    // every face with its peak and mean von Mises (MPa), most stressed first
+    async faces() {
+      const f = (await feaSolved('fea.faces')).fea;
+      if (f.status !== 'solved') throw new Error(`fea.faces: the study is ${f.status}${f.error ? `: ${f.error}` : ''}; fea.result() has its findings`);
+      return (f.faces || []).map(x => ({ name: x.name, max: x.max, mean: x.mean }));
+    },
+  };
+
   const scope = {
     files,
     run,
     check,
     program,
+    fea,
     ...makeQueries(host),
     selection() {
       const s = host.selection;

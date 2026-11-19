@@ -1,0 +1,15 @@
+{
+  "id": "F-05",
+  "title": "Slider-crank rod",
+  "group": "FEA",
+  "order": 5,
+  "difficulty": "advanced",
+  "about": "A rod stress study that imports joint loads and inertia from a 3000 rpm mechanism cycle.",
+  "view": "axo",
+  "overlays": "dims,names,stress",
+  "stageLink": {
+    "preset": "F-06",
+    "label": "View source mechanism"
+  },
+  "tries": "Compare the selected pose with an explicit crank angle | Inspect the bore loads and held-seat reaction"
+}
