@@ -1,0 +1,11 @@
+{
+  "id": "F-02",
+  "title": "Column under pressure",
+  "group": "FEA",
+  "order": 2,
+  "difficulty": "easy",
+  "about": "A PLA column under face pressure and its own weight, supported by frictionless rollers.",
+  "view": "axo",
+  "overlays": "dims,names,stress",
+  "tries": "Double the pressure and compare compression | Remove gravity and compare with pH/E"
+}

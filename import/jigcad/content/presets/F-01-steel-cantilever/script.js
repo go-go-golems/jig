@@ -1,0 +1,12 @@
+const section = j.sketch('section', { on: j.plane.YZ })
+  .rect('square', 6, 6, { center: true })
+const beam = j.part('Beam').material(j.material('steel'))
+  .extrude(section.profiles(), mm(60), { id: 'beam' })
+
+return j.fea('Steel cantilever', { part: beam })
+  .params({ F: N(20) })
+  .fix(j.feat('beam').startFace(), { label: 'clamped root' })
+  .force(j.feat('beam').endFace(), 'F', { dir: '-Z', label: 'tip load' })
+  .check('displacement', { limit: mm(0.18), faces: j.feat('beam').endFace() })
+  .margin(2)
+  .mesh({ size: mm(3), refine: true, budget: 60000 })

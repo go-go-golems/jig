@@ -1,0 +1,11 @@
+{
+  "id": "F-04",
+  "title": "Driven-arm reactions",
+  "group": "FEA",
+  "order": 4,
+  "difficulty": "medium",
+  "about": "A full turn of a loaded arm, with hinge reaction forces and motor torque plotted by angle.",
+  "view": "plan",
+  "overlays": "dims,names,joints",
+  "tries": "Open Mechanism and compare hinge force with motor torque | Double the speed and compare the hinge force"
+}

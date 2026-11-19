@@ -35,9 +35,10 @@ make web
 go run ./cmd/jigcad serve --no-models --dist import/jigcad/dist
 ```
 
-If you unpacked an archive, start with the checksum command. Open the workbench at `http://127.0.0.1:8787/`,
-paste the [cantilever example](import/jigcad/test/engine/scripts/52-fea-cantilever.js) into `script.js`, and click
-**Run**. The Stage shows stress and displacement after the solve. Omit `--no-models` to use the agent with Pi.
+If you unpacked an archive, start with the checksum command. Open the workbench at `http://127.0.0.1:8787/` and
+choose **FEA → F-01 Steel cantilever** in the preset menu. The Stage shows stress and displacement after the solve.
+The other FEA presets cover pressure and gravity, acceleration and solver comparison, mechanism reactions, and stress
+from mechanism loads. Each preset has exercises in **Notes**. Omit `--no-models` to use the agent with Pi.
 
 ## Layout
 
