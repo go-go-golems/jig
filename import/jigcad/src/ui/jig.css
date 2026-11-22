@@ -246,3 +246,6 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .renderside .diags { margin: 6px 0 0; padding-left: 16px; font-size: var(--fs-xs); }
 .renderside .diags .bad { color: var(--accent); }
 @media (max-width: 640px) { .renderbody { flex-direction: column; } .renderside { width: auto; border-left: 0; border-top: 1px solid var(--hair); } }
+.renderview .rendertime { gap: 8px; align-items: center; }
+.renderview .rendertime input[type=range] { flex: 1; min-width: 120px; }
+.renderview .rendertime .small { font-size: var(--fs-xs); color: var(--ink-2); font-variant-numeric: tabular-nums; }

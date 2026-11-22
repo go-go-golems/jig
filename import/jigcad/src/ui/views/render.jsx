@@ -6,6 +6,7 @@ import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { useHost } from '../common.jsx';
 import { renderHostOf, LIBRARY, LOOK_FILE, defaultLook } from '../../render/host.js';
 import { Name } from './stage.jsx';
+import { saveOrCopy } from '../save.js';
 
 function useRender(rh) {
   const [, force] = useReducer((x) => x + 1, 0);
@@ -59,7 +60,13 @@ export function RenderView({ host }) {
     catch (e) { host.toast(e.message, 'bad'); }
   };
 
-  const p = rh.picked, vp = rh.vp;
+  const job = async (o, mime) => {
+    try {
+      const files = await rh.renderJob(o);
+      for (const f of files ?? []) await saveOrCopy(host, f.name, f.data, '', mime);
+    } catch (e) { if (e?.name !== 'AbortError' && !/abort/i.test(e?.message ?? '')) host.toast(`The render failed: ${e.message}`, 'bad'); }
+  };
+  const p = rh.picked, vp = rh.vp, dur = rh.duration();
   const errors = rh.diags.filter((d) => d.severity === 'error'), warnings = rh.diags.filter((d) => d.severity === 'warning');
   return (
     <div class="tabbody col renderview">
@@ -69,7 +76,25 @@ export function RenderView({ host }) {
         {vp?.compiled && <span class="pill"><span>spp</span><b>{vp.spp | 0}</b></span>}
         <button class="btn sm" onClick={() => rh.resetCamera()} title="back to the look's camera">Reset camera</button>
         <button class="btn sm" onClick={openLook} title="materials, light and camera as a Candela scene file">{host.files.has(LOOK_FILE) ? 'Edit look.js' : 'Make look.js'}</button>
+        {rh.rendering ? (
+          <>
+            <span class="pill"><span>render</span><b>{Math.round((rh.progress ?? 0) * 100)}% {rh.progressNote}</b></span>
+            <button class="btn sm" onClick={() => rh.cancelJob()}>Cancel</button>
+          </>
+        ) : vp?.compiled && (
+          <>
+            <button class="btn sm" title="1920 × 1080, 256 samples per pixel, PNG" onClick={() => job({ kind: 'still', width: 1920, height: 1080, spp: 256, format: 'png' }, 'image/png')}>Render PNG</button>
+            {dur > 0 && <button class="btn sm" title={`the timeline (${dur} s) at 24 fps, 1280 × 720, 32 samples per pixel`} onClick={() => job({ kind: 'sequence', start: 0, end: dur, fps: 24, width: 1280, height: 720, spp: 32, format: 'mp4' }, 'video/mp4')}>Render video</button>}
+          </>
+        )}
       </div>
+      {dur > 0 && (
+        <div class="toolbar rendertime">
+          <button class="btn sm" onClick={() => rh.play()} aria-label={rh.playing ? 'Pause' : 'Play'}>{rh.playing ? '❚❚' : '▶'}</button>
+          <input type="range" min="0" max={dur} step="0.01" value={rh.time} onInput={(e) => { rh.play(false); rh.setTime(+e.currentTarget.value); }} aria-label="time" />
+          <span class="small">{rh.time.toFixed(2)} / {dur} s · {rh.result?.compiled?.animation?.study ?? ''}</span>
+        </div>
+      )}
       <div class="renderbody">
         <div class="renderwrap" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onWheel={wheel} onContextMenu={(e) => e.preventDefault()}>
           <canvas ref={canvas} />

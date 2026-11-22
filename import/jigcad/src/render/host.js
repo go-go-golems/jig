@@ -11,8 +11,10 @@ import LIB from '../generated/candela-lib.json';
 export const LOOK_FILE = 'look.js';
 export const LOOK_MARK = '// materials: the Render view adds lines here';
 
-/** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model */
-export function defaultLook({ view = 'axo' } = {}) {
+/** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model,
+ *  and an assembly's first study as the timeline */
+export function defaultLook({ view = 'axo', study = null } = {}) {
+  const motion = study ? `\n// the timeline: the study '${study}' in 4 s (asm.studies() lists them); add .motionBlur({ angle: 180, fps: 24 }) to the camera for blur\nexport const animation = asm.animate(${JSON.stringify(study)}, { duration: 4 });\n` : '';
   return `// look.js: how the model is rendered (materials, light, camera) as a Candela scene (JIG-016).
 // The Render view edits the chain under the marker: a material chosen for a face adds a .meta() line there.
 import { scene, shape, light, camera, hdri, material, finish } from 'candela';
@@ -28,7 +30,7 @@ export default scene()
   .add(shape.plane().at(0, floor, 0).material(material.pbr().baseColor(0.18).roughness(0.8)).id('floor'))
   .add(light.env.hdri(hdri.studio(), { rotate: 30 }))
   .camera(camera.thinLens().at(v.at).lookAt(v.target).focal(v.focal).fstop(8));
-`;
+${motion}`;
 }
 
 /** a .meta() line for look.js: the address and the patch as code */
@@ -98,12 +100,16 @@ export class RenderHost {
     this.pkg = null; this.result = null; this.vp = null; this.canvas = null;
     this.freeCam = null; this.picked = null; this.backend = null;
     this._seq = 0; this._pkgKey = null; this._lookKey = null; this._raf = 0;
+    this.time = 0; this.playing = false; this.rendering = false; this.progress = null;
   }
   on(fn) { this.ls.add(fn); return () => this.ls.delete(fn); }
   emit() { for (const f of this.ls) try { f(this); } catch (e) { console.error(e); } }
 
   /** the look file's text: the project's look.js, else the default for the stage's current view */
-  look() { return this.host.files.get(LOOK_FILE) ?? defaultLook({ view: ['axo', 'front', 'side', 'plan'].includes(this.host.view?.name) ? this.host.view.name : 'axo' }); }
+  look() {
+    const view = ['axo', 'front', 'side', 'plan'].includes(this.host.view?.name) ? this.host.view.name : 'axo';
+    return this.host.files.get(LOOK_FILE) ?? defaultLook({ view, study: Object.keys(this.pkg?.studies ?? {})[0] ?? null });
+  }
 
   /** start again, e.g. after a lost device: a fresh canvas and backend ('auto' | 'webgpu' | 'webgl2') */
   async restart(prefer = this.prefer) {
@@ -141,12 +147,17 @@ export class RenderHost {
     this.offs = null; this.vp = null; this.canvas = null;
   }
   loop() {
-    const step = () => {
+    const step = (now) => {
       this._raf = requestAnimationFrame(step);
-      if (!this.vp?.compiled || !this.vp.packed || this.loading || document.hidden) return;   // not while shaders compile
+      if (!this.vp?.compiled || !this.vp.packed || this.loading || this.rendering || document.hidden) return;   // not while shaders compile or a job renders
       if (this.vp.backend?.lost && this.status !== 'error') {
         // a GPU device can be lost (a driver reset, a dispatch past the watchdog on a software adapter)
         this.status = 'error'; this.message = `The GPU device was lost after ${this.vp.spp | 0} samples (${this.backend}); restart the view, or try WebGL2.`; this.emit(); return;
+      }
+      if (this.playing) {
+        const dt = this._last ? Math.min(0.1, (now - this._last) / 1000) : 0;
+        this._last = now;
+        this.setTime(this.time + dt, true);
       }
       if (this.vp.frame()) this._spp !== this.vp.spp && ((this._spp = this.vp.spp), this.emit());
     };
@@ -160,8 +171,7 @@ export class RenderHost {
     if (!prog) { this.status = 'idle'; this.message = 'Nothing compiled yet.'; this.emit(); return; }
     const seq = ++this._seq;
     const model = JSON.stringify([...this.host.files].filter(([k]) => k !== LOOK_FILE)) + JSON.stringify(this.host.overrides ?? {}) + prog.hash;
-    const look = this.look();
-    if (!force && model === this._pkgKey && look === this._lookKey) return;
+    if (!force && model === this._pkgKey && this.look() === this._lookKey) return;
     this.status = 'building'; this.emit();
     try {
       if (model !== this._pkgKey || !this.pkg) {
@@ -171,7 +181,7 @@ export class RenderHost {
         if (seq !== this._seq) return;
         this.pkg = JSON.parse(e.data); this._pkgKey = model;
       }
-      await this.build(seq, look);
+      await this.build(seq, this.look());   // after the package: the default look's timeline names its first study
     } catch (e) {
       if (seq !== this._seq) return;
       this.status = 'error'; this.message = e.message; this.emit();
@@ -186,7 +196,15 @@ export class RenderHost {
     if (!r.ok) { this.status = 'error'; this.message = r.error?.message ?? 'the look did not build'; this.emit(); return; }
     this.loading = true; this.status = 'compiling'; this.emit();
     const t0 = performance.now();
-    try { await this.vp.load(r.compiled, { time: 0 }); }
+    const anim = r.compiled.animation;
+    if (!anim) { this.playing = false; this.time = 0; this._timeFor = null; }
+    else if (anim.study && this._timeFor !== anim.study) {
+      // a study's timeline opens where the stage stands: the drive's current value as a time
+      this._timeFor = anim.study;
+      const t = this.timeOfDrive(anim);
+      if (t != null) this.time = t;
+    }
+    try { await this.vp.load(r.compiled, { time: this.time }); }
     catch (e) { this.status = 'error'; this.message = `shader compile failed: ${e.message}`; this.emit(); return; }
     finally { this.loading = false; }
     this.loadMs = performance.now() - t0;
@@ -194,6 +212,41 @@ export class RenderHost {
     if (this.freeCam) this.vp.setView(this.freeCam);
     this.status = 'ready'; this.message = null; this.emit();
   }
+
+  // ---------- the timeline: the look's export const animation (asm.animate) ----------
+  duration() { const a = this.result?.compiled?.animation; return a ? (a.duration > 0 ? a.duration : 4) : 0; }
+  /** the time at which an asm.animate() timeline shows the assembly's current drive value (null if unknown) */
+  timeOfDrive(anim) {
+    const s = this.pkg?.studies?.[anim.study], prog = this.host.program?.ok !== false ? this.host.program : this.host.lastGood;
+    const j = s && prog?.assembly?.joints?.find((x) => x.id === s.drive);
+    const x = s?.x, from = s?.from ?? x?.[0], to = s?.to ?? x?.[x.length - 1];
+    if (!j || !Number.isFinite(j.value) || !(anim.duration > 0) || !Number.isFinite(from) || !Number.isFinite(to) || to === from) return null;
+    return Math.min(anim.duration, Math.max(0, ((j.value - from) / (to - from)) * anim.duration));
+  }
+  setTime(t, quiet = false) {
+    const d = this.duration();
+    this.time = d ? ((t % d) + d) % d : 0;
+    if (this.vp?.compiled && this.vp.packed) this.vp.repack(this.time);
+    if (!quiet) this.emit();
+  }
+  play(on = !this.playing) { this.playing = !!on && this.duration() > 0; this._last = 0; this.emit(); }
+
+  // ---------- render jobs: a still or a sequence at a fixed size and sample count (Candela's runRender) ----------
+  async renderJob(o) {
+    if (!this.vp?.compiled || this.rendering) return null;
+    this.rendering = true; this.playing = false; this.progress = 0; this.progressNote = ''; this.ctrl = new AbortController(); this.emit();
+    try {
+      const opts = { name: (this.host.preset?.id || this.host.program?.name || 'jig').replace(/[^\w.-]+/g, '-'), seed: 1, ...o };
+      if (opts.kind !== 'sequence' && opts.time == null && this.duration()) opts.time = this.time;
+      return await this.C.runRender(opts, { vp: this.vp, signal: this.ctrl.signal, seek: async (t) => this.vp.repack(t),
+        onProgress: (p, note) => { this.progress = p; this.progressNote = note || ''; this.emit(); } });
+    } finally {
+      this.rendering = false; this.progress = null; this.ctrl = null;
+      if (this.vp?.compiled) this.vp.repack(this.time);
+      this.emit();
+    }
+  }
+  cancelJob() { this.ctrl?.abort(); }
 
   // ---------- camera: orbit, pan and zoom about the target, Y up ----------
   camera() {

@@ -36,6 +36,8 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
     await page.waitForFunction(() => window.jigRender && (jigRender.status === 'error' || (jigRender.status === 'ready' && jigRender.vp?.spp >= 16)), null, { timeout: 120000 });
     const st = await page.evaluate(() => ({ status: jigRender.status, message: jigRender.message, backend: jigRender.backend, spp: jigRender.vp?.spp, objects: jigRender.result?.compiled?.objects?.length, diags: jigRender.diags.map((d) => `${d.severity} ${d.code} ${d.message}`) }));
     check('Candela renders F-06', st.status === 'ready', JSON.stringify(st));
+    const t0 = await page.evaluate(() => jigRender.time);
+    check('the timeline opens at the stage’s pose (the drive at 30° of 0–360° in 4 s)', Math.abs(t0 - 4 * 30 / 360) < 1e-6, `t = ${t0}`);
     console.log('     load', await page.evaluate(async () => { const a = await navigator.gpu?.requestAdapter(); const i = a?.info || {}; return `${Math.round(jigRender.loadMs)} ms (shader compile), ${jigRender.vp.spp} spp, adapter ${[i.vendor, i.architecture, i.description].filter(Boolean).join(' ') || 'n/a'}${a?.isFallbackAdapter ? ' (fallback)' : ''}`; }));
     await page.locator('.renderwrap').screenshot({ path: path.join(OUT, 'render-f06.png') });
 
@@ -59,6 +61,24 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
       await page.waitForFunction(() => jigRender.vp?.spp >= 16, null, { timeout: 60000 });
       await page.locator('.renderwrap').screenshot({ path: path.join(OUT, 'render-f06-brass.png') });
     }
+    // the timeline: the default look animates the assembly's first study, F-06's cycle
+    const tl = await page.evaluate(() => {
+      const rodM = () => { const vp = jigRender.vp, O = vp.packed.O; for (let k = 0; k < vp.packed.nObjs; k++) { const b = k * 24, o = vp.compiled.objects[O[b + 21] | 0]; if (o.def?.name === 'rod/body1') return Array.from(O.subarray(b + 4, b + 16)); } return null; };
+      jigRender.setTime(0); const a = rodM(); jigRender.setTime(1); const b = rodM(); jigRender.setTime(0);
+      return { duration: jigRender.duration(), study: jigRender.result.compiled.animation?.study, moved: a && b && a.some((v, i) => Math.abs(v - b[i]) > 1e-6), ui: !!document.querySelector('.renderview .rendertime input[type=range]') };
+    });
+    check('the timeline plays the study cycle and moves the rod', tl.duration === 4 && tl.study === 'cycle' && tl.moved && tl.ui, JSON.stringify(tl));
+    const still = await page.evaluate(async () => { const f = await jigRender.renderJob({ kind: 'still', width: 96, height: 64, spp: 4, format: 'png' }); const d = new Uint8Array(f[0].data); return { name: f[0].name, png: d[0] === 0x89 && d[1] === 0x50 && d[2] === 0x4e && d[3] === 0x47, bytes: d.length }; });
+    check('a still renders to PNG', still.png && /\.png$/.test(still.name), JSON.stringify(still));
+    const seq = await page.evaluate(async () => {
+      const out = {};
+      for (const format of ['mp4', 'webm']) {
+        try { const f = await jigRender.renderJob({ kind: 'sequence', start: 0, end: 0.125, fps: 24, width: 96, height: 64, spp: 2, format }); out[format] = { name: f[0].name, bytes: new Uint8Array(f[0].data).length }; }
+        catch (e) { out[format] = { error: e.message }; }
+      }
+      return out;
+    });
+    check('a sequence of the timeline encodes to video', (seq.mp4 && seq.mp4.bytes > 0) || (seq.webm && seq.webm.bytes > 0), JSON.stringify(seq));
     const real = errors.filter((e) => !/Failed to load resource.*favicon/.test(e));   // the browser asks for /favicon.ico itself
     check('no console errors', real.length === 0, real.slice(0, 6).join(' | '));
   } catch (e) {
