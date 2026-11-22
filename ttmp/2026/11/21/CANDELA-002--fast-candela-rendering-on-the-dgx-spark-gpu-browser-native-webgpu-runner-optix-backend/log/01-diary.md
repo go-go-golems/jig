@@ -546,3 +546,77 @@ and publish it as a vault PROJECT REPORT.
   pipeline and buffers, measurements, the spike, the compile design (translation rules, `Kernel` struct, traversal
   shim, run-time compilation), the live workbench (architecture, method mapping, frames, denoiser, final renders),
   phases with image-comparison exit checks, failure modes, open questions.
+
+## Step 10: Design doc 02 — candela-rt (V8 + OptiX), the engine split, the live protocol
+
+After a design conversation (what a preset's program is, emitting CUDA directly, where JavaScript must run, which
+callbacks exist), the user settled the direction: keep the JS callbacks and run V8 on the backend. I wrote
+`design-doc/02-candela-as-a-compiler-with-backends-the-v8-and-optix-render-runtime.md` as an intern guide and
+uploaded it to reMarkable. No engine code changed.
+
+### Prompt Context
+**User prompt (verbatim):** "let's keep the JS callbacks, let's use V8 on the backend. let's go, you design it out
+you're good at that. Create  a detailed analysis / design / implementation guide that is for a new intern, explaining
+all the parts of the system needed to understand what it is, with prose paragraphs and bullet point sand pseudocode
+and diagrams and api references and file references. It should be very clear and technical. Store in the ticket and
+the nupload to remarkable."
+(Preceding questions in the conversation: "what's a preset's kernel?", "can we compile to something other than WGSL
+to target optix more directly?", "…run a JS sandbox in the backend process (say, quickjs)…", "basically like a
+compiler with different backends", "what are number-heavy loops…", "what are some examples in our presets?", "we can
+ofc use v8 if we are already doing c++ anyway... and those are part of the backend, no?", "the preset code is kind of
+the only code that should be run on the backend, and the rest should potentially be ported to C++…", "Or maybe you can
+send the IR entirely to the backend? or do we have callbacks we would need to run?")
+**Assistant interpretation:** Turn the agreed direction into a complete, phased design with interfaces and tests.
+**Inferred user intent:** A plan an intern can execute, and a record of why each boundary is where it is.
+
+### What I did
+- Measured in Node: build+compile B-01 72 ms, K-01 209 ms, K-09 570 ms; per-frame animation+pack 0.04/0.13/0.24 ms
+  (`scripts/08-time-build.mts`, rerun 76/219/576 ms, 0.03/0.09/0.20 ms). CPU-profiled K-09's build
+  (`scripts/09-profile-build.mts`): diagnostics stack capture ~35%, `blasOf` 74 ms, `ggxAlbedoTable` 50 ms,
+  `studioImg`+`envTables` 88 ms (`various/12-build-timing-and-profile.txt`).
+- Catalogued callbacks: `animation` (K-01, K-02, K-07, K-08, K-09), behaviours (W-01, run in `host.ts:204`),
+  derived params (B-02, W-03; `params.ts:99`), static params (E-01, E-04, E-07, X-05, K-09); external poses (K-08).
+- Checked host requirements: modules run as `async` bodies via `new Function` (`candela.ts:77`); no timers/fetch/DOM
+  in the front end; K-09 uses `atob`; D-02 uses `Math.random()` at build time.
+- Checked toolchain: NVRTC has `nvrtcGetOptiXIR`; nvJPEG ships with CUDA 13; OptiX 9.0 has `optixTraverse`/
+  `optixReorder`/`optixInvoke` and the AOV denoiser; `libnode-dev` 18.19.1 is the apt candidate (not installed).
+- Wrote doc 02 (sections: system in one page, background incl. V8 embedding, decisions D1–D10, TypeScript split with
+  types, session, determinism, targets, dialects, bundle; candela-rt structure, JsRuntime, OptixRenderer, device
+  programs and shim, output, CLI; live protocol and sequence; jobs; phases; tests; risks; API and file references).
+- Second pass found and fixed: RNG claim (the translated kernel keeps `pcgH`, so parity should be tighter than AO's),
+  phase 0 exit referenced an IR hash that only exists after phase 1, glowing analytic objects need a separate GAS
+  (masks are per instance), moving meshes need `motionBase = 0` until SRT motion, metering source named, evidence
+  moved from the scratchpad into the ticket.
+- Reworded three tasks to the doc-02 phases; added phase 0, 1 and 4 tasks; index lists doc 02.
+
+### Why
+- Callbacks (`animation`, behaviours, derived params) must run where frames are produced; with V8 in the native
+  process they run there directly, and the browser only needs to send inputs.
+
+### What worked
+- `docmgr doctor` clean (below).
+
+### What didn't work
+- First timing script failed as `.ts` with top-level await under tsx (`TransformError`); `.mts` works.
+
+### What I learned
+- Behaviours and the clock live in the app layer (`host.ts`), so the backend needs them moved into the engine
+  (`SceneSession`) — a refactor the browser also benefits from.
+- The largest JS cost of a build is diagnostics' stack capture, not scene code.
+
+### What was tricky to build
+- Keeping the replicated-front-end design honest: it only works with deterministic builds, hence seeded
+  `Math.random`, bundle-hash checks and an IR hash per build.
+
+### What warrants a second pair of eyes
+- D3 (embed V8 via libnode 18 / V8 10.2) versus a self-built V8; phase 0 decides.
+- D9 (single process) trades crash isolation for simplicity; the browser-owns-state rule is what makes it safe.
+
+### What should be done in the future
+- Phase 0 (needs `sudo apt install libnode-dev`) and the phase-1 golden recorder, before touching `compile.ts`.
+
+### Code review instructions
+- Read doc 02 sections 4–6 against `kernel.ts:523` (`traceAll`), `compile.ts:633` (`pack`), `host.ts:204–226`.
+
+### Technical details
+- Supersedes: the vault report's buffer-level `RemoteOptixBackend`; step 2 (Dawn runner) deferred (D10).
