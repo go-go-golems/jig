@@ -1,0 +1,22 @@
+# final validation 911759a 2026-11-21T19:39:03-05:00
+$ npm run typecheck
+typecheck: ok
+$ npm run typecheck:strict
+strict files: 0 implicit-any errors · rest of the repo: 1891 in 30 files (not enforced)
+$ npm test
+agent loop: ok — {"text":"Let me look.\n\nIt is 2.","truncated":false}
+$ npm run validate
+validate exit=0
+105/105 build
+validate: identical to original baseline
+$ npm run build
+✓ built in 3.00s
+$ npm run build:single
+dist-single/index.html  4,579.61 kB │ gzip: 1,832.44 kB
+✓ built in 3.33s
+$ shot B-01 webgl2 (dist)
+{"preset":"B-01","ok":true,"backend":"WebGL2","spp":1}
+no console errors
+$ shot M-07 webgl2 dark (dist-single)
+{"preset":"M-07","ok":true,"backend":"WebGL2","spp":1}
+no console errors

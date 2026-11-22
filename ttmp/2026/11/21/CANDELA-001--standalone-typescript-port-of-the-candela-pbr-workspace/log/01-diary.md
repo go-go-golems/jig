@@ -323,3 +323,71 @@ download. Then the UI layer was typed until `tsc --noEmit` is clean for the whol
 - Error code mapping: `AuthenticationError`/`PermissionDeniedError` → `not_granted`; `RateLimitError` →
   `rate_limited`; 400 mentioning prompt length → `prompt_too_large`; other `APIError` → `api_error`; abort →
   `cancelled`; `stop_reason: refusal` → `refused`.
+
+## Step 5: Typing ratchet, README, final validation and render parity
+
+Closed the last task: a ratchet so typing can tighten file by file, full types for the leaf modules every other
+module imports (diagnostics, units), a README, the in-app agent doc, and a final run of every gate. Also settled
+the Step 1 question about low headless sample counts by running the original build under the same harness.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Finish with documentation and evidence that the port is complete and faithful.
+**Inferred user intent:** A port that can be picked up and continued.
+**Commit (code):** 911759a — "Typing ratchet (noImplicitAny allowlist), typed diag/units/highlight, README"
+
+### What I did
+- `scripts/typecheck-strict.ts` (`npm run typecheck:strict`): runs `tsc --noImplicitAny` and fails only on
+  errors in an allowlist (`src/content/`, `src/app/claude.ts`, `highlight.ts`, `main.tsx`, `src/engine/units.ts`,
+  `diag.ts`, `kernel.ts`, `scripts/`, `tests/`). Rest of the repo: 1891 implicit anys in 30 files, reported but
+  not enforced.
+- `diag.ts`: `Loc`, `Severity`, `Diag`, `DiagOptions`; `CandelaError` fields typed. `units.ts`: `Dim`,
+  `Quantity` fields, `UnitFn` overloads (`u.lm(5)` → `Quantity`, `u.lm([…])` → `Quantity[]`).
+- `fx.ts` `stageError`: `loc.col - 1` → `(loc.col || 1) - 1` because `Loc.col` is optional; `callSite()` always
+  sets `col`, so behaviour is unchanged in practice.
+- `README.md`; `content/docs/23-agent.md` gained a "Connecting it" section.
+- Final gate log: `various/02-final-validation.txt`.
+
+### Why
+- The engine's builder DSL (proxies, method tables) is where most implicit anys live; forcing `noImplicitAny`
+  globally would mean weeks of annotations with real behaviour risk. A ratchet lets that happen incrementally.
+
+### What worked
+- `npm run typecheck` ok; `npm run typecheck:strict` → `strict files: 0 implicit-any errors`; `npm test` ok;
+  `npm run validate` → `105/105 build`, identical to the original baseline; `npm run build` ok;
+  `npm run build:single` → `dist-single/index.html 4,579.61 kB`; screenshots of `dist/` (B-01) and
+  `dist-single/` (M-07, dark) → `ok: true`, `no console errors`.
+- Parity: the original `sources/candela/dist/local.html`, served by the same `scripts/shot.ts` (DIST pointing at a
+  copy named `index.html`), M-07 dark WebGL2 → `{"ok":true,"backend":"WebGL2","spp":1}`, and its screenshot is
+  visually identical to the port's (`shots/orig-m07.png` vs `shots/final-m07-single.png`; same build stats
+  `12 objects · 5 kernels · 3 uniforms`, same `I205` diagnostic).
+
+### What didn't work
+- No failures in this step.
+
+### What I learned
+- The 0–1 spp after 8–12 s seen since Step 1 is the headless SwiftShader harness: the original build behaves the
+  same way, so it is not a port regression.
+
+### What was tricky to build
+- The ratchet must filter tsc output by path prefix, because `tsc` reports implicit anys in every file the program
+  includes; a per-file `tsconfig` would still pull in (and report on) imported modules.
+
+### What warrants a second pair of eyes
+- WebGPU has boot evidence (no errors, shaders compiling) but no converged-pixel evidence under SwiftShader; check
+  on real hardware.
+- The agent has not been exercised against the live API.
+
+### What should be done in the future
+- Grow the strict allowlist: `output.ts`, `video.ts`, `hdri.ts`, `wgsl2glsl.ts` next (self-contained), then
+  `params.ts`; give `compile.ts`'s state `S` an interface.
+- Port `tools/lockstitch/render.js` and the original browser tests (`test/out.js`, `test/video.js`,
+  `test/gallery.js`) to `scripts/` on the new harness.
+- A live agent smoke test once a key is available.
+
+### Code review instructions
+- `npm install && npm run typecheck && npm run typecheck:strict && npm test && npm run validate && npm run build`.
+- Then `npm run dev` and open `#B-01`; Agent → Connection to try the agent with a key.
+
+### Technical details
+- Ratchet output format: `strict files: N implicit-any errors · rest of the repo: M in K files (not enforced)`.
