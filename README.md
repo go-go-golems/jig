@@ -44,8 +44,50 @@ Open a preset directly with its id in the hash: `http://localhost:5173/#K-01`.
 | `content/docs/`, `content/reference.md` | the docs and the API reference (also the agent's reference) |
 | `content/gen/` | the Python scripts that generated the presets |
 | `scripts/`, `tests/` | validation, screenshots, typing ratchet, agent loop test |
-| `tools/lockstitch/` | the lockstitch-head converter and renderer (from the original workspace; not yet ported to TS) |
+| `tools/lockstitch/` | the lockstitch-head converter and renderer (from the original workspace); `render.ts --engine rt` renders the reel with candela-rt |
 | `spec/` | the API design spec |
+| `native/rt/` | `candela-rt`, the native render runtime (C++): embedded V8, CUDA/OptiX renderers, render jobs, live server — see below |
+| `native/optix/` | the standalone OptiX ambient-occlusion spike |
+| `ttmp/2026/11/21/CANDELA-00{1,2}--…/` | tickets: design docs, the implementation diaries, measurement evidence |
+
+## candela-rt: rendering on an NVIDIA GPU (DGX Spark)
+
+`candela-rt` runs Candela's engine unchanged in embedded V8, translates each scene's WGSL program to CUDA
+(`src/engine/wgsl2cuda.ts`), compiles it with NVRTC at run time, and renders it either as plain CUDA or on the RT
+cores through OptiX (`--backend auto` picks per scene). It renders stills and sequences (PNG, EXR, PFM, MP4 through
+NVENC), denoises with the OptiX AI denoiser (`--denoise ai`), and serves the workbench's **OptiX** viewport mode
+(`serve`). Design: `ttmp/…/CANDELA-002…/design-doc/02-…`; history and measurements: that ticket's `log/01-diary.md`.
+
+Prerequisites (tested on a DGX Spark: GB10 `sm_121`, Ubuntu arm64, CUDA 13.0, driver 580):
+
+- `sudo apt install libnode-dev zlib1g-dev cmake ninja-build ffmpeg` — V8 comes from Ubuntu's libnode; ffmpeg must
+  have `h264_nvenc` (Ubuntu's arm64 build does).
+- CUDA toolkit 13 (NVRTC, nvJPEG, the driver API).
+- The **OptiX SDK 9.0.0** headers, unpacked to `~/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64` (or pass
+  `-DOptiX_INSTALL_DIR=…`). The SDK version must match the driver's OptiX ABI: SDK 9.1 fails on driver 580 with
+  `OPTIX_ERROR_UNSUPPORTED_ABI_VERSION`.
+- IXWebSocket is fetched by CMake (FetchContent).
+
+```sh
+npm install
+npm run bundle:core                                   # dist-core/candela-core.js, the engine for embedded V8
+cmake -S native/rt -B build/rt -G Ninja && ninja -C build/rt
+
+./build/rt/candela-rt render K-09 --size 960x540 --spp 256            # still → PFM; add --format png,exr
+./build/rt/candela-rt render K-09 --param "scene=S-07 Whole head" --sequence --start 0 --end 1.9583 \
+    --size 1920x1080 --spp 16 --denoise ai --format mp4                # NVENC video, one stitch
+./build/rt/candela-rt serve --bind 0.0.0.0 --port 8790                # then toggle "OptiX" in the workbench
+```
+
+Job outputs go to `~/data/pbr-spark/renders/<preset>/` (a plain PFM still, used for parity checks, to
+`build/parity/`) unless `--out` is given. Compiled programs are cached in
+`~/data/candela/cubin-cache` (first compile of a scene: NVRTC 2–8 s, OptiX module 8–17 s; later runs: milliseconds).
+The workbench finds the server at `ws://<page host>:8790`, or at `?rt=ws://host:port` in the page URL. Over plain
+HTTP from another machine the browser has no WebGPU (not a secure context) and falls back to WebGL2 for its local
+view; the OptiX view is unaffected.
+
+Checks for this part: `npm run test:golden`, `npm run test:session`, `npx tsx scripts/parity-sweep.ts --size 320x180
+--spp 1` (WGSL on Dawn vs CUDA), `./build/rt/candela-rt cuda-sweep`.
 
 ## The agent
 
