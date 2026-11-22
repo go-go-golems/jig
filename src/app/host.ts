@@ -10,6 +10,7 @@ import { isParam } from '../engine/params';
 import { rayMesh } from '../engine/mesh';
 import { assets, parseHDR, fromRGBA8 } from '../engine/hdri';
 import { RenderQueue } from '../engine/output';
+import { stepBehaviors } from '../engine/session';
 import type { Preset, Doc } from '../content/catalog';
 
 const NS = 'candela.v1.';
@@ -202,18 +203,11 @@ export class Host {
   }
   // behaviours run on the host every frame; they move objects through transform overrides (a repack, never a recompile)
   runBehaviors(dt) {
-    const w = this.world(); this.anim = this.anim || new Map(); let moved = false;
-    for (const b of this.behaviors) {
-      try {
-        if (!b.id) { if (!this._bErr) { this._bErr = true; this.toast('a .behavior() needs the node to have an .id()', true); } continue; }
-        let st = this.anim.get(b.id);
-        if (!st) { const at = (b.comp.props.at || [0, 0, 0]).map(v => typeof v === 'number' ? v : +v || 0); st = { pos: at.slice(), rot: [0, 0, 0], scale: null }; this.anim.set(b.id, st); }
-        const self = { position: vecHandle(st.pos), rotation: vecHandle(st.rot), get scale() { return st.scale == null ? 1 : st.scale; }, set scale(v) { st.scale = +v; }, id: b.id };
-        b.fn(self, { t: this.time, dt, world: w, state: this.state || (this.state = {}) });
-        moved = true;
-      } catch (e) { if (!this._bErr) { this._bErr = true; this.toast('behavior: ' + e.message, true); } }
-    }
-    return moved;
+    this.anim = this.anim || new Map(); this.state = this.state || {};
+    return stepBehaviors(this.behaviors, { anim: this.anim, state: this.state }, {
+      t: this.time, dt, world: this.world(),
+      onError: m => { if (!this._bErr) { this._bErr = true; this.toast(m, true); } },
+    });
   }
   setRunning(on) { this.running = on; this.notify(); }
   // move the scene to time t (renders, the timeline): behaviours step by dt, poses and fields of time follow
@@ -378,7 +372,6 @@ export class Host {
   irGraph() { return this.result && this.result.scene ? irGraph(this.result.scene) : { nodes: ([] as any[]), edges: ([] as any[]) }; }
 }
 
-const vecHandle = a => new Proxy(a, { get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; }, set(t, k, v) { const i = { x: 0, y: 1, z: 2 }[k]; if (i != null) t[i] = +v; else t[k] = v; return true; } });
 function downscale(c, maxW) { if (c.width <= maxW) return c; const k = maxW / c.width; const d = document.createElement('canvas'); d.width = Math.round(c.width * k); d.height = Math.round(c.height * k); d.getContext('2d')!.drawImage(c, 0, 0, d.width, d.height); return d; }
 function findComp(sc, sel) { let hit: any = null; const v = c => { if (hit) return; if (matches(c, sel)) { hit = c; return; } (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (!hit && sc.props.camera && matches(sc.props.camera, sel)) hit = sc.props.camera; return hit; }
 function collect(sc, sel) { const out: any[] = []; const v = c => { if (matches(c, sel)) out.push(c); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); return out; }

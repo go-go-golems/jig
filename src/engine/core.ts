@@ -18,3 +18,41 @@ export async function digestCatalog(content: Record<string, string>, ids: string
 }
 
 export const version = 'candela-core 0';
+
+// ---- sessions: the scene's callbacks (animation, behaviours) running frame by frame, outside the browser ----
+export { SceneSession } from './session';
+import { SceneSession } from './session';
+import { digestBytes } from './digest';
+
+export interface SessionTrace {
+  id: string; ok: boolean; error?: string;
+  behaviors?: number; animated?: boolean;
+  frames?: { t: number; U: string; O: string; SDd: string }[];
+  frameMs?: number;            // mean seek + pack per frame
+}
+
+/** step one preset's session at `fps` for `frames` frames (behaviours step by 1/fps) and digest each frame's buffers */
+export async function sessionTrace(id: string, files: Record<string, string>, o: { fps: number; frames: number; seed?: number }): Promise<SessionTrace> {
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const s = new SceneSession({ seed: o.seed || 0 });
+  const r = await s.build(files);
+  if (!r.ok) return { id, ok: false, error: r.error ? String(r.error.message || r.error) : 'build failed' };
+  const frames: { t: number; U: string; O: string; SDd: string }[] = [];
+  let ms = 0;
+  for (let f = 0; f < o.frames; f++) {
+    const t = f / o.fps, t0 = now();
+    s.seek(t, f === 0 ? 0 : 1 / o.fps);
+    const P = s.pack();
+    ms += now() - t0;
+    frames.push({ t, U: digestBytes(P.U), O: digestBytes(P.O), SDd: digestBytes(P.SDd) });
+  }
+  return { id, ok: true, behaviors: s.behaviors.length, animated: !!s.compiled.animation, frames, frameMs: ms / o.frames };
+}
+
+/** session traces for the presets in `content` that move: those with behaviours or an animation export */
+export async function sessionCatalog(content: Record<string, string>, ids: string[] | null, o: { fps: number; frames: number; seed?: number }): Promise<SessionTrace[]> {
+  const presets = loadPresets(content).filter(p => (!ids || !ids.length || ids.includes(p.id)) && /\.behavior\(|export const animation|export function animation/.test(Object.values(p.files).join('\n')));
+  const out: SessionTrace[] = [];
+  for (const p of presets) out.push(await sessionTrace(p.id, p.files, o));
+  return out;
+}

@@ -18,7 +18,8 @@
     "lockstitch": "tsx tools/lockstitch/render.ts",
     "bundle:core": "tsx scripts/bundle-core.ts",
     "digest:core": "tsx scripts/core-digest.ts",
-    "test:golden": "tsx tests/golden-pack.test.ts"
+    "test:golden": "tsx tests/golden-pack.test.ts",
+    "test:session": "tsx tests/session.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

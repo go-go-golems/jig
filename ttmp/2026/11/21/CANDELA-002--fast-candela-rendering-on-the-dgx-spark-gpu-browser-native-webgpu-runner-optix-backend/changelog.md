@@ -43,3 +43,11 @@ Phase 0: candela-rt embeds V8 10.2 (libnode); engine bundle builds 105/105 prese
 ### Related Files
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/js_runtime.cpp — V8 embedding
+
+## 2026-11-21
+
+SceneSession: clock/behaviours/poses in the engine; candela-rt session steps 6/6 moving presets identically to Node
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/session.ts — SceneSession and shared pose/env/behaviour functions

@@ -769,3 +769,68 @@ update it at later ones.
   (`noteSceneRandom`, `withBuildLambda`), `tests/golden-pack.test.ts`, `src/engine/digest.ts` (`packEnv`).
 - Validate: `npm run test:golden` (105/105), `npm run bundle:core && ./build/rt/candela-rt digest --json /tmp/v8.json
   && npx tsx scripts/core-digest.ts --compare /tmp/v8.json` (105/105).
+
+## Step 13: SceneSession — clock, behaviours and poses move into the engine; callbacks run in embedded V8
+
+The backend must run scene callbacks without a browser, but the clock and behaviours lived in the app's `Host` and
+the pose/env logic in `Viewport`. I moved that logic into `src/engine/session.ts` as shared functions (the browser
+now calls them) plus a `SceneSession` class for headless hosts, added a test with closed-form answers, and a
+`candela-rt session` command. All six moving presets step identically in V8-in-C++ and Node, frame by frame.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11)
+**Assistant interpretation:** Next phase-1 item from design doc 02 §5.2.
+**Inferred user intent:** Callbacks running in the native process, without changing the browser.
+**Commit (code):** the commit after this entry ("CANDELA-002: SceneSession …")
+
+### What I did
+- `src/engine/session.ts`: `posesAt` (from `Viewport.posesFor`), `makePackEnv` (from `Viewport.repack`),
+  `vecHandle` and `stepBehaviors` (from `Host.runBehaviors`), moved verbatim; `SceneSession` (build with seed, clock,
+  behaviour state, external poses, `seek(t, dt)` with Host.seek's reset rule, `env`, `pack`, injected `world`).
+- `viewport.ts` `repack`/`posesFor` and `host.ts` `runBehaviors` now call them (one-toast error rule kept via
+  `onError`); `digest.ts` `packEnv` uses `makePackEnv`.
+- `tests/session.test.ts` (`npm run test:session`): W-01 stepped 48 frames at 24 fps, positions read back from `pack`'s
+  object records via `inv34` and compared with the closed forms in the preset; top rotation exact; reset on seek back;
+  K-09 session pack = viewport pack; D-02 determinism per seed.
+- Bundle exports `SceneSession`, `sessionTrace`, `sessionCatalog`; `candela-rt session` steps moving presets (those with
+  `.behavior(` or an `animation` export) and digests `U`, `O`, `SDd` per frame; `core-digest.ts --session` is the
+  Node side.
+
+### Why
+- Moving verbatim and making the browser use the moved code keeps one implementation; the golden test and a browser
+  render check that nothing changed.
+
+### What worked
+- Session test: W-01 max error 5.84e-8 over 48 frames; all checks pass. Golden 105/105. `validate` 105/105; agent test ok.
+- `candela-rt session`: 6/6 (W-01 behaviours; K-01, K-02, K-07, K-08, K-09 animation); Node: `6/6 identical frame by
+  frame`. Per-frame cost in V8: 0.04–1.0 ms.
+- Browser: W-01 sequence on WebGPU shows ball and pendulum moving (`various/14-w01-behaviours-webgpu-strip.png`).
+
+### What didn't work
+- My first test asserted that `seek(0, 0)` leaves no behaviour state; `Host.seek` (and the session) reset and then run
+  behaviours once with `dt = 0`, recreating fresh state. Corrected the test to check the top's rotation is back to 0.
+
+### What I learned
+- Behaviour overrides reach `pack` through `nodeXf` (`compile.ts:68–80`): position replaces `at`, rotation is applied
+  as x, y, z rotations after the node's own, scale multiplies the linear part.
+
+### What was tricky to build
+- Reading positions back: `O` holds world→object matrices in BVH order; `+21` maps back to `compiled.objects` (which
+  carry ids), and `inv34` gives the translation.
+
+### What warrants a second pair of eyes
+- `SceneSession.world` defaults to a minimal object (`time`, `ids`); W-01 doesn't use `world`. A behaviour that patches
+  the scene through `world.$(…)` works in the browser only for now.
+- The viewport still owns its own `seed`/`motionOverride`; the session mirrors them as fields.
+
+### What should be done in the future
+- The `lower`/targets split of `compile`/`pack`; then the CUDA dialect.
+
+### Code review instructions
+- `src/engine/session.ts`, the diffs in `viewport.ts` (`repack`, `posesFor`) and `host.ts` (`runBehaviors`),
+  `tests/session.test.ts`, `native/rt/src/main.cpp` `cmdSession`.
+- Validate: `npm run test:session && npm run test:golden && npm run bundle:core && ninja -C build/rt &&
+  ./build/rt/candela-rt session --json /tmp/s.json && npx tsx scripts/core-digest.ts --session --compare /tmp/s.json`.
+
+### Technical details
+- Evidence: `various/14-scene-session.txt`.

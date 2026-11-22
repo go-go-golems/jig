@@ -4,6 +4,7 @@
 //   - cross-engine checks (phase 0): the same bundle in Node and in V8 embedded in candela-rt must agree.
 // Plain JavaScript only (no crypto, no Node APIs), so it runs unchanged in any V8.
 import { build } from './candela';
+import { posesAt, makePackEnv } from './session';
 
 /** a 64-bit hash (two independent 32-bit lanes, murmur3-style mixing) of an ArrayBuffer view, as 16 hex digits */
 export function digestBytes(v: ArrayBufferView): string {
@@ -28,17 +29,10 @@ export function digestString(s: string): string {
   return digestBytes(u16);
 }
 
-/** the `env` the viewport passes to `pack` at time t (Viewport.repack, src/engine/viewport.ts): poses from the scene's
- *  animation, the seed, and motion-blur samples across the shutter when the camera asks for them */
+/** the `env` the viewport passes to `pack` at time t (Viewport.repack): poses from the scene's animation, the seed,
+ *  and motion-blur samples across the shutter when the camera asks for them — the shared session.ts implementation */
 export function packEnv(compiled: any, animation: ((t: number) => any) | null, time: number, seed = 0): Record<string, any> {
-  const poses = (t: number) => (animation ? animation(t) : null);
-  const env: Record<string, any> = { time, overrides: null, poses: poses(time), seed };
-  const mb = compiled.motionBlur;
-  if (mb && mb.interval > 0 && mb.steps >= 2) {
-    const K = mb.steps;
-    env.motion = { samples: Array.from({ length: K }, (_, k) => { const tk = time + (k / (K - 1) - 0.5) * mb.interval; return { time: tk, poses: poses(tk) }; }) };
-  }
-  return env;
+  return makePackEnv(t => posesAt(animation, null, t), { time, overrides: null, seed, motion: compiled.motionBlur });
 }
 
 /** hashes of everything `pack` returns at one moment, with the viewport's env */

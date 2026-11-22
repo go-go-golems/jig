@@ -1,5 +1,6 @@
 // viewport.js — drives a backend: compiles a scene's shaders, packs and uploads its data, accumulates samples,
 // meters the exposure, and answers screenshots and light-meter readings.
+import { posesAt, makePackEnv } from './session';
 import { GPURenderer, GLRenderer, displaySource, TONEMAP_IX, type Backend } from './render';
 import { cameraUniforms, U_BASE, vec3 as V } from './compile';
 import { cmf, xyzToLinearSRGB, Gen, genFunction, lift, E, node, withTracer, nodeOf, constNode, parseColor } from './fx';
@@ -96,26 +97,15 @@ export class Viewport {
   repack(time = 0, overrides = null) {
     if (!this.compiled) return;
     this.time = time;
-    const env: any = { time, overrides: overrides || this.overrides || null, poses: this.posesFor(time), seed: this.seed || 0 };
-    // motion blur: the scene at `steps` instants across the shutter, centred on now
     const mb = this.motionOverride !== undefined ? this.motionOverride : this.compiled.motionBlur;
-    if (mb && mb.interval > 0 && mb.steps >= 2) {
-      const K = mb.steps;
-      env.motion = { samples: Array.from({ length: K }, (_, k) => { const tk = time + (k / (K - 1) - 0.5) * mb.interval; return { time: tk, poses: this.posesFor(tk) }; }) };
-    }
+    const env = makePackEnv(t => this.posesFor(t), { time, overrides: overrides || this.overrides || null, seed: this.seed || 0, motion: mb });
     this.packed = this.compiled.pack(env);
     this.backend.upload(this.packed);
     this.reset();
   }
   // poses (id → world matrix) at time t: the scene's `export const animation`, then poses pushed from outside
   // (setPoses: a map, or a function of time), which win
-  posesFor(t) {
-    const a = this.compiled && this.compiled.animation, x = this.externalPoses;
-    let P: any = null;
-    if (a) { try { P = a(t); this.poseError = null; } catch (e) { this.poseError = e.message; } }
-    if (x) { const X = typeof x === 'function' ? x(t) : x; const obj = m => (m instanceof Map ? Object.fromEntries(m) : m || {}); P = Object.assign({}, obj(P), obj(X)); }
-    return P;
-  }
+  posesFor(t) { return posesAt(this.compiled && this.compiled.animation, this.externalPoses, t, m => { this.poseError = m; }); }
   get animated() { return !!(this.compiled && (this.compiled.animation || typeof this.externalPoses === 'function')); }
   setPoses(p) { this.externalPoses = p || null; if (this.compiled) this.repack(this.time || 0); }
   setSeed(n) { this.seed = n >>> 0; this.reset(); }
