@@ -1,6 +1,7 @@
 // render.js — progressive rendering on the GPU: WebGPU compute when the browser has it, WebGL2 fragment shaders
 // otherwise. Both run the same kernel source; post-processing (denoise, exposure, tone map, false colour, user
 // passes) is shared WGSL too. Shaders are cached by their source, so moving a slider never recompiles.
+import { WGSL_PRELUDE, WGSL_MAIN } from './wgsl-entry';
 import { wgslToGlsl } from './wgsl2glsl';
 import { POST } from './kernel';
 
@@ -112,38 +113,13 @@ export class GPURenderer {
     device.lost.then(i => { r.lost = true; r.lostInfo = i && i.message; });
     return r;
   }
-  prelude(nU?) {
-    return `@group(0) @binding(0) var<storage, read> uni: array<vec4f>;
-@group(0) @binding(1) var<storage, read> objs: array<vec4f>;
-@group(0) @binding(2) var<storage, read> lits: array<vec4f>;
-@group(0) @binding(3) var<storage, read> bvhs: array<vec4f>;
-@group(0) @binding(4) var<storage, read> sd: array<vec4f>;
-@group(0) @binding(5) var<storage, read_write> accum: array<vec4f>;
-@group(0) @binding(6) var<storage, read_write> aovA: array<vec4f>;
-@group(0) @binding(7) var<storage, read_write> aovN: array<vec4f>;
-fn U(i: i32) -> vec4f { return uni[i]; }
-fn objF(i: i32) -> vec4f { return objs[i]; }
-fn litF(i: i32) -> vec4f { return lits[i]; }
-fn bvhF(i: i32) -> vec4f { return bvhs[i]; }
-fn sdF(i: i32) -> vec4f { return sd[i]; }
-`;
-  }
+  prelude(nU?) { return WGSL_PRELUDE; }
   async compile(compiled, dispSrc) {
     const dev = this.device;
     const key = compiled.shared;
     let pipe = this.cache.get(key);
     if (!pipe) {
-      const code = this.prelude(compiled.nU) + compiled.shared + `
-@compute @workgroup_size(8, 8)
-fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let res: vec2f = U(0).xy;
-  if (f32(gid.x) >= res.x || f32(gid.y) >= res.y) { return; }
-  let o: PixOut = renderPixel(vec2f(f32(gid.x), f32(gid.y)), u32(U(0).z));
-  let ix: u32 = gid.y * u32(res.x) + gid.x;
-  if (U(0).z < 0.5) { accum[ix] = o.c; if (i32(U(21).w) != 20) { aovA[ix] = o.alb; aovN[ix] = o.nrm; } }
-  else { accum[ix] = accum[ix] + o.c; aovA[ix] = aovA[ix] + o.alb; aovN[ix] = aovN[ix] + o.nrm; }
-}
-`;
+      const code = this.prelude(compiled.nU) + compiled.shared + WGSL_MAIN;
       const mod = dev.createShaderModule({ code });
       const info = await mod.getCompilationInfo();
       const errs = info.messages.filter(m => m.type === 'error');

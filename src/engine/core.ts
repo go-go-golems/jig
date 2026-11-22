@@ -56,3 +56,31 @@ export async function sessionCatalog(content: Record<string, string>, ids: strin
   for (const p of presets) out.push(await sessionTrace(p.id, p.files, o));
   return out;
 }
+
+// ---- headless rendering: the CUDA translation and the buffers a native renderer needs ----
+export { wgslToCuda } from './wgsl2cuda';
+export { cudaProgram } from './targets/cuda';
+export { openRender } from './headless';
+import { openRender, type HeadlessOptions } from './headless';
+import { cudaProgram } from './targets/cuda';
+import { build } from './candela';
+
+/** openRender for a preset of `content` by id */
+export async function openRenderPreset(content: Record<string, string>, id: string, o: HeadlessOptions) {
+  const p = loadPresets(content).find(q => q.id === id);
+  if (!p) return { ok: false, error: `no preset ${id}` };
+  return openRender(p.files, o);
+}
+
+/** the CUDA program of every preset (or `ids`), for the NVRTC sweep: { id, ok, error?, source?, hash, lines, … } */
+export async function cudaCatalog(content: Record<string, string>, ids: string[] | null, target: 'cuda' | 'optix' = 'cuda') {
+  const out: any[] = [];
+  for (const p of loadPresets(content).filter(q => !ids || !ids.length || ids.includes(q.id))) {
+    try {
+      const r: any = await build(p.files);
+      if (!r.ok) { out.push({ id: p.id, ok: false, stage: 'build', error: String(r.error && r.error.message || r.error) }); continue; }
+      out.push({ id: p.id, ok: true, ...cudaProgram(r.compiled, target) });
+    } catch (e: any) { out.push({ id: p.id, ok: false, stage: 'translate', error: String(e.message || e) }); }
+  }
+  return out;
+}

@@ -191,16 +191,26 @@ v8::Local<v8::Value> JsRuntime::settle(v8::Local<v8::Value> v) {
 
 v8::Local<v8::Value> JsRuntime::call(const char* objectName, const char* method, std::initializer_list<v8::Local<v8::Value>> args) {
   auto ctx = context();
-  v8::TryCatch tc(iso_);
   v8::Local<v8::Value> objV;
   if (!ctx->Global()->Get(ctx, str(objectName)).ToLocal(&objV) || !objV->IsObject()) throw JsError(std::string("no global object ") + objectName);
-  auto obj = objV.As<v8::Object>();
+  return callMethod(objV.As<v8::Object>(), method, args);
+}
+
+v8::Local<v8::Value> JsRuntime::callMethod(v8::Local<v8::Object> obj, const char* method, std::initializer_list<v8::Local<v8::Value>> args) {
+  auto ctx = context();
+  v8::TryCatch tc(iso_);
   v8::Local<v8::Value> fnV;
-  if (!obj->Get(ctx, str(method)).ToLocal(&fnV) || !fnV->IsFunction()) throw JsError(std::string(objectName) + "." + method + " is not a function");
+  if (!obj->Get(ctx, str(method)).ToLocal(&fnV) || !fnV->IsFunction()) throw JsError(std::string(method) + " is not a function");
   std::vector<v8::Local<v8::Value>> argv(args);
   auto r = fnV.As<v8::Function>()->Call(ctx, obj, (int)argv.size(), argv.data());
   if (r.IsEmpty()) rethrow(tc);
   return settle(r.ToLocalChecked());
+}
+
+v8::Local<v8::Value> JsRuntime::get(v8::Local<v8::Value> obj, const char* key) const {
+  v8::Local<v8::Value> v;
+  if (!obj->IsObject() || !obj.As<v8::Object>()->Get(context(), str(key)).ToLocal(&v)) return v8::Undefined(iso_);
+  return v;
 }
 
 }  // namespace crt

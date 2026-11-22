@@ -3,6 +3,28 @@
 // below (one implementation); SceneSession bundles them for hosts without a browser, such as candela-rt, where the
 // scene's callbacks (animation(t), .behavior(), derived params) run in embedded V8.
 import { build } from './candela';
+import { cameraUniforms } from './compile';
+import { cmf, xyzToLinearSRGB } from './fx';
+
+// white balance for the spectral engine: the flat spectrum renders as (1, 1, 1)
+const WB = (() => { const s: [number, number, number] = [0, 0, 0]; for (let l = 380; l < 780; l += 1) { const c = xyzToLinearSRGB(cmf(l + 0.5)); for (let i = 0; i < 3; i++) s[i] += c[i]; } return s.map(v => 106.857 / v); })();
+
+/** write the per-frame uniforms into U (moved from Viewport.frame): size, sample index, camera, integrator settings,
+ *  white balance, seed. `spp` is the number of samples accumulated so far (0 restarts accumulation). */
+export function frameUniforms(U: Float32Array, compiled: any, o: { width: number; height: number; spp: number; time: number; view?: any; focusPoint?: any; seed?: number }) {
+  const engine = compiled.engine || {};
+  const cam = cameraUniforms(compiled.cameraComp, { width: o.width, height: o.height, time: o.time, view: o.view, focusPoint: o.focusPoint });
+  const integ = engine.integrator || {};
+  const mode = ({ path: 0, albedo: 1, normals: 2, depth: 3, ao: 4, custom: 9 } as Record<string, number>)[integ.__integrator] || 0;
+  const sppF = Math.max(1, engine.sppPerFrame || 1);
+  U.set([o.width, o.height, o.spp === 0 ? 0 : o.spp + 1, sppF], 0);
+  U.set(cam.U1, 4); U.set(cam.U2, 8); U.set(cam.U3, 12); U.set(cam.U4, 16);
+  U.set([1, integ.maxDepth || 8, integ.rrAfter || 3, (integ.nee === false ? 0 : 1) | (integ.mis === 'none' ? 0 : 2)], 20);
+  U[80] = cam.bladeRot || 0; U[81] = integ.radius || 0.5; U[82] = integ.clamp || 0;
+  U[84] = compiled.spectral ? WB[0] : 1; U[85] = compiled.spectral ? WB[1] : 1; U[86] = compiled.spectral ? WB[2] : 1; U[87] = mode;
+  U[96] = o.seed || 0;
+  return { cam, sppF };
+}
 
 export type Poses = Record<string, any> | Map<string, any> | null;
 export type PoseSource = Poses | ((t: number) => Poses);

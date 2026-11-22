@@ -34,6 +34,10 @@ class JsRuntime {
   void runScript(const std::string& source, const std::string& name);
   // globalThis.<objectName>.<method>(args…); if the result is a promise, pump microtasks until it settles
   v8::Local<v8::Value> call(const char* objectName, const char* method, std::initializer_list<v8::Local<v8::Value>> args);
+  // obj.<method>(args…), with the same promise handling
+  v8::Local<v8::Value> callMethod(v8::Local<v8::Object> obj, const char* method, std::initializer_list<v8::Local<v8::Value>> args);
+  // obj[key], or undefined
+  v8::Local<v8::Value> get(v8::Local<v8::Value> obj, const char* key) const;
   // wait for a promise: microtask checkpoints and platform tasks until it is no longer pending
   v8::Local<v8::Value> settle(v8::Local<v8::Value> maybePromise);
 

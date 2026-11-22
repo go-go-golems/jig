@@ -1,13 +1,11 @@
 // viewport.js — drives a backend: compiles a scene's shaders, packs and uploads its data, accumulates samples,
 // meters the exposure, and answers screenshots and light-meter readings.
-import { posesAt, makePackEnv } from './session';
+import { posesAt, makePackEnv, frameUniforms } from './session';
 import { GPURenderer, GLRenderer, displaySource, TONEMAP_IX, type Backend } from './render';
-import { cameraUniforms, U_BASE, vec3 as V } from './compile';
-import { cmf, xyzToLinearSRGB, Gen, genFunction, lift, E, node, withTracer, nodeOf, constNode, parseColor } from './fx';
+import { U_BASE, vec3 as V } from './compile';
+import { Gen, genFunction, lift, E, node, withTracer, nodeOf, constNode, parseColor } from './fx';
 import { CandelaError } from './diag';
 
-// white balance for the spectral engine: the flat spectrum renders as (1, 1, 1)
-const WB = (() => { const s: [number, number, number] = [0, 0, 0]; for (let l = 380; l < 780; l += 1) { const c = xyzToLinearSRGB(cmf(l + 0.5)); for (let i = 0; i < 3; i++) s[i] += c[i]; } return s.map(v => 106.857 / v); })();
 
 export class Viewport {
   canvas: HTMLCanvasElement & { __gpuUsed?: boolean };
@@ -133,17 +131,8 @@ export class Viewport {
     // the frame's time: given, or the time the scene was last packed at (renders, seeks) — shading fields of time,
     // a moving camera and the packed poses all agree
     const tNow = o.time != null ? o.time : (this.time || 0);
-    const cam = cameraUniforms(this.compiled.cameraComp, { width: w, height: h, time: tNow, view: this.view, focusPoint: this.focusPoint });
+    const { cam, sppF } = frameUniforms(U, this.compiled, { width: w, height: h, spp: this.spp, time: tNow, view: this.view, focusPoint: this.focusPoint, seed: this.seed || 0 });
     this.cam = cam;
-    const integ = this.engine.integrator || {};
-    const mode = { path: 0, albedo: 1, normals: 2, depth: 3, ao: 4, custom: 9 }[integ.__integrator] || 0;
-    const sppF = Math.max(1, this.engine.sppPerFrame || 1);
-    U.set([w, h, this.spp === 0 ? 0 : this.spp + 1, sppF], 0);
-    U.set(cam.U1, 4); U.set(cam.U2, 8); U.set(cam.U3, 12); U.set(cam.U4, 16);
-    U.set([1, integ.maxDepth || 8, integ.rrAfter || 3, (integ.nee === false ? 0 : 1) | (integ.mis === 'none' ? 0 : 2)], 20);
-    U[80] = cam.bladeRot || 0; U[81] = integ.radius || 0.5; U[82] = integ.clamp || 0;
-    U[84] = this.compiled.spectral ? WB[0] : 1; U[85] = this.compiled.spectral ? WB[1] : 1; U[86] = this.compiled.spectral ? WB[2] : 1; U[87] = mode;
-    U[96] = this.seed || 0;
     b.setUniforms(U);
     b.trace();
     this.spp += sppF;

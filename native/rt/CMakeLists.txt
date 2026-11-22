@@ -16,6 +16,11 @@ endif()
 find_path(V8_INCLUDE_DIR v8.h PATHS /usr/include/node NO_DEFAULT_PATH REQUIRED)
 find_library(NODE_LIB node REQUIRED)
 
-add_executable(candela-rt src/main.cpp src/js_runtime.cpp)
+# Phase 2: the plain-CUDA target — NVRTC compiles each scene's translated program, the driver API runs it.
+find_package(CUDAToolkit REQUIRED)
+
+add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp)
 target_include_directories(candela-rt PRIVATE ${V8_INCLUDE_DIR} src)
-target_link_libraries(candela-rt PRIVATE ${NODE_LIB} pthread)
+target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc pthread)
+# where NVRTC finds candela_wgsl.h and the target headers when --kernels is not given
+target_compile_definitions(candela-rt PRIVATE CANDELA_KERNELS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/kernels")
