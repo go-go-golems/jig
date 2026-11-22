@@ -13,11 +13,12 @@
 import { labScope, filesObject } from '../scope.js';
 
 export const BRIDGED = ['run', 'look', 'exportFile', 'params.set', 'params.clear', 'presets.create', 'presets.load',
-  'presets.rename', 'select', 'view.set', 'lab.follow', 'files.write', 'files.edit', 'files.rename', 'files.remove'];
+  'presets.rename', 'select', 'view.set', 'lab.follow', 'files.write', 'files.edit', 'files.rename', 'files.remove',
+  'fea.result', 'fea.faces'];
 export const RAW_CALL = '__call';
 // calls after which the sandbox's mirror is out of date
 export const CHANGES = new Set(['files.write', 'files.edit', 'files.rename', 'files.remove', 'run', 'params.set', 'params.clear',
-  'presets.load', 'presets.create', 'presets.rename', 'select', 'view.set', 'lab.follow']);
+  'presets.load', 'presets.create', 'presets.rename', 'select', 'view.set', 'lab.follow', 'fea.result', 'fea.faces']);
 
 const plainView = v => (v ? { name: v.name ?? null, overlays: v.overlays ? [...v.overlays] : [], shown: v.shown ? [...v.shown] : [] } : null);
 const presetMeta = p => (p ? { id: p.id, title: p.title, group: p.group, about: p.about } : null);

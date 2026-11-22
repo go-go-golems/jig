@@ -38,8 +38,26 @@ import('./engine/rs/index.js').then(RS => {
 
 render(<App host={host} />, document.getElementById('root'));
 
-const presets = host.presets();
-const first = store.get('preset');
-const id = presets.some(p => p.id === first) ? first : presets[0]?.id;
-if (id) host.loadPreset(id);
-else host.loadScratch({ 'script.js': "return j.part('box')\n  .params({ w: mm(60), d: mm(40), h: mm(30) })\n  .extrude(j.sketch('base', { on: j.plane.XY }).rect('outline', 'w', 'd', { center: true }).profiles(), 'h', { id: 'body' })\n" }, { title: 'A first box', about: 'no presets were bundled, so here is a box' });
+function writePresetUrl(preset, replace = false) {
+  const url = new URL(location.href), name = preset.slug || preset.id;
+  if (url.searchParams.get('preset') === name) return;
+  url.searchParams.set('preset', name);
+  if (replace) history.replaceState(history.state, '', url);
+  else history.pushState(history.state, '', url);
+}
+
+function openPresetFromUrl() {
+  const presets = host.presets();
+  const requested = new URLSearchParams(location.search).get('preset');
+  const stored = store.get('preset');
+  const preset = (requested ? presets.find(p => p.slug === requested || p.id === requested) : null)
+    ?? presets.find(p => p.id === stored) ?? presets[0];
+  if (!preset) return false;
+  writePresetUrl(preset, true);
+  if (preset.id !== host.preset?.id) host.loadPreset(preset.id);
+  return true;
+}
+
+host.on('preset', preset => writePresetUrl(preset));
+window.addEventListener('popstate', openPresetFromUrl);
+if (!openPresetFromUrl()) host.loadScratch({ 'script.js': "return j.part('box')\n  .params({ w: mm(60), d: mm(40), h: mm(30) })\n  .extrude(j.sketch('base', { on: j.plane.XY }).rect('outline', 'w', 'd', { center: true }).profiles(), 'h', { id: 'body' })\n" }, { title: 'A first box', about: 'no presets were bundled, so here is a box' });

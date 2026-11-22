@@ -12,6 +12,10 @@ import { MechanismSolver, runStudy, studyApi, equationCount, COORDS, coordKey } 
 import { q as quantity } from './units.js';
 import { toKine } from './kine.js';
 import { gearSpecOf, meshReport } from './gears.js';
+import { massProps, kinematics, reactions as jointReactions, magnitude } from './dynamics.js';
+import { material as materialOf } from './inspect.js';
+import { isQuantity } from './units.js';
+import { G0, acceleration, force, moment } from './vectors.js';
 
 const V = K.V;
 const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, pinSlot: 2, planar: 3, ball: 3, snap: 0 };
@@ -60,6 +64,15 @@ class Assembly {
   study(name, o = {}) { return this._w({ studies: [...(this.o.studies ?? []), { name, ...o }] }); }
   report(name, fn, o = {}) { return this._w({ reports: [...(this.o.reports ?? []), { name, fn, unit: o.unit ?? '', digits: o.digits ?? 3 }] }); }
   explode(steps) { return this._w({ explode: steps }); }
+  // forces (spec v0.2, layer 5): the drive's speed turns per-radian rates into per-second ones; gravity (−Z, 1 g, by
+  // default once forces are asked for); wrenches on a port, a vector or a lambda of the study row (null: none);
+  // reactions(study) adds the joint forces, the driving torques and the bodies' accelerations to that study's rows
+  speed(jointId, value) { return this._w({ speed: { joint: jointId, value } }); }
+  gravity(v = '-Z') { return this._w({ gravity: v }); }
+  wrench(ref, fn, o = {}) { return this._w({ wrenches: [...(this.o.wrenches ?? []), { ref, fn, at: o.at ?? null, moment: o.moment ?? null, label: o.label ?? ref, line: callerLine() }] }); }
+  reactions(study = null, o = {}) { return this._w({ reactions: [...(this.o.reactions ?? []), { study, ...o }] }); }
+  // the loads one component carries at a pose of a study, for a stress study (j.fea(…).from(asm, { component, … }))
+  loadCase(from, opts, h) { return loadCaseOf(this, from, opts, h); }
   // interference(ids?, { study?, pairs?, every?, within?, clearance?, volume?, exact? }): with a study, every
   // sampled pose of it is checked; overlaps report the shared volume V(a ∩ b) = V(a) + V(b) − V(a ∪ b)
   interference(ids, o = {}) { return this._w({ interference: Array.isArray(ids) ? { ...o, ids } : { ...(ids ?? {}) } }); }
@@ -99,12 +112,13 @@ function programOf(name, solved, { t0, opts, finalize }) {
     ports: (mech?.ports ?? []).filter(pf => !pf.ref.includes(':@rigid')), origins: mech?.origins ?? {}, fixed: mech?.ground ?? [],
     mobility: mob, assembled: mech?.assembled ?? true, conflicts: mech?.conflicts ?? [], residual: mech?.residual ?? 0,
     drives: mech?.drives ?? {}, couples: mech?.couples ?? [],
-    measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [],
+    measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [], forces: mech?.forces ?? null,
     // the bill of materials nests by subassembly; prog.bom({ group: 'flat' }) lists the parts alone
     bom: bomOf(eff.tree.children) };
   const prog = finalize({ kind: 'assembly', name, parts, t0, opts, assembly: info, occurrences, placements,
     extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace,
     extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
+  prog.P.mech = mech; prog.P.comp = comp;
   prog.bom = (bo = {}) => (bo.group === 'flat' ? flatBom(info.bom) : info.bom);
   // the product structure (STEP export): parts and subassemblies with their placements now
   prog.structure = () => structureOf(eff.tree, comp, name); prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
@@ -271,6 +285,7 @@ export function solveAssembly(asm, opts, compilePart) {
   const RESERVED = new Set(['x', 'q', 'ok', 'move', 'limit']);
   for (const m of o.measures ?? []) if (RESERVED.has(m.name)) diagnostics.push({ level: 'error', kind: 'asm.measure', at: m.name, message: `a measure cannot be called '${m.name}': study rows use that name`, fix: `rename it, e.g. '${m.name}1'` });
   const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {};
+  let forceCtx = null; const dynLive = {};
   let measured = {}, reports = [];
   if (assembled && !opts.forPrint) {
     measured = S.read(measures);
@@ -285,9 +300,22 @@ export function solveAssembly(asm, opts, compilePart) {
       // interference over the study: the named one(s), or every sweep when .interference() names none
       const ifr = o.interference, swept = !!ifr && (ifr.study ? [ifr.study].flat().includes(st.name) : st.name.startsWith('sweep:'));
       const poses = [];
+      // forces over the study (layer 5): joint reactions, driving torques and accelerations at every pose
+      const dynOn = !!jn && (o.reactions ?? []).some((r) => r.study == null || r.study === st.name);
+      const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
       const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps: st.steps ?? 360,
-        onRow: swept ? (k) => { poses[k] = S.transforms(); } : null }, measures, o.events ?? []);
+        onRow: swept || dynOn ? (k, row) => { if (swept) poses[k] = S.transforms(); if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } : null }, measures, o.events ?? []);
       studies[st.name] = res;
+      if (dynOn) {
+        const keys = Object.keys(dyn.find(Boolean)?.readings ?? {});
+        for (const k of keys) { res.keys.push(k); res.extrema[k] = extremaOf(res.rows, k); }
+        res.forces = dyn.map((d) => d && { joints: Object.fromEntries(Object.entries(d.joints).map(([id, w]) => [id, { F: w.F.map(r6), M: w.M.map(r6), at: w.at.map(r6) }])), drives: d.drives });
+        res.rate = F.rate(st.drive); res.gravity = F.g;
+        dynLive[st.name] = dyn;
+        const worst = Math.max(0, ...dyn.filter(Boolean).map((d) => d.residual));
+        if (worst > 1e-6) diagnostics.push({ level: 'warning', kind: 'asm.forces', at: st.name, message: `the joints cannot hold the loads in balance at every pose (residual ${(worst * 100).toFixed(2)} %): a free motion is not driven, or a load pushes along it`, fix: 'drive or couple every free joint, or check the loads' });
+        trace.push({ pass: `forces:${st.name}`, level: 'L5', ms: 0, cached: false, note: `${dyn.filter(Boolean).length} poses, ${F.rate(st.drive) ? 'inertia at ' + F.rate(st.drive).toFixed(3) + (jn.kind === 'slider' ? ' mm/s' : ' rad/s') : 'statics (no .speed())'}` });
+      }
       if (swept && !res.error) {
         const tc = performance.now(), c = studyClearance(res, poses, comp, ifr, diagnostics, decisions);
         res.clearance = c.pairs;
@@ -299,11 +327,12 @@ export function solveAssembly(asm, opts, compilePart) {
       if (res.jump != null) diagnostics.push({ level: 'warning', kind: 'asm.branchJump', at: st.name, message: `a component jumped at ${res.jump.toFixed(1)}${res.unit}: the solution changed branch`, fix: 'use more steps, or a hint that starts on the other branch' });
       trace.push({ pass: `study:${st.name}`, level: 'L5', ms: performance.now() - tq, cached: false, note: `${res.rows.length} poses, ${res.events.length} event(s)` });
     }
+    for (const r of o.reactions ?? []) if (r.study != null && !studies[r.study]) diagnostics.push({ level: 'error', kind: 'asm.forces', at: String(r.study), message: `reactions: no study '${r.study}'`, fix: Object.keys(studies).length ? `one of ${Object.keys(studies).map((k) => `'${k}'`).join(', ')}, or asm.study('${r.study}', { drive, from, to, steps })` : `asm.study('${r.study}', { drive, from, to, steps })` });
     for (const name of [ifrStudies(o.interference)].flat().filter(Boolean)) if (!studies[name]) diagnostics.push({ level: 'error', kind: 'asm.interference', at: name, message: `interference: no study '${name}'`, fix: `asm.study('${name}', { drive, from, to, steps })` });
     const api = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, studyApi(v)]));
     reports = (o.reports ?? []).map(r => { let value = null, error = null; try { value = r.fn({ studies: api, measures: measured, mobility, joints: S.jointValues() }); } catch (e) { error = e.message; } return { name: r.name, value: typeof value === 'number' ? value : value == null ? null : String(value), unit: r.unit, digits: r.digits, error }; });
     for (const r of reports) if (r.error) diagnostics.push({ level: 'error', kind: 'asm.report', at: r.name, message: r.error });
-    if (S.measureError) diagnostics.push({ level: 'warning', kind: 'asm.measure', at: 'measure', message: S.measureError });
+    diagnostics.push(...S.calls.diagnostics());   // every lambda that threw, named, with where (mechanism.js UserCalls)
   }
   const T = S.transforms();
   [...comp.keys()].forEach((id, i) => { comp.get(id).T = T[i]; });
@@ -329,7 +358,8 @@ export function solveAssembly(asm, opts, compilePart) {
     return out;
   };
   const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
-  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
+  if (forceCtx?.redundantNote && mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.forcesSplit', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation(s) repeat: how ${mobility.redundantJoints.join(', ')} share the load along them is not fixed by statics; the least split is reported`, fix: 'a stress study of the parts that share it (bonded, with their stiffness) settles the split' });
+  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), dyn: dynLive, forces: forceCtx ? { gravity: forceCtx.g, masses: forceCtx.table, speed: o.speed ? { joint: o.speed.joint, rate: forceCtx.rate(o.speed.joint) } : null } : null, couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
     ports: S.portFrames(), origins: Object.fromEntries(S.bodies.map((b) => [b.id, b.t.slice()])), ground: S.bodies.filter((b) => b.ground).map((b) => b.id) };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
@@ -553,6 +583,125 @@ function pairOverlap(A, B, TA, TB) {
   return v;
 }
 
+// ── forces (spec v0.2, layer 5) ─────────────────────────────────────────────────────────────────────────────────
+const r6 = (x) => +x.toPrecision(6);
+// gravity reads as a stress study's does (vectors.js): '-Z' is 1 g, [x, y, z] a vector in g; false leaves it out
+function gDir(v) {
+  if (v === false || v === null) return null;
+  if (v === undefined) return [0, 0, -G0];
+  return acceleration(v, { what: 'gravity' });
+}
+// masses from the parts (each component's bodies, in its own frame) and their materials; the drive rates; wrenches
+function forceSetup(S, comp, o, diagnostics, decisions) {
+  const masses = new Map(), table = [];
+  const ids = [...comp.keys()];
+  ids.forEach((id, i) => {
+    const X = comp.get(id), bi = S.index.get(id);
+    if (bi == null || S.bodies[bi].ground) return;
+    const named = X.c.item.meta?.material;
+    const mat = materialOf(named ?? 'PLA');
+    if (!named) decisions.push({ at: id, kind: 'mass', chose: `${mat.name} (${mat.density} g/cm³)`, alternatives: [], reason: `${X.c.item.name} names no material: .material(j.material('steel')) on the part` });
+    const mp = massProps(X.res.state.bodies.map((b) => meshBody(b)), mat.density * 1e-9);
+    masses.set(bi, mp);
+    table.push({ id, material: mat.name, mass: r6(mp.mass * 1e6), c: mp.c.map(r6) });   // grams
+  });
+  const g = gDir(o.gravity);
+  decisions.push({ at: 'forces', kind: 'gravity', chose: g ? `[${g.map((x) => +(x / G0).toFixed(4))}] g` : 'none', alternatives: [], reason: o.gravity === undefined ? 'jig’s +Z is up; .gravity(false) leaves weight out' : 'set by .gravity()' });
+  const num = (v) => (isQuantity(v) ? v.value : Number(v));
+  const rate = (drive) => (o.speed && o.speed.joint === drive ? num(o.speed.value) : null);
+  const wrenches = (o.wrenches ?? []).map((w) => {
+    const [cid, pname] = String(w.ref).split(':'), bi = S.index.get(cid);
+    if (bi == null) { diagnostics.push({ level: 'error', kind: 'asm.wrench', at: w.ref, message: `wrench: no component '${cid}'` }); return null; }
+    const P = pname ? S.port(`${cid}:${pname}`) : null;
+    if (pname && !P) { diagnostics.push({ level: 'error', kind: 'asm.wrench', at: w.ref, message: `wrench: ${cid} has no port '${pname}'` }); return null; }
+    return { ...w, bi, comp: cid, port: pname ?? null, point: w.at ? w.at.map(Number) : P ? P.o : [0, 0, 0] };
+  }).filter(Boolean);
+  return { masses, table, g, rate, wrenches, redundantNote: true };
+}
+const N3 = (v) => (v == null ? null : force(v, { what: 'wrench force' }));
+const NMM3 = (v) => (v == null ? [0, 0, 0] : moment(v, { what: 'wrench moment' }));
+// one sampled pose: wrench lambdas read the row, then kinematics (when the drive has a speed) and the reactions
+function forceRow(S, F, drive, row, where) {
+  const rate = F.rate(drive);
+  const kin = rate ? kinematics(S, drive, rate, F.masses) : null;
+  const wr = [];
+  for (const w of F.wrenches) {
+    // a lambda that throws is an error the compile reports (S.calls), not a pose without this load
+    const r = typeof w.fn === 'function' ? S.calls.run('wrench', w.label, w.fn, row, where) : { ok: true, value: w.fn };
+    if (!r.ok) continue;
+    const v = r.value;
+    if (v == null || v === false) continue;
+    const arr = Array.isArray(v), F3 = arr ? N3(v) : N3(v.force) ?? [0, 0, 0], M3 = NMM3(arr ? w.moment : v.moment);
+    wr.push({ bi: w.bi, comp: w.comp, port: w.port, label: w.label, point: w.point, force: F3, moment: M3 });
+  }
+  const r = jointReactions(S, { masses: F.masses, kin, gravity: F.g, wrenches: wr });
+  const readings = {};
+  for (const [id, x] of Object.entries(r.joints)) readings[`F:${id}`] = magnitude(x.F);
+  for (const [id, t] of Object.entries(r.drives)) readings[`T:${id}`] = t;
+  return { readings, joints: r.joints, drives: r.drives, couples: r.couples, kin, wrenches: wr, residual: r.residual, R: S.bodies.map((b) => b.R.map((x) => x.slice())), t: S.bodies.map((b) => b.t.slice()) };
+}
+
+// The loads one component carries at one pose: the wrench each of its joints puts on it (moved into its own frame),
+// the wrenches applied to it, and its weight and inertia as a body load. One seat is held (the support a stress
+// study needs): the one named, else the joint toward the ground, else the most loaded.
+function loadCaseOf(asm, from, opts, h) {
+  const cid = from.component;
+  if (!cid) throw Object.assign(new Error('name the component to study: .from(asm, { component: \'link\' })'), {});
+  const studyName = from.study ?? asm.o.studies?.[0]?.name;
+  if (!studyName) throw new Error('the assembly has no study to take a pose from: asm.study(\'cycle\', { drive, from, to, steps }), or name a subassembly\'s: .from(asm, { study: \'sub/cycle\' })');
+  const withForces = (asm.o.reactions ?? []).some((r) => r.study == null || r.study === studyName) ? asm : asm.reactions(studyName);
+  const t0 = performance.now();
+  const prog = compileAssembly(withForces, { ...opts, mesh: false }, h);
+  const errs = prog.data.diagnostics.filter((d) => d.level === 'error');
+  if (errs.length) throw new Error(`the assembly does not compile: ${errs[0].message}`);
+  const mech = prog.P.mech, S = mech.solver, dyn = mech.dyn[studyName];
+  if (!dyn) throw new Error(`no study '${studyName}'`);
+  const X = prog.P.comp.get(cid), bi = S.index.get(cid);
+  if (!X || bi == null) throw new Error(`no component '${cid}' (the assembly has ${[...prog.P.comp.keys()].join(', ')})`);
+  if (S.bodies[bi].ground) throw new Error(`${cid} is the ground: it carries no reaction of its own; study a moving component`);
+  const st = mech.studies[studyName], rows = st.rows;
+  const mine = S.joints.filter((jn) => jn.A.bi === bi || jn.B.bi === bi);
+  const load = (k) => { const d = dyn[k]; if (!d) return -1; let s = 0; for (const jn of mine) s += magnitude(d.joints[jn.id].F); return s; };
+  let k;
+  if (from.at == null || from.at === 'worst') { k = 0; let best = -1; for (let i = 0; i < rows.length; i++) { const v = load(i); if (v > best) { best = v; k = i; } } }
+  else { const x = isQuantity(from.at) ? (st.unit === 'mm' ? from.at.in('mm') : from.at.in('deg')) : Number(from.at); k = rows.reduce((b, r, i) => (dyn[i] && Math.abs(r.x - x) < Math.abs(rows[b].x - x) ? i : b), rows.findIndex((r, i) => dyn[i])); }
+  const d = dyn[k];
+  if (!d) throw new Error(`study ${studyName} reached no pose to take loads from`);
+  const R = d.R[bi], t = d.t[bi], RT = [0, 1, 2].map((i) => [R[0][i], R[1][i], R[2][i]]);
+  const toLocalV = (v) => [0, 1, 2].map((i) => RT[i][0] * v[0] + RT[i][1] * v[1] + RT[i][2] * v[2]);
+  const toLocalP = (p) => toLocalV([p[0] - t[0], p[1] - t[1], p[2] - t[2]]);
+  const vsub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], vcr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  // the seat to hold: named, else the joint toward the ground in the placement tree, else the most loaded
+  const parent = S.treeEdges?.find((e) => e.child === bi)?.id;
+  let held = from.hold ? mine.find((jn) => (jn.A.bi === bi ? jn.A.name : jn.B.name) === from.hold)?.id : parent ?? null;
+  if (from.hold && !held) throw new Error(`hold: ${cid} has no joint at a port '${from.hold}' (its ports: ${mine.map((jn) => (jn.A.bi === bi ? jn.A.name : jn.B.name)).join(', ')})`);
+  if (!held && mine.length) held = mine.reduce((b, jn) => (magnitude(d.joints[jn.id].F) > magnitude(d.joints[b.id].F) ? jn : b)).id;
+  const seats = [];
+  for (const jn of mine) {
+    const onB = jn.B.bi === bi, P = onB ? jn.B : jn.A, w = d.joints[jn.id];
+    const F = onB ? w.F : w.A.F, Mb = onB ? w.M : w.A.M;
+    const Pw = [R[0][0] * P.o[0] + R[0][1] * P.o[1] + R[0][2] * P.o[2] + t[0], R[1][0] * P.o[0] + R[1][1] * P.o[1] + R[1][2] * P.o[2] + t[1], R[2][0] * P.o[0] + R[2][1] * P.o[1] + R[2][2] * P.o[2] + t[2]];
+    const M = vsub3(Mb, vcr(vsub3(Pw, w.at), F));   // the moment about this side's own port origin
+    seats.push({ port: P.name, joint: jn.id, kind: jn.kind, force: toLocalV(F), moment: toLocalV(M), point: P.o.slice(), local: { o: P.o, z: P.z }, held: jn.id === held, bearing: jn.kind === 'revolute' || jn.kind === 'cylindrical', faces: from.faces?.[P.name] ?? null });
+  }
+  for (const w of d.wrenches.filter((x) => x.bi === bi)) {
+    const P = w.port ? S.port(`${cid}:${w.port}`) : null;
+    seats.push({ port: w.port ?? `at [${w.point}]`, joint: w.label, kind: 'wrench', force: toLocalV(w.force), moment: toLocalV(w.moment), point: w.point, local: { o: w.point, z: P?.z ?? [0, 0, 1] }, held: false, bearing: false, faces: (w.port && from.faces?.[w.port]) ?? null });
+  }
+  const mp = mech.solver && prog.P.mech && (forceMass(S, prog.P.comp, cid));
+  const kin = d.kin?.[bi];
+  const g = st.gravity ?? null;
+  const body = { c: mp?.c ?? [0, 0, 0], a0: kin ? toLocalV(kin.a) : [0, 0, 0], alpha: kin ? toLocalV(kin.al) : [0, 0, 0], omega: kin ? toLocalV(kin.w) : [0, 0, 0], g: g ? toLocalV(g) : [0, 0, 0] };
+  const pose = { study: studyName, row: k, x: rows[k].x, unit: st.unit, rate: st.rate ?? null, held, component: cid };
+  const decisions = [{ at: `${cid}@${studyName}`, kind: 'pose', chose: `${+rows[k].x.toFixed(3)}${st.unit} of ${studyName}`, alternatives: [], reason: from.at == null || from.at === 'worst' ? `the pose where ${cid}'s joints carry the most (Σ|F| ${load(k).toFixed(3)} N)` : 'named by at' },
+    { at: `${cid}@${studyName}`, kind: 'support', chose: `seat ${seats.find((x) => x.held)?.port ?? '—'} held`, alternatives: seats.filter((x) => !x.held && x.kind !== 'wrench').map((x) => x.port), reason: from.hold ? 'named by hold' : parent ? 'the joint toward the ground; its reaction is what the others and the inertia leave' : 'the most loaded joint' }];
+  return { part: X.c.item, material: X.c.item.meta?.material ?? null, seats, body, pose, diagnostics: [], decisions, trace: [{ pass: `loads:${cid}`, level: 'L5', ms: performance.now() - t0, cached: false, note: `${seats.length} seats at ${+rows[k].x.toFixed(2)}${st.unit} of ${studyName}` }] };
+}
+function forceMass(S, comp, cid) {
+  const X = comp.get(cid), mat = materialOf(X.c.item.meta?.material ?? 'PLA');
+  return massProps(X.res.state.bodies.map((b) => meshBody(b)), mat.density * 1e-9);
+}
+
 // limits: numbers are degrees for an angle and millimetres for a slide; quantities carry their own unit
 const limitsOf = jn => jn.limits?.map(x => typeof x === 'number' ? (jn.kind === 'slider' ? x : x * Math.PI / 180) : num(x));
 const slideLimitsOf = jn => jn.slideLimits?.map(x => typeof x === 'number' ? x : num(x)) ?? null;
@@ -673,7 +822,7 @@ function geometryFrame(X, sel, o = {}, side = 'a') {
 function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
   const comps = new Map(), parts = [], subs = new Map(), presetPorts = [];
   const values = { ...declared };   // by full id: a flexible child's own values join under its prefix (gather)
-  const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [] };
+  const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [], wrenches: [], reactions: [], speeds: [] };
   const childOut = { studies: {}, reports: [], measures: {} };
   const tree = { kind: 'assembly', id: '', item: asm.name, children: [] };
   const rootOf = A => A.o.ground ?? A.o.components.find(x => x.opts.ground)?.id ?? A.o.components[0]?.id;
@@ -754,6 +903,13 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
     sweeps: (v, P) => { for (const sw of v) extra.sweeps.push({ ...sw, jointId: P(sw.jointId) }); },
     reports: (v, P, prefix) => { for (const rp of v) extra.reports.push({ ...rp, name: P(rp.name), fn: ctx => rp.fn(unprefixCtx(ctx, prefix)) }); },
     contacts: (v, P, prefix, A) => { for (const ct of v) extra.contacts.push({ ids: (ct.ids ?? A.o.components.map(x => x.id)).map(P) }); },
+    // forces (layer 5): its loads on its own components, reading its own row names; reactions over its studies
+    wrenches: (v, P, prefix) => { for (const w of v) extra.wrenches.push({ ...w, ref: P(w.ref), label: P(w.label), fn: typeof w.fn === 'function' ? row => w.fn(unprefixRow(row, prefix)) : w.fn }); },
+    reactions: (v, P, prefix, A) => { for (const r of v) {
+      const all = [...(A.o.studies ?? []).map(st => P(st.name)), ...(A.o.sweeps ?? []).map(sw => `sweep:${P(sw.jointId)}`)];
+      for (const study of r.study == null ? all : [P(r.study)]) extra.reactions.push({ ...r, study });
+    } },
+    speed: (v, P, prefix) => { extra.speeds.push({ ...v, joint: P(v.joint), from: prefix }); },
   };
   const gather = (A, prefix, cv) => {
     const P = s => `${prefix}/${s}`;
@@ -784,7 +940,11 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
   const o = { ...own, joints, drives: { ...extra.drives, ...(own.drives ?? {}) }, hints: { ...extra.hints, ...(own.hints ?? {}) },
     couples: [...extra.couples, ...(own.couples ?? [])], measures: [...extra.measures, ...(own.measures ?? [])], events: [...extra.events, ...(own.events ?? [])],
     studies: [...extra.studies, ...(own.studies ?? [])], sweeps: [...extra.sweeps, ...(own.sweeps ?? [])], reports: [...extra.reports, ...(own.reports ?? [])],
-    contacts: [...extra.contacts, ...(own.contacts ?? [])] };
+    contacts: [...extra.contacts, ...(own.contacts ?? [])],
+    wrenches: [...extra.wrenches, ...(own.wrenches ?? [])], reactions: [...extra.reactions, ...(own.reactions ?? [])],
+    // one drive rate per mechanism: the assembly's own, else the first flexible subassembly's (any other is said)
+    speed: own.speed ?? extra.speeds[0] };
+  for (const sp of extra.speeds) if (sp !== o.speed) diagnostics.push({ level: 'warning', kind: 'asm.flexible', at: sp.from, message: `${sp.from} is flexible: its .speed('${sp.joint}') is not carried into ${asm.name} (it runs at ${o.speed.joint}'s rate)`, fix: `one .speed() per mechanism: set it on ${asm.name}` });
   return { o, comps, parts, tree, presetPorts, childOut, groundId, values };
 }
 // What each declaration of a flexible subassembly becomes in its parent (expandAssembly's gather): 'carried' under its
@@ -793,7 +953,8 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
 const FLEXIBLE = {
   components: 'walked', ground: 'walked', params: 'walked', overrides: 'walked',
   joints: 'carried', drives: 'carried', hints: 'carried', couples: 'carried', measures: 'carried', events: 'carried',
-  studies: 'carried', sweeps: 'carried', reports: 'carried', contacts: 'carried',
+  studies: 'carried', sweeps: 'carried', reports: 'carried', contacts: 'carried', wrenches: 'carried', reactions: 'carried', speed: 'carried',
+  gravity: 'gravity is the top assembly\'s: its world\'s down',
   pip: 'print-in-place is planned for the assembly printed', interference: 'its pairs and study are named in its own ids',
   explode: 'an exploded view is the top assembly\'s', configs: 'configurations are chosen on the top assembly',
 };

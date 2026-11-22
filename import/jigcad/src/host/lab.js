@@ -1,11 +1,11 @@
 // lab: links: Markdown links that drive the workbench. Both spellings work:
-//   path style   lab:view/stage?view=front · lab:select/body/end · lab:param/w=80 · lab:preset/A-06 · lab:run
+//   path style   lab:view/stage?view=front · lab:select/body/end · lab:param/w=80 · lab:joint/turn=5 · lab:preset/A-06 · lab:run
 //   query style  lab:view?name=front · lab:node?id=shell · lab:param?id=w&value=80 · lab:preset?id=A-06
 // The first path segment is the action; the rest of the path and the query are its arguments.
 import { NAMED_VIEWS, findFace } from './host.js';
 import { resolveParamName } from './param-names.js';
 
-export const VIEW_IDS = ['notes', 'code', 'agent', 'docs', 'book', 'reference', 'stage', 'params', 'graph', 'ir', 'trace', 'experiments'];
+export const VIEW_IDS = ['notes', 'code', 'agent', 'docs', 'book', 'reference', 'stage', 'params', 'graph', 'ir', 'trace', 'mechanism', 'experiments', 'presets'];
 
 export function parseLink(href) {
   const raw = String(href || '').trim();
@@ -64,11 +64,23 @@ export function followLink(host, href) {
       if (program?.params?.some(p => p.name === name)) { host.focus('params', { param: name }); return true; }
       return bad(`no face or node ${name}`);
     }
-    case 'param': {
+    case 'joint': case 'param': {
       let name = rest[0] || q.id || q.name, value = q.value;
       if (name && name.includes('=')) [name, value] = name.split(/=(.*)/s);
-      if (!name) return bad('lab:param needs a name');
-      if (program) { const r = resolveParamName(program.params, name); if (r.error) return bad(r.error); name = r.name; }
+      if (!name) return bad(`lab:${action} needs a name`);
+      if (action === 'joint') {
+        const joint = program?.assembly?.joints?.find(j => j.id === name && j.unit && j.value != null);
+        if (!joint) return bad(`no movable joint ${name}`);
+        if (value != null && value !== '') {
+          const v = numberOrText(value);
+          host.setOverride(name, typeof v === 'number' ? `${v} ${joint.unit === '°' ? 'deg' : joint.unit}` : v);
+        }
+        host.focus('mechanism');
+        return true;
+      }
+      const param = program ? resolveParamName(program.params, name) : null;
+      if (param?.error) return bad(param.error);
+      name = param?.name ?? name;
       if (value != null && value !== '') host.setOverride(name, numberOrText(value));
       host.focus('params', { param: name });
       return true;

@@ -100,11 +100,36 @@ const ANGULAR = new Set(['revolute', 'cylindrical', 'pinSlot']);
 // the second value of a two-valued joint: how far b's origin has slid along a's z (cylindrical) or x (pin in slot)
 const SLIDE_AXIS = { cylindrical: 'Z', pinSlot: 'X' };
 
+// User lambdas (a measure, an event, a wrench's load) are called through one door, the solver's: a throw is kept with
+// the lambda's name and where it was read (the first time, and how many more), for the compile to report
+// (diagnostics()), and the call answers { ok: false }. A throw is never read as a value, such as null for "no load
+// here" or "no crossing", so a broken lambda cannot quietly leave a load or an event out of a study.
+const CALL_LEVEL = { measure: 'warning', event: 'error', wrench: 'error' };
+const CALL_FIX = {
+  wrench: 'the load is left out wherever it throws, so the reactions there are not the study\'s: fix the lambda (return null where there is no load)',
+  event: 'its crossings are not found where it throws: fix the lambda',
+  measure: 'the reading is empty where it throws: fix the lambda',
+};
+export class UserCalls {
+  constructor() { this.failed = new Map(); }
+  run(kind, name, fn, arg, where = null) {
+    try { return { ok: true, value: fn(arg) }; } catch (e) {
+      const key = `${kind}:${name}`, f = this.failed.get(key);
+      if (f) f.more++; else this.failed.set(key, { kind, name, message: e?.message ?? String(e), where, more: 0 });
+      return { ok: false, value: undefined };
+    }
+  }
+  diagnostics() {
+    return [...this.failed.values()].map((f) => ({ level: CALL_LEVEL[f.kind] ?? 'error', kind: `asm.${f.kind}`, at: f.name,
+      message: `${f.kind} '${f.name}' threw${f.where ? ` at ${f.where}` : ''}${f.more ? ` (and ${f.more} more time${f.more > 1 ? 's' : ''})` : ''}: ${f.message}`, fix: CALL_FIX[f.kind] }));
+  }
+}
+
 // spec: { bodies: [{ id, ground, T0 (4×4), ports: { name: 4×4 } }], joints: [{ id, kind, a, b }], drives: Map, hints: Map,
 //         couples: [{ id, a, b, ratio, offset }], seeds: Map (start values for undriven tree joints) }
 export class MechanismSolver {
   constructor(spec) {
-    this.diags = [];
+    this.diags = []; this.calls = new UserCalls();
     this.bodies = spec.bodies.map((b) => ({ ...b, ...poseOfMatrix(b.T0) }));
     this.index = new Map(this.bodies.map((b, i) => [b.id, i]));
     let off = 0;
@@ -496,7 +521,7 @@ export class MechanismSolver {
   }
   read(measures) {
     const m = this.reader(), out = {};
-    for (const { name, fn } of measures) { try { const v = fn(m); out[name] = Array.isArray(v) ? v.map((x) => +x) : v; } catch (e) { out[name] = null; this.measureError = e.message; } }
+    for (const { name, fn } of measures) { const r = this.calls.run('measure', name, fn, m); out[name] = !r.ok ? null : Array.isArray(r.value) ? r.value.map((x) => +x) : r.value; }
     return out;
   }
   jointValues() {
@@ -549,7 +574,7 @@ export function runStudy(S, st, measures, events) {
   }
   const evs = [];
   for (const ev of events) {
-    const test = (row) => { try { return !!ev.fn(row); } catch { return null; } };
+    const test = (row) => { const r = S.calls.run('event', ev.name, ev.fn, row, `${st.name} at ${+row.x.toFixed(3)}${ang ? '°' : ' mm'}`); return r.ok ? !!r.value : null; };
     for (let k = 1; k < rows.length; k++) {
       const a = rows[k - 1], b = rows[k]; if (!a.ok || !b.ok) continue;
       const ta = test(a), tb = test(b); if (ta == null || tb == null || ta === tb) continue;

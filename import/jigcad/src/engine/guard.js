@@ -24,7 +24,7 @@ export const HELP = { on: false };
 const PROBES = new Set([
   'then', 'catch', 'finally', 'toJSON', 'toString', 'valueOf', 'toLocaleString', 'constructor', 'prototype', '__proto__',
   'inspect', 'nodeType', 'tagName', '$$typeof', 'asymmetricMatch', '@@__IMMUTABLE_ITERABLE__@@', '@@__IMMUTABLE_RECORD__@@',
-  'length', 'name', 'caller', 'arguments', 'kind', 'isPart', 'isAssembly', 'isPrintJob', 'isDesign', 'describe',
+  'length', 'name', 'caller', 'arguments', 'kind', 'isPart', 'isAssembly', 'isPrintJob', 'isFeaStudy', 'isDesign', 'describe',
 ]);
 
 /** Edit distance with transpositions (optimal string alignment); case differences count half. */

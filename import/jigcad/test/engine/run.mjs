@@ -1138,6 +1138,187 @@ return j.assembly('top').add('frame', box('frame'), { ground: true, at: j.tx.mov
   return `spin ${J('drive/spin').toFixed(1)}°, bracket drop ${A.reports.find(r => r.name === 'bracket/drop').value.toFixed(3)} mm; STEP ${prods.length} products, ${nauo} usages`;
 });
 
+
+
+// ── stress studies (JIG-015): the mesher and the solver are wasm modules (vendor/fea, tools/fea-wasm/build.sh) or
+// native programs named by JIG_TETGEN / JIG_CCX; without a mesher the studies cannot run and are skipped
+const BK = await import('../../src/fea/backends.js');
+const have = await BK.available();
+const feaTest = (name, fn) => have.tetgen ? test(name, fn) : (console.log(`skip ${name}: no TetGen (vendor/fea/tetgen.mjs or JIG_TETGEN)`), null);
+// the reply is a patch over the compile's program, as the host applies it; it must survive postMessage (structured clone)
+const solveFea = async () => {
+  const r = await W.handle({ id: 4, op: 'fea' });
+  if (!r.ok) throw new Error(r.error.message);
+  const before = W.currentProgram().data, sent = structuredClone(r.patch, { transfer: W.transferables(r.patch) });
+  assert(!Object.keys(sent).some((k) => !W.FEA_PATCH.includes(k)), `patch keys ${Object.keys(sent)}`);
+  return { ...before, ...sent };
+};
+await feaTest('52 stress study: a cantilever against Timoshenko and My/I; faces by name; params; cached', async () => {
+  const p0 = await compile('52-fea-cantilever.js');
+  assert(p0.kind === 'fea' && p0.fea.status === 'pending' && !errs(p0).length, `pending: ${JSON.stringify(errs(p0))}`);
+  assert(p0.fea.fixtures[0].faces[0] === 'body/start' && p0.fea.loads[0].faces[0] === 'body/end' && near(p0.fea.loads[0].force[2], -20), 'faces and the param force');
+  const p = await solveFea();
+  assert(p.fea.status === 'solved' && !errs(p).length, `solved: ${JSON.stringify(errs(p))}`);
+  const E = 200000, nu = 0.29, F = 20, L = 60, I = 6 ** 4 / 12, G = E / (2 * (1 + nu));
+  const tip = F * L ** 3 / (3 * E * I) + F * L / (5 / 6 * 36 * G);
+  const dz = p.metrics.displacement.value;
+  assert(Math.abs(dz / tip - 1) < 0.02, `tip ${dz} vs Timoshenko ${tip}`);
+  assert(near(p.fea.reaction[2], 20, 1e-6) && p.fea.balance < 1e-6, `reaction ${p.fea.reaction}`);
+  const My = 6 * F * L / 6 ** 3;   // the bending stress at the root
+  assert(p.fea.peak.value > 0.9 * My && p.fea.peak.value < 1.6 * My && p.fea.peak.at[0] < 6, `peak ${p.fea.peak.value} at ${p.fea.peak.at} on ${p.fea.peak.faces} (My/I ${My})`);
+  assert(near(p.metrics.safetyFactor.value, 250 / p.fea.peak.value, 1e-9), 'safety factor = strength / peak');
+  assert(p.fea.faces.length === 6 && p.fea.faces[0].max >= p.fea.faces[5].max, 'face tones');
+  // the part names no material; the study's steel weighs it: 2.16 cm³ × 7.85 g/cm³
+  assert(p.summary.material === 'steel' && near(p.metrics.mass.value, 2.16 * 7.85, 1e-6), `material ${p.summary.material}, mass ${p.metrics.mass.value}`);
+  const q = await compile('52-fea-cantilever.js', { options: { override: { F: 40 } } });
+  assert(near(q.fea.loads[0].force[2], -40), `override F = 40 N: ${q.fea.loads[0].force}`);
+  // the compile's reply goes to the page by transfer; the cache must keep its own arrays
+  structuredClone(W.currentProgram().data, { transfer: W.transferables(W.currentProgram().data) });
+  const again = await compile('52-fea-cantilever.js');
+  assert(again.fea.status === 'solved' && again.fea.cached, 'a second compile reads the cached result');
+  assert(again.fea.surface.vonMises.length > 0 && again.fea.surface.vonMises.length === p.fea.surface.vonMises.length, 'the cached stress field survived the transfer');
+  structuredClone(again, { transfer: W.transferables(again) });
+  // CalculiX and the reference solver on the same mesh: the same element, so the same numbers, to the 7 digits of
+  // CalculiX's .dat (and the iterative solve's tolerance)
+  let second = '';
+  if (/CalculiX/.test(p.fea.solver)) {
+    await compile(script('52-fea-cantilever.js').replace(".mesh({", ".solver('js').mesh({"));
+    const js = await solveFea();
+    assert(/JavaScript/.test(js.fea.solver) && js.fea.mesh.dof === p.fea.mesh.dof, `the same mesh: ${js.fea.mesh.dof} vs ${p.fea.mesh.dof}`);
+    const dU = Math.abs(js.fea.displacement.value / dz - 1), dS = Math.abs(js.fea.peak.value / p.fea.peak.value - 1), dG = Math.abs(js.fea.gauss.value / p.fea.gauss.value - 1);
+    assert(dU < 1e-5 && dS < 1e-4 && dG < 1e-4, `CalculiX vs the JavaScript solver: displacement ${dU}, peak ${dS}, gauss peak ${dG}`);
+    second = `; the JavaScript solver agrees to ${Math.max(dU, dS, dG).toExponential(1)}`;
+  }
+  return `tip ${dz.toFixed(5)} mm vs ${tip.toFixed(5)} (${((dz / tip - 1) * 100).toFixed(2)} %), peak ${p.fea.peak.value.toFixed(1)} MPa (My/I ${My.toFixed(1)}), ${p.fea.solver}${second}`;
+});
+await feaTest('55 stress study: a column on rollers under pressure (exact for quadratic elements) and its own weight', async () => {
+  // pressure alone: uniaxial, linear in z, which quadratic tetrahedra hold exactly
+  await compile(script('55-fea-column.js').replace('  .gravity()\n', ''));
+  let p = await solveFea();
+  assert(p.fea.status === 'solved' && !errs(p).length, JSON.stringify(errs(p)));
+  const pr = 0.01, H = 100, A = 100, E = 3500, rg = 1.24e-9 * 9806.65;
+  const drop = (q) => { const u = q.fea.surface.u; let uz = 0; for (let i = 2; i < u.length; i += 3) uz = Math.min(uz, u[i]); return -uz; };
+  assert(Math.abs(drop(p) / (pr * H / E) - 1) < 1e-6, `top ${drop(p)} vs pH/E ${pr * H / E}`);
+  assert(Math.abs(p.fea.peak.value / pr - 1) < 1e-6, `uniaxial ${p.fea.peak.value} MPa vs p`);
+  // with its weight: the base carries p A + ρ g V exactly; the drop gains about ρ g H² / 2E (the flat base bends the
+  // self-weight solution a little: its own curvature, ν ρ g r² / 2E, is held flat there)
+  await compile('55-fea-column.js');
+  p = await solveFea();
+  const base = pr * A + rg * A * H, top = pr * H / E + rg * H * H / (2 * E);
+  // exact up to how the solver reports it: CalculiX's .dat prints 7 significant digits a node
+  const tol = /CalculiX/.test(p.fea.solver) ? 1e-6 : 1e-9;
+  assert(Math.abs(p.fea.reaction[2] / base - 1) < tol, `base reaction ${p.fea.reaction[2]} vs ${base}`);
+  assert(Math.abs(drop(p) / top - 1) < 1e-3, `top ${drop(p)} vs ${top}`);
+  return `pH/E exact to ${Math.abs(drop(p) / top - 1).toExponential(1)} with weight; base ${base.toFixed(6)} N (${(Math.abs(p.fea.reaction[2] / base - 1)).toExponential(1)}), ${p.fea.solver}`;
+});
+await feaTest('56 stress study edges: a gravity vector keeps its magnitude; a load the supports take whole solves to zero', async () => {
+  // .gravity([0, 0, -2]) is 2 g, as .accel and an assembly's .gravity read it; a magnitude with { dir } reads alike
+  const col = script('55-fea-column.js'), withG = (g) => col.replace('  .gravity()\n', `  .gravity(${g})\n`);
+  const gOf = () => W.currentProgram().P.feaJob.loads.find((l) => l.label === 'gravity').g;
+  await compile(withG('[0, 0, -0.1]'));
+  assert(near(gOf()[2], -0.1 * 9806.65), `0.1 g: ${gOf()}`);
+  await compile(withG("0.5, { dir: [0, 0, -3] }"));
+  assert(near(gOf()[2], -0.5 * 9806.65), `0.5 g along a dir: ${gOf()}`);
+  const bad = await compile(withG("[0, 0, N(1)]"));
+  assert(errs(bad).some((d) => d.kind === 'fea.load' && /takes an acceleration/.test(d.message)), `a force is not an acceleration: ${JSON.stringify(errs(bad))}`);
+  await compile(withG('[0, 0, -2]'));
+  let p = await solveFea();
+  const base = 0.01 * 100 + 2 * 1.24e-9 * 9806.65 * 100 * 100, tol = /CalculiX/.test(p.fea.solver) ? 1e-6 : 1e-9;
+  assert(p.fea.status === 'solved' && Math.abs(p.fea.reaction[2] / base - 1) < tol, `2 g: base ${p.fea.reaction[2]} vs ${base}`);
+  // no work for the solver: a zero force, and a force on the held face; both solvers return u = 0 and the reaction
+  const beam = script('52-fea-cantilever.js'), solvers = /CalculiX/.test(p.fea.solver) ? ['', ".solver('js')"] : [''];
+  for (const s of solvers) {
+    await compile(beam.replace('.mesh({', `${s}.mesh({`), { options: { override: { F: 0 } } });
+    p = await solveFea();
+    assert(p.fea.status === 'solved' && !errs(p).length && p.fea.displacement.value === 0, `F = 0 ${s}: ${p.fea.status} ${JSON.stringify(errs(p))} ${p.fea.displacement?.value}`);
+    await compile(beam.replace("force(j.feat('body').endFace()", "force(j.feat('body').startFace()").replace('.mesh({', `${s}.mesh({`));
+    p = await solveFea();
+    assert(p.fea.status === 'solved' && !errs(p).length && Math.abs(p.fea.displacement.value) < 1e-12, `force on the held face ${s}: ${p.fea.status} ${JSON.stringify(errs(p))} ${p.fea.displacement?.value}`);
+    assert(near(p.fea.reaction[2], 20, 1e-6) && p.fea.balance < 1e-6, `the support takes the 20 N ${s}: ${p.fea.reaction}`);
+  }
+  // what blocks a study is said, and blocks it: a check made after the program exists lands in its diagnostics
+  const blocked = async (src, kind, re) => {
+    const q = await compile(src), e = errs(q).find((d) => d.kind === kind);
+    assert(q.fea.status === 'blocked' && e && re.test(e.message), `${kind}: ${q.fea.status} ${JSON.stringify(errs(q))}`);
+  };
+  await blocked(beam.replace("j.material('steel')", "j.material('steel').with({ strength: undefined })"), 'fea.material', /no strength/);
+  await blocked(beam.replace(".force(j.feat('body').endFace(), 'F', { dir: '-Z', label: 'tip' })", ''), 'fea.unloaded', /nothing loads/);
+  await blocked(beam.replace(".fix(j.feat('body').startFace(), { label: 'root' })", ''), 'fea.free', /nothing holds/);
+  return `2 g base ${p.fea.reaction[2].toFixed(3)} N; zero-work solves on ${solvers.length} solver${solvers.length > 1 ? 's' : ''}; strength, loads, fixtures block`;
+});
+await test('57 mechanism: a lambda that throws is an error naming it and the pose, never a pose without it', async () => {
+  // a wrench whose lambda throws: the reactions would leave its load out, so the compile fails and says where
+  const mech = script('53-fea-from-mechanism.js').replace("row => row.clamp < -70 ? [0, N(4), 0] : null", 'row => row.nope.deeper');
+  const a = await compile(mech.replace(/return j\.fea[\s\S]*$/, 'return head'));
+  const w = errs(a).find((d) => d.kind === 'asm.wrench');
+  assert(w && /'needle in the cloth' threw at cycle at 0° \(and 360 more times\): Cannot read properties of undefined/.test(w.message), JSON.stringify(errs(a)));
+  // a stress study taking its loads from it does not compile either, and gives that reason
+  const r = await W.handle({ id: 1, op: 'compile', files: { 'script.js': mech }, options: {} });
+  const msg = r.ok ? JSON.stringify(errs(r.program)) : r.error.message;
+  assert(/from: the assembly does not compile: wrench 'needle in the cloth' threw/.test(msg), msg);
+  // an event whose lambda throws finds no crossings: an error too, not an event that never happens
+  const ev = await compile(script('46-couple.js').replace('w => w.hookAngle < 0', 'w => w.hookAngle.nope.deeper < 0'));
+  const e = errs(ev).find((d) => d.kind === 'asm.event');
+  assert(e && /event 'hook past 180°' threw at /.test(e.message), JSON.stringify(errs(ev)));
+  return `${w.message.slice(0, 60)}…`;
+});
+await test('54 forces: slider-crank reactions balance energy (drive power = dKE/dt; statics: torque = dPE/dθ)', async () => {
+  const base = script('43-slider-crank.js');
+  const run = async (extra) => { await compile(base.replace(".report('stroke'", `${extra}\n  .report('stroke'`)); return W.currentProgram(); };
+  const { massProps } = await import('../../src/engine/dynamics.js');
+  const { meshBody } = await import('../../src/engine/mesh.js');
+  const massesOf = (live) => { const S = live.P.mech.solver, m = new Map(); for (const [id, X] of live.P.comp) { const bi = S.index.get(id); if (!S.bodies[bi].ground) m.set(bi, massProps(X.res.state.bodies.map(b => meshBody(b)), 1.24e-9)); } return m; };
+  // inertia only, at 800 a minute
+  let live = await run(".reactions('cycle').speed('main', turn(800).div(minute(1))).gravity(false)");
+  let st = live.data.assembly.studies.cycle, dyn = live.P.mech.dyn.cycle, M = massesOf(live);
+  assert(st.keys.includes('F:pin') && st.keys.includes('T:main') && st.extrema['F:pin'], `keys ${st.keys}`);
+  const KE = (d) => { let e = 0; for (const [bi, mp] of M) { const k = d.kin[bi], R = d.R[bi]; const Iw = R.map(r => [0, 1, 2].map(j => r.reduce((s, x, i) => s + x * [0, 1, 2].reduce((t, l) => t + mp.I[i][l] * R[j][l], 0), 0))); const Iww = Iw.map(r => r[0] * k.w[0] + r[1] * k.w[1] + r[2] * k.w[2]); e += 0.5 * mp.mass * (k.v[0] ** 2 + k.v[1] ** 2 + k.v[2] ** 2) + 0.5 * (k.w[0] * Iww[0] + k.w[1] * Iww[1] + k.w[2] * Iww[2]); } return e; };
+  const h = st.rows[1].q - st.rows[0].q, rate = st.rate;
+  let worst = 0, top = 0;
+  for (let k = 1; k < st.rows.length - 1; k++) { const P = st.rows[k]['T:main'] * rate, dK = (KE(dyn[k + 1]) - KE(dyn[k - 1])) / (2 * h) * rate; worst = Math.max(worst, Math.abs(P - dK)); top = Math.max(top, Math.abs(P)); }
+  assert(worst < 2e-3 * top, `drive power vs dKE/dt: ${worst} of ${top}`);
+  // statics under gravity along −Y (the slider's line)
+  live = await run(".reactions('cycle').gravity('-Y')");
+  st = live.data.assembly.studies.cycle; dyn = live.P.mech.dyn.cycle; M = massesOf(live);
+  const PE = (k) => { let e = 0; for (const [bi, mp] of M) { const R = dyn[k].R[bi], t = dyn[k].t[bi]; e += mp.mass * 9806.65 * (R[1][0] * mp.c[0] + R[1][1] * mp.c[1] + R[1][2] * mp.c[2] + t[1]); } return e; };
+  let ws = 0, ts = 0;
+  for (let k = 1; k < st.rows.length - 1; k++) { const dP = (PE(k + 1) - PE(k - 1)) / (2 * h); ws = Math.max(ws, Math.abs(st.rows[k]['T:main'] - dP)); ts = Math.max(ts, Math.abs(st.rows[k]['T:main'])); }
+  assert(ws < 1e-3 * ts, `drive torque vs dPE/dθ: ${ws} of ${ts}`);
+  assert(live.data.diagnostics.some(d => d.kind === 'asm.forcesSplit'), 'the redundant split is said');
+  // reactions over a study that does not exist: an error that names the studies there are
+  live = await run(".reactions('cylce')");
+  const miss = live.data.diagnostics.find(d => d.kind === 'asm.forces' && d.level === 'error');
+  assert(miss && /no study 'cylce'/.test(miss.message) && /'cycle'/.test(miss.fix), JSON.stringify(miss));
+  return `power vs dKE/dt ${(worst / top).toExponential(1)}, torque vs dPE/dθ ${(ws / ts).toExponential(1)}`;
+});
+await test('58 forces in a flexible subassembly: its wrenches, reactions and speed are the parent\'s, under its prefix', async () => {
+  // the slider-crank alone, and the same as the only (flexible) component of a parent: the same joint forces at every
+  // pose, its wrench reading its own row names; its gravity is the parent's, and the compile says it is not carried
+  const forces = ".reactions('cycle').speed('main', turn(800).div(minute(1))).wrench('slider:wrist', row => row.clamp < -70 ? [0, N(4), 0] : null, { label: 'needle' })";
+  const head = script('43-slider-crank.js').replace("return j.assembly('needle-bar drive')", "const head = j.assembly('needle-bar drive')").replace(".report('stroke'", `${forces}\n  .report('stroke'`);
+  const alone = await compile(head + '\nreturn head'), flex = await compile(head + "\nreturn j.assembly('machine').add('sub', head, { flexible: true })");
+  assert(errs(flex).length === 0 && !flex.diagnostics.some(d => d.kind === 'asm.flexible'), JSON.stringify(flex.diagnostics.filter(d => d.level !== 'info')));
+  const A = alone.assembly.studies.cycle.rows, F = flex.assembly.studies['sub/cycle']?.rows ?? [];
+  let worst = 0, top = 0, loaded = 0;
+  A.forEach((r, k) => { worst = Math.max(worst, Math.abs(r['F:pin'] - F[k]?.['F:sub/pin'])); top = Math.max(top, r['F:pin']); if (r.clamp < -70) loaded++; });
+  assert(F.length === A.length && loaded > 0 && worst <= 1e-9 * top, `F:pin alone vs F:sub/pin: worst ${worst} of ${top} over ${F.length} rows`);
+  const g = await compile(head.replace(forces, `${forces}.gravity('-Y')`) + "\nreturn j.assembly('machine').add('sub', head, { flexible: true })");
+  assert(g.diagnostics.some(d => d.kind === 'asm.flexible' && /its \.gravity\(\) is not carried/.test(d.message)), JSON.stringify(g.diagnostics.map(d => d.kind)));
+  return `${F.length} poses, F:pin within ${(worst / top).toExponential(1)}, ${loaded} with the needle's load`;
+});
+await feaTest('53 stress study from a mechanism: the link at its worst pose; the held seat carries what the joint does', async () => {
+  const p0 = await compile('53-fea-from-mechanism.js');
+  assert(p0.fea.status === 'pending' && !errs(p0).length, JSON.stringify(errs(p0)));
+  const seats = p0.fea.mechanism.seats;
+  assert(seats.length === 2 && seats.filter(s => s.held).length === 1 && seats.find(s => s.held).port === 'big', `seats ${JSON.stringify(seats)}`);
+  assert(p0.decisions.some(d => d.kind === 'seat' && /s\.big/.test(d.chose)) && p0.decisions.some(d => d.kind === 'pose'), 'the seats are the bores');
+  const p = await solveFea();
+  assert(p.fea.status === 'solved' && !errs(p).length, JSON.stringify(errs(p)));
+  const bal = p.decisions.find(d => d.kind === 'balance');
+  assert(bal && !p.diagnostics.some(d => d.kind === 'fea.mechanismBalance'), `balance: ${bal?.reason}`);
+  return `${p0.fea.pose.x}° of ${p0.fea.pose.study}: ${bal.chose}; peak ${p.fea.peak.value.toFixed(2)} MPa`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

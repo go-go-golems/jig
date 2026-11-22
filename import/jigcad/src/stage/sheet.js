@@ -20,13 +20,17 @@ export const OVERLAYS = [
   { key: 'dims', label: 'Dims', about: 'overall dimensions of the bounding box', on: true },
   { key: 'hidden', label: 'Hidden', about: 'hidden edges, dashed', on: false },
   { key: 'overhang', label: 'Overhang', about: 'faces that print over air, hatched', on: false },
+  { key: 'stress', label: 'Stress', about: 'a stress study: faces hatched by their peak von Mises, densest at the peak', on: true },
   { key: 'bed', label: 'Bed', about: 'the printer bed and the parts on its plates', on: true },
   { key: 'normals', label: 'Normals', about: 'face normals as arrows', on: false },
   { key: 'dof', label: 'DOF', about: 'free degrees of freedom in a sketch', on: true },
   { key: 'joints', label: 'Joints', about: 'an assembly’s joints, port frames, free motions and measured paths', on: true },
 ];
 export const DEFAULT_OVERLAYS = OVERLAYS.filter(o => o.on).map(o => o.key);
-const KIND = { part: 'PART', sketch: 'SKETCH', assembly: 'ASSEMBLY', print: 'PRINT', design: 'DESIGN', region: 'REGION' };
+const KIND = { part: 'PART', sketch: 'SKETCH', assembly: 'ASSEMBLY', print: 'PRINT', design: 'DESIGN', region: 'REGION', fea: 'STRESS' };
+// a stress study's tones: a face whose own peak reaches this share of the part's peak is hatched in this hue, the
+// hatch heavier toward the peak
+const STRESS_BANDS = [{ from: 0.9, hue: 'red', width: 2.2 }, { from: 0.75, hue: 'warn', width: 1.8 }, { from: 0.5, hue: 'warn', width: 1.2 }, { from: 0.25, hue: 'muted', width: 0.8 }];
 
 const offscreen = new WeakMap();
 function off(canvas, w, h) {
@@ -125,6 +129,16 @@ export function draw(canvas, program, viewIn, o = {}) {
     const O = off(canvas, bw, bh), tones = [];
     const sel = o.selection && o.selection.face != null ? faceSet(scene, [o.selection]) : null;
     if (sel && sel.any) tones.push({ set: sel.set, col: rgba32(C.red), width: K.hatch * 1.4 });
+    const fea = program && program.fea;
+    if (has('stress') && fea && fea.status === 'solved' && fea.faces && fea.peak) {
+      const peak = fea.peak.value || 1;
+      for (const b of STRESS_BANDS) {
+        const lo = b.from, hi = STRESS_BANDS[STRESS_BANDS.indexOf(b) - 1]?.from ?? Infinity;
+        const refs = fea.faces.filter(f => f.max / peak >= lo && f.max / peak < hi).map(f => ({ body: fea.body, face: f.face }));
+        const s = refs.length ? faceSet(scene, refs) : null;
+        if (s && s.any) tones.push({ set: s.set, col: rgba32(C[b.hue]), width: K.hatch * b.width });
+      }
+    }
     if (has('overhang') && program.print && program.print.overhang) {
       overhang = program.print.overhang.flatMap(oh => (oh.faces || []).map(f => ({ body: oh.body, face: f })));
       const s = faceSet(scene, overhang); if (s.any) tones.push({ set: s.set, col: rgba32(C.warn), width: K.hatch * 1.4 });
@@ -161,6 +175,10 @@ export function draw(canvas, program, viewIn, o = {}) {
     if (has('normals')) drawNormals(ctx, C, state);
     if (has('dims') && scene.instances.length) drawBoxDims(ctx, C, state);
     if (has('joints') && program?.kind === 'assembly') drawMechanism(ctx, C, state, program);
+    if (has('stress') && program?.fea?.status === 'solved' && program.fea.peak && scene.instances.length) {
+      const f = program.fea, p = proj(cam, f.peak.at);
+      label(ctx, C, `σ ${fmtNum(f.peak.value, 1)} MPa · SF ${fmtNum(f.safetyFactor, 2)}`, p, { dx: 10, dy: -10, size: K.label, tone: f.safetyFactor < 1 ? 'red' : f.safetyFactor < (f.margin ?? 2) ? 'warn' : 'ink' });
+    }
     // plate labels when there is more than one plate: outside each bed's front-left corner
     if (scene.bed && scene.bed.plates.length > 1 && cam.planar) for (const pl of scene.bed.plates) {
       const band = Math.min(10, Math.max(3, (scene.bed.x1 - scene.bed.x0) * 0.025));
@@ -381,6 +399,12 @@ function titleRows(program, scene, view, cam, sk) {
     rows.push(['SKETCH', `${sk.id}${p.name && p.name !== sk.id ? ' · ' + p.name : ''}`]);
     rows.push(['STATUS', sketchStatus(sk).text]);
     rows.push(['ENTITIES', `${(sk.entities || []).length} entities · ${(sk.constraints || []).length} constraints`]);
+  } else if (p.kind === 'fea') {
+    const f = p.fea || {};
+    rows.push(['STRESS', `${p.name || '–'}${f.part ? ' · ' + f.part : ''}`]);
+    rows.push(['PEAK', f.status === 'solved' ? `${fmtNum(f.peak.value, 1)} MPa · SF ${fmtNum(f.safetyFactor, 2)} (${f.material?.name ?? ''} ${f.strength} MPa)` : f.status === 'pending' ? 'solving…' : f.status || '–']);
+    rows.push(['MOVES', f.status === 'solved' ? `${fmtNum(f.displacement.value, 4)} mm` : '–']);
+    rows.push(['SOLVER', f.status === 'solved' ? `${f.solver} · ${f.mesh.elements} C3D10` : '–']);
   } else if (p.kind === 'print' && p.print) {
     const pr = p.print, bed = pr.printer && pr.printer.bed;
     rows.push(['PRINT', p.name || '–']);

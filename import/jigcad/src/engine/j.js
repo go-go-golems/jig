@@ -13,6 +13,7 @@ import { printer, print, preset } from './print.js';
 import { rules, rule, check } from './rules.js';
 import { lib } from './lib.js';
 import { assembly, joint, couple } from './assembly.js';
+import { fea } from './fea.js';
 import { design, param, search, objective, metric, evaluate, stage } from './explore.js';
 import { laws, law, structure, gen } from './laws.js';
 import { exportTo } from './io.js';
@@ -33,12 +34,12 @@ export function makeJ() {
     sel, feat, on, hole, fit, stack, material,
     region: core.region ?? kRegion,
     sketch3d: core.sketch3d ?? kSketch3d,
-    printer, print, preset, rules, rule, check, lib, assembly, joint, couple,
+    printer, print, preset, rules, rule, check, lib, assembly, joint, couple, fea,
     design, param: { ...(core.param ?? {}), ...param }, search, objective, metric, evaluate, stage,
     laws, law, structure, gen,
     inspect: inspectApi, export: exportTo,
     compile: (m, o) => {
-      if (!m || typeof m !== 'object') throw new TypeError(`j.compile: give a part, sketch, assembly, print job or design (got ${m === null ? 'null' : typeof m})`);
+      if (!m || typeof m !== 'object') throw new TypeError(`j.compile: give a part, sketch, assembly, print job, stress study or design (got ${m === null ? 'null' : typeof m})`);
       return compileModel(m, o).keep();
     },
     hash: x => x?.data?.hash ?? 'h:' + hashValue(x),
