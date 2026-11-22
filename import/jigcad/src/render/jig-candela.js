@@ -16,6 +16,16 @@
 // predicate f({ component, id, meta }) such as f => f.meta.featureType === 'hole'. The node id of a
 // component's group is its jig id ('sub/slider'), so poses and picks use jig's names. The result is immutable, like
 // every Candela builder: .face() and .material() return a new group.
+//
+// Motion: an assembly's studies come in the package with a pose per row for every component they move.
+//   asm.studies()                       → [{ name, drive, unit, from, to, rows, wraps, components }]
+//   asm.posesAt('cycle', 30)            → { crank: [16 numbers], rod: […], slider: […] }   (x in the study's unit,
+//                                           'deg' or 'mm', or a quantity: u.deg(30))
+//   export const animation = asm.animate('cycle', { duration: 2 });     // one crank turn in 2 s
+// Between rows, positions interpolate linearly and rotations by quaternion (the shorter arc, renormalised). Outside
+// its range a study of whole turns of a revolute drive (0° to 360°) wraps; any other holds its first or last row.
+// Poses are world matrices in the package's frame: they place each component where jigScene() puts the model, at the
+// origin (a pose replaces the transforms above its node: a model moved as a whole would jump back).
 import { scene, shape, mesh, finish } from 'candela';
 
 const FORMAT = 'jig-cad-package';
@@ -114,6 +124,83 @@ function viewOf(pkg, name, o = {}) {
   return { at: target.map((x, a) => x + cc[a] * d), target, focal, fov };
 }
 
+// ---- study poses: decoded on first use (base64 from a file, typed arrays from the page), kept per study ----
+const POSES = (globalThis.__jigCandelaPoses ??= new WeakMap());
+const TURN = 360;
+/** does the study wrap outside its range: a revolute drive over a whole number of turns */
+const wraps = (st) => { const span = Math.abs((st.to ?? 0) - (st.from ?? 0)); return st.unit === 'deg' && span > 1e-6 && Math.abs(span / TURN - Math.round(span / TURN)) < 1e-9; };
+// a rotation matrix (column-major 4×4) as a unit quaternion [x, y, z, w] (Shepperd)
+function quat(M, o) {
+  const m00 = M[o], m10 = M[o + 1], m20 = M[o + 2], m01 = M[o + 4], m11 = M[o + 5], m21 = M[o + 6], m02 = M[o + 8], m12 = M[o + 9], m22 = M[o + 10];
+  const tr = m00 + m11 + m22;
+  let q;
+  if (tr > 0) { const k = Math.sqrt(tr + 1) * 2; q = [(m21 - m12) / k, (m02 - m20) / k, (m10 - m01) / k, k / 4]; }
+  else if (m00 > m11 && m00 > m22) { const k = Math.sqrt(1 + m00 - m11 - m22) * 2; q = [k / 4, (m01 + m10) / k, (m02 + m20) / k, (m21 - m12) / k]; }
+  else if (m11 > m22) { const k = Math.sqrt(1 + m11 - m00 - m22) * 2; q = [(m01 + m10) / k, k / 4, (m12 + m21) / k, (m02 - m20) / k]; }
+  else { const k = Math.sqrt(1 + m22 - m00 - m11) * 2; q = [(m02 + m20) / k, (m12 + m21) / k, k / 4, (m10 - m01) / k]; }
+  const l = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
+  return q.map((v) => v / l);
+}
+function decoded(st) {
+  let d = POSES.get(st);
+  if (d) return d;
+  d = { x: Array.from(st.x || []), M: {}, Q: {} };
+  for (const [id, a] of Object.entries(st.poses || {})) d.M[id] = decode(a, Float32Array);
+  POSES.set(st, d);
+  return d;
+}
+const quats = (d, id) => {
+  if (d.Q[id]) return d.Q[id];
+  const M = d.M[id], n = M.length / 16, Q = new Float64Array(4 * n);
+  for (let r = 0; r < n; r++) Q.set(quat(M, 16 * r), 4 * r);
+  return (d.Q[id] = Q);
+};
+/** the row before x and how far toward the next one: [i, f], x wrapped or clamped into the rows the study reached */
+function segment(st, X, x) {
+  const n = X.length;
+  if (wraps(st)) {
+    const lo = Math.min(st.from, st.to), span = Math.abs(st.to - st.from);
+    if (x < lo || x > lo + span) x = lo + (((x - lo) % span) + span) % span;
+  }
+  if (n === 1) return [0, 0];
+  const up = X[n - 1] >= X[0], a0 = up ? X[0] : X[n - 1], b0 = up ? X[n - 1] : X[0];
+  x = Math.min(b0, Math.max(a0, x));
+  let a = 0, b = n - 1;
+  while (b - a > 1) { const m = (a + b) >> 1; if (up ? X[m] <= x : X[m] >= x) a = m; else b = m; }
+  const f = X[b] === X[a] ? 0 : (x - X[a]) / (X[b] - X[a]);
+  return [a, Math.min(1, Math.max(0, f))];
+}
+const poseRow = (M, r) => Array.from(M.subarray(16 * r, 16 * r + 16));
+function between(d, id, i, f) {
+  const M = d.M[id];
+  if (f < 1e-9) return poseRow(M, i);
+  if (f > 1 - 1e-9) return poseRow(M, i + 1);
+  const Q = quats(d, id), a = 16 * i, b = a + 16;
+  const qa = Q.subarray(4 * i, 4 * i + 4), qb = Q.subarray(4 * i + 4, 4 * i + 8);
+  const s = qa[0] * qb[0] + qa[1] * qb[1] + qa[2] * qb[2] + qa[3] * qb[3] < 0 ? -1 : 1;
+  let x = qa[0] + (s * qb[0] - qa[0]) * f, y = qa[1] + (s * qb[1] - qa[1]) * f, z = qa[2] + (s * qb[2] - qa[2]) * f, w = qa[3] + (s * qb[3] - qa[3]) * f;
+  const l = Math.hypot(x, y, z, w) || 1;
+  x /= l; y /= l; z /= l; w /= l;
+  const t = [0, 1, 2].map((k) => M[a + 12 + k] + (M[b + 12 + k] - M[a + 12 + k]) * f);
+  return [1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 0,
+    2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 0,
+    2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y), 0,
+    t[0], t[1], t[2], 1];
+}
+// a drive value: a number in the study's unit, or a Candela quantity of the drive's kind (u.deg(30), u.mm(5)), whose
+// own number is in radians or metres
+function driveValue(s, x) {
+  if (x && typeof x === 'object' && 'dim' in x) return s.unit === 'deg' && x.dim === 'angle' ? (x.v * 180) / Math.PI : s.unit === 'mm' && x.dim === 'length' ? x.v * 1000 : NaN;
+  return typeof x === 'number' ? x : Number(x);
+}
+function studyOf(pkg, name, where) {
+  const S = pkg.studies || {}, st = S[name];
+  if (st) return st;
+  const names = Object.keys(S);
+  if (!names.length) throw new Error(`jigScene().${where}('${name}'): the package has no studies (an assembly's .study(name, { drive, from, to, steps }) makes one)`);
+  throw new Error(`jigScene().${where}('${name}'): no study '${name}'; did you mean ${didYouMean(String(name), names).map((n) => `'${n}'`).join(', ')}?`);
+}
+
 function realize(st) {
   const comps = new Map(st.pkg.components.map((c) => [c.id, c]));
   const byComp = new Map();
@@ -192,6 +279,30 @@ function jig(st) {
     /** jig's named views (axo, front, side, plan) as a perspective camera: { at, target, focal, fov } */
     view(name = 'axo', o) { return viewOf(st.pkg, name, o); },
     center() { const B = st.pkg.bounds; return B ? [0, 1, 2].map((a) => (B[0][a] + B[1][a]) / 2) : [0, 0, 0]; },
+    /** the package's studies: [{ name, drive, unit ('deg' | 'mm'), from, to, rows, wraps, components }] */
+    studies() {
+      return Object.entries(st.pkg.studies || {}).map(([name, s]) => ({ name, drive: s.drive, unit: s.unit, from: s.from ?? s.x[0], to: s.to ?? s.x[s.x.length - 1],
+        rows: s.x.length, wraps: wraps(s), components: Object.keys(s.poses || {}) }));
+    },
+    /** every component the study moves, posed at drive value x (the study's unit): { id: 16-number column-major matrix } */
+    posesAt(name, x) {
+      const s = studyOf(st.pkg, name, 'posesAt'), v = driveValue(s, x);
+      if (!Number.isFinite(v)) throw new Error(`jigScene().posesAt('${name}', ${x}): x is a value of the drive ${s.drive}, in ${s.unit}`);
+      const d = decoded(s), out = {};
+      if (!d.x.length) return out;
+      const [i, f] = segment(s, d.x, v);
+      for (const id of Object.keys(d.M)) out[id] = between(d, id, i, f);
+      return out;
+    },
+    /** t (seconds) → poses: the drive from `from` to `to` (the study's range by default) in `duration` seconds, for
+     *  export const animation = asm.animate('cycle', { duration: 2 }); past the end it wraps or holds as posesAt does */
+    animate(name, o = {}) {
+      const s = studyOf(st.pkg, name, 'animate'), duration = +o.duration;
+      if (!(duration > 0)) throw new Error(`jigScene().animate('${name}', { duration }): the duration is in seconds, more than 0; got ${o.duration}`);
+      const a = driveValue(s, o.from ?? s.from ?? s.x[0]), b = driveValue(s, o.to ?? s.to ?? s.x[s.x.length - 1]);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`jigScene().animate('${name}', { from, to }): values of the drive ${s.drive}, in ${s.unit}`);
+      return (t) => api.posesAt(name, a + (b - a) * (t / duration));
+    },
     bounds() { return st.pkg.bounds; },
     package: st.pkg,
   };

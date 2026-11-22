@@ -120,6 +120,9 @@ function programOf(name, solved, { t0, opts, finalize }) {
     extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
   prog.P.mech = mech; prog.P.comp = comp;
   prog.bom = (bo = {}) => (bo.group === 'flat' ? flatBom(info.bom) : info.bom);
+  // a study's poses (poseTrack): every component's world transform at each reached row; worker side only. No name:
+  // every study's, by name (a rigid subassembly's under '<sub>/<study>', its components placed in this world)
+  prog.studyPoses = (study) => (study == null ? { ...(mech?.poses ?? {}) } : mech?.poses?.[study] ?? null);
   // the product structure (STEP export): parts and subassemblies with their placements now
   prog.structure = () => structureOf(eff.tree, comp, name); prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
   // compile the solved mechanism to a kine program (spec M7): { source, observe, notes, input }
@@ -284,7 +287,7 @@ export function solveAssembly(asm, opts, compilePart) {
   // a study row keeps its own x (drive value), q, ok, move and limit: a measure by one of those names would overwrite it
   const RESERVED = new Set(['x', 'q', 'ok', 'move', 'limit']);
   for (const m of o.measures ?? []) if (RESERVED.has(m.name)) diagnostics.push({ level: 'error', kind: 'asm.measure', at: m.name, message: `a measure cannot be called '${m.name}': study rows use that name`, fix: `rename it, e.g. '${m.name}1'` });
-  const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {};
+  const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {}, posesOf = {};
   let forceCtx = null; const dynLive = {};
   let measured = {}, reports = [];
   if (assembled && !opts.forPrint) {
@@ -299,13 +302,14 @@ export function solveAssembly(asm, opts, compilePart) {
       const full = jn && jn.kind !== 'slider' ? 2 * Math.PI : 10;
       // interference over the study: the named one(s), or every sweep when .interference() names none
       const ifr = o.interference, swept = !!ifr && (ifr.study ? [ifr.study].flat().includes(st.name) : st.name.startsWith('sweep:'));
-      const poses = [];
+      const poses = [], steps = st.steps ?? 360, track = poseTrack(S, steps + 1);
       // forces over the study (layer 5): joint reactions, driving torques and accelerations at every pose
       const dynOn = !!jn && (o.reactions ?? []).some((r) => r.study == null || r.study === st.name);
       const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
-      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps: st.steps ?? 360,
-        onRow: swept || dynOn ? (k, row) => { if (swept) poses[k] = S.transforms(); if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } : null }, measures, o.events ?? []);
+      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
+        onRow: (k, row) => { const Ts = track.add(row.x); if (swept) poses[k] = Ts; if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } }, measures, o.events ?? []);
       studies[st.name] = res;
+      if (!res.error) posesOf[st.name] = track.done(res);
       if (dynOn) {
         const keys = Object.keys(dyn.find(Boolean)?.readings ?? {});
         for (const k of keys) { res.keys.push(k); res.extrema[k] = extremaOf(res.rows, k); }
@@ -359,7 +363,7 @@ export function solveAssembly(asm, opts, compilePart) {
   };
   const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
   if (forceCtx?.redundantNote && mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.forcesSplit', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation(s) repeat: how ${mobility.redundantJoints.join(', ')} share the load along them is not fixed by statics; the least split is reported`, fix: 'a stress study of the parts that share it (bonded, with their stiffness) settles the split' });
-  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), dyn: dynLive, forces: forceCtx ? { gravity: forceCtx.g, masses: forceCtx.table, speed: o.speed ? { joint: o.speed.joint, rate: forceCtx.rate(o.speed.joint) } : null } : null, couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
+  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), dyn: dynLive, forces: forceCtx ? { gravity: forceCtx.g, masses: forceCtx.table, speed: o.speed ? { joint: o.speed.joint, rate: forceCtx.rate(o.speed.joint) } : null } : null, couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, poses: posesOf, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
     ports: S.portFrames(), origins: Object.fromEntries(S.bodies.map((b) => [b.id, b.t.slice()])), ground: S.bodies.filter((b) => b.ground).map((b) => b.id) };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
@@ -403,7 +407,36 @@ export function solveAssembly(asm, opts, compilePart) {
   }
   // a rigid subassembly's own studies, reports and readings (in its own frame), under its id
   Object.assign(mech.studies, E.childOut.studies); mech.reports.push(...E.childOut.reports); Object.assign(mech.measures, E.childOut.measures);
+  // and its studies' poses, of its own components, carried into this world: where its root now puts its frame
+  for (const [k, v] of Object.entries(E.childOut.poses)) { const R = comp.get(v.sub.root); if (R) mech.poses[k] = liftPoses(v, v.sub.id, K.matMul(R.T, K.matInverse(v.sub.rootLocal)), k); }
   return { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech, eff: E };
+}
+// A study's poses (JIG-016): every component's world transform (jig's frame, column-major, as S.transforms() gives
+// them) at each row the study reached, packed per component. Every study keeps them, on the worker side only
+// (P.mech.poses, prog.studyPoses): a row costs one S.transforms() beside its solve, and a 361-row study of 30
+// components is 1.4 MB (0.7 MB as the CAD package's float32). The ProgramData sent to the page never carries them;
+// the CAD package (cadpkg.js) does, in Candela's frame. Rows the study could not reach (gaps, limits) have none.
+// → { study, drive, unit: 'deg' | 'mm', from, to, rows: [row index], x: Float64Array (drive values, in unit),
+//     T: { [componentId]: Float64Array(16 × x.length) } }
+function poseTrack(S, capacity) {
+  const ids = S.bodies.map(b => b.id), T = ids.map(() => new Float64Array(16 * capacity)), x = new Float64Array(capacity);
+  let n = 0;
+  return {
+    add(xv) { const Ts = S.transforms(); if (n < capacity) { for (let i = 0; i < ids.length; i++) T[i].set(Ts[i], 16 * n); x[n++] = xv; } return Ts; },
+    done(res) {
+      const rows = res.rows.flatMap((r, k) => (r.ok ? [k] : []));
+      return { study: res.name, drive: res.drive, unit: res.unit === 'mm' ? 'mm' : 'deg', from: res.from, to: res.to, rows, x: x.slice(0, n),
+        T: Object.fromEntries(ids.map((id, i) => [id, T[i].slice(0, 16 * n)])) };
+    },
+  };
+}
+// a rigid subassembly's study poses in its parent: its components under its prefix, each placed by F (where the
+// parent puts the subassembly's frame) · its pose in the subassembly's own solve; the drive keeps its own name, as
+// the study's record does
+function liftPoses(v, prefix, F, name) {
+  const lift = (A) => { const out = new Float64Array(A.length); for (let r = 0; r < A.length; r += 16) out.set(K.matMul(F, A.subarray(r, r + 16)), r); return out; };
+  const { sub, ...rest } = v;
+  return { ...rest, study: name, T: Object.fromEntries(Object.entries(v.T).map(([cid, A]) => [`${prefix}/${cid}`, lift(A)])) };
 }
 // a joint value: a number (rad or mm), a quantity, or quantity text such as '90 deg' (an override typed in the params view)
 const num = v => { if (typeof v === 'number') return v; if (typeof v === 'string') { try { return quantity(v).value; } catch { return NaN; } } return v?.value ?? Number(v); };
@@ -823,7 +856,7 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
   const comps = new Map(), parts = [], subs = new Map(), presetPorts = [];
   const values = { ...declared };   // by full id: a flexible child's own values join under its prefix (gather)
   const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [], wrenches: [], reactions: [], speeds: [] };
-  const childOut = { studies: {}, reports: [], measures: {} };
+  const childOut = { studies: {}, reports: [], measures: {}, poses: {} };
   const tree = { kind: 'assembly', id: '', item: asm.name, children: [] };
   const rootOf = A => A.o.ground ?? A.o.components.find(x => x.opts.ground)?.id ?? A.o.components[0]?.id;
   // a root is always a component: an id that names a subassembly (it grounds its parent, by .ground() or by coming
@@ -882,6 +915,7 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
       }
       subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
       for (const [k, v] of Object.entries(r.mech?.studies ?? {})) childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}` };
+      for (const [k, v] of Object.entries(r.mech?.poses ?? {})) childOut.poses[`${id}/${k}`] = { ...v, sub: sn };
       for (const rep of r.mech?.reports ?? []) childOut.reports.push({ ...rep, name: `${id}/${rep.name}` });
       for (const [k, v] of Object.entries(r.mech?.measures ?? {})) childOut.measures[`${id}/${k}`] = v;
     }
