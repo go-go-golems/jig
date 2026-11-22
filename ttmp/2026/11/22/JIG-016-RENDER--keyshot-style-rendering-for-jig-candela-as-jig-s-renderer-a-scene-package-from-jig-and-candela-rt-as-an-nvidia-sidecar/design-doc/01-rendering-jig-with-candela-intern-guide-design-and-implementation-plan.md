@@ -45,7 +45,7 @@ Phases 0–5 are implemented. Phase 6 (the repository merge) waits for the OptiX
   - the Render view with picking, the material library, the timeline and PNG/MP4 jobs (`a1c04de`, `89ad6fc`).
 - **Tests:** `test/render/*.test.mjs` (36), `test/ui/render.cjs` (10 checks in Chromium on the GPU) and the Go tests in `pkg/render`.
 - **Changed from the design while building:**
-  - **The bridge is a Candela library module** (`src/render/jig-candela.js`). Its source is sent to Candela's build as the scene file `jig-candela.js`, next to `jig-program.js` and the look. It is not part of `candela-core.js`, so Candela's core needed only one change: path ids, made upstream as a local, unpushed pbr-spark commit `38fc068` and vendored from there.
+  - **The bridge is a Candela library module** (`src/render/jig-candela.js`). Its source is sent to Candela's build as the scene file `jig-candela.js`, next to `jig-program.js` and the look. It is not part of `candela-core.js`, so Candela's core needed only one change: path ids, made upstream as pbr-spark commit `38fc068` (branch `jig-016-path-ids`, pushed 2026-11-22) and vendored from there.
   - **The bridge is immutable,** like every Candela builder: `.face()`, `.material()` and `.meta()` return a new group, written as one chain.
   - **`.meta(sel, patch)` was added.** It patches the metadata autoFinish reads, so a face keeps the axis jig found. The Render view's material library writes these lines.
   - **Selectors** are addresses, globs, lists of addresses, or predicates over face metadata. A glob matches by name: `body/side[s.*]` also matches the outline's sides `body/side[s.r.*]`.
