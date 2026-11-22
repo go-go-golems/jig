@@ -2,7 +2,7 @@
 
 The Synchro-Compur 0-MXV is the leaf shutter of many cameras of the 1950s and 1960s. Five steel blades are pivoted round a 25 mm opening. A ring swings them open and shut, a spring-driven cam turns the ring once per exposure, and a gear train with a pallet escapement times the slow speeds. This model comes from the Compur project: 29 parts drawn in jig from the repair manual's dimensions, 118.7 g in brass, steel and aluminium, and a planar simulation of the mechanism written for them. The idea it shows: jig draws the parts, and an outside engine moves them in the Render view.
 
-> **Try it.** [Open the Render view](lab:show/render) and play the timeline: 0.5 s at rest, one 1/125 release slowed 250 times, then 1 s at rest. [Look from the front](lab:view/stage?view=plan) to see the parts as they are drawn: the blades shut and the cam with its opening lug on the ring's stud. In `look.js`, set `CUTAWAY` to `true` to leave out the front cover, the speed ring and the speed cam and watch the mechanism under them.
+> **Try it.** [Open the Render view](lab:show/render) and play the timeline: 0.5 s at rest, one 1/125 release slowed 250 times, then 1 s at rest. [Look from the front](lab:view/stage?view=plan) to see the parts as they are drawn: the blades shut and the cam with its opening lug on the ring's stud. In `look.js`, set `CUTAWAY` to `true` to leave out the front cover, the speed ring, the speed cam and the cocking ring and watch the mechanism under them.
 
 ## How it moves
 

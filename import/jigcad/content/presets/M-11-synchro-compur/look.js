@@ -8,10 +8,10 @@ import { jigScene } from 'jig-candela';
 import { program } from 'jig-program';
 import poses from './compur-poses.look.js';
 
-// true leaves out the front cover, the speed ring and the speed cam, to show
-// the mechanism at work under them
+// true leaves out the front cover, the speed ring, the speed cam and the
+// cocking ring and pinion, to show the mechanism at work under them
 const CUTAWAY = false;
-const FRONT = ['cover', 'speedRing', 'speedCam'];
+const FRONT = ['cover', 'speedRing', 'speedCam', 'cockingRing', 'pinion'];
 
 // One material per finish and part, not per face. Candela compiles a material's
 // axis and centre into the shader, and every face of the Compur has a centre of
