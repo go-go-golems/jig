@@ -13,8 +13,8 @@ the original sources are under that ticket's `sources/candela/`.
 
 ## Candela inside jig
 
-Candela lives in jig at `import/candela` (it was the repository `wesen/2026-11-21--pbr-spark`, merged with its
-history by `git subtree` in JIG-017). jig renders its CAD models with this engine: the workbench's Render view, the
+Candela lives in jig at `import/candela`. It was the repository `wesen/2026-11-21--pbr-spark`, merged here with its
+history by `git subtree` in JIG-017; that repository is archived. jig renders its CAD models with this engine: the workbench's Render view, the
 CAD-package bridge `import/jigcad/src/render/jig-candela.js`, and `jigcad serve`, which starts `candela-rt` and
 proxies it at `/rt`. The intern guide to all of it is JIG-017's design doc
 (`../../ttmp/2026/11/22/JIG-017-CANDELA--…/design-doc/01-…`).

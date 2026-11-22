@@ -15,3 +15,4 @@
 - [ ] Next phase: scope in openRender and candela-rt serve <!-- t:7ssd -->
 - [ ] Next phase: Render view OptiX mode over /rt <!-- t:mdm5 -->
 - [ ] Next phase: render jobs, remote GPU, candela-rt release artifact <!-- t:m0wn -->
+- [x] Deprecate and archive pbr-spark with a notice pointing to jig <!-- t:3g3r -->

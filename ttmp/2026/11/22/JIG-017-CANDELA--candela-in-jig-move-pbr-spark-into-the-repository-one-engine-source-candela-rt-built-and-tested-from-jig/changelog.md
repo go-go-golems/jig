@@ -34,3 +34,7 @@ Golden test fixed: the 10 differences are CPU architecture (arm64 baseline vs x8
 ## 2026-11-22
 
 Guide and candela-rt reference map uploaded to reMarkable as one PDF: /ai/2026/11/22/JIG-017-CANDELA/JIG-017 Candela inside jig
+
+## 2026-11-22
+
+pbr-spark deprecated and archived: README notice pointing to go-go-golems/jig import/candela (59b7036, pushed to its main), description and homepage set, gh repo archive; no open PRs or issues, main was e3b799e, the commit jig merged

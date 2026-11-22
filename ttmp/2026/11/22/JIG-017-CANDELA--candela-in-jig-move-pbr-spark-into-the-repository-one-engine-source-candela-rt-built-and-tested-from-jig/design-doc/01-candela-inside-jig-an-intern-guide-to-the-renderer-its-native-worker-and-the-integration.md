@@ -42,7 +42,8 @@ WhenToUse: "Before changing Candela's engine, candela-rt, the Render view, or th
 This section is the as-built summary; the rest of the document explains the system and the reasons behind it. It is
 updated at the end of JIG-017 (see the ticket's diary for the evidence of each step).
 
-- **Done in JIG-017:** Candela's repository (pbr-spark) moved into jig at `import/candela` with its history; jig
+- **Done in JIG-017:** Candela's repository (pbr-spark) moved into jig at `import/candela` with its history, and
+  pbr-spark is archived with a notice pointing here; jig
   builds both Candela bundles from that tree and the vendored copy is gone; Candela's core is written where Candela's
   tools and candela-rt look for it and copied into jig's `dist/`; Candela's engine tests run in jig's `make test-js`
   and CI without npm, in about 13 s, against a golden baseline per CPU architecture; Candela's tickets joined jig's `ttmp`; `make candela-rt` builds the native renderer; `jigcad serve`
@@ -485,14 +486,11 @@ from jig, with its original paths. Path-limited history does not cross the renam
 - `git blame` on the new path attributes lines to the original pbr-spark commits, because the merge's tree reuses
   their blobs.
 
-If work continues in pbr-spark for a while, the two can be kept in step:
-
-```sh
-git subtree pull --prefix=import/candela git@github.com:wesen/2026-11-21--pbr-spark.git main   # their commits into jig
-git subtree push --prefix=import/candela git@github.com:wesen/2026-11-21--pbr-spark.git <branch> # jig's fixes back
-```
-
-The intended end state is that jig is upstream and pbr-spark is archived (a decision for its owner).
+pbr-spark was then deprecated and archived (2026-11-22): its README opens with a notice pointing to
+`import/candela` in jig, and its last commit, `59b7036`, adds only that notice. jig is the only place Candela is
+developed; there is nothing to `git subtree pull` any more. Had the two needed to run side by side for a while,
+`git subtree pull --prefix=import/candela <url> main` and `git subtree push --prefix=import/candela <url> <branch>`
+would have moved commits between them.
 
 ### 7.4 Step 2: one engine source
 

@@ -339,3 +339,40 @@ The intern guide and the candela-rt reference map were bundled into one PDF with
 
 ### What warrants a second pair of eyes
 - **The PDF's rendering.** It was not inspected locally, per the upload skill's default. The mermaid blocks render as code in the PDF, since pandoc does not draw them.
+
+## Step 6: pbr-spark deprecated and archived
+
+At the user's request, pbr-spark now points to jig and is read-only. Before archiving I checked that it held nothing jig lacks: `main` was still `e3b799e`, the commit the subtree merge took in. Its only other branch, `jig-016-path-ids` (`38fc068`), is an ancestor of `main`. It had no open pull requests or issues (#1–#3 merged).
+
+### Prompt Context
+**User prompt (verbatim):** "can you mark the original pbr-spark as deprecated and archive it, and point to jig?"
+
+Then, mid-turn: "and open PR, which are open right now?"
+
+**Assistant interpretation:** a README notice, the repository description and homepage, then archive. The second message asks which PRs are open: jig #5 (JIG-016), and none in pbr-spark.
+
+**Inferred user intent:** one place to develop Candela, with nobody landing in the old repository by mistake.
+
+**Commit (code):** pbr-spark `59b7036` "Deprecated: Candela moved into go-go-golems/jig (import/candela)", pushed to its `main`.
+
+### What I did
+- Checked pbr-spark's state:
+  - `gh repo view` printed `isArchived: false`;
+  - `gh pr list --state open` and `gh issue list --state open` returned nothing;
+  - `git ls-remote --heads` showed `main e3b799e` and `jig-016-path-ids 38fc068`;
+  - `git merge-base --is-ancestor 38fc068 e3b799e` confirmed the branch is merged.
+- Cloned `main` into the scratchpad and added a `> [!WARNING]` block under the README's title:
+  - it links `go-go-golems/jig` and `tree/main/import/candela`;
+  - it names `e3b799e` and PRs #1–#3 as everything that reached jig.
+  - Committed and pushed: `e3b799e..59b7036  main -> main`.
+- Set the description and homepage, then archived: `gh repo edit … --description "Deprecated and archived: Candela moved into go-go-golems/jig (import/candela), with its history" --homepage https://github.com/go-go-golems/jig`, then `gh repo archive … --yes`.
+- In jig, the guide's §7.3 and §0 and Candela's README now say pbr-spark is archived. Updated the tasks and changelog.
+
+### What worked
+- `gh repo view --json isArchived,description,homepageUrl` printed `"isArchived":true`, with the new description and homepage.
+
+### What didn't work
+- **Pushing `jig-017-candela`.** I read the mid-turn message as "open a PR" at first, and `git push -u origin jig-017-candela` was refused by the permission classifier. The message turned out to be a question, so the branch stays local, and no PR was opened.
+
+### What warrants a second pair of eyes
+- **A link that 404s until merge.** The README links `go-go-golems/jig/tree/main/import/candela`, which exists only once JIG-017 reaches jig's `main`. Until then the repository link works and the directory link doesn't. An archived repository can't be edited without unarchiving it first.
