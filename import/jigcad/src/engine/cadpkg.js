@@ -12,12 +12,17 @@
 //   cadPackage(prog, { quality: 'render' | 'preview', studies })  → the package, arrays as typed arrays (transferable)
 //   encodeCadPackage(pkg)                                        → JSON text, arrays as base64 (export('candela'))
 //
+// Every body carries content keys, key and meshKey (keysOf), so a renderer that keeps mesh definitions between
+// packages (the bridge does) builds again only the bodies an edit changed; the render tessellation of a body the
+// feature cache kept is not redone either (meshOf).
+//
 // An assembly's studies come with their poses (studies.<name>: drive, unit, x, and per component a float32 4×4 per
 // row, in Candela's frame), so a Candela scene plays a study back with the bridge's posesAt() and animate().
 import * as K from './kernel.js';
 import { meshBody, faceMeta } from './mesh.js';
 import { selectInPart } from './compile.js';
 import { finishTargets } from './assembly.js';
+import { hashStr } from './hash.js';
 
 export const CAD_PACKAGE_FORMAT = 'jig-cad-package';
 export const CAD_PACKAGE_VERSION = 1;
@@ -210,6 +215,49 @@ function studiesOf(prog, components, which) {   // components: id → its placem
 }
 const moves = (A, T) => { for (let i = 0; i < A.length; i++) if (Math.abs(A[i] - T[i % 16]) > 1e-9) return true; return false; };
 
+// ---- between compiles: the render tessellation per body, and a content key per package body ----
+// A compile hands back the very Body objects of the features the feature cache kept (compile.js featureCache: a hit
+// returns the cached state; gc() keeps their shapes), so a Body is the key of its render-quality tessellation, and an
+// edit that leaves a part alone does not mesh it again. The cache is this module's, not the body's _mesh, which
+// holds the stage's coarser mesh (meshBody's cache: false keeps it). A body the cache dropped comes back as a new
+// object, is meshed again, and hashes the same.
+const RENDER_MESHES = new WeakMap();   // Body → its mesh at render quality
+const MESH_HASHES = new WeakMap();     // a mesh → the hash of its arrays
+/** counters, for tests and measurements: bodies meshed at render quality, and meshes reused from an earlier export */
+export const cadStats = { meshed: 0, reused: 0 };
+function meshOf(b, quality) {
+  if (quality !== 'render') return meshBody(b);   // the stage's own, cached on the body
+  let m = RENDER_MESHES.get(b);
+  if (m) { cadStats.reused++; return m; }
+  m = meshBody(b, { angular: 0.1, cache: false });
+  RENDER_MESHES.set(b, m); cadStats.meshed++;
+  return m;
+}
+// a 64-bit content hash (two 32-bit lanes, FNV-1a and a multiply–xorshift) of typed arrays read as 32-bit words
+function hashArrays(list) {
+  let h1 = 0x811c9dc5, h2 = 0x9e3779b9;
+  for (const a of list) {
+    const u = new Uint32Array(a.buffer, a.byteOffset, a.byteLength >> 2);
+    h1 = Math.imul(h1 ^ u.length, 16777619); h2 = Math.imul(h2 ^ u.length, 0x5bd1e995); h2 ^= h2 >>> 15;
+    for (let i = 0; i < u.length; i++) {
+      const w = u[i];
+      h1 = Math.imul(h1 ^ w, 16777619);
+      h2 = Math.imul(h2 ^ w, 0x5bd1e995); h2 ^= h2 >>> 15;
+    }
+  }
+  return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
+// A package body's content keys, for a renderer's cache of mesh definitions (the bridge's): meshKey names its
+// triangles and the ids of its faces (bodies with the same one have the same triangles and the same face order, so
+// they can share a BVH); key names all that the bridge's mesh definition holds: that, its id, its component and the
+// component's look, and every face's meta (a finish, a colour). A body whose key a renderer holds needs nothing new.
+function keysOf(m, id, component, look, faces) {
+  let mh = MESH_HASHES.get(m);
+  if (!mh) { mh = hashArrays([m.positions, m.normals, m.indices, m.triFace]); MESH_HASHES.set(m, mh); }
+  const meshKey = 'm' + hashStr(`${CAD_PACKAGE_VERSION}|${mh}|${faces.map((f) => f.id).join('\u0000')}`);
+  return { key: 'd' + hashStr(`${meshKey}|${id}|${component}|${JSON.stringify(look)}|${JSON.stringify(faces)}`), meshKey };
+}
+
 /**
  * The CAD package of a compiled program. quality 'render' tessellates at a finer angle than the stage (0.1 rad
  * instead of 0.3) so reflective bores do not show facets; 'preview' reuses the stage's meshes. studies: which of an
@@ -229,7 +277,7 @@ export function cadPackage(prog, { quality = 'render', studies = true } = {}) {
     for (const b of p.res.state.bodies) {
       const id = `${p.name}/${b.id}`;
       const T = placement.get(id) ?? K.IDENTITY;
-      const m = meshBody(b, quality === 'render' ? { angular: 0.1, cache: false } : {});
+      const m = meshOf(b, quality);
       if (!components.has(p.name)) {
         components.set(p.name, { id: p.name, parent: p.name.includes('/') ? p.name.slice(0, p.name.lastIndexOf('/')) : null,
           transform: toCandelaMatrix(T), material: meta.material?.name ?? null, color: meta.color ?? null, look: look.meta ?? {} });
@@ -243,8 +291,9 @@ export function cadPackage(prog, { quality = 'render', studies = true } = {}) {
       }
       const bb = b.bbox();
       if (bb) for (const c of boxCorners(bb)) grow(W, pt(K.matApply(T, c)));
-      bodies.push({ id, component: p.name, transform: toCandelaMatrix(T), positions: pos, normals: nrm,
-        indices: Uint32Array.from(m.indices), triFace: Uint32Array.from(m.triFace), faces: faceRecords(b, m, p, look, types, multi, ov) });
+      const faces = faceRecords(b, m, p, look, types, multi, ov);
+      bodies.push({ id, component: p.name, ...keysOf(m, id, p.name, look.meta ?? {}, faces), transform: toCandelaMatrix(T), positions: pos, normals: nrm,
+        indices: Uint32Array.from(m.indices), triFace: Uint32Array.from(m.triFace), faces });
     }
   }
   return {

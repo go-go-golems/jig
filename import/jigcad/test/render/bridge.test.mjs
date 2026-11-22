@@ -146,7 +146,8 @@ test('the same program from typed arrays (the page) and from JSON (a file, cande
   assert.equal(fromJson.compiled.shared, fromJson2.compiled.shared);
   const typed = JSON.parse(text);
   const dec = (s, T) => { const u = Buffer.from(s, 'base64'); return new T(u.buffer, u.byteOffset, u.byteLength / T.BYTES_PER_ELEMENT); };
-  for (const b of typed.bodies) { b.positions = dec(b.positions, Float32Array); b.normals = dec(b.normals, Float32Array); b.indices = dec(b.indices, Uint32Array); b.triFace = dec(b.triFace, Uint32Array); }
+  // without its content keys, so the bridge builds these bodies from the typed arrays instead of reusing the JSON's
+  for (const b of typed.bodies) { b.positions = dec(b.positions, Float32Array); b.normals = dec(b.normals, Float32Array); b.indices = dec(b.indices, Uint32Array); b.triFace = dec(b.triFace, Uint32Array); delete b.key; delete b.meshKey; }
   const fromTyped = await buildLook(DEFAULT_LOOK, typed);
   assert.equal(fromTyped.compiled.shared, fromJson.compiled.shared, 'the program (irHash input) is the same');
   const digest = (r) => C.digestBytes(r.compiled.pack({}).O);
