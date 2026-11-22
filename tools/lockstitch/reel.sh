@@ -3,7 +3,7 @@
 # zigzag (two stitches) and the whole head (rendered as four stitches with an orbiting camera) once, with the scene's
 # name in the corner. Needs ffmpeg with libx264 and drawtext.
 set -e
-D=${1:-/home/claude/shots/lockstitch/video}
+D=${1:-$HOME/data/pbr-spark/lockstitch}
 FONT=${FONT:-/usr/share/fonts/opentype/inter/Inter-Medium.otf}
 cap() { printf "drawtext=fontfile=%s:text='%s':x=28:y=h-52:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.45:boxborderw=9" "$FONT" "$1"; }
 ffmpeg -v error -y \

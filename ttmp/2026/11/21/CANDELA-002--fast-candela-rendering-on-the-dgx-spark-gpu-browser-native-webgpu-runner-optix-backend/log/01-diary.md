@@ -318,3 +318,75 @@ program on this machine works.
 
 ### Remaining requirements and next action
 - Step 3 phase 2: the scene package writer (TS) and reader (C++); phases 3–7 per guide §6.8. Steps 1 and 2 are also open.
+
+## Step 7: Step 1 implemented — render any preset (and the lockstitch scenes) on the GPU from the command line
+
+Re-uploaded the corrected guide as a new document (v2, so annotations on v1 survive), then implemented step 1:
+`scripts/render-preset.ts` drives the built workbench in Playwright's headless shell with the GPU flags and runs a
+job through the workbench's own render queue; `tools/lockstitch/render.ts` replaces `render.js` on top of it. One
+1080p lockstitch stitch at 64 spp now takes 3.9 minutes on the GB10.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, update, then continue, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Re-upload the revised guide, then implement the plan in order, starting with step 1.
+**Inferred user intent:** Turn the design into working tools, with the diary as the record.
+**Commit (code):** see the commit after this entry ("CANDELA-002: step 1 …")
+
+### What I did
+- `remarquee upload bundle <guide> --name "CANDELA-002 Candela on the DGX Spark - intern guide v2" …` →
+  `OK: uploaded … intern guide v2.pdf -> /ai/2026/11/21/CANDELA-002` (default header; `stmaryrd` is installed now).
+- Read `host.ts` (`params()`, `onParam` → static params rebuild after 30 ms, `_seq`, `building`/`compiling`, the
+  `RenderQueue` job shape `{status, progress, note, files}`), `params.ts` (handle `set`, `isStatic`, choices are
+  static), `tools/lockstitch/render.js` (source patching of `scene`/`stitch`/`orbit`, `end: dur - 1/fps`).
+- Wrote `scripts/render-preset.ts`: `openSession` (serve `dist/`, launch with `GPU_ARGS`), `renderWith(session,
+  opts)` (load `#preset`, refuse non-NVIDIA backends, apply params, `workbench.render({...job, autosave:false})`,
+  poll, stream files back in 3 MiB base64 chunks via `page.exposeFunction`), `renderPreset`, `parseArgs`, CLI.
+- Wrote `tools/lockstitch/render.ts` (same flags as `render.js`, one session for all scenes, params instead of
+  source patching, default output `~/data/pbr-spark/lockstitch`); deleted `render.js`; `reel.sh` default dir; README;
+  npm scripts `render`, `lockstitch`; `tools/` added to `tsconfig.json` `include`.
+- Committed the `webgpu` dependency the user installed (`package.json`/`package-lock.json`).
+
+### Why
+- Going through `workbench.render` reuses `runRender` (seeding, exposure lock, sequences, encoders) instead of
+  reimplementing output; the browser is only the GPU host here.
+- Default output under `~/data/` per the global instruction for media.
+
+### What worked
+- B-01 1080p/64 spp still: 2.0 s; visually correct (red sphere, soft shadow).
+- K-09 with `--param "scene=S-03 Rotary hook"`: rebuilt and rendered the rotary hook; 13-frame 720p MP4 (h264).
+- Full stitch: `npx tsx tools/lockstitch/render.ts --scenes 7 --size 1920x1080 --spp 64` → 48 frames, 230.5 s render
+  (13.3 spp/s), h264 High 1080p (`various/10-step1-render-preset.txt`).
+- `npx tsc --noEmit -p .` clean (now including `tools/`).
+
+### What didn't work
+- First lockstitch run design flaw (caught before it bit): setting a static param to its current value (K-09's
+  default scene `S-07 Whole head`) triggers no rebuild, so waiting for `_seq` to advance would time out after 60 s.
+  Fixed by comparing `h.value` first and logging `(unchanged)`; verified by the S-07 still finishing in 2.0 s.
+
+### What I learned
+- The render queue's video path (WebCodecs H.264 in the browser) is not the bottleneck at 1080p: 48 frames encode
+  inside the 230 s; the path tracer is (~4.8 s per 64-spp frame).
+- 13.3 spp/s on the full stitch vs 12.4 in the throughput probe: per-sample overhead is amortised slightly better in
+  a sequence.
+
+### What was tricky to build
+- Getting files out of the page: `job.files[].data` are `Uint8Array`s inside the page; `page.evaluate` return values
+  are JSON-serialised, so a 1080p EXR or MP4 would be a huge array. Chunked base64 through an exposed function keeps
+  each message ≤4 MiB and writes straight to disk.
+
+### What warrants a second pair of eyes
+- `renderWith` sets `workbench.running = false` before the job so the clock does not advance while a still renders;
+  check that sequences still drive time through `seek` (the MP4 frames do animate in the 13-frame test).
+- Numeric parsing of `--param`: a choice keeps the string; other string values that parse as numbers become numbers.
+  Colour/vector params are not supported from the CLI yet.
+
+### What should be done in the future
+- Steps 2 and 3. A comparison against `render.js` on SwiftShader at 1080p/64 spp was not run (estimated >1 h).
+
+### Code review instructions
+- Start at `scripts/render-preset.ts` `renderWith`; then `tools/lockstitch/render.ts`.
+- Validate: `npm run build && npx tsx tools/lockstitch/render.ts --still --scenes 3,7 --size 960x540 --spp 32`.
+
+### Technical details
+- GPU flags: `--use-angle=vulkan --enable-features=Vulkan --enable-unsafe-webgpu --ignore-gpu-blocklist`.
+- Backend check: `/nvidia/i` against `vp.backend.name + vp.backend.info` ("WebGPU nvidia").

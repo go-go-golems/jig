@@ -11,6 +11,8 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: repo://scripts/render-preset.ts
+      Note: 'Step 1: render any preset headless on the GPU'
     - Path: repo://src/engine/compile.ts
       Note: 'compile and pack: objects, generated WGSL, GPU buffers'
     - Path: repo://src/engine/kernel.ts
@@ -21,6 +23,8 @@ RelatedFiles:
       Note: WebGPU/WebGL2 backends; limits caps
     - Path: repo://tools/lockstitch/render.js
       Note: Lockstitch headless renderer to port for step 1
+    - Path: repo://tools/lockstitch/render.ts
+      Note: 'Step 1: lockstitch scenes on the GPU (replaces render.js)'
     - Path: repo://ttmp/2026/11/21/CANDELA-002--fast-candela-rendering-on-the-dgx-spark-gpu-browser-native-webgpu-runner-optix-backend/scripts/02-throughput.ts
       Note: Throughput measurement on the GB10
 ExternalSources: []
@@ -437,6 +441,12 @@ version of this guide** (`various/07-nvenc-probe.txt`): Ubuntu's arm64 `ffmpeg` 
 2.2–3.5 s, far faster than the renderer produces frames.
 
 ## 4. Step 1: the existing renderer on the real GPU
+
+> **Status (implemented, 2026-11-21):** `scripts/render-preset.ts` and `tools/lockstitch/render.ts` (replacing
+> `render.js`); `npm run render` / `npm run lockstitch`. One K-09 stitch at 1080p and 64 spp renders in 230.5 s
+> (13.3 samples/s, `various/10-step1-render-preset.txt`). Differences from the sketch below: params are applied with
+> the param handles' `set` (a static param rebuilds; the script waits for the new build), files return to Node in
+> base64 chunks through `page.exposeFunction`, and the script refuses a non-NVIDIA backend unless `--allow-software`.
 
 **Goal.** Render the lockstitch scenes (and any preset) headless on the GB10 with no renderer changes, and measure.
 Effort: a day.

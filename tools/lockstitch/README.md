@@ -29,14 +29,18 @@ The lockstitch head (a sewing machine mechanism modelled in jig and animated by 
    positions, nlerp of rotations) and returns a pose per part. Its **Scene** param is the original page's seven
    scenes; each frames its region from the original's view direction.
 
-3. **Render** headless (Chromium, WebGL2 through SwiftShader on a machine with no GPU; a real GPU is ~100× faster):
+3. **Render** headless on the GPU (`npm run build` first; Playwright's headless shell with ANGLE-on-Vulkan and
+   WebGPU flags; it refuses a software rasteriser unless `--allow-software`). Output defaults to
+   `~/data/pbr-spark/lockstitch/`. On the DGX Spark one 1080p stitch at 64 spp (48 frames) takes ~3.9 min.
 
    ```sh
-   node tools/lockstitch/render.js --size 960x540 --spp 8 --fps 24 --stitch 2 --format mp4 --out out/
-   node tools/lockstitch/render.js --still --size 1920x1080 --spp 64 --scenes 3,7
-   node tools/lockstitch/render.js --scenes 7 --turns 4 --orbit -12 --name S-07-whole-head   # four stitches, the camera swinging 48°
-   sh tools/lockstitch/reel.sh out/                                                           # all seven, captioned, one MP4
+   npx tsx tools/lockstitch/render.ts --size 960x540 --spp 8 --fps 24 --stitch 2 --format mp4
+   npx tsx tools/lockstitch/render.ts --still --size 1920x1080 --spp 64 --scenes 3,7
+   npx tsx tools/lockstitch/render.ts --scenes 7 --turns 4 --orbit -12 --name S-07-whole-head   # four stitches, the camera swinging 48°
+   sh tools/lockstitch/reel.sh ~/data/pbr-spark/lockstitch                                      # all seven, captioned, one MP4
    ```
+
+   Any other preset renders the same way: `npx tsx scripts/render-preset.ts <id> [--param id=value]…`.
 
    Options: `--scenes 1,…,7`, `--size WxH`, `--spp`, `--fps`, `--stitch` (seconds per stitch), `--turns`,
    `--format mp4|webm|png`, `--quality draft|standard|high|max`, `--still [--time s]`, `--backend webgl2|webgpu`,

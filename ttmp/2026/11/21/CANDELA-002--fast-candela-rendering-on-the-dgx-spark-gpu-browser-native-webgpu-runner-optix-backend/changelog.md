@@ -15,3 +15,7 @@ Intern guide written: renderer walkthrough, GB10 measurements, designs for GPU b
 ## 2026-11-21
 
 Guide uploaded to reMarkable /ai/2026/11/21/CANDELA-002 (header override: stmaryrd.sty missing locally)
+
+## 2026-11-21
+
+Step 1 implemented: scripts/render-preset.ts, tools/lockstitch/render.ts; 1080p stitch at 64 spp in 230 s on the GB10
