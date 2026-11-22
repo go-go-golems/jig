@@ -16,7 +16,7 @@ const D = CANDELA_DATA;
 const host = new Host({ presets: D.presets, docs: D.docs, reference: D.reference });
 (window as any).workbench = host;      // for the curious, in the console
 host.captureWorkbench = (maxW) => captureWorkbench(host, maxW);
-const MIME = n => (/\.png$/.test(n) ? 'image/png' : /\.zip$/.test(n) ? 'application/zip' : /\.exr$/.test(n) ? 'image/x-exr' : 'application/octet-stream');
+const MIME = (n: string) => (/\.png$/.test(n) ? 'image/png' : /\.zip$/.test(n) ? 'application/zip' : /\.exr$/.test(n) ? 'image/x-exr' : 'application/octet-stream');
 host.saveFiles = async (files: { name: string; data: Uint8Array | Blob | string }[]) => {
   let ok = true;
   for (const f of files || []) ok = (await saveFile(host, f.name, new Blob([f.data as BlobPart], { type: MIME(f.name) }))) && ok;

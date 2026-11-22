@@ -3,10 +3,10 @@
 const KW = new Set('const let var function return if else for while do of in new class extends import export from require this typeof instanceof break continue switch case default try catch finally throw async await yield delete void static get set super'.split(' '));
 const LIT = new Set(['null', 'undefined', 'true', 'false', 'NaN', 'Infinity']);
 const RE = /(\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$))|('(?:[^'\\\n]|\\.)*'?|"(?:[^"\\\n]|\\.)*"?|`(?:[^`\\]|\\.)*`?)|(=>)|(\b\d+(?:\.\d+)?(?:e[-+]?\d+)?\b|\.\d+\b)|([A-Za-z_$][\w$]*)|([{}()[\];,.:?!<>=+\-*/%&|^~]+)|(\s+)|(.)/g;
-const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-export function tokens(src) {
-  const out: any[] = []; let m: any; RE.lastIndex = 0;
+export function tokens(src: string): [string, string][] {
+  const out: [string, string][] = []; let m: RegExpExecArray | null; RE.lastIndex = 0;
   while ((m = RE.exec(src))) {
     const t = m[0];
     if (m[1]) out.push(['tk-c', t]);
@@ -21,7 +21,7 @@ export function tokens(src) {
   return out;
 }
 // one HTML string per line, so the editor can mark lines
-export function highlightLines(src) {
+export function highlightLines(src: string): string[] {
   const lines = [''];
   for (const [cls, text] of tokens(src)) {
     const parts = text.split('\n');
@@ -32,4 +32,4 @@ export function highlightLines(src) {
   }
   return lines;
 }
-export const highlight = src => highlightLines(src).join('\n');
+export const highlight = (src: string): string => highlightLines(src).join('\n');

@@ -18,6 +18,13 @@ You can show it pictures too: **paste**, **drop** or attach an image — a refer
 
 **Auto** runs each step as it comes; **Ask** shows you each step's code and waits; **Read-only** refuses edits. Every step that changed files can be reverted.
 
+## Connecting it
+
+The agent calls the Anthropic API from this page with your own access: open **Connection** in the Agent view and
+enter an API key (or the base URL of a proxy that adds one). It is stored in this browser only. **Model** picks
+the tier — *Fast* (`claude-haiku-5-5`), *Balanced* and *Deep* (`claude-opus-5-5`, Deep thinking harder) — and each
+tier's model id can be changed there. **Thinking** overrides how much effort the model spends.
+
 ## What it is good at
 
 Diagnosing (it reads the codes and the hints), converting between photometric units, tuning by measurement (meter a point, adjust, meter again), and explaining the physics behind a preset. It works from the same reference you can read in the **Reference** view.

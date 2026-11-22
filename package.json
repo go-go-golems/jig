@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p .",
     "validate": "tsx scripts/validate.ts",
     "test": "tsx tests/agent-loop.test.ts",
-    "shot": "tsx scripts/shot.ts"
+    "shot": "tsx scripts/shot.ts",
+    "typecheck:strict": "tsx scripts/typecheck-strict.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

@@ -42,7 +42,7 @@ export const isExpr = x => !!nodeOf(x);
 
 function stageError(n) {
   const loc = callSite();
-  const src = lineText(loc), col = loc ? loc.col - 1 : 0;
+  const src = lineText(loc), col = loc ? (loc.col || 1) - 1 : 0;
   const near = src.slice(Math.max(0, col - 2), col + 40);
   const cmp = /^[^;]*?(\s(>=?|<=?|===?|!==?)\s|\?)/.test(near) || /\b(if|while)\s*\(/.test(src);
   if (cmp) throw new CandelaError('E202', `cannot branch on a symbolic ${tname(n.type)} with \`?:\`, \`if\` or a comparison`, { loc, hint: ['→ fx.select(a.gt(b), x, y)            hard edge', '→ fx.mix(y, x, a.smoothstep(lo, hi))   anti-aliased'] });
