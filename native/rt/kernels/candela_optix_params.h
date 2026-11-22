@@ -14,6 +14,7 @@ struct CandelaParams {
   float4* aovN;
   OptixTraversableHandle ias;  // meshes (one instance each) + one instance of the analytic GAS
   const int* aabbObjects;      // custom primitive index → object index in O
+  const int* sphereObjects;    // built-in sphere primitive index → object index in O
 };
 extern "C" { __constant__ CandelaParams params; }
 

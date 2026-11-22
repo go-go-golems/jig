@@ -8,7 +8,7 @@ import { digestString } from '../digest';
 export type CudaTargetKind = 'cuda' | 'optix';
 /** 'auto': the headless driver picks OptiX when the RT cores pay off (meshes, many objects), plain CUDA otherwise */
 export type CudaTargetChoice = CudaTargetKind | 'auto';
-export interface CudaProgram { source: string; hash: string; lines: number; functions: number; omitted: string[]; translateMs: number }
+export interface CudaProgram { source: string; hash: string; lines: number; functions: number; omitted: string[]; translateMs: number; ser?: boolean }
 
 const TARGETS: Record<CudaTargetKind, { omit: string[]; renameDefs?: Record<string, string>; prelude: string; kernelPrelude: string; epilogue: string }> = {
   // plain CUDA: the translated traceAll walks Candela's own BVH; checks the translation in isolation
@@ -29,9 +29,12 @@ export function cudaPostProgram(displayWgsl: string): CudaProgram {
   return { source, hash: digestString(source), lines: source.split('\n').length, functions: translation.functions.length, omitted: translation.omitted, translateMs: now() - t0 };
 }
 
-export function cudaProgram(compiled: { shared: string }, target: CudaTargetKind = 'cuda'): CudaProgram {
+/** o.ser (OptiX only): shader execution reordering in the traversal shim (CANDELA_SER, candela_traversal.inc) */
+export function cudaProgram(compiled: { shared: string }, target: CudaTargetKind = 'cuda', o: { ser?: boolean } = {}): CudaProgram {
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const t0 = now();
-  const { source, translation }: { source: string; translation: CudaTranslation } = cudaSource(compiled.shared, TARGETS[target]);
-  return { source, hash: digestString(source), lines: source.split('\n').length, functions: translation.functions.length, omitted: translation.omitted, translateMs: now() - t0 };
+  const ser = target === 'optix' && !!o.ser;
+  const t = TARGETS[target];
+  const { source, translation }: { source: string; translation: CudaTranslation } = cudaSource(compiled.shared, ser ? { ...t, prelude: '#define CANDELA_SER 1\n' + t.prelude } : t);
+  return { source, hash: digestString(source), lines: source.split('\n').length, functions: translation.functions.length, omitted: translation.omitted, translateMs: now() - t0, ser };
 }

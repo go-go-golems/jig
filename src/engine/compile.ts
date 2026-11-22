@@ -136,6 +136,14 @@ function buildBVH(items) {
 }
 
 // ---------- sun, sky ----------
+/** whether a material's lobes can send a path into the object (a refracting or thin dielectric, a medium's bounds, an
+ *  interior medium): such objects need hits from inside, which OptiX's built-in sphere intersector does not report,
+ *  so the OptiX target keeps them on the custom intersection program (targets/optix.ts) */
+export function enterableMaterial(code: string): boolean {
+  if (/L\.kind = (5|6)\b/.test(code) || /L\.med = (?!-1;)/.test(code)) return true;
+  return code.split('\n').some(line => /L\.kind = 3;/.test(line) && !/L\.flags = 2;/.test(line));
+}
+
 export function directNormalLux(elevRad) {
   const e = elevRad * 180 / Math.PI; if (e <= 0) return 0;
   const z = 90 - e, am = 1 / (Math.cos(z * Math.PI / 180) + 0.50572 * Math.pow(96.07995 - z, -1.6364));
@@ -545,7 +553,7 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
   // ---- data packing (re-run when params move or the clock ticks) ----
   const compiled = {
     shared, post: POST, nU, spectral: spectralOn, engine: eng, slots: S.slotList, ids: S.ids, behaviors: S.behaviors, moving: S.moving,
-    objects: S.objs, lightsMeta: S.lights, materials: S.mats.map(m => ({ id: m.id, label: m.label, users: m.users || 1 })), media: S.media, cameraComp: S.cam,
+    objects: S.objs, lightsMeta: S.lights, materials: S.mats.map(m => ({ id: m.id, label: m.label, users: m.users || 1, enterable: enterableMaterial(m.code) })), media: S.media, cameraComp: S.cam,
     stats: { objects: S.objs.length, lights: S.lights.length, materials: S.mats.length, media: S.media.length, sdfs: S.sdfs.length, params: S.slotList.length, lines: 0, triangles: S.triangles, meshes: S.meshDefs, sceneData: S.sdHead.byteLength },
     motionBlur: S.cam && S.cam.props && S.cam.props.motion ? S.cam.props.motion : null, hdri: S.env6, poseIds: S.nodeIds,
     sun: S.sun, sky: S.sky, env: S.env, fog: S.fog,
