@@ -1,0 +1,19 @@
+{
+  "id": "M-11",
+  "title": "Synchro-Compur leaf shutter",
+  "group": "Mechanisms",
+  "order": 11,
+  "difficulty": "advanced",
+  "about": "the 29 parts of a Synchro-Compur 0-MXV camera shutter, rendered in brass, steel and black, and moved in the Render view by the shutter's own dynamics: one 1/125 release, 250 times slower",
+  "view": "axo",
+  "overlays": "shadows,grid,dims",
+  "tries": "Open the Render view and play the release | Show the mechanism: set CUTAWAY to true in look.js | Make the blades brass in the Render view's material library",
+  "agent": {
+    "role": "a camera-shutter mechanic who knows the Compur repair manual",
+    "prompt": "Prefer finishes and materials through .material() and .finish() in the script; never move a part's placement, because the baked poses in compur-poses.look.js are relative to where each part is drawn; regenerate the poses with tools/compur-poses.mjs rather than editing them.",
+    "fragments": {
+      "poses": "Say which simulated body drives each component you change, and whether the poses in compur-poses.look.js still fit it."
+    },
+    "defaultFragments": ["poses"]
+  }
+}
