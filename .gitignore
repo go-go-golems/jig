@@ -8,3 +8,4 @@ shots/
 ttmp/**/sources/local/*.zip
 # build output inside the imported original (regenerable with its build/build.js)
 ttmp/**/sources/candela/dist/
+build/

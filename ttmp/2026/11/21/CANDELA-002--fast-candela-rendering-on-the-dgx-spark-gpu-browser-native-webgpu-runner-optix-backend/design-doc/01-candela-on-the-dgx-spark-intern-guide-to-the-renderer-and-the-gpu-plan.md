@@ -11,8 +11,14 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: repo://native/optix/src/ao.cu
+      Note: 'Step 3 spike: AO device programs'
+    - Path: repo://native/optix/src/main.cpp
+      Note: 'Step 3 spike: OptiX host (GAS/IAS, pipeline, timing)'
     - Path: repo://scripts/render-preset.ts
       Note: 'Step 1: render any preset headless on the GPU'
+    - Path: repo://scripts/scene-package.ts
+      Note: 'Step 3: scene package writer (v0: geometry, instances, camera)'
     - Path: repo://src/engine/compile.ts
       Note: 'compile and pack: objects, generated WGSL, GPU buffers'
     - Path: repo://src/engine/kernel.ts
@@ -598,6 +604,13 @@ traversal on the GPU. Measure with `timestamp-query` around the trace dispatch t
 640×360 reaches at least the WebGL2 browser number (386 samples/s); results match the browser renderer (section 7).
 
 ## 6. Step 3: an OptiX backend
+
+> **Status (spike, 2026-11-21):** phase 1 done (SDK 9.0.0, `optixTriangle`); a traversal spike exists:
+> `scripts/scene-package.ts` writes a version-0 package (triangles, instance transforms, camera) and
+> `native/optix/` builds `candela-optix-ao`, Candela's AO integrator on the RT cores. On K-09 at 1080p it runs
+> **1,721 full-frame samples/s against 105 for the WebGPU kernel (~16×)**, and the two images agree (mean AO 0.9894
+> both; `various/11-optix-ao-spike.txt`). AO is traversal-bound; the path tracer's speed-up will be smaller and is
+> what phases 3–5 will measure.
 
 **Goal.** Use the RT cores for BVH traversal and triangle tests, OptiX's AI denoiser for clean images at low sample
 counts, and OptiX features the WebGPU kernel cannot express (curves for thread, SER for coherence). Effort: 2–4

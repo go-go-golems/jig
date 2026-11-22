@@ -390,3 +390,93 @@ job through the workbench's own render queue; `tools/lockstitch/render.ts` repla
 ### Technical details
 - GPU flags: `--use-angle=vulkan --enable-features=Vulkan --enable-unsafe-webgpu --ignore-gpu-blocklist`.
 - Backend check: `/nvidia/i` against `vp.backend.name + vp.backend.info` ("WebGPU nvidia").
+
+## Step 8: OptiX traversal spike — Candela's AO on the RT cores is ~16× the WebGPU kernel on K-09
+
+The user asked "what about using optix?" while step 1 was finishing. Rather than argue from the plan, I built the
+smallest thing that measures it: a version-0 scene package exported from the real build (triangles, instance
+transforms from the packed object records, camera rows) and a C++ OptiX program running Candela's AO integrator on
+it. Same scene, camera, radius and estimator as the WebGPU kernel's AO mode, so the two numbers compare directly.
+
+Result: 1,721 vs 105 full-frame samples/s at 1080p (~16×), with matching images (mean AO 0.9894 in both, mean 8-bit
+difference 0.10).
+
+### Prompt Context
+**User prompts (verbatim):** "you'll need a backend server, right?", "what about using optix?", "install",
+"when something is missing, install it", "or tell me how"
+**Assistant interpretation:** Show whether OptiX pays off on this machine before building the backend; install
+missing dependencies (or give the sudo command) instead of working around them.
+**Inferred user intent:** Decide where to invest: the Dawn runner (step 2) or OptiX (step 3).
+**Commit (code):** see the commit after this entry ("CANDELA-002: OptiX traversal spike …")
+
+### What I did
+- Read how geometry reaches the GPU: `compile` returns `objects` (with `def` for meshes); `pack` writes 24 floats per
+  object with the world→object 3×4 row-major matrix at +4 and `origIdx` at +21; `MeshDef.tris` is 24 floats per
+  triangle (positions first); `cameraUniforms` gives U rows 1–4; `viewport.repack` passes `animation(t)` poses.
+- `scripts/scene-package.ts` (v0): positions per unique mesh def → `geometry.bin`, instances with
+  `inv34(Mi)` (= OptiX's instance transform layout), camera; planes/rects/boxes as exact triangles; `--engine` and
+  `withEngine()` to override a scene's engine (prepend an import, append `export const engine`).
+- `scripts/render-preset.ts`: `--engine` (same override through `setFile` + rebuild), timing from the queue's
+  `job.ms` with 100 ms polling, and stills default to the preset's start time.
+- `native/optix/`: `params.h`, `ao.cu` (raygen with Candela's camera and cosHemi AO, closest hit using
+  `optixGetTriangleVertexData`, two misses), `main.cpp` (GAS per mesh with compaction, IAS, pipeline, SBT, timed
+  launches, EXR writer), `CMakeLists.txt` (nvcc `-optix-ir` for sm_121, FetchContent for nlohmann/json), README.
+- Ticket script `07-exr-stats.py` (EXR reader, coverage/mean, `--pgm`); run via `uv run --with numpy`.
+
+### Why
+- AO isolates traversal (one camera + one occlusion ray, almost no shading), which is exactly what OptiX changes.
+- Using the packed object records and `cameraUniforms` means the package is the GPU's own view of the scene, so
+  any mismatch would show up as an image difference, not be hidden by a second export path.
+
+### What worked
+- First build of `native/optix` compiled and linked cleanly; first run produced a correct image.
+- `candela-optix-ao … --spp 1024` → `594.9 ms → 1721.2 full-frame spp/s, 3569 Msamples/s, 7138 Mrays/s`; GAS build
+  for 36 meshes 22.6 ms.
+- WebGPU: `render-preset.ts K-09 --engine "E.offline().integrator(I.ao({ radius: 0.05 }))" --spp 1024 --time 0` →
+  104.7 spp/s; `07-exr-stats.py` mean 0.9894, coverage 1.0.
+- Diff: mean 0.101, p99 3.0, 0.016% of pixels > 16 (`various/11-*`).
+
+### What didn't work
+- Appending `import … from 'candela'` at the end of `scene.js`: `scene.js: syntax error: Cannot use import
+  statement outside a module`. Imports must lead the file → `withEngine` prepends the import.
+- The AO PNGs were black: K-09 fixes exposure (EV 9.6 → ×1.07e-3), so AO ≈ 1 maps to black. The EXR comment
+  ("beauty × exposure (1.0738e-3)") confirmed it; stats divide it out.
+- First timing: 2 s polling made 64 spp and 256 spp look like 31.8 and 63.7 spp/s; switched to the queue's `job.ms`.
+- First comparison showed different handwheel/disc angles: the WebGPU still rendered at the time the clock reached
+  while loading, the package at t=0. Rerun with `--time 0` matched; fixed the default in `render-preset.ts`.
+- `import numpy` failed (not installed; `sudo -n apt-get install python3-numpy` → `sudo: a password is required`).
+  Started rewriting the reader without numpy; the user interrupted ("install", "when something is missing, install
+  it", "or tell me how"). Used `uv run --with numpy` (no sudo) instead and saved that preference to memory.
+- `nlohmann/json` missing → CMake FetchContent of the v3.11.3 release (system alternative noted in the README).
+
+### What I learned
+- OptiX's instance transform is the same 3×4 row-major layout Candela's `pack` uses, so instances map one to one.
+- K-09's 23.7k triangles compact to a 671 KiB GAS total; building all of them takes ~23 ms, so rebuilding per frame
+  is affordable, and animated poses only need an IAS refit/rebuild (7 KiB).
+- Earlier step-1 stills without `--time` were rendered at a load-dependent time (not reproducible).
+
+### What was tricky to build
+- Making the comparison honest: same estimator (camera jitter, Ng facing the ray, 4·EPS offset, cosine lobe,
+  radius), same geometry including the backdrop plane and box, same time; and checking both mean and per-pixel
+  difference before believing the ratio.
+
+### What warrants a second pair of eyes
+- The 16× is for AO. The path tracer shades every bounce, samples lights and (on WebGPU) waits per sample; its
+  OptiX speed-up is not measured yet. Expect less than 16×; how much less is what phases 3–5 will show.
+- `main.cpp` leaks device buffers (one-shot benchmark); fine for the spike, not for the backend.
+
+### What should be done in the future
+- Step 3 phase 2 proper: package v1 (materials, lights, env, params, normals/uvs, motion) and the WGSL→CUDA translator.
+- Decide whether step 2 (Dawn runner) is still worth doing before OptiX (see the reply to the user).
+
+### Code review instructions
+- `scripts/scene-package.ts` `scenePackage()`; `native/optix/src/ao.cu`; `native/optix/src/main.cpp` from
+  "geometry:" to "launch".
+- Reproduce: `npx tsx scripts/scene-package.ts K-09 && cmake -G Ninja -S native/optix -B build/optix && ninja -C
+  build/optix && ./build/optix/candela-optix-ao ~/data/pbr-spark/packages/K-09 --spp 1024`.
+
+### Technical details
+- Payload: camera ray 4 × u32 (t, Ng.xyz), shadow ray 1 × u32 (visible). SBT: 1 raygen, 2 misses, 2 hit records
+  (stride RAY_TYPES = 2), instance sbtOffset 0. Pipeline: single-level instancing, maxTraceDepth 1, stack sizes from
+  `optixUtilComputeStackSizes`, max traversable depth 2.
+- Build flags: GAS `PREFER_FAST_TRACE | ALLOW_RANDOM_VERTEX_ACCESS | ALLOW_COMPACTION`; geometry `DISABLE_ANYHIT`.

@@ -19,3 +19,7 @@ Guide uploaded to reMarkable /ai/2026/11/21/CANDELA-002 (header override: stmary
 ## 2026-11-21
 
 Step 1 implemented: scripts/render-preset.ts, tools/lockstitch/render.ts; 1080p stitch at 64 spp in 230 s on the GB10
+
+## 2026-11-21
+
+OptiX traversal spike: K-09 AO at 1080p 1721 spp/s on RT cores vs 105 on WebGPU, images match

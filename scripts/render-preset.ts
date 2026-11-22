@@ -1,9 +1,9 @@
 // scripts/render-preset.ts — render a preset headless on the GPU through the workbench's own render queue.
 //
 //   npx tsx scripts/render-preset.ts <presetId> [--param id=value]… [--size 1920x1080] [--spp 64] [--seed 1]
-//       [--still [--time 1.2]] | [--sequence --start 0 --end 2 --fps 24]
+//       [--still [--time 1.2 (default: the preset's start time)]] | [--sequence --start 0 --end 2 --fps 24]
 //       [--format png|exr|both|mp4|webm] [--quality draft|standard|high|max] [--backend webgpu|webgl2]
-//       [--name stem] [--out dir] [--allow-software]
+//       [--name stem] [--out dir] [--allow-software] [--engine "E.offline().integrator(I.ao({ radius: 0.05 }))"]
 //
 // How it works: serves dist/ (run `npm run build` first) on localhost, opens the workbench in Playwright's headless
 // shell with GPU flags (ANGLE on Vulkan, WebGPU), loads the preset by its #id, applies params through the param
@@ -37,6 +37,8 @@ export interface RenderJob {
 export interface RenderPresetOptions {
   preset: string;
   params?: Record<string, string | number | boolean>;
+  /** replace the scene's engine, e.g. "E.offline().integrator(I.ao({ radius: 0.05 }))" (see scene-package.ts withEngine) */
+  engine?: string;
   job: RenderJob;
   backend?: 'webgpu' | 'webgl2';
   outDir: string;
@@ -96,6 +98,17 @@ export async function renderWith(session: Session, o: RenderPresetOptions): Prom
   if (!/nvidia/i.test(loaded.backend) && !o.allowSoftware) throw new Error(`not on the NVIDIA GPU: backend is "${loaded.backend}" (pass --allow-software to render anyway)`);
   log(`${o.preset}: ${loaded.backend}`);
 
+  if (o.engine) {
+    const seq = await page.evaluate(expr => {
+      const w = (window as any).workbench, seq = w._seq || 0;
+      w.setFile('scene.js', `import { engine as E, integrator as I } from 'candela';\n${w.files['scene.js']}\nexport const engine = ${expr};\n`);
+      w.build({});
+      return seq;
+    }, o.engine);
+    await page.waitForFunction(seq => (window as any).workbench._seq > seq, seq, { timeout: 60000, polling: 20 });
+    await waitIdle(page);
+    log(`  engine = ${o.engine}`);
+  }
   // params: a static param (choice, .static()) rebuilds the scene; wait for the new build
   for (const [id, value] of Object.entries(o.params || {})) {
     const r = await page.evaluate(({ id, value }) => {
@@ -122,18 +135,22 @@ export async function renderWith(session: Session, o: RenderPresetOptions): Prom
   await page.evaluate(job => {
     const w = (window as any).workbench;
     w.running = false;   // the clock stays where the job puts it (stills: --time; sequences: each frame's time)
+    // a still without --time renders at the preset's start time, not wherever the clock got to while the page loaded
+    if (job.kind === 'still' && job.time == null) job.time = (w.preset && w.preset.time) || 0;
     (window as any).__job = w.render(Object.assign({ autosave: false }, job));
   }, job);
   let lastNote = '';
+  let lastLog = 0;
   for (;;) {
     const s = await page.evaluate(() => { const j = (window as any).__job; return { status: j.status, progress: j.progress, note: j.note, error: j.error ? String(j.error.message || j.error) : null }; });
     if (s.status === 'done') break;
     if (s.status === 'failed' || s.status === 'cancelled') throw new Error(`render ${s.status}: ${s.error || ''}`);
     const note = `  ${(s.progress * 100).toFixed(0).padStart(3)}% ${s.note || s.status}`;
-    if (note !== lastNote) { log(note); lastNote = note; }
-    await new Promise(r => setTimeout(r, 2000));
+    if (note !== lastNote && Date.now() - lastLog > 2000) { log(note); lastNote = note; lastLog = Date.now(); }
+    await new Promise(r => setTimeout(r, 100));
   }
-  const ms = Date.now() - t0;
+  // the queue's own timing (job start → done), else the poll's
+  const ms = (await page.evaluate(() => (window as any).__job.ms)) || Date.now() - t0;
   // send the files back in chunks (3 MiB of bytes → 4 MiB of base64 per call)
   await page.evaluate(async () => {
     const j = (window as any).__job, CH = 3 * 1024 * 1024;
@@ -186,7 +203,7 @@ async function main() {
     ...(flags.name ? { name: String(flags.name) } : {}),
   };
   const outDir = path.resolve(String(flags.out || path.join(os.homedir(), 'data/pbr-spark/renders', preset)));
-  const r = await renderPreset({ preset, params, job, backend: (flags.backend as 'webgpu' | 'webgl2') || 'webgpu', outDir, allowSoftware: !!flags['allow-software'] });
+  const r = await renderPreset({ preset, params, job, engine: typeof flags.engine === 'string' ? flags.engine : undefined, backend: (flags.backend as 'webgpu' | 'webgl2') || 'webgpu', outDir, allowSoftware: !!flags['allow-software'] });
   const samples = job.spp * (sequence ? Math.round(((job.end! - job.start!) * job.fps!)) + 1 : 1);
   console.log(`done in ${(r.ms / 1000).toFixed(1)} s (${(samples / (r.ms / 1000)).toFixed(1)} spp/s incl. encode) → ${r.files.join(', ')}`);
 }

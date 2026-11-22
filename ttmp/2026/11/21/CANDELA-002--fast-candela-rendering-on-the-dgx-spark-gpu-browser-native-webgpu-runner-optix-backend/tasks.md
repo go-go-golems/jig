@@ -7,3 +7,4 @@
 - [ ] Step 2: native Dawn runner (GPU injection, no-DOM output, batching, 1 GiB cap, NVENC ffmpeg sink, compressed EXR) <!-- t:bqlh -->
 - [ ] Step 3: OptiX backend (SDK install, scene package, WGSL->CUDA, GAS/IAS, programs, motion, SER, denoiser) <!-- t:uaob -->
 - [x] Step 3 phase 1: OptiX SDK 9.0.0 installed, optixTriangle runs on GB10 (sm_121) <!-- t:uj5d -->
+- [x] Step 3 spike: scene package v0 + candela-optix-ao (AO on RT cores, ~16x WebGPU on K-09) <!-- t:qj0x -->
