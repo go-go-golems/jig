@@ -1,0 +1,6 @@
+root: .
+defaults:
+    owners: []
+    intent: ""
+filenamePrefixPolicy: ""
+vocabulary: vocabulary.yaml
