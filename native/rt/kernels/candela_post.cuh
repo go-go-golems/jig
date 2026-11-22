@@ -20,5 +20,8 @@ extern "C" __global__ void candela_display() {
   const i32 gx = i32(blockIdx.x * blockDim.x + threadIdx.x), gy = i32(blockIdx.y * blockDim.y + threadIdx.y);
   if (gx >= res.x || gy >= res.y) return;
   const vec4f c = k.displayPx(vec2i(gx, gy), res);
-  post.out[gy * res.x + gx] = make_uchar4(unorm8(c.x), unorm8(c.y), unorm8(c.z), unorm8(c.w));
+  const i32 i = gy * res.x + gx;
+  const uchar4 o = make_uchar4(unorm8(c.x), unorm8(c.y), unorm8(c.z), unorm8(c.w));
+  post.out[i] = o;
+  if (post.rgb) { post.rgb[i * 3] = o.x; post.rgb[i * 3 + 1] = o.y; post.rgb[i * 3 + 2] = o.z; }
 }

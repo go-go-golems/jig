@@ -11,7 +11,9 @@ namespace crt {
 
 class Renderer {
  public:
-  virtual ~Renderer() = default;
+  virtual ~Renderer() { freeImages(); }
+  /** a new image size: the three buffers are reallocated (accumulation restarts with the next launch at spp 0) */
+  void resize(int w, int h) { if (w == w_ && h == h_) return; freeImages(); allocImages(w, h); }
   virtual void upload(std::span<const float> O, std::span<const float> LI, std::span<const float> BV, std::span<const float> SD) = 0;
   virtual void launch(std::span<const float> U) = 0;
   void sync() { cuCtxSynchronize(); }
@@ -31,6 +33,12 @@ class Renderer {
     cuMemcpyDtoH(v.data(), p, v.size() * 4);
     return v;
   }
+  void allocImages(int w, int h) {
+    w_ = w; h_ = h;
+    const size_t img = size_t(w) * h * 16;
+    for (CUdeviceptr* p : {&acc_, &aovA_, &aovN_}) { cuMemAlloc(p, img); cuMemsetD8(*p, 0, img); }
+  }
+  void freeImages() { for (CUdeviceptr* p : {&acc_, &aovA_, &aovN_}) { if (*p) cuMemFree(*p); *p = 0; } }
   int w_ = 0, h_ = 0;
   CUdeviceptr acc_ = 0, aovA_ = 0, aovN_ = 0;
 };

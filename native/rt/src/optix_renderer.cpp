@@ -40,7 +40,6 @@ struct Empty {};
 static char logBuf[8192];
 
 OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int width, int height, bool motion) : motion_(motion) {
-  w_ = width; h_ = height;
   logBuf[0] = 0;
   OX(optixInit());
   OptixDeviceContextOptions co = {};
@@ -100,16 +99,14 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   sbt_.missRecordBase = up(&ms, sizeof ms); sbt_.missRecordStrideInBytes = sizeof ms; sbt_.missRecordCount = 1;
   sbt_.hitgroupRecordBase = up(hg, sizeof hg); sbt_.hitgroupRecordStrideInBytes = sizeof hg[0]; sbt_.hitgroupRecordCount = 2;
 
-  const size_t img = size_t(w_) * h_ * 16;
-  acc_ = alloc(img); aovA_ = alloc(img); aovN_ = alloc(img);
-  CU_(cuMemsetD8(acc_, 0, img)); CU_(cuMemsetD8(aovA_, 0, img)); CU_(cuMemsetD8(aovN_, 0, img));
+  allocImages(width, height);
   params_ = alloc(sizeof(HostParams));
 }
 
 OptixRenderer::~OptixRenderer() {
   for (CUdeviceptr p : meshBuffers_) cuMemFree(p);
   for (CUdeviceptr p : frameBuffers_) cuMemFree(p);
-  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, acc_, aovA_, aovN_, aabbObj_, params_, sbt_.raygenRecord, sbt_.missRecordBase, sbt_.hitgroupRecordBase}) if (p) cuMemFree(p);
+  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, aabbObj_, params_, sbt_.raygenRecord, sbt_.missRecordBase, sbt_.hitgroupRecordBase}) if (p) cuMemFree(p);
   if (pipe_) optixPipelineDestroy(pipe_);
   for (auto g : pg_) if (g) optixProgramGroupDestroy(g);
   if (mod_) optixModuleDestroy(mod_);

@@ -18,11 +18,16 @@ class PostProcessor {
   /** D: the display uniforms (display.ts displayUniforms, 128 floats); steps/sigma: the denoiser's schedule (0: off) */
   void run(std::span<const float> D, int steps, float sigma, CUdeviceptr accum, CUdeviceptr aovA, CUdeviceptr aovN);
   std::vector<uint8_t> readRGBA8();
+  /** the last image as packed RGB on the device (written by run when rgb output is on) */
+  CUdeviceptr rgbBuffer() const { return rgb_; }
+  void enableRGB(bool on);
+  int width() const { return w_; }
+  int height() const { return h_; }
 
  private:
   CUmodule mod_ = nullptr;
   CUfunction den_ = nullptr, disp_ = nullptr;
-  CUdeviceptr params_ = 0, dsp_ = 0, tA_ = 0, tB_ = 0, out_ = 0;
+  CUdeviceptr params_ = 0, dsp_ = 0, tA_ = 0, tB_ = 0, out_ = 0, rgb_ = 0;
   int w_, h_;
 };
 

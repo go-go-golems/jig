@@ -145,6 +145,7 @@
 
 /* machines: the id overlay, drop target, render view */
 .vp-ids { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: 1; }
+.vp-remote { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; user-select: none; }
 .vpwrap.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
 .renderview .row label.lbl { display: inline-flex; align-items: center; gap: 6px; }
 .renderview input.num { width: 76px; height: 26px; border: 1px solid var(--hair); background: var(--bg); padding: 0 6px; font: inherit; font-size: var(--fs-s); font-variant-numeric: tabular-nums; border-radius: 0; }

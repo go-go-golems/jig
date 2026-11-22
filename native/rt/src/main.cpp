@@ -34,22 +34,23 @@
 #include "js_runtime.h"
 #include "image_io.h"
 #include "post.h"
+#include "common.h"
 
 namespace fs = std::filesystem;
 
-static std::string readFile(const fs::path& p) {
+std::string readFile(const fs::path& p) {
   std::ifstream f(p, std::ios::binary);
   if (!f) throw std::runtime_error("cannot read " + p.string());
   std::stringstream s; s << f.rdbuf(); return s.str();
 }
 
-static std::string arg(int argc, char** argv, const char* name, const char* def) {
+std::string arg(int argc, char** argv, const char* name, const char* def) {
   for (int i = 1; i + 1 < argc; i++) if (std::string(argv[i]) == name) return argv[i + 1];
   return def;
 }
 
 // content/ as a JS object { 'presets/B-01-hello-sphere.js': '…', … }
-static v8::Local<v8::Object> readContent(crt::JsRuntime& rt, const fs::path& dir, size_t* files, size_t* bytes) {
+v8::Local<v8::Object> readContent(crt::JsRuntime& rt, const fs::path& dir, size_t* files, size_t* bytes) {
   auto obj = v8::Object::New(rt.isolate());
   for (const auto& e : fs::recursive_directory_iterator(dir)) {
     if (!e.is_regular_file()) continue;
@@ -150,7 +151,7 @@ static int cmdSession(int argc, char** argv) {
 
 // ---- phase 2: CUDA ----------------------------------------------------------------------------------------------
 
-static std::string kernelsDir(int argc, char** argv) { return arg(argc, argv, "--kernels", CANDELA_KERNELS_DIR); }
+std::string kernelsDir(int argc, char** argv) { return arg(argc, argv, "--kernels", CANDELA_KERNELS_DIR); }
 
 // a hash of the target headers, so cached cubins are rebuilt when candela_wgsl.h or an entry point changes
 static std::string headersHash(const std::string& dir) {
@@ -161,14 +162,14 @@ static std::string headersHash(const std::string& dir) {
   for (const auto& f : files) for (unsigned char c : f.filename().string() + readFile(f)) { h ^= c; h *= 1099511628211ull; }
   char buf[17]; snprintf(buf, sizeof buf, "%016llx", (unsigned long long)h); return buf;
 }
-static fs::path cacheDir(int argc, char** argv) {
+fs::path cacheDir(int argc, char** argv) {
   const char* home = getenv("HOME");
   fs::path d = arg(argc, argv, "--cache", ((home ? std::string(home) : std::string(".")) + "/data/candela/cubin-cache").c_str());
   fs::create_directories(d);
   return d;
 }
 // compile through the cache: <cache>/<source hash>-<headers hash>-<arch>.cubin
-static crt::NvrtcResult compileCached(const std::string& source, const std::string& hash, const std::string& name, const std::string& kdir, const std::string& arch, const fs::path& cache, bool* hit, bool optixIR = false) {
+crt::NvrtcResult compileCached(const std::string& source, const std::string& hash, const std::string& name, const std::string& kdir, const std::string& arch, const fs::path& cache, bool* hit, bool optixIR) {
   uint64_t fh = 1469598103934665603ull; for (unsigned char c : crt::nvrtcOptionsKey()) { fh ^= c; fh *= 1099511628211ull; }
   char fb[9]; snprintf(fb, sizeof fb, "%08x", (unsigned)(fh & 0xffffffffu));
   const fs::path f = cache / (hash + "-" + headersHash(kdir) + "-" + arch + "-" + fb + (optixIR ? ".optixir" : ".cubin"));
@@ -280,7 +281,7 @@ static int cmdCudaSweep(int argc, char** argv) {
   return ok == (int)jobsV.size() ? 0 : 2;
 }
 
-static bool hasFlag(int argc, char** argv, const char* name) { for (int i = 1; i < argc; i++) if (std::string(argv[i]) == name) return true; return false; }
+bool hasFlag(int argc, char** argv, const char* name) { for (int i = 1; i < argc; i++) if (std::string(argv[i]) == name) return true; return false; }
 static std::vector<std::string> args(int argc, char** argv, const char* name) {
   std::vector<std::string> v;
   for (int i = 1; i + 1 < argc; i++) if (std::string(argv[i]) == name) v.push_back(argv[i + 1]);
@@ -491,7 +492,8 @@ int main(int argc, char** argv) {
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
                     "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--param id=value]… [--seed n]\n"
                     "                 [--format pfm,png,exr,mp4] [--sequence --start s --end s | --frames n] [--fps 24] [--fixed-seed]\n"
-                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n");
+                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
+                    "       candela-rt serve [--port 8790] [--bind 0.0.0.0] [--token t] [--max-spp 2048] [--max-width 1920]\n");
     return 1;
   }
   crt::JsRuntime::initProcess(argv[0]);
@@ -501,6 +503,7 @@ int main(int argc, char** argv) {
     else if (std::string(argv[1]) == "session") rc = cmdSession(argc, argv);
     else if (std::string(argv[1]) == "cuda-sweep") rc = cmdCudaSweep(argc, argv);
     else if (std::string(argv[1]) == "render") rc = cmdRender(argc, argv);
+    else if (std::string(argv[1]) == "serve") rc = cmdServe(argc, argv);
     else fprintf(stderr, "unknown command %s\n", argv[1]);
   } catch (const std::exception& e) {
     fprintf(stderr, "error: %s\n", e.what());

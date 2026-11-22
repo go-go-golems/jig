@@ -11,6 +11,7 @@ import { rayMesh } from '../engine/mesh';
 import { assets, parseHDR, fromRGBA8 } from '../engine/hdri';
 import { RenderQueue } from '../engine/output';
 import { stepBehaviors } from '../engine/session';
+import { RemoteRender } from './remote';
 import type { Preset, Doc } from '../content/catalog';
 
 const NS = 'candela.v1.';
@@ -47,6 +48,7 @@ export class Host {
   selection: any;
   focusReq: any;
   view: any;
+  remote: RemoteRender | null = null;
   freeCam: any;
   history: any;
   assetVersion: number;
@@ -151,6 +153,7 @@ export class Host {
       compiled.animation = r.animation || null;
       this.behaviors = compiled.behaviors;
       if (this.vp) await this.loadIntoViewport(compiled, seq);
+      this.remoteFiles();
     }
     this.building = false; this.notify();
     return r;
@@ -180,6 +183,7 @@ export class Host {
   // ---------- params ----------
   onParam(p) {
     if (!this.result || !this.result.ok) return;
+    if (this.remote && p && p.id) this.remote.sendParam(p.id, p.value);
     if (p && p.isStatic) { clearTimeout(this._pt); this._pt = setTimeout(() => this.build({}), 30); return; }
     if (this.vp && this.vp.compiled) { this.vp.repack(this.time); }
     this.notify();
@@ -208,6 +212,13 @@ export class Host {
     }
     if (this.interacting) vp.dynScale = 0.5; else if (vp.dynScale !== 1) { vp.dynScale = 1; vp.reset(); }
     if (document.hidden) return;
+    // OptiX mode: the camera and the image size go to candela-rt; the local renderer rests while frames arrive
+    if (this.remote) {
+      const c = this.canvas, dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (c && c.clientWidth > 0) this.remote.sendView(this.freeCam, Math.round(c.clientWidth * dpr * (this.view.quality || 1)), Math.round(c.clientHeight * dpr * (this.view.quality || 1)));
+      this.remote.sendClock(this.time, !!(animated && this.running), this.speed || 1);
+      if (this.remote.live) { if (this.running && animated && this.remote.frame) this.time = this.remote.frame.t; return; }
+    }
     vp.frame({ time: this.time });
   }
   // behaviours run on the host every frame; they move objects through transform overrides (a repack, never a recompile)
@@ -219,6 +230,21 @@ export class Host {
     });
   }
   setRunning(on) { this.running = on; this.notify(); }
+
+  // ---------- OptiX mode: candela-rt serve on the Spark (src/app/remote.ts) ----------
+  /** on: connect to candela-rt and show its frames; off: back to the local renderer */
+  setRemote(on: boolean) {
+    if (!on) { if (this.remote) this.remote.close(); this.remote = null; if (this.vp) this.vp.reset(); store.set('remote', false); this.notify(); return; }
+    if (this.remote) return;
+    this.remote = new RemoteRender(() => this.notify(), () => this.remoteFiles());
+    store.set('remote', true);
+    this.notify();
+  }
+  /** send the current scene (after a build, and when the server says hello) */
+  remoteFiles() {
+    const r = this.remote; if (!r || !this.result || !this.result.ok) return;
+    r.sendFiles(this.files, Object.fromEntries(paramStore.values), this.time, 1, this.result.compiled && this.result.compiled.shared);
+  }
   // move the scene to time t (renders, the timeline): behaviours step by dt, poses and fields of time follow
   seek(t, dt = 0) {
     const vp = this.vp; if (!vp || !vp.compiled) return;

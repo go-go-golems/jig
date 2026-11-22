@@ -18,7 +18,7 @@ PostProcessor::PostProcessor(const std::vector<char>& cubin, int width, int heig
   PCU(cuModuleGetFunction(&disp_, mod_, "candela_display"));
   size_t psize = 0;
   PCU(cuModuleGetGlobal(&params_, &psize, mod_, "post"));
-  if (psize != 6 * sizeof(CUdeviceptr)) throw std::runtime_error("post has an unexpected size " + std::to_string(psize));
+  if (psize != 7 * sizeof(CUdeviceptr)) throw std::runtime_error("post has an unexpected size " + std::to_string(psize));
   const size_t img = size_t(w_) * h_ * 16;
   PCU(cuMemAlloc(&dsp_, 128 * 4 * 5));   // the uniforms of up to 4 denoise passes and the display pass
   PCU(cuMemAlloc(&tA_, img)); PCU(cuMemAlloc(&tB_, img));
@@ -26,7 +26,7 @@ PostProcessor::PostProcessor(const std::vector<char>& cubin, int width, int heig
 }
 
 PostProcessor::~PostProcessor() {
-  for (CUdeviceptr p : {dsp_, tA_, tB_, out_}) if (p) cuMemFree(p);
+  for (CUdeviceptr p : {dsp_, tA_, tB_, out_, rgb_}) if (p) cuMemFree(p);
   if (mod_) cuModuleUnload(mod_);
 }
 
@@ -44,11 +44,16 @@ void PostProcessor::run(std::span<const float> D, int steps, float sigma, CUdevi
     const CUdeviceptr dk = dsp_ + size_t(k) * 512;
     PCU(cuMemcpyHtoD(dk, d, sizeof d));
     const CUdeviceptr dst = k % 2 == 0 ? tA_ : tB_;
-    const CUdeviceptr p[6] = {dk, src, aovA, aovN, dst, out_};
+    const CUdeviceptr p[7] = {dk, src, aovA, aovN, dst, out_, display ? rgb_ : 0};
     PCU(cuMemcpyHtoD(params_, p, sizeof p));
     PCU(cuLaunchKernel(display ? disp_ : den_, gx, gy, 1, 8, 8, 1, 0, nullptr, nullptr, nullptr));
     src = dst;
   }
+}
+
+void PostProcessor::enableRGB(bool on) {
+  if (on && !rgb_) PCU(cuMemAlloc(&rgb_, size_t(w_) * h_ * 3));
+  if (!on && rgb_) { cuMemFree(rgb_); rgb_ = 0; }
 }
 
 std::vector<uint8_t> PostProcessor::readRGBA8() {

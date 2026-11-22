@@ -9,5 +9,6 @@ struct CandelaPostParams {
   const float4* aovN;   // normal sum, w = depth
   float4* dst;          // candela_denoise output
   uchar4* out;          // candela_display output: display-referred RGBA, 8 bits per channel, rows top-down
+  unsigned char* rgb;   // optional: the same image as packed RGB (the JPEG encoder's input), or null
 };
 extern "C" { __constant__ CandelaPostParams post; }

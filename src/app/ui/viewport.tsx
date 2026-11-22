@@ -91,6 +91,7 @@ export function ViewportView({ host }: { host: Host }) {
       <div className="tbslider"><Slider compact origin={0} value={V.evComp} min={-4} max={4} step={0.1} def={0} digits={1} onChange={v => host.setView('evComp', v)} label="Exposure compensation" /></div>
       <span className="sp" />
       <Tog on={!host.running} onClick={() => host.setRunning(!host.running)} title="Pause the clock (animations and behaviours)">Pause</Tog>
+      <Tog on={!!host.remote} onClick={() => host.setRemote(!host.remote)} title="Render on the Spark: candela-rt serve (OptiX on the RT cores) streams the frames">OptiX</Tog>
       <button className="btn sm" onClick={() => host.resetCamera()} title="Back to the scene's camera (double-click the view)" disabled={!host.freeCam}>Scene camera</button>
       <button className="btn sm" onClick={shot} title="Save the image as PNG">Save PNG</button>
       <button className="btn sm" onClick={() => host.focus({ view: 'render' })} title="Stills, sequences and EXR passes at a fixed size">Render…</button>
@@ -99,7 +100,9 @@ export function ViewportView({ host }: { host: Host }) {
       onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDropOn(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn(false); }}
       onDrop={async e => { e.preventDefault(); setDropOn(false); for (const f of e.dataTransfer.files) { try { await host.addAssetFile(f); } catch (x) { host.toast(`${f.name}: ${x.message}`, true); } } }}>
       {V.aov === 'ids' && <canvas ref={idCanvas} className="vp-ids" aria-label="Instance and face ids" />}
+      {host.remote && host.remote.frameUrl && <img className="vp-remote" src={host.remote.frameUrl} alt="" draggable={false} />}
       <div className="chip-row">
+        {host.remote && <RemoteChips host={host} />}
         <span className={'chip on' + (vp && vp.backend && vp.backend.name === 'WebGPU' ? ' gpu' : '')} title={vp && vp.backend ? vp.backend.info : 'starting'}>{vp && vp.backend ? vp.backend.name : '…'}</span>
         {vp && vp.compiled && <span className="chip ghost">{vp.spp} spp · {vp.backend.w}×{vp.backend.h}{vp.compiled.spectral ? ' · spectral' : ''}</span>}
         {(host.building || host.compiling) && <span className="chip busy">{host.compiling ? 'compiling shaders' : 'building'}</span>}
@@ -124,6 +127,16 @@ export function ViewportView({ host }: { host: Host }) {
     </div>
     <div className="hint"><b>Viewport</b><span>drag to orbit · Shift-drag or right-drag to pan · wheel to zoom · click to select · Alt-click to meter · double-click for the scene camera</span></div>
   </div>;
+}
+
+function RemoteChips({ host }: { host: Host }) {
+  const r = host.remote!, f = r.frame;
+  const state = r.state === 'live' ? 'OptiX' : r.state === 'error' ? 'OptiX: ' + (r.message || 'error').slice(0, 80) : 'OptiX: ' + r.state + (r.message ? ' · ' + r.message.slice(0, 60) : '');
+  return <>
+    <span className={'chip on gpu' + (r.state === 'live' ? '' : ' busy')} title={r.server ? `candela-rt on ${r.server.gpu} · ${r.url}` : r.url}>{state}</span>
+    {f && <span className="chip ghost">{f.spp} spp · {f.width}×{f.height} · {r.built ? r.built.target : ''}{r.built && r.built.motion ? ' +motion' : ''} · {r.fps.toFixed(0)} fps</span>}
+    {r.mismatch && <span className="chip busy" title="the browser and candela-rt built different programs (different engine versions?)">program differs</span>}
+  </>;
 }
 
 function TitleBlock({ host, vp, cam }) {

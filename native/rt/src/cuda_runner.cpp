@@ -78,7 +78,6 @@ std::string CudaContext::arch() const {
 std::string CudaContext::deviceName() const { char n[256] = {0}; cuDeviceGetName(n, sizeof n, dev_); return n; }
 
 CudaRenderer::CudaRenderer(const std::vector<char>& cubin, int width, int height) {
-  w_ = width; h_ = height;
   CU(cuModuleLoadData(&mod_, cubin.data()));
   CU(cuModuleGetFunction(&fn_, mod_, "candela_main"));
   size_t psize = 0;
@@ -90,12 +89,10 @@ CudaRenderer::CudaRenderer(const std::vector<char>& cubin, int width, int height
   size_t stack = 0;
   CU(cuCtxGetLimit(&stack, CU_LIMIT_STACK_SIZE));
   if (stack < 8192) CU(cuCtxSetLimit(CU_LIMIT_STACK_SIZE, 8192));
-  const size_t img = size_t(w_) * h_ * 16;
-  acc_ = alloc(img); aovA_ = alloc(img); aovN_ = alloc(img);
-  CU(cuMemsetD8(acc_, 0, img)); CU(cuMemsetD8(aovA_, 0, img)); CU(cuMemsetD8(aovN_, 0, img));
+  allocImages(width, height);
 }
 CudaRenderer::~CudaRenderer() {
-  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, acc_, aovA_, aovN_}) if (p) cuMemFree(p);
+  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_}) if (p) cuMemFree(p);
   if (mod_) cuModuleUnload(mod_);
 }
 CUdeviceptr CudaRenderer::alloc(size_t bytes) { CUdeviceptr p = 0; CU(cuMemAlloc(&p, bytes < 16 ? 16 : bytes)); return p; }

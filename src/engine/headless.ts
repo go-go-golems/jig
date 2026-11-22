@@ -11,6 +11,7 @@ import { WGSL_PRELUDE, WGSL_MAIN } from './wgsl-entry';
 import { optixScene, optixFrame, type OptixScene, type OptixFrame } from './targets/optix';
 import { displaySource, postSettings, displayUniforms, meterExposure, passesFromBuffers, type PostSettings } from './display';
 import { passesToEXR } from './output';
+import { digestString } from './digest';
 
 export interface HeadlessOptions {
   width: number; height: number; time?: number;
@@ -55,6 +56,18 @@ export interface HeadlessRender {
   exr(accum: Float32Array, aovA: Float32Array, aovN: Float32Array, ids: Float32Array | null): Uint8Array;
   postSettings: PostSettings;
   session: SceneSession;
+  // ---- live sessions (candela-rt serve, phase 5) ----
+  /** hash of the scene program (compiled.shared); the browser computes the same from its own build */
+  irHash: string;
+  /** a camera override from the workbench's navigation ({ at, target, … } as Viewport.setView), or null */
+  view: any;
+  setView(view: any): void;
+  resize(width: number, height: number): void;
+  /** set a param: 'repack' (dynamic: the buffers change, version++), 'rebuild' (static: open the scene again with
+   *  paramValues()), or 'unknown' */
+  setParam(id: string, value: any): 'repack' | 'rebuild' | 'unknown';
+  /** the values set so far (to reopen the scene with after a static change or an edit) */
+  paramValues(): Record<string, any>;
 }
 export type HeadlessResult = HeadlessRender | { ok: false; error: string };
 
@@ -105,14 +118,14 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     frame() {
       const U = P.U.slice();
       // the camera can depend on params: evaluate it with this session's parameters
-      const f = withParamScope(s.params, () => frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: h.spp, time: h.time, seed: h.seed }));
+      const f = withParamScope(s.params, () => frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: h.spp, time: h.time, seed: h.seed, view: h.view }));
       cam = f.cam;
       h.spp += f.sppF;
       return U;
     },
     idUniforms() {
       const U = P.U.slice();
-      withParamScope(s.params, () => frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: 0, time: h.time, seed: h.seed }));
+      withParamScope(s.params, () => frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: 0, time: h.time, seed: h.seed, view: h.view }));
       U.set([h.width, h.height, 0, 1], 0); U[7] = 0; U[87] = 20;
       return U;
     },
@@ -141,6 +154,19 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     },
     postSettings: ps.post,
     session: s,
+    irHash: digestString(s.compiled.shared),
+    view: null,
+    setView(view) { h.view = view || null; h.spp = 0; },
+    resize(width, height) { h.width = width; h.height = height; h.spp = 0; },
+    setParam(id, value) {
+      const def = s.params.defs.get(id);
+      if (!def) return 'unknown';
+      s.setParam(id, value);
+      if (def.isStatic) return 'rebuild';
+      h.seek(h.time, 0);
+      return 'repack';
+    },
+    paramValues() { return Object.fromEntries(s.params.values); },
   };
   return h;
 }
