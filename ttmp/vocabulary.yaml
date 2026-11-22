@@ -19,6 +19,10 @@ topics:
       description: LLM providers, inference and streaming
     - slug: testing
       description: Test suites, harnesses and evaluation
+    - slug: rendering
+      description: 'Physically based rendering: Candela, materials, lighting, render output'
+    - slug: gpu
+      description: 'GPU compute and rendering: WebGPU, CUDA, OptiX, the candela-rt sidecar'
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
