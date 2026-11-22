@@ -1,0 +1,11 @@
+# NVENC probe 2026-11-21 — ffmpeg 6.1.1 (Ubuntu arm64 package), driver 580.178.04, GB10
+$ ffmpeg -hide_banner -encoders | grep nvenc
+ V....D av1_nvenc            NVIDIA NVENC av1 encoder (codec av1)
+ V....D h264_nvenc           NVIDIA NVENC H.264 encoder (codec h264)
+ V....D hevc_nvenc           NVIDIA NVENC hevc encoder (codec hevc)
+# for each: ffmpeg -f lavfi -i testsrc2=size=3840x2160:rate=24 -frames:v 96 -c:v <enc> -pix_fmt <fmt> -preset p7 -cq 20 out.mp4
+# then ffprobe codec,profile,width,height,pix_fmt,nb_frames; wall time includes test-pattern generation
+h264_nvenc  yuv420p  -> h264,Main,3840,2160,yuv420p,96        2.55 s
+hevc_nvenc  p010le   -> hevc,Main 10,3840,2160,yuv420p10le,96  3.22 s
+av1_nvenc   p010le   -> av1,Main,3840,2160,yuv420p10le,96      2.21 s
+hevc_nvenc  yuv444p  -> hevc,Rext,3840,2160,yuv444p,96         3.47 s

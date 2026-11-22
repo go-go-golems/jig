@@ -431,9 +431,10 @@ and `primitive-index`. No `shader-f16`.
 
 `scripts/03-webcodecs-probe.ts` (`various/04-webcodecs-probe.txt`): Chromium's WebCodecs on this machine offers
 **no hardware encoders**; software H.264 and VP9 only; HEVC 10-bit and AV1 10-bit are unsupported. NVENC is
-therefore only reachable natively (ffmpeg built with `nvenc`, or the NVIDIA Video Codec SDK). Whether GB10's NVENC
-supports AV1 and 10-bit HEVC is **not yet verified**; check with `ffmpeg -h encoder=hevc_nvenc` / a test encode once
-an NVENC-enabled ffmpeg is installed.
+therefore only reachable natively (ffmpeg built with `nvenc`, or the NVIDIA Video Codec SDK). **Verified after the first
+version of this guide** (`various/07-nvenc-probe.txt`): Ubuntu's arm64 `ffmpeg` 6.1.1 includes `h264_nvenc`,
+`hevc_nvenc` and `av1_nvenc`, and the GB10 encodes 4K HEVC Main 10 and AV1 10-bit (`p010le`), 96 frames in
+2.2–3.5 s, far faster than the renderer produces frames.
 
 ## 4. Step 1: the existing renderer on the real GPU
 
@@ -810,8 +811,7 @@ code. Status: proposed.
 
 ## 9. Open questions
 
-- Does GB10's NVENC support AV1 and 10-bit HEVC, and does Ubuntu's arm64 `ffmpeg` package include `nvenc`? Blocks
-  the 10-bit master format, not the runner.
+- ~~Does GB10's NVENC support AV1 and 10-bit HEVC?~~ Answered: yes, both, with Ubuntu's `ffmpeg` (section 3.5).
 - Which OptiX SDK version to standardise on (9.0 or later) and how to distribute it (it requires an NVIDIA developer
   download, so it cannot be an npm dependency). Blocks step 3 phase 1.
 - Is it acceptable that the OptiX backend shades in ray generation (simpler, identical path loop) rather than in

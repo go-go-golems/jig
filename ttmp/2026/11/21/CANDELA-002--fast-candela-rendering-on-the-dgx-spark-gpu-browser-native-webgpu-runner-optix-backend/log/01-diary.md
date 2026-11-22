@@ -210,3 +210,31 @@ header loads a package this machine's TeX installation does not have; a header f
 
 ### Remaining requirements and next action
 - Implementation tasks 3–5 (steps 1–3) are open; the guide is a design, not an implementation.
+
+## Step 4: Tooling installed; NVENC verified; OptiX SDK inspected
+
+The user installed `texlive-science`, `ffmpeg`, `vulkan-tools`, `openexr` and `ninja-build`, and downloaded the OptiX
+SDK. I verified NVENC on the GB10 and inspected the SDK installer without running it.
+
+### Prompt Context
+**User prompts (verbatim):** "install texlive-science", "what do I need to install to go further?", "check ~/DOwnloads",
+"all the rest is installed", "it says it should have arm64 too"
+**Assistant interpretation:** Confirm the prerequisites for steps 2–3 are in place and check the downloaded SDK.
+**Inferred user intent:** Unblock the implementation steps.
+
+### Evidence and commits
+- `texlive-science` 2023.20240207-1 installed (by the user; my `sudo -n` failed: `sudo: a password is required`).
+- NVENC: `various/07-nvenc-probe.txt` — 4K H.264, HEVC Main 10, AV1 10-bit and HEVC 4:4:4 all encode; this closes
+  the guide's NVENC open question (guide §3.5 and §9 updated).
+- `~/Downloads/NVIDIA-OptiX-SDK-9.1.0-linux64-x86_64.sh` (sha256 `4902adeb…c8585`), a CPack self-extracting
+  archive (payload = `tail -n +216 | gunzip | tar`). Listed without running: 1105 entries — `include/optix*.h`
+  (19 headers), `SDK/` (sample sources, CMake, data), `doc/`, licences, and `lib64/libglfw.so.3.4`, the only
+  native binary, built for x86_64.
+
+### Noteworthy decisions or failures
+- Did not run the installer: it requires accepting NVIDIA's EULA (`--skip-license` would accept it on the user's
+  behalf).
+
+### Remaining requirements and next action
+- Choose the SDK package (aarch64 installer or this one) and install to `~/opt/`; then build `optixTriangle`
+  for `sm_121` (step 3, phase 1).
