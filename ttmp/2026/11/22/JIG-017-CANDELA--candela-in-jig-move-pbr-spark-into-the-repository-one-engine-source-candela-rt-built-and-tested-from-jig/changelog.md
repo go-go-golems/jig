@@ -30,3 +30,7 @@ Golden test fixed: the 10 differences are CPU architecture (arm64 baseline vs x8
 
 - /home/manuel/code/wesen/go-go-golems/jig/import/candela/scripts/core-digest.ts — vm builtins bound locally
 - /home/manuel/code/wesen/go-go-golems/jig/import/candela/tests/golden-pack.test.ts — per-architecture baseline
+
+## 2026-11-22
+
+Guide and candela-rt reference map uploaded to reMarkable as one PDF: /ai/2026/11/22/JIG-017-CANDELA/JIG-017 Candela inside jig

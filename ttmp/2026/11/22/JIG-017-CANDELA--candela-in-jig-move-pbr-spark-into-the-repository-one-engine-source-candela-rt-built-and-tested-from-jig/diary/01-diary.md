@@ -311,3 +311,31 @@ The WGSL hash and every other buffer matched.
   make test-candela
   cd import/candela && ESBUILD=../../.bin/esbuild/node_modules/esbuild/lib/main.js node scripts/node-tests.mjs --run scripts/core-digest.ts -- --ids B-01,K-09
   ```
+
+## Step 5: the guide delivered to reMarkable
+
+The intern guide and the candela-rt reference map were bundled into one PDF with a table of contents and uploaded. The ticket's tasks and changelog are up to date. What remains open is the next phase the guide designs (Part 8) and the decisions listed in the final report.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 1 ("Store in the ticket and then upload to remarkable").
+**Assistant interpretation:** one bundled PDF of the guide plus the reference map, under the ticket's date folder.
+**Commit (code):** the docs commit after `3c0df97`.
+
+### What I did
+- A small-model subagent ran the single upload command:
+
+  ```sh
+  remarquee upload bundle design-doc/01-… reference/01-… --name "JIG-017 Candela inside jig" --remote-dir "/ai/2026/11/22/JIG-017-CANDELA" --toc-depth 2 --non-interactive
+  ```
+
+- Checked off the upload task and added a changelog entry.
+
+### What worked
+- `OK: uploaded JIG-017 Candela inside jig.pdf -> /ai/2026/11/22/JIG-017-CANDELA`. That confirms cloud delivery, not device sync.
+- No reauthentication was needed.
+
+### What didn't work
+- Nothing.
+
+### What warrants a second pair of eyes
+- **The PDF's rendering.** It was not inspected locally, per the upload skill's default. The mermaid blocks render as code in the PDF, since pandoc does not draw them.

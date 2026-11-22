@@ -11,7 +11,7 @@
 - [x] CI: Candela's engine tests in make test-js (push.yml); candela-rt.yml on a self-hosted nvidia runner, gated <!-- t:rahq -->
 - [x] Candela README and old-repository references <!-- t:pref -->
 - [x] Intern guide (design doc) and candela-rt reference map <!-- t:demv -->
-- [ ] Upload the guide to reMarkable <!-- t:nac7 -->
+- [x] Upload the guide to reMarkable <!-- t:nac7 -->
 - [ ] Next phase: scope in openRender and candela-rt serve <!-- t:7ssd -->
 - [ ] Next phase: Render view OptiX mode over /rt <!-- t:mdm5 -->
 - [ ] Next phase: render jobs, remote GPU, candela-rt release artifact <!-- t:m0wn -->
