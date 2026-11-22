@@ -76,7 +76,9 @@ const describe = c => ({ kind: c.kind, id: c.props.id || undefined });
 
 // ---------- shared methods ----------
 const COMMON = {
-  id: (c, s) => { if (typeof s !== 'string' || !/^[\w-]+$/.test(s)) throw new CandelaError('E121', `.id(name): a name of letters, digits, - and _ ; got ${JSON.stringify(s)}`); return c.with('id', s); },
+  // ids are map keys (poses, overrides, '#id' selectors): paths such as a CAD assembly's 'sub/slider' and dotted
+  // names are allowed, as long as they do not start or end with a separator
+  id: (c, s) => { if (typeof s !== 'string' || !/^[\w-]+([./][\w-]+)*$/.test(s)) throw new CandelaError('E121', `.id(name): a name of letters, digits, - and _, or a path of them joined by / or . ('sub/slider'); got ${JSON.stringify(s)}`); return c.with('id', s); },
   tag: (c, ...t) => c.with('tags', (c.props.tags || []).concat(t.flat())),
   with: (c, f) => { if (!f || !f.__fragment) throw new CandelaError('E121', `.with(…) takes a fragment (from fragment('name') or candela/fragments)`); if (!f.targetsKind(c.kind)) throw new CandelaError('E131', `fragment '${f.name}' targets ${f.kinds.join(', ')}, not ${c.kind}`); if ((c.meta.frags || []).includes(f)) return c; checkConflicts(c, f); return c.withMeta({ frags: (c.meta.frags || []).concat([f]) }); },
   unchecked: (c, ...codes) => c.withMeta({ unchecked: (c.meta.unchecked || []).concat(codes.length ? codes : ['*']) }),
