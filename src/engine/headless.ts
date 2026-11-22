@@ -5,13 +5,16 @@
 import { SceneSession, frameUniforms } from './session';
 import { cudaProgram, type CudaProgram, type CudaTargetKind } from './targets/cuda';
 import { WGSL_PRELUDE, WGSL_MAIN } from './wgsl-entry';
+import { optixScene, type OptixScene } from './targets/optix';
 
-export interface HeadlessOptions { width: number; height: number; time?: number; seed?: number; target?: CudaTargetKind | null }
+export interface HeadlessOptions { width: number; height: number; time?: number; seed?: number; target?: CudaTargetKind | null; /** false: render without the camera's motion blur (parity checks) */ motionBlur?: boolean }
 export interface HeadlessRender {
   ok: true;
   width: number; height: number; time: number;
   wgsl: string;                       // prelude + scene program + main
   cuda: CudaProgram | null;
+  /** OptiX build inputs (target 'optix'); its O replaces the WebGPU one */
+  optix: OptixScene | null;
   /** storage buffers (float4 rows): objects, lights, top-level BVH, scene data (static head + dynamic tail at dynBase) */
   O: Float32Array; LI: Float32Array; BV: Float32Array; SD: Float32Array;
   /** samples accumulated so far, and per launch */
@@ -30,15 +33,18 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
   const r = await s.build(files);
   if (!r.ok) return { ok: false, error: r.error ? String(r.error.message || r.error) : 'build failed' };
   const time = o.time || 0;
+  if (o.motionBlur === false) s.motionOverride = null;
   s.seek(time, 0);
   const P = s.pack(time);
   const SD = new Float32Array(Math.max(4, P.dynBase * 4 + P.SDd.length));
   SD.set(P.SDs); SD.set(P.SDd, P.dynBase * 4);
+  const optix = o.target === 'optix' ? optixScene(s.compiled, P) : null;
   const h: HeadlessRender = {
     ok: true, width: o.width, height: o.height, time,
     wgsl: WGSL_PRELUDE + s.compiled.shared + WGSL_MAIN,
     cuda: o.target === null ? null : cudaProgram(s.compiled, o.target || 'cuda'),
-    O: nonEmpty(P.O), LI: nonEmpty(P.LI), BV: nonEmpty(P.BV), SD,
+    optix,
+    O: nonEmpty(optix ? optix.O : P.O), LI: nonEmpty(P.LI), BV: nonEmpty(P.BV), SD,
     spp: 0, sppPerFrame: Math.max(1, (s.compiled.engine && s.compiled.engine.sppPerFrame) || 1),
     frame() {
       const U = P.U.slice();

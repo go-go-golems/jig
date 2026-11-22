@@ -671,6 +671,11 @@ function pack(S, env, nU) {
     }
     O.set([o.irand, oi, mb, o.ty >= 6 ? o.bound : 0], b + 20);
   });
+  // per packed object, its world box (swept over the shutter when it moves; NaN for unbounded objects): the OptiX
+  // target builds its own acceleration structures from these instead of the BVH (CANDELA-002 phase 3)
+  const boxOf = new Map(items.map(it => [it.idx, it.box]));
+  const boxes = new Float32Array(Math.max(1, order.length) * 6).fill(NaN);
+  order.forEach((oi, k) => { const b = boxOf.get(oi); if (b) boxes.set([b[0][0], b[0][1], b[0][2], b[1][0], b[1][1], b[1][2]], k * 6); });
   const BV = new Float32Array(Math.max(1, bvh.nodes.length) * 8);
   bvh.nodes.forEach((n, k) => { BV.set([n.mn[0], n.mn[1], n.mn[2], n.a, n.mx[0], n.mx[1], n.mx[2], n.cnt], k * 8); });
   // lights
@@ -790,7 +795,7 @@ function pack(S, env, nU) {
     if (isQ(v)) v = v.v;
     if (typeof v === 'number') set(s.slot, [v, 0, 0, 0]); else if (Array.isArray(v)) set(s.slot, [v[0] || 0, v[1] || 0, v[2] || 0, v[3] || 0]);
   }
-  return { U, O, LI, BV, SDs: S.sdHead, SDd, dynBase, order, remap, nObjs: order.length, sunDir, sunElev, envType, moving: rig.size, mats };
+  return { U, O, LI, BV, SDs: S.sdHead, SDd, dynBase, order, remap, nObjs: order.length, nBounded: bvh.order.length, boxes, sunDir, sunElev, envType, moving: rig.size, mats };
 }
 function lightIntensityAt(c, env) {
   const p = c.props;

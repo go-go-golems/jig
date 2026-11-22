@@ -42,10 +42,10 @@ export async function dawnDevice(): Promise<GPUDevice> {
 export interface WgslRenderResult { acc: Float32Array; alb: Float32Array | null; meta: Record<string, number | string> }
 
 /** render one scene with its WGSL program on `device`; returns the accumulation buffer (RGBA sums) */
-export async function wgslRender(device: GPUDevice, files: Record<string, string>, o: { width: number; height: number; spp: number; time?: number; aov?: boolean }): Promise<WgslRenderResult> {
+export async function wgslRender(device: GPUDevice, files: Record<string, string>, o: { width: number; height: number; spp: number; time?: number; aov?: boolean; motionBlur?: boolean }): Promise<WgslRenderResult> {
   const { width: w, height: h } = o;
   const t0 = performance.now();
-  const r = await openRender(files, { width: w, height: h, time: o.time || 0, target: null });
+  const r = await openRender(files, { width: w, height: h, time: o.time || 0, target: null, motionBlur: o.motionBlur });
   if (!r.ok) throw new Error(r.error);
   const tBuild = performance.now() - t0;
   const t1 = performance.now();
@@ -106,7 +106,7 @@ async function main() {
   const preset = loadCatalogFromDisk().presets.find(p => p.id === id);
   if (!preset) throw new Error(`no preset ${id}`);
   const device = await dawnDevice();
-  const res = await wgslRender(device, preset.files, { width: w, height: h, spp: +(flags.spp || 64), time: +(flags.time || 0), aov: !!flags.aov });
+  const res = await wgslRender(device, preset.files, { width: w, height: h, spp: +(flags.spp || 64), time: +(flags.time || 0), aov: !!flags.aov, motionBlur: flags['no-motion-blur'] ? false : undefined });
   const base = path.join(outDir, `${id}.wgsl`);
   writePFM(base + '.pfm', w, h, meanRGB(res.acc, w, h));
   if (res.alb) writePFM(base + '.albedo.pfm', w, h, meanRGB(res.alb, w, h));

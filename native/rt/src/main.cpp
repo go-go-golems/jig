@@ -26,9 +26,11 @@
 #include <atomic>
 #include <cmath>
 #include <mutex>
+#include <memory>
 #include <thread>
 
 #include "cuda_runner.h"
+#include "optix_renderer.h"
 #include "js_runtime.h"
 
 namespace fs = std::filesystem;
@@ -164,13 +166,14 @@ static fs::path cacheDir(int argc, char** argv) {
   return d;
 }
 // compile through the cache: <cache>/<source hash>-<headers hash>-<arch>.cubin
-static crt::NvrtcResult compileCached(const std::string& source, const std::string& hash, const std::string& name, const std::string& kdir, const std::string& arch, const fs::path& cache, bool* hit) {
+static crt::NvrtcResult compileCached(const std::string& source, const std::string& hash, const std::string& name, const std::string& kdir, const std::string& arch, const fs::path& cache, bool* hit, bool optixIR = false) {
   uint64_t fh = 1469598103934665603ull; for (unsigned char c : crt::nvrtcOptionsKey()) { fh ^= c; fh *= 1099511628211ull; }
   char fb[9]; snprintf(fb, sizeof fb, "%08x", (unsigned)(fh & 0xffffffffu));
-  const fs::path f = cache / (hash + "-" + headersHash(kdir) + "-" + arch + "-" + fb + ".cubin");
+  const fs::path f = cache / (hash + "-" + headersHash(kdir) + "-" + arch + "-" + fb + (optixIR ? ".optixir" : ".cubin"));
   if (fs::exists(f)) { crt::NvrtcResult r; const std::string b = readFile(f); r.cubin.assign(b.begin(), b.end()); r.ok = true; if (hit) *hit = true; return r; }
   if (hit) *hit = false;
-  auto r = crt::nvrtcCompile(source, name, kdir, arch);
+  auto r = optixIR ? crt::nvrtcCompile(source, name, kdir, arch, true, {CANDELA_OPTIX_INCLUDE_DIR, CANDELA_CUDA_INCLUDE_DIR})
+                   : crt::nvrtcCompile(source, name, kdir, arch);
   if (r.ok) std::ofstream(f, std::ios::binary).write(r.cubin.data(), (std::streamsize)r.cubin.size());
   return r;
 }
@@ -187,6 +190,8 @@ static int cmdCudaSweep(int argc, char** argv) {
   const std::string jsonOut = arg(argc, argv, "--json", "");
   const std::string kdir = kernelsDir(argc, argv);
   const int jobs = std::stoi(arg(argc, argv, "--jobs", std::to_string(std::max(1u, std::thread::hardware_concurrency() / 2)).c_str()));
+  const std::string backend = arg(argc, argv, "--backend", "cuda");
+  const bool optix = backend == "optix";
 
   crt::CudaContext cuda;
   const std::string arch = cuda.arch();
@@ -203,7 +208,7 @@ static int cmdCudaSweep(int argc, char** argv) {
     auto contentObj = readContent(rt, content, &nFiles, &nBytes);
     auto idsArr = v8::Array::New(rt.isolate());
     { std::stringstream ss(ids); std::string id; uint32_t n = 0; while (std::getline(ss, id, ',')) if (!id.empty()) idsArr->Set(rt.context(), n++, rt.str(id)).Check(); }
-    auto res = rt.call("Candela", "cudaCatalog", {contentObj, idsArr, rt.str("cuda")}).As<v8::Array>();
+    auto res = rt.call("Candela", "cudaCatalog", {contentObj, idsArr, rt.str(backend)}).As<v8::Array>();
     for (uint32_t i = 0; i < res->Length(); i++) {
       auto r = res->Get(rt.context(), i).ToLocalChecked();
       Job j;
@@ -214,7 +219,7 @@ static int cmdCudaSweep(int argc, char** argv) {
       jobsV.push_back(std::move(j));
     }
   }
-  printf("%s (%s), NVRTC, %zu presets, %d compile threads\n", cuda.deviceName().c_str(), arch.c_str(), jobsV.size(), jobs);
+  printf("%s (%s), NVRTC → %s, %zu presets, %d compile threads\n", cuda.deviceName().c_str(), arch.c_str(), optix ? "OptiX-IR" : "cubin", jobsV.size(), jobs);
   const fs::path cache = cacheDir(argc, argv);
   std::atomic<size_t> next{0};
   std::mutex printMu;
@@ -223,7 +228,7 @@ static int cmdCudaSweep(int argc, char** argv) {
       Job& j = jobsV[i];
       if (!j.ok) continue;
       bool hit = false;
-      auto r = compileCached(j.source, j.hash, j.id + ".cu", kdir, arch, cache, &hit);
+      auto r = compileCached(j.source, j.hash, j.id + ".cu", kdir, arch, cache, &hit, optix);
       j.compileMs = hit ? 0 : r.ms; j.ok = r.ok; j.log = r.log; j.cubin = r.cubin.size(); j.bin = std::move(r.cubin);
       if (!r.ok) { j.stage = "nvrtc"; j.error = firstLines(r.log, 6); }
       std::lock_guard<std::mutex> lk(printMu);
@@ -239,6 +244,12 @@ static int cmdCudaSweep(int argc, char** argv) {
   int ok = 0; double sumMs = 0, maxMs = 0; int compiled = 0;
   for (auto& j : jobsV) {
     if (!j.ok) continue;
+    if (optix) {   // create the OptiX module and pipeline once (what a render would do), without a scene
+      try { crt::OptixRenderer R(cuda.ctx(), j.bin, 16, 16); } catch (const std::exception& e) { j.ok = false; j.stage = "optix"; j.error = e.what(); continue; }
+      ok++;
+      if (j.compileMs > 0) { sumMs += j.compileMs; maxMs = std::max(maxMs, j.compileMs); compiled++; }
+      continue;
+    }
     CUmodule m; CUfunction f;
     if (cuModuleLoadData(&m, j.bin.data()) != CUDA_SUCCESS || cuModuleGetFunction(&f, m, "candela_main") != CUDA_SUCCESS) { j.ok = false; j.stage = "load"; j.error = "cuModuleLoadData failed"; continue; }
     cuFuncGetAttribute(&j.regs, CU_FUNC_ATTRIBUTE_NUM_REGS, f);
@@ -290,9 +301,13 @@ static int cmdRender(int argc, char** argv) {
   const int sppTarget = std::stoi(arg(argc, argv, "--spp", "64"));
   const double time = std::stod(arg(argc, argv, "--time", "0"));
   const fs::path outDir = arg(argc, argv, "--out", "build/parity");
+  const std::string backend = arg(argc, argv, "--backend", "cuda");
+  if (backend != "cuda" && backend != "optix") { fprintf(stderr, "--backend cuda|optix\n"); return 1; }
+  const bool optix = backend == "optix";
   const std::string kdir = kernelsDir(argc, argv);
   const int w = std::stoi(size.substr(0, size.find('x'))), h = std::stoi(size.substr(size.find('x') + 1));
-  bool aov = false; for (int i = 1; i < argc; i++) if (std::string(argv[i]) == "--aov") aov = true;
+  bool aov = false, noMotion = false;
+  for (int i = 1; i < argc; i++) { if (std::string(argv[i]) == "--aov") aov = true; if (std::string(argv[i]) == "--no-motion-blur") noMotion = true; }
   fs::create_directories(outDir);
 
   crt::CudaContext cuda;
@@ -305,7 +320,7 @@ static int cmdRender(int argc, char** argv) {
   size_t nFiles = 0, nBytes = 0;
   auto contentObj = readContent(rt, content, &nFiles, &nBytes);
   const auto t0 = std::chrono::steady_clock::now();
-  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"time\":" + std::to_string(time) + ",\"target\":\"cuda\"}");
+  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"time\":" + std::to_string(time) + ",\"target\":\"" + backend + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + "}");
   auto hr = rt.call("Candela", "openRenderPreset", {contentObj, rt.str(id), opts});
   if (!rt.get(hr, "ok")->IsTrue()) { fprintf(stderr, "%s: %s\n", id.c_str(), rt.toStdString(rt.get(hr, "error")).c_str()); return 2; }
   auto H = hr.As<v8::Object>();
@@ -313,10 +328,25 @@ static int cmdRender(int argc, char** argv) {
   auto prog = rt.get(H, "cuda");
   const std::string source = rt.toStdString(rt.get(prog, "source")), hash = rt.toStdString(rt.get(prog, "hash"));
   bool hit = false;
-  auto comp = compileCached(source, hash, id + ".cu", kdir, cuda.arch(), cacheDir(argc, argv), &hit);
+  auto comp = compileCached(source, hash, id + ".cu", kdir, cuda.arch(), cacheDir(argc, argv), &hit, optix);
   if (!comp.ok) { fprintf(stderr, "%s: NVRTC failed:\n%s\n", id.c_str(), comp.log.c_str()); return 2; }
-  crt::CudaRenderer R(comp.cubin, w, h);
-  R.upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+  std::unique_ptr<crt::CudaRenderer> RC;
+  std::unique_ptr<crt::OptixRenderer> RO;
+  if (optix) {
+    RO = std::make_unique<crt::OptixRenderer>(cuda.ctx(), comp.cubin, w, h);
+    auto X = rt.get(H, "optix");
+    std::vector<crt::OptixMeshInput> meshes;
+    auto ma = rt.get(X, "meshes").As<v8::Array>();
+    for (uint32_t i = 0; i < ma->Length(); i++) {
+      auto m = ma->Get(rt.context(), i).ToLocalChecked();
+      meshes.push_back({rt.view<float>(rt.get(m, "vertices")), (unsigned)rt.get(m, "count").As<v8::Number>()->Value()});
+    }
+    RO->buildScene(meshes, rt.view<float>(rt.get(X, "instances")), rt.view<float>(rt.get(X, "aabbs")), rt.view<int>(rt.get(X, "aabbObjects")));
+    RO->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+  } else {
+    RC = std::make_unique<crt::CudaRenderer>(comp.cubin, w, h);
+    RC->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+  }
   const auto t1 = std::chrono::steady_clock::now();
   int launches = 0;
   double jsMs = 0;
@@ -325,21 +355,24 @@ static int cmdRender(int argc, char** argv) {
     const auto a = std::chrono::steady_clock::now();
     auto U = rt.callMethod(H, "frame", {});
     jsMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - a).count();
-    R.launch(rt.view<float>(U));
+    if (optix) RO->launch(rt.view<float>(U)); else RC->launch(rt.view<float>(U));
     launches++;
   }
-  auto acc = R.readAccum();
+  auto acc = optix ? RO->readAccum() : RC->readAccum();
   const double renderMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
   const int spp = (int)rt.get(H, "spp").As<v8::Number>()->Value();
-  const fs::path base = outDir / (id + ".cuda");
+  const fs::path base = outDir / (id + "." + backend);
   writePFM(base.string() + ".pfm", w, h, acc);
-  if (aov) writePFM(base.string() + ".albedo.pfm", w, h, R.readAlbedo());
-  std::ofstream(base.string() + ".json") << "{\"id\":\"" << id << "\",\"backend\":\"cuda-nvrtc\",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << time
+  if (aov) writePFM(base.string() + ".albedo.pfm", w, h, optix ? RO->readAlbedo() : RC->readAlbedo());
+  const int regs = optix ? 0 : RC->registers(), local = optix ? 0 : RC->localBytes();
+  std::ofstream(base.string() + ".json") << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0) << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << time
       << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
-      << ",\"renderMs\":" << renderMs << ",\"jsMs\":" << jsMs << ",\"registers\":" << R.registers() << ",\"localBytes\":" << R.localBytes()
+      << ",\"renderMs\":" << renderMs << ",\"jsMs\":" << jsMs << ",\"registers\":" << regs << ",\"localBytes\":" << local
       << ",\"sppPerSec\":" << spp * double(w) * h / (renderMs / 1000) << "}\n";
-  printf("%s cuda/nvrtc: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), %d regs, %d B local → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
-         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), renderMs, jsMs, R.registers(), R.localBytes(), base.string().c_str());
+  if (optix) printf("%s optix: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms) → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
+         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), RO->buildMs(), RO->gasBytes() / 1024.0, renderMs, jsMs, base.string().c_str());
+  else printf("%s cuda/nvrtc: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), %d regs, %d B local → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
+         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), renderMs, jsMs, regs, local, base.string().c_str());
   return 0;
 }
 
@@ -347,8 +380,8 @@ int main(int argc, char** argv) {
   if (argc < 2 || std::string(argv[1]) == "--help") {
     fprintf(stderr, "usage: candela-rt digest  [--bundle f] [--content dir] [--ids a,b] [--times 0,0.37] [--json out]\n"
                     "       candela-rt session [--bundle f] [--content dir] [--ids a,b] [--frames 48] [--fps 24] [--json out]\n"
-                    "       candela-rt cuda-sweep [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
-                    "       candela-rt render <id> [--size WxH] [--spp n] [--time t] [--out dir] [--aov]\n");
+                    "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
+                    "       candela-rt render <id> [--backend cuda|optix] [--size WxH] [--spp n] [--time t] [--out dir] [--aov] [--no-motion-blur]\n");
     return 1;
   }
   crt::JsRuntime::initProcess(argv[0]);

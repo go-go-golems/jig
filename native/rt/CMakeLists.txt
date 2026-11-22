@@ -19,8 +19,17 @@ find_library(NODE_LIB node REQUIRED)
 # Phase 2: the plain-CUDA target — NVRTC compiles each scene's translated program, the driver API runs it.
 find_package(CUDAToolkit REQUIRED)
 
-add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp)
-target_include_directories(candela-rt PRIVATE ${V8_INCLUDE_DIR} src)
-target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc pthread)
+# Phase 3: the OptiX target. OptiX SDK 9.0.0 matches the Spark's driver 580 (runtime ABI 110); headers only, the
+# implementation is in the driver (optixInit loads it).
+set(OptiX_INSTALL_DIR "$ENV{HOME}/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64" CACHE PATH "OptiX SDK root (contains include/optix.h)")
+if(NOT EXISTS "${OptiX_INSTALL_DIR}/include/optix.h")
+  message(FATAL_ERROR "OptiX SDK not found at ${OptiX_INSTALL_DIR}: pass -DOptiX_INSTALL_DIR=<sdk root>")
+endif()
+
+add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp src/optix_renderer.cpp)
+target_include_directories(candela-rt PRIVATE ${V8_INCLUDE_DIR} ${OptiX_INSTALL_DIR}/include src)
+target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc pthread ${CMAKE_DL_LIBS})
+# NVRTC needs the OptiX device headers to compile a scene's OptiX program
+target_compile_definitions(candela-rt PRIVATE CANDELA_OPTIX_INCLUDE_DIR="${OptiX_INSTALL_DIR}/include" CANDELA_CUDA_INCLUDE_DIR="${CUDAToolkit_INCLUDE_DIRS}")
 # where NVRTC finds candela_wgsl.h and the target headers when --kernels is not given
 target_compile_definitions(candela-rt PRIVATE CANDELA_KERNELS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/kernels")

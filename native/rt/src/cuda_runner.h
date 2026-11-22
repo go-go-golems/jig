@@ -21,8 +21,10 @@ struct NvrtcResult {
 /** the NVRTC options in effect (built-in defaults + CANDELA_NVRTC_FLAGS), for cache keys */
 std::string nvrtcOptionsKey();
 
-/** compile CUDA source to a cubin for the given architecture (e.g. "sm_121"); `includeDir` holds native/rt/kernels */
-NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch);
+/** compile CUDA source with NVRTC for the given architecture (e.g. "sm_121"); `includeDir` holds native/rt/kernels.
+ *  `optixIR`: produce OptiX-IR (for optixModuleCreate) instead of a cubin; `extraIncludes`: more -I directories. */
+NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch,
+                         bool optixIR = false, const std::vector<std::string>& extraIncludes = {});
 
 class CudaContext {
  public:

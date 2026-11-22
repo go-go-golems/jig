@@ -30,7 +30,8 @@ std::string nvrtcOptionsKey() {
   return k;
 }
 
-NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch) {
+NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch,
+                         bool optixIR, const std::vector<std::string>& extraIncludes) {
   NvrtcResult res;
   const auto t0 = std::chrono::steady_clock::now();
   nvrtcProgram prog;
@@ -38,7 +39,11 @@ NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, con
   const std::string inc = "-I" + includeDir, gpu = "--gpu-architecture=" + arch;
   std::vector<std::string> extra;   // CANDELA_NVRTC_FLAGS: extra options, space separated (experiments)
   if (const char* e = getenv("CANDELA_NVRTC_FLAGS")) { std::stringstream ss(e); std::string t; while (ss >> t) extra.push_back(t); }
+  std::vector<std::string> incs;
+  for (const auto& d : extraIncludes) incs.push_back("-I" + d);
   std::vector<const char*> opts = {inc.c_str(), gpu.c_str()};
+  for (auto& x : incs) opts.push_back(x.c_str());
+  if (optixIR) opts.push_back("--optix-ir");
   for (const char* x : kNvrtcOptions) opts.push_back(x);
   for (auto& x : extra) opts.push_back(x.c_str());
   const nvrtcResult cr = nvrtcCompileProgram(prog, (int)opts.size(), opts.data());
@@ -47,10 +52,10 @@ NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, con
   if (logSize > 1) { res.log.resize(logSize); nvrtcGetProgramLog(prog, res.log.data()); res.log.resize(logSize - 1); }
   if (cr == NVRTC_SUCCESS) {
     size_t n = 0;
-    nvrtcGetCUBINSize(prog, &n);
-    res.cubin.resize(n);
-    nvrtcGetCUBIN(prog, res.cubin.data());
-    res.ok = true;
+    if (optixIR) { nvrtcGetOptiXIRSize(prog, &n); res.cubin.resize(n); nvrtcGetOptiXIR(prog, res.cubin.data()); }
+    else { nvrtcGetCUBINSize(prog, &n); res.cubin.resize(n); nvrtcGetCUBIN(prog, res.cubin.data()); }
+    res.ok = n > 0;
+    if (!res.ok) res.log += "\nNVRTC produced no output";
   }
   nvrtcDestroyProgram(&prog);
   res.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
