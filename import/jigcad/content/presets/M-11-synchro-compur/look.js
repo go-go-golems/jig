@@ -12,9 +12,27 @@ import poses from './compur-poses.look.js';
 // the mechanism at work under them
 const CUTAWAY = false;
 const FRONT = ['cover', 'speedRing', 'speedCam'];
-const model = !CUTAWAY ? program : { ...program,
-  components: program.components.filter((c) => !FRONT.includes(c.id)),
-  bodies: program.bodies.filter((b) => !FRONT.includes(b.component)) };
+
+// One material per finish and part, not per face. Candela compiles a material's
+// axis and centre into the shader, and every face of the Compur has a centre of
+// its own: 540 materials, a 0.5 MB shader that takes minutes to compile. So the
+// tool marks of a moving part run about its pivot and the frame's about the
+// optical axis: 59 materials. Kept per package, so a rebuild reuses the meshes.
+const pivot = (id) => {
+  const c = poses.components[id]?.c ?? [0, 0];
+  return [c[0] / 1000, 0, -c[1] / 1000];
+};
+const DRESSED = (globalThis.__compurDressed ??= new WeakMap());
+function dressed(p) {
+  if (!DRESSED.has(p)) DRESSED.set(p, { ...p, bodies: p.bodies.map((b) => ({
+    ...b, faces: b.faces.map((f) => (!f.meta.center ? f
+      : { ...f, meta: { ...f.meta, center: pivot(b.component) } })) })) });
+  return DRESSED.get(p);
+}
+const all = dressed(program);
+const model = !CUTAWAY ? all : { ...all,
+  components: all.components.filter((c) => !FRONT.includes(c.id)),
+  bodies: all.bodies.filter((b) => !FRONT.includes(b.component)) };
 
 const asm = jigScene(model, { autoFinish: true })
   // materials: the Render view adds lines here

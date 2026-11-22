@@ -179,6 +179,10 @@ test('the look builds in Candela with the files the Render view sends: an animat
   assert.equal(a.study, undefined, 'not a study: the Render view does not look for a drive');
   assert.deepEqual(Object.keys(a(0)).sort(), [...MOVING].sort());
   assert.ok(maxDiff(a(2).blade1, BAKED.animate(pkg)(2).blade1) < 1e-12, 'the same poses as the module run here');
+  // a shader the GPU compiles in seconds: the look gives the faces of a part one tool-mark centre (Candela compiles
+  // each material's centre into the shader; with a centre per face this package makes 540 of them, 0.5 MB of WGSL)
+  assert.ok(r.compiled.materials.length < 80, `${r.compiled.materials.length} materials`);
+  assert.ok(r.compiled.shared.length < 150e3, `${r.compiled.shared.length} bytes of shader`);
   // the look keeps the Render view's marker and the chain's end, so a material from the library still lands
   const lines = PRESET['look.js'].split('\n'), at = lines.findIndex((l) => l.trim() === LOOK_MARK);
   assert.ok(at > 0 && lines.slice(at + 1).some((l) => l.trim() === ';'));
