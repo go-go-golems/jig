@@ -152,8 +152,9 @@ export class Host {
       }
       compiled.animation = r.animation || null;
       this.behaviors = compiled.behaviors;
-      if (this.vp) await this.loadIntoViewport(compiled, seq);
+      // OptiX mode: the server gets the scene first, so a slow local shader compile does not hold it back
       this.remoteFiles();
+      if (this.vp) await this.loadIntoViewport(compiled, seq);
     }
     this.building = false; this.notify();
     return r;

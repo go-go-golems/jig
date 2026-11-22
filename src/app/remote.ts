@@ -4,7 +4,7 @@
 // of native/rt/src/serve.cpp.
 import { digestString } from '../engine/digest';
 
-export type RemoteState = 'connecting' | 'building' | 'compiling' | 'live' | 'closed' | 'error';
+export type RemoteState = 'connecting' | 'building' | 'compiling' | 'live' | 'taken' | 'closed' | 'error';
 export interface RemoteFrame { t: number; spp: number; ev: number; width: number; height: number; renderMs: number; epoch: number; playing: boolean }
 
 /** the server's address: ?rt=ws://host:port in the page URL, else localStorage 'candela.rtUrl', else this host:8790 */
@@ -99,6 +99,7 @@ export class RemoteRender {
   private onText(s: string) {
     let m: any; try { m = JSON.parse(s); } catch { return; }
     if (m.type === 'hello') { this.server = m; this.state = 'building'; this.onHello(); }
+    else if (m.type === 'status' && m.state === 'taken') { this.state = 'taken'; this.message = 'another browser took over candela-rt; toggle OptiX to take it back'; }
     else if (m.type === 'status') { this.state = m.state === 'compiling' ? 'compiling' : 'building'; this.message = m.target ? `compiling for ${m.target}` : ''; }
     else if (m.type === 'built') { this.built = m; if (m.ok) { this.state = 'live'; this.message = ''; } else { this.state = 'error'; this.message = m.error; } }
     else if (m.type === 'error') { this.message = m.message; }
@@ -112,7 +113,7 @@ export class RemoteRender {
     const url = URL.createObjectURL(new Blob([b.subarray(4 + hl)], { type: 'image/jpeg' }));
     const old = this.frameUrl;
     this.frame = head; this.frameUrl = url; this.frames++; this.fpsWindow.push(performance.now());
-    if (this.state !== 'live' && this.built && this.built.ok) this.state = 'live';
+    if (this.state !== 'live' && this.state !== 'taken' && this.built && this.built.ok) this.state = 'live';
     this.onChange();
     // the <img> switches to the new URL on the next render; free the old one a little later
     if (old) setTimeout(() => URL.revokeObjectURL(old), 1000);

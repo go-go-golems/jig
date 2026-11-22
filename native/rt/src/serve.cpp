@@ -123,9 +123,13 @@ class Live {
   void sendText(const std::string& s) { if (client_) client_->sendText(s); }
 
   void handle(const Incoming& m) {
-    if (m.kind == Incoming::Open) { client_ = m.ws; return; }
+    if (m.kind == Incoming::Open) return;   // a connection owns the session once it speaks
     if (m.kind == Incoming::Close) { if (m.ws == client_) client_.reset(); return; }
-    if (m.ws != client_) client_ = m.ws;   // the last connection to speak is the one we render for
+    // the last connection to speak is the one we render for; the previous one is told, so it stops waiting for frames
+    if (m.ws != client_) {
+      if (client_) client_->sendText("{\"type\":\"status\",\"state\":\"taken\"}");
+      client_ = m.ws;
+    }
     auto msg = rt().fromJSON(m.text);
     const std::string type = str(msg, "type");
     if (type == "hello") {

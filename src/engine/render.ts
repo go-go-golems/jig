@@ -261,11 +261,22 @@ export class GLRenderer {
     r.tex = {}; r.lost = false; canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); r.lost = true; });
     return r;
   }
-  program(fs, label) {
+  // compile and link a program without blocking the page: with KHR_parallel_shader_compile the driver compiles on its
+  // own threads and we poll for completion between frames; reading COMPILE_STATUS or LINK_STATUS right away would
+  // stall the main thread until the whole path tracer is compiled (seconds for big scenes on some drivers)
+  async program(fs, label) {
     const gl = this.gl;
-    const sh = (t, s) => { const x = gl.createShader(t)!; gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(x) || 'compile failed'; const e: any = new Error(`GLSL (${label}): ` + log.split('\n').slice(0, 4).join(' ')); e.source = s; e.shaderErrors = log.split('\n').filter(Boolean).map(l => { const m = l.match(/0:(\d+):\s*(.*)/); return m ? { line: +m[1], message: m[2] } : { line: 0, message: l }; }); throw e; } return x; };
-    const p = gl.createProgram()!; gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`GLSL link (${label}): ` + gl.getProgramInfoLog(p));
+    const par = gl.getExtension('KHR_parallel_shader_compile');
+    const fail = (x, s) => { const log = gl.getShaderInfoLog(x) || 'compile failed'; const e: any = new Error(`GLSL (${label}): ` + log.split('\n').slice(0, 4).join(' ')); e.source = s; e.shaderErrors = log.split('\n').filter(Boolean).map(l => { const m = l.match(/0:(\d+):\s*(.*)/); return m ? { line: +m[1], message: m[2] } : { line: 0, message: l }; }); return e; };
+    const sh = (t, s) => { const x = gl.createShader(t)!; gl.shaderSource(x, s); gl.compileShader(x); return x; };
+    const vs = sh(gl.VERTEX_SHADER, VS), fsh = sh(gl.FRAGMENT_SHADER, fs);
+    const p = gl.createProgram()!; gl.attachShader(p, vs); gl.attachShader(p, fsh); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
+    if (par) while (!gl.getProgramParameter(p, par.COMPLETION_STATUS_KHR) && !gl.isContextLost()) await new Promise(r => setTimeout(r, 16));
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) throw fail(vs, VS);
+      if (!gl.getShaderParameter(fsh, gl.COMPILE_STATUS)) throw fail(fsh, fs);
+      throw new Error(`GLSL link (${label}): ` + gl.getProgramInfoLog(p));
+    }
     const uniforms: Record<string, any> = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
     for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i)!; uniforms[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); }
     return { p, u: uniforms };
@@ -299,7 +310,7 @@ void main() {
   if (U(0).z < 0.5) { oC = o.c; oA = o.alb; oN = o.nrm; }
   else { oC = texelFetch(tPC, ip, 0) + o.c; oA = texelFetch(tPA, ip, 0) + o.alb; oN = texelFetch(tPN, ip, 0) + o.nrm; }
 }`;
-      pipe = Object.assign(this.program(fs, 'path tracer'), { code: fs, nU: compiled.nU });
+      pipe = Object.assign(await this.program(fs, 'path tracer'), { code: fs, nU: compiled.nU });
       this.cache.set(key, pipe);
       if (this.cache.size > 16) { const k = this.cache.keys().next().value!; gl.deleteProgram(this.cache.get(k).p); this.cache.delete(k); }
     }
@@ -319,9 +330,9 @@ vec3 aAt(ivec2 p) { return texelFetch(tA, p, 0).xyz / max(D(0).z, 1.0); }
 vec4 nAt(ivec2 p) { vec4 n = texelFetch(tN, p, 0) / max(D(0).z, 1.0); return vec4(safeNorm(n.xyz), n.w); }
 `;
       const body = wgslToGlsl(dispSrc);
-      const den = this.program(pre + body + `
+      const den = await this.program(pre + body + `
 void main() { ivec2 res = ivec2(int(D(0).x), int(D(0).y)); ivec2 p = ivec2(gl_FragCoord.xy); outC = vec4(denoisePx(p, int(D(4).x), res, D(4).y, D(0).w), 1.0); }`, 'denoise');
-      const disp = this.program(pre + body + `
+      const disp = await this.program(pre + body + `
 void main() { ivec2 res = ivec2(int(D(0).x), int(D(0).y)); ivec2 q = ivec2(gl_FragCoord.xy); outC = displayPx(ivec2(q.x, q.y), res); }`, 'display');
       this.post = { key: dispSrc, den, disp };
     }

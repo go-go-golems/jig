@@ -100,7 +100,7 @@ export function ViewportView({ host }: { host: Host }) {
       onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDropOn(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn(false); }}
       onDrop={async e => { e.preventDefault(); setDropOn(false); for (const f of e.dataTransfer.files) { try { await host.addAssetFile(f); } catch (x) { host.toast(`${f.name}: ${x.message}`, true); } } }}>
       {V.aov === 'ids' && <canvas ref={idCanvas} className="vp-ids" aria-label="Instance and face ids" />}
-      {host.remote && host.remote.frameUrl && <img className="vp-remote" src={host.remote.frameUrl} alt="" draggable={false} />}
+      {host.remote && host.remote.live && <img className="vp-remote" src={host.remote.frameUrl!} alt="" draggable={false} />}
       <div className="chip-row">
         {host.remote && <RemoteChips host={host} />}
         <span className={'chip on' + (vp && vp.backend && vp.backend.name === 'WebGPU' ? ' gpu' : '')} title={vp && vp.backend ? vp.backend.info : 'starting'}>{vp && vp.backend ? vp.backend.name : '…'}</span>
