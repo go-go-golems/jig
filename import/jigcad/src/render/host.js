@@ -9,6 +9,9 @@
 import LIB from '../generated/candela-lib.json';
 
 export const LOOK_FILE = 'look.js';
+// project files the look may import (baked poses, shared materials): sent to Candela's build under their own names,
+// e.g. import poses from './shutter-poses.look.js'. jig's compile never runs them (only script.js runs).
+export const isLookFile = (path) => path === LOOK_FILE || /\.look\.js$/.test(path);
 export const LOOK_MARK = '// materials: the Render view adds lines here';
 
 /** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model,
@@ -106,6 +109,8 @@ export class RenderHost {
   emit() { for (const f of this.ls) try { f(this); } catch (e) { console.error(e); } }
 
   /** the look file's text: the project's look.js, else the default for the stage's current view */
+  /** what a rebuild depends on besides the package: the look and the files it may import */
+  lookKey(look = this.look()) { return look + JSON.stringify([...this.host.files].filter(([k]) => k !== LOOK_FILE && isLookFile(k))); }
   look() {
     const view = ['axo', 'front', 'side', 'plan'].includes(this.host.view?.name) ? this.host.view.name : 'axo';
     return this.host.files.get(LOOK_FILE) ?? defaultLook({ view, study: Object.keys(this.pkg?.studies ?? {})[0] ?? null });
@@ -170,8 +175,8 @@ export class RenderHost {
     const prog = this.host.program?.ok !== false ? this.host.program : this.host.lastGood;
     if (!prog) { this.status = 'idle'; this.message = 'Nothing compiled yet.'; this.emit(); return; }
     const seq = ++this._seq;
-    const model = JSON.stringify([...this.host.files].filter(([k]) => k !== LOOK_FILE)) + JSON.stringify(this.host.overrides ?? {}) + prog.hash;
-    if (!force && model === this._pkgKey && this.look() === this._lookKey) return;
+    const model = JSON.stringify([...this.host.files].filter(([k]) => !isLookFile(k))) + JSON.stringify(this.host.overrides ?? {}) + prog.hash;
+    if (!force && model === this._pkgKey && this.lookKey() === this._lookKey) return;
     this.status = 'building'; this.emit();
     try {
       if (model !== this._pkgKey || !this.pkg) {
@@ -189,9 +194,10 @@ export class RenderHost {
   }
   async build(seq = ++this._seq, look = this.look()) {
     const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': 'export const program = __jigPackage;', 'scene.js': look };
+    for (const [k, v] of this.host.files) if (k !== LOOK_FILE && isLookFile(k)) files[k] = v;
     const r = await this.C.build(files, { scope: { __jigPackage: this.pkg } });
     if (seq !== this._seq) return;
-    this.result = r; this._lookKey = look;
+    this.result = r; this._lookKey = this.lookKey(look);
     this.diags = [...(this.pkg.diagnostics ?? []).map((d) => ({ severity: d.level, code: d.kind, message: d.message, line: d.line })), ...(r.diags ?? [])];
     if (!r.ok) { this.status = 'error'; this.message = r.error?.message ?? 'the look did not build'; this.emit(); return; }
     this.loading = true; this.status = 'compiling'; this.emit();
