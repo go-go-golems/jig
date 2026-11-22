@@ -228,3 +228,21 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .mechview tr.failrow td { color: var(--accent); }
 .mechview input[type=range] { width: 160px; }
 .mechview pre.pickline { white-space: pre-wrap; word-break: break-all; margin: 6px 0; }
+
+/* Render (JIG-016): Candela's path-traced view, the picked face and the material library */
+.renderview .toolbar { gap: 6px; flex-wrap: wrap; }
+.renderbody { display: flex; flex: 1; min-height: 0; }
+.renderwrap { position: relative; flex: 1; min-width: 0; min-height: 200px; touch-action: none; cursor: grab; background: var(--stage); }
+.renderwrap:active { cursor: grabbing; }
+.renderwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.rendermsg { position: absolute; left: 12px; top: 12px; right: 12px; font-size: var(--fs-s); color: var(--ink-2); }
+.rendermsg.bad { color: var(--accent); }
+.renderside { width: 230px; flex: none; overflow: auto; padding: 8px; border-left: 1px solid var(--hair); display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-s); }
+.renderside .kv { display: flex; justify-content: space-between; gap: 8px; }
+.renderside .kv b { text-align: right; overflow-wrap: anywhere; font-family: var(--font-code); font-weight: normal; }
+.renderside .small { font-size: var(--fs-xs); color: var(--ink-2); }
+.renderside .matgroup { display: flex; flex-wrap: wrap; gap: 4px; }
+.renderside .matgroup-title { width: 100%; font-size: var(--fs-xs); color: var(--ink-2); margin-top: 4px; }
+.renderside .diags { margin: 6px 0 0; padding-left: 16px; font-size: var(--fs-xs); }
+.renderside .diags .bad { color: var(--accent); }
+@media (max-width: 640px) { .renderbody { flex-direction: column; } .renderside { width: auto; border-left: 0; border-top: 1px solid var(--hair); } }

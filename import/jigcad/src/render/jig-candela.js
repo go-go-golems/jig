@@ -16,7 +16,7 @@
 // predicate f({ component, id, meta }) such as f => f.meta.featureType === 'hole'. The node id of a
 // component's group is its jig id ('sub/slider'), so poses and picks use jig's names. The result is immutable, like
 // every Candela builder: .face() and .material() return a new group.
-import { scene, shape, mesh } from 'candela';
+import { scene, shape, mesh, finish } from 'candela';
 
 const FORMAT = 'jig-cad-package';
 const ARRAYS = { positions: Float32Array, normals: Float32Array, indices: Uint32Array, triFace: Uint32Array };
@@ -126,13 +126,24 @@ function realize(st) {
     const comp = comps.get(cid) || { id: cid, transform: null, look: {} };
     const Tc = comp.transform || bodies[0].transform;
     const nodes = bodies.map((b) => {
-      let n = shape.mesh(defOf(b, comp));
-      if (st.o.autoFinish !== false) n = n.autoFinish();
+      // each face's last word, in call order: an explicit material (.face/.material) or a metadata patch (.meta),
+      // which autoFinish turns into a material (a later .meta() drops an earlier explicit material)
+      const mats = new Map(), patches = new Map();
       for (const op of st.ops) {
         if (!op.comp(cid)) continue;
-        const ids = b.faces.filter((f) => (op.pred ? op.pred({ component: cid, id: f.id, meta: f.meta }) : op.face(f.id))).map((f) => f.id);
-        if (ids.length) n = n.face(ids, op.m);
+        for (const f of b.faces) {
+          if (!(op.pred ? op.pred({ component: cid, id: f.id, meta: f.meta }) : op.face(f.id))) continue;
+          if (op.patch) { patches.set(f.id, Object.assign(patches.get(f.id) || {}, op.patch)); mats.delete(f.id); }
+          else mats.set(f.id, op.m);
+        }
       }
+      let n = shape.mesh(defOf(b, comp));
+      const auto = st.o.autoFinish !== false;
+      if (patches.size) n = n.autoFinish((meta, f) => (patches.has(f.id) ? finish.fromMetadata(Object.assign({}, meta, patches.get(f.id))) : auto ? finish.fromMetadata(meta) : null));
+      else if (auto) n = n.autoFinish();
+      const byMat = new Map();
+      for (const [id, m] of mats) { if (!byMat.has(m)) byMat.set(m, []); byMat.get(m).push(id); }
+      for (const [m, ids] of byMat) n = n.face(ids, m);
       const rel = isIdentity(Tc) || isIdentity(b.transform) ? (isIdentity(b.transform) ? null : b.transform) : mul(inv(Tc), b.transform);
       return isIdentity(rel) ? n : place(n, rel);
     });
@@ -152,6 +163,16 @@ function jig(st) {
         throw new Error(`jigScene().face(${typeof sel === 'function' ? 'ƒ' : JSON.stringify(sel)}): no face matches; did you mean ${didYouMean(String(sel), names).join(', ')}?`);
       }
       return jig({ ...st, ops: st.ops.concat([{ ...p, m }]) });
+    },
+    /** patch the metadata faces are dressed from (autoFinish): { material, process, finish, color, roughness }.
+     *  Unlike a material, it keeps what jig found (the axis a turned face's grooves run around). */
+    meta(sel, patch) {
+      if (!patch || typeof patch !== 'object') throw new Error(`jigScene().meta(${JSON.stringify(sel)}, patch): the patch is an object such as { material: 'brass' }`);
+      if (!api.faces(sel).length) {
+        const names = st.pkg.bodies.flatMap((b) => [b.component, ...b.faces.map((f) => `${b.component}#${f.id}`)]);
+        throw new Error(`jigScene().meta(${typeof sel === 'function' ? 'ƒ' : JSON.stringify(sel)}): no face matches; did you mean ${didYouMean(String(sel), names).join(', ')}?`);
+      }
+      return jig({ ...st, ops: st.ops.concat([{ ...parse(sel), patch }]) });
     },
     /** a material for every face of the components an address names ('crank', 'sub/*') */
     material(comp, m) {

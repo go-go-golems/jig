@@ -196,3 +196,20 @@ test('placement is exact for general rotations and at the gimbal (90° about Y)'
     }
   }
 });
+
+test('.meta() patches what autoFinish reads; a later .meta() beats an earlier explicit material', async () => {
+  const r = await buildLook(look(`const asm = jigScene(program)
+  .face(['rod#body/side[s.big]', 'rod#body/side[s.small]'], finish.ground({ metal: 'bearing-steel' }))
+  .meta('rod#body/side[s.big]', { material: 'brass' })
+  .meta('slider', { finish: 'paint', color: '#c8102e' });
+export default scene().add(asm).add(light.env.hdri(hdri.studio()));`));
+  assert.ok(r.ok, r.error?.message);
+  const byName = Object.fromEntries(meshObjects(r).map(({ o }) => [o.def.name, o]));
+  const rod = byName['rod/body1'], fm = (o, id) => o.faceMats[o.def.faces.findIndex((f) => f.id === id)];
+  assert.ok(fm(rod, 'body/side[s.big]') >= 0 && fm(rod, 'body/side[s.small]') >= 0);
+  assert.notEqual(fm(rod, 'body/side[s.big]'), fm(rod, 'body/side[s.small]'), 'the big bore became brass; the small one kept the explicit material');
+  assert.equal(new Set(byName['slider/body1'].faceMats).size, 1, 'the whole slider painted');
+  const bad = await buildLook(look(`const asm = jigScene(program).meta('rod#body/side[s.bgi]', { material: 'brass' });
+export default scene().add(asm);`));
+  assert.match(bad.error.message, /meta\("rod#body\/side\[s\.bgi\]"\): no face matches; did you mean .*rod#body\/side\[s\.big\]/);
+});

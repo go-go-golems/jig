@@ -1,0 +1,243 @@
+// render/host.js: the Render view's controller (JIG-016 §6.5). It owns Candela on the page: it loads dist/candela.js
+// on first use, asks jig's worker for the CAD package of the open program (export('candela')), builds the look file
+// (the project's look.js, or a default one) with the bridge (src/render/jig-candela.js) through Candela's own build,
+// drives a Candela Viewport on a canvas, maps clicks back to jig's names, and edits look.js when a material is
+// chosen for a face. No Preact here: views/render.jsx draws it and listens to its events.
+//
+//   const rh = renderHostOf(host);  rh.attach(canvas);  rh.on('change', …);  rh.pick(nx, ny) → { component, face, … }
+//   rh.applyMeta('rod#body/side[s.big]', { material: 'brass' })   → a line in look.js, then a rebuild
+import LIB from '../generated/candela-lib.json';
+
+export const LOOK_FILE = 'look.js';
+export const LOOK_MARK = '// materials: the Render view adds lines here';
+
+/** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model */
+export function defaultLook({ view = 'axo' } = {}) {
+  return `// look.js: how the model is rendered (materials, light, camera) as a Candela scene (JIG-016).
+// The Render view edits the chain under the marker: a material chosen for a face adds a .meta() line there.
+import { scene, shape, light, camera, hdri, material, finish } from 'candela';
+import { jigScene } from 'jig-candela';
+import { program } from 'jig-program';
+
+const asm = jigScene(program, { autoFinish: true })
+  ${LOOK_MARK}
+  ;
+const v = asm.view('${view}'), floor = asm.bounds() ? asm.bounds()[0][1] : 0;
+export default scene()
+  .add(asm)
+  .add(shape.plane().at(0, floor, 0).material(material.pbr().baseColor(0.18).roughness(0.8)).id('floor'))
+  .add(light.env.hdri(hdri.studio(), { rotate: 30 }))
+  .camera(camera.thinLens().at(v.at).lookAt(v.target).focal(v.focal).fstop(8));
+`;
+}
+
+/** a .meta() line for look.js: the address and the patch as code */
+export function metaLine(address, patch) {
+  const body = Object.entries(patch).map(([k, v]) => `${/^[a-z]\w*$/i.test(k) ? k : JSON.stringify(k)}: ${JSON.stringify(v)}`).join(', ');
+  return `  .meta(${JSON.stringify(address)}, { ${body} })`;
+}
+
+/** look.js with one more line at the end of the marked chain; null when the marker or its chain's end is gone */
+export function addToLook(text, line) {
+  const lines = text.split('\n'), at = lines.findIndex((l) => l.trim() === LOOK_MARK);
+  if (at < 0) return null;
+  let end = at + 1;
+  while (end < lines.length && lines[end].trim() !== ';') end++;
+  if (end >= lines.length) return null;
+  lines.splice(end, 0, line);
+  return lines.join('\n');
+}
+
+// the materials offered for a face: patches of the face's metadata, so Candela's finish keeps the axis jig found
+// (a turned face stays turned about its axis when it becomes brass)
+export const LIBRARY = [
+  { group: 'Steel', items: [
+    ['Steel, machined', { material: 'steel', finish: null }], ['Steel, ground', { material: 'steel', finish: null, process: 'ground' }],
+    ['Steel, polished', { material: 'steel', finish: null, process: 'polished' }], ['Black oxide', { material: 'steel', finish: 'black-oxide' }],
+    ['Zinc plated', { material: 'steel', finish: 'zinc' }], ['Stainless, brushed', { material: 'stainless', finish: null, process: 'brushed' }],
+    ['Chrome', { finish: 'chrome' }],
+  ] },
+  { group: 'Aluminium', items: [
+    ['Aluminium, machined', { material: 'aluminium', finish: null }], ['Anodized black', { material: 'aluminium', finish: 'anodized-black' }],
+    ['Anodized blue', { material: 'aluminium', finish: 'anodized', color: '#2b4c7e' }], ['Anodized clear', { material: 'aluminium', finish: 'anodized-clear' }],
+  ] },
+  { group: 'Copper alloys', items: [['Brass', { material: 'brass', finish: null }], ['Bronze', { material: 'bronze', finish: null }], ['Copper', { material: 'copper', finish: null }]] },
+  { group: 'Coats', items: [['Paint, red', { finish: 'paint', color: '#c8102e' }], ['Powder coat, black', { finish: 'powder-coat', color: '#2a2a2a' }]] },
+  { group: 'Plastics', items: [['PLA, white', { material: 'pla', finish: null, process: null, color: '#f2f0eb' }], ['ABS, black', { material: 'abs', finish: null, process: null, color: '#1d1d1f' }], ['Rubber', { finish: 'rubber' }], ['Glass', { finish: 'glass' }]] },
+];
+
+let candela = null;
+/** dist/candela.js, loaded once, beside app.js */
+export const loadCandela = () => (candela ??= import(/* not bundled: dist/candela.js */ new URL('./candela.js', import.meta.url).href));
+
+const V = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k], len: (a) => Math.hypot(a[0], a[1], a[2]),
+  norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+};
+const xfPoint = (M, p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2] + M[3], M[4] * p[0] + M[5] * p[1] + M[6] * p[2] + M[7], M[8] * p[0] + M[9] * p[1] + M[10] * p[2] + M[11]];
+const xfDir = (M, d) => [M[0] * d[0] + M[1] * d[1] + M[2] * d[2], M[4] * d[0] + M[5] * d[1] + M[6] * d[2], M[8] * d[0] + M[9] * d[1] + M[10] * d[2]];
+
+/** a pick in the compiled scene → jig's names: { component, body, face, meta, point } (meshes only) */
+export function faceAt(compiled, pkg, hit) {
+  const ob = compiled?.objects?.[hit?.object];
+  if (!ob?.def) return null;
+  const body = pkg?.bodies?.find((b) => b.id === ob.def.name), f = ob.def.faces[hit.face];
+  if (!body || !f) return null;
+  return { component: body.component, body: body.id, face: f.id, meta: f.meta, address: `${body.component}#${f.id}` };
+}
+
+export class RenderHost {
+  constructor(host) {
+    this.host = host;
+    this.ls = new Set();
+    this.status = 'idle';            // idle | loading | building | ready | error
+    this.message = null;
+    this.diags = [];
+    this.pkg = null; this.result = null; this.vp = null; this.canvas = null;
+    this.freeCam = null; this.picked = null; this.backend = null;
+    this._seq = 0; this._pkgKey = null; this._lookKey = null; this._raf = 0;
+  }
+  on(fn) { this.ls.add(fn); return () => this.ls.delete(fn); }
+  emit() { for (const f of this.ls) try { f(this); } catch (e) { console.error(e); } }
+
+  /** the look file's text: the project's look.js, else the default for the stage's current view */
+  look() { return this.host.files.get(LOOK_FILE) ?? defaultLook({ view: ['axo', 'front', 'side', 'plan'].includes(this.host.view?.name) ? this.host.view.name : 'axo' }); }
+
+  async attach(canvas) {
+    this.canvas = canvas;
+    this.status = 'loading'; this.emit();
+    try {
+      const C = await loadCandela();
+      this.C = C;
+      this.vp = new C.Viewport(canvas);
+      await this.vp.init('auto');
+      this.backend = this.vp.backendName;   // the viewport may swap the canvas for WebGL2: listen on its parent
+      this.vp.target = 1024;          // stop accumulating at 1024 samples per pixel
+      this.offs = [this.host.on('program', () => this.refresh()), this.host.on('files', () => this.refresh())];
+      this.loop();
+      await this.refresh(true);
+    } catch (e) {
+      this.status = 'error'; this.message = `Candela did not start: ${e.message}`; console.error(e); this.emit();
+    }
+  }
+  detach() {
+    cancelAnimationFrame(this._raf); this._raf = 0;
+    for (const off of this.offs ?? []) off();
+    this.offs = null; this.vp = null; this.canvas = null;
+  }
+  loop() {
+    const step = () => {
+      this._raf = requestAnimationFrame(step);
+      if (!this.vp?.compiled || !this.vp.packed || this.loading || document.hidden) return;   // not while shaders compile
+      if (this.vp.frame()) this._spp !== this.vp.spp && ((this._spp = this.vp.spp), this.emit());
+    };
+    this._raf = requestAnimationFrame(step);
+  }
+
+  /** after a compile or an edit: a new package when the model changed, a rebuild when the look changed */
+  async refresh(force = false) {
+    if (!this.vp) return;
+    const prog = this.host.program?.ok !== false ? this.host.program : this.host.lastGood;
+    if (!prog) { this.status = 'idle'; this.message = 'Nothing compiled yet.'; this.emit(); return; }
+    const seq = ++this._seq;
+    const model = JSON.stringify([...this.host.files].filter(([k]) => k !== LOOK_FILE)) + JSON.stringify(this.host.overrides ?? {}) + prog.hash;
+    const look = this.look();
+    if (!force && model === this._pkgKey && look === this._lookKey) return;
+    this.status = 'building'; this.emit();
+    try {
+      if (model !== this._pkgKey || !this.pkg) {
+        // an edit not compiled yet: the compile's 'program' event comes back here with the new model
+        if (this.host.dirty || this.host.compiling) { if (seq === this._seq) { this.status = this.pkg ? 'ready' : 'building'; this.emit(); } return; }
+        const e = await this.host.export('candela', { quality: 'render' });
+        if (seq !== this._seq) return;
+        this.pkg = JSON.parse(e.data); this._pkgKey = model;
+      }
+      await this.build(seq, look);
+    } catch (e) {
+      if (seq !== this._seq) return;
+      this.status = 'error'; this.message = e.message; this.emit();
+    }
+  }
+  async build(seq = ++this._seq, look = this.look()) {
+    const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': 'export const program = __jigPackage;', 'scene.js': look };
+    const r = await this.C.build(files, { scope: { __jigPackage: this.pkg } });
+    if (seq !== this._seq) return;
+    this.result = r; this._lookKey = look;
+    this.diags = [...(this.pkg.diagnostics ?? []).map((d) => ({ severity: d.level, code: d.kind, message: d.message, line: d.line })), ...(r.diags ?? [])];
+    if (!r.ok) { this.status = 'error'; this.message = r.error?.message ?? 'the look did not build'; this.emit(); return; }
+    this.loading = true; this.status = 'compiling'; this.emit();
+    const t0 = performance.now();
+    try { await this.vp.load(r.compiled, { time: 0 }); }
+    catch (e) { this.status = 'error'; this.message = `shader compile failed: ${e.message}`; this.emit(); return; }
+    finally { this.loading = false; }
+    this.loadMs = performance.now() - t0;
+    if (seq !== this._seq) return;
+    if (this.freeCam) this.vp.setView(this.freeCam);
+    this.status = 'ready'; this.message = null; this.emit();
+  }
+
+  // ---------- camera: orbit, pan and zoom about the target, Y up ----------
+  camera() {
+    if (this.freeCam) return this.freeCam;
+    const c = this.vp?.cam;
+    return c?.at && c?.target ? { at: c.at.slice(), target: c.target.slice() } : null;
+  }
+  orbit(dx, dy, mode = 'orbit') {
+    const base = this.camera(); if (!base) return;
+    const at = base.at.slice(), tgt = base.target.slice();
+    if (mode === 'pan') {
+      const f = V.norm(V.sub(tgt, at)), r = V.norm(V.cross(f, [0, 1, 0])), up = V.cross(r, f), d = V.len(V.sub(tgt, at)) * 0.0015;
+      const off = V.add(V.mul(r, -dx * d), V.mul(up, dy * d));
+      this.freeCam = { at: V.add(at, off), target: V.add(tgt, off) };
+    } else if (mode === 'zoom') {
+      this.freeCam = { at: V.add(tgt, V.mul(V.sub(at, tgt), Math.exp(dy * 0.0015))), target: tgt };
+    } else {
+      const v = V.sub(at, tgt), r = V.len(v);
+      let az = Math.atan2(v[0], v[2]), el = Math.asin(Math.max(-1, Math.min(1, v[1] / r)));
+      az -= dx * 0.006; el = Math.max(-1.45, Math.min(1.45, el + dy * 0.006));
+      this.freeCam = { at: [tgt[0] + r * Math.cos(el) * Math.sin(az), tgt[1] + r * Math.sin(el), tgt[2] + r * Math.cos(el) * Math.cos(az)], target: tgt };
+    }
+    this.vp?.setView(this.freeCam); this.emit();
+  }
+  resetCamera() { this.freeCam = null; this.vp?.setView(null); this.emit(); }
+
+  // ---------- picking: a CPU ray against the packed meshes ----------
+  pick(nx, ny) {
+    const vp = this.vp, C = this.C;
+    if (!vp?.packed || !vp.cam || !C?.rayMesh) return null;
+    const cam = vp.cam, ndc = [nx * 2 - 1, 1 - ny * 2];
+    const d = V.norm(V.add(cam.U4.slice(0, 3), V.add(V.mul(cam.U2.slice(0, 3), ndc[0]), V.mul(cam.U3.slice(0, 3), ndc[1]))));
+    const o = cam.U1.slice(0, 3), O = vp.packed.O, n = vp.packed.nObjs;
+    let best = Infinity, hit = null;
+    for (let k = 0; k < n; k++) {
+      const b = k * 24;
+      if (O[b] !== 13 || ((O[b + 3] | 0) & 1)) continue;          // meshes only, visible ones
+      const M = Array.from(O.subarray(b + 4, b + 16)), oi = O[b + 21] | 0, def = vp.compiled.objects[oi]?.def;
+      const h = def ? C.rayMesh(def, xfPoint(M, o), xfDir(M, d), best) : null;
+      if (h && h.t > 1e-6 && h.t < best) { best = h.t; hit = { object: oi, face: h.face }; }
+    }
+    const at = hit ? faceAt(vp.compiled, this.pkg, hit) : null;
+    this.picked = at ? { ...at, point: V.add(o, V.mul(d, best)) } : null;
+    this.emit();
+    return this.picked;
+  }
+
+  /** choose a material for faces: one .meta() line at the end of look.js's chain (look.js is created if absent) */
+  applyMeta(address, patch) {
+    const had = this.host.files.has(LOOK_FILE), text = this.look(), line = metaLine(address, patch);
+    const next = addToLook(text, line);
+    if (next == null) throw new Error(`look.js has no '${LOOK_MARK}' line with a chain ending in ';' under it; add this line to the chain yourself: ${line.trim()}`);
+    if (had) this.host.setFile(LOOK_FILE, next); else this.host.addFile(LOOK_FILE, next);
+    return line;
+  }
+}
+
+const HOSTS = new WeakMap();
+/** one RenderHost per workbench host */
+export const renderHostOf = (host) => {
+  let r = HOSTS.get(host);
+  if (!r) { HOSTS.set(host, (r = new RenderHost(host))); globalThis.jigRender = r; }   // for the console and the UI tests
+  return r;
+};

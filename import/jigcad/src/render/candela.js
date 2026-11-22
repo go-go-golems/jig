@@ -8,3 +8,4 @@ export { API, paramStore, formatDiag, compile } from '../../vendor/candela/src/e
 export { Viewport } from '../../vendor/candela/src/engine/viewport.ts';
 export { RenderQueue, runRender, passesToEXR, writeEXR, readEXR } from '../../vendor/candela/src/engine/output.ts';
 export { videoSupport } from '../../vendor/candela/src/engine/video.ts';
+export { rayMesh } from '../../vendor/candela/src/engine/mesh.ts';   // picking against CAD meshes (render/host.js)
