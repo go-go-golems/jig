@@ -335,7 +335,7 @@ The orientation decision reads like `lexicographic: support 0 mm³ → bed conta
 - `j.on(comp, sel)` as a joint end ✓: a bore's axis, a circular edge's centre, a planar face (faces meet face to face); `j.frame.on(j.on(…), { flip, at, offset })` adjusts it. Example: `.joint('pin', j.joint.revolute(), j.on('plate', j.sel.faces('%cylinder')), j.on('arm', j.sel.faces('%cylinder')))`.
 - `j.joint.revolute({ asBuilt: true })` ✓: an as-built joint: the components stay where their `at` puts them. Example: `.joint('h', j.joint.revolute({ asBuilt: j.on('base', j.sel.faces('%cylinder')) }), 'base', 'arm')`.
 - `j.joint.pinSlot({ limits, slideLimits })` ✓: turns about z and slides along x. Example: `.joint('pin', j.joint.pinSlot(), 'yoke:slot', 'crank:pin')`.
-- `.contact(ids)` ✓: a contact set; a drag stops where two of them would touch. Example: `.contact(['lid', 'stop'])`.
+- `.contact(ids)` ✓: a contact set; a drag stops where two of them would touch, however far past the obstacle the target is (each step is walked within the parts' clearance). Pairs touching when a drag starts may part. A flexible subassembly's sets join the parent's. Example: `.contact(['lid', 'stop'])`.
 
 ## The Program and exports
 

@@ -76,15 +76,22 @@ export function assembly(name = 'assembly') { return new Assembly(name, { compon
 
 function compileAssembly(asm, opts, { compilePart, finalize }) {
   const t0 = performance.now();
-  const { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech, eff } = solveAssembly(asm, opts, compilePart);
-  const o = eff.o;
+  // past the solve, the program reads the assembly only as expanded (eff: a flexible subassembly's joints, drives,
+  // readings and contact sets prefixed and merged, the tree of every subassembly): the declaration's own lists are
+  // not in scope to be read by mistake, only its name crosses
+  return programOf(asm.name, solveAssembly(asm, opts, compilePart), { t0, opts, finalize });
+}
+function programOf(name, solved, { t0, opts, finalize }) {
+  const { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech, eff } = solved;
+  const o = eff.o, subNodes = subassemblyNodes(eff.tree);
   // the count (Grübler–Kutzbach, from the joint kinds alone) and, beside it, what the solver found
   const mob = { ...mobility({ components: [...comp.keys()], joints: mech?.jointRefs ?? [] }), ...(mech?.mobility ?? {}) };
   if (mech?.mobility) { mob.solverDOF = mech.mobility.dof; mob.note = mech.mobility.redundant ? `${mech.mobility.redundant} joint equation(s) repeat the others: ${mech.mobility.redundantJoints.join(', ')} must stay exactly aligned in the real parts` : 'no joint equation repeats another'; }
   const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
-  const subOf = id => [...eff.subs.keys()].filter(s => id.startsWith(s + '/')).sort((a, b) => b.length - a.length)[0] ?? null;
-  const info = { name: asm.name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId, sub: subOf(id) })),
-    subassemblies: [...eff.subs.values()].map(S => ({ id: S.id, flexible: S.flexible, root: S.root, fixed: !!comp.get(S.root)?.fixed })),
+  // every subassembly, a rigid one's nested ones too: the tree is the one record of the product structure
+  const subOf = id => subNodes.map(n => n.id).filter(s => id.startsWith(s + '/')).sort((a, b) => b.length - a.length)[0] ?? null;
+  const info = { name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId, sub: subOf(id) })),
+    subassemblies: subNodes.map(S => ({ id: S.id, flexible: S.flexible, root: S.root, fixed: !!comp.get(S.root)?.fixed })),
     joints: o.joints.filter(j => !j.synthetic).map(j => ({ id: j.id, kind: j.kind, a: refText(j.a), b: refText(j.b), limits: limitsOf(j), slideLimits: slideLimitsOf(j), equations: equationCount(j.kind),
       slide: values.get(j.id)?.slide ?? null,
       value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false,
@@ -95,12 +102,12 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
     measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [],
     // the bill of materials nests by subassembly; prog.bom({ group: 'flat' }) lists the parts alone
     bom: bomOf(eff.tree.children) };
-  const prog = finalize({ kind: 'assembly', name: asm.name, parts, t0, opts, assembly: info, occurrences, placements,
+  const prog = finalize({ kind: 'assembly', name, parts, t0, opts, assembly: info, occurrences, placements,
     extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace,
     extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
   prog.bom = (bo = {}) => (bo.group === 'flat' ? flatBom(info.bom) : info.bom);
   // the product structure (STEP export): parts and subassemblies with their placements now
-  prog.structure = () => structureOf(eff, comp, asm.name); prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
+  prog.structure = () => structureOf(eff.tree, comp, name); prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
   // compile the solved mechanism to a kine program (spec M7): { source, observe, notes, input }
   prog.kine = (ko = {}) => { if (!mech?.solver) throw new Error('kine: no solved mechanism'); return toKine(mech.solver, info, ko); };
   // drag to pose: { ref: 'comp:port', to: [x, y, z] } → the pose the joints allow nearest the target, the component
@@ -112,19 +119,14 @@ function compileAssembly(asm, opts, { compilePart, finalize }) {
     const home = S.pose;
     if (dragged && !reset) S.pose = dragged;
     try {
-      // contact sets: a step that makes a new pair touch is not taken (pairs already touching may move apart)
-      const order = [...comp.keys()], pairs = contactPairs(asm.o.contacts, order);
-      let blocked = null, stoppedBy = null;
-      if (pairs.length) {
-        const touching = () => { const T = S.transforms(); return pairs.filter(([a, b]) => pairGap(comp.get(a), comp.get(b), T[order.indexOf(a)], T[order.indexOf(b)], 0.05, false) < 1e-6).map(p => p.join('–')); };
-        const before = new Set(touching());
-        blocked = () => { const now = touching().filter(k => !before.has(k)); if (now.length) stoppedBy = now; return now.length > 0; };
-      }
-      const ok = S.drag(ref, to, { blocked });
-      const T = S.transforms(), ids = [...comp.keys()];
+      // contact sets, the expanded assembly's (a flexible subassembly's own come prefixed): the drag walks each step
+      // within the clearance, so it stops where a pair would touch, however far the target lies
+      const ids = [...comp.keys()];
+      const ok = S.drag(ref, to, { guard: contactGuard(comp, ids, o.contacts) });
+      const T = S.transforms();
       const out = { ok, transforms: Object.fromEntries(ids.map((id, i) => [id, T[i]])), ports: S.portFrames(), joints: S.jointValues(),
         overrides: Object.fromEntries(S.holds().map(h => [h.id, `${+h.shown.toFixed(4)} ${h.unit}`])), at: S.world(S.port(ref)).P,
-        limits: S.limited ?? [], contacts: stoppedBy ?? [] };
+        limits: S.limited ?? [], contacts: S.touched ?? [] };
       if (ok) dragged = S.pose;
       return out;
     } finally { S.pose = home; }
@@ -559,6 +561,36 @@ function contactPairs(sets, ids) {
   }
   return out;
 }
+// Contact sets as a drag sees them (MechanismSolver.drag's guard). A check of the pose a step ends at cannot see a
+// part that passed through another on the way, so the guard speaks of motions instead: at(T) measures the clearance of
+// each pair at a pose, room(at, T) how much of it the motion from there to T uses, and a drag only takes a piece of a
+// step whose travel fits inside the clearance where the piece starts (conservative advancement). The clearance is a
+// lower bound: the boxes' gap when they are apart by more than NEAR, the meshes' gap within it; the travel an upper
+// one: how far a corner of a part's box moves, the two parts' summed. Pairs that touch when the drag starts may part.
+const NEAR = 1, TOUCH = 1e-3, SAFE = 0.9;
+function contactGuard(comp, ids, sets) {
+  const pairs = contactPairs(sets, ids);
+  if (!pairs.length) return null;
+  const index = new Map(ids.map((id, i) => [id, i]));
+  const corners = new Map([...new Set(pairs.flat())].map(id => [id, comp.get(id).res.state.bodies.flatMap(b => { const bb = b.bbox(); return [0, 1].flatMap(i => [0, 1].flatMap(k => [0, 1].map(l => [bb[i][0], bb[k][1], bb[l][2]]))); })]));
+  const gap = ([a, b], T) => {
+    const A = comp.get(a), B = comp.get(b), TA = T[index.get(a)], TB = T[index.get(b)];
+    let g = Infinity;
+    for (const x of A.res.state.bodies) for (const y of B.res.state.bodies) {
+      const bg = boxGapOf(worldBox(x.bbox(), TA), worldBox(y.bbox(), TB));
+      g = Math.min(g, bg > NEAR ? bg : Math.min(NEAR, meshGapNear(meshTris(meshBody(x), TA), meshTris(meshBody(y), TB), NEAR)));
+    }
+    return g;
+  };
+  const travel = (id, Ta, Tb) => { const i = index.get(id); let m = 0; for (const c of corners.get(id)) m = Math.max(m, V.len(V.sub(K.matApply(Tb[i], c), K.matApply(Ta[i], c)))); return m; };
+  let live = pairs;
+  return {
+    start(T) { live = pairs.filter(p => gap(p, T) >= TOUCH); return live.length > 0; },
+    at(T) { const gaps = live.map(p => gap(p, T)); return { T, gaps, touching: live.filter((p, k) => gaps[k] < TOUCH).map(p => p.join('–')) }; },
+    // ≥ 1: the motion from the measured pose to T fits; below, the share of it that would
+    room(at, T) { let r = Infinity; live.forEach((p, k) => { const t = travel(p[0], at.T, T) + travel(p[1], at.T, T); if (t > 0) r = Math.min(r, SAFE * at.gaps[k] / t); }); return r; },
+  };
+}
 
 // a joint end: 'comp:port' | 'comp' (as-built) | j.on(comp, sel) | j.frame.on(j.on(comp, sel), { flip, at, offset })
 function parseEnd(ref) {
@@ -659,7 +691,7 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
         walk(c.item, id, Ts, sn, { ...(c.item.o.params ?? {}), ...(c.item.o.overrides ?? {}) });
         gather(c.item, id);
         const root = `${id}/${rootOf(c.item)}`;
-        subs.set(id, { id, flexible, root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) });
+        subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
         continue;
       }
       // rigid: its own solve, with the parent's values for '<sub>/…' as its overrides
@@ -671,7 +703,9 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
         comps.set(gid, { c: { ...X.c, id: gid }, res: X.res, T: T0, T0, level: id });
         parts.push({ name: gid, part: X.c.item, res: X.res });
       }
-      sn.children = prefixTree(r.eff.tree.children, id);
+      // its tree whole, nested subassemblies and all, as this level names and places them (structure only: it moves
+      // as one body here, so none of them is solved or fixed again)
+      sn.children = nestTree(r.eff.tree.children, id, Ts);
       const root = `${id}/${r.groundId}`;
       for (const cid of r.comp.keys()) {
         const gid = `${id}/${cid}`; if (gid === root) continue;
@@ -679,7 +713,7 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
         presetPorts.push({ cid: gid, name: '@rigid', m: K.IDENTITY.slice() });
         extra.joints.push({ id: `${id}/(rigid ${cid})`, kind: 'rigid', group: '{e}', dof: 0, a: `${root}:@rigid~${cid}`, b: `${gid}:@rigid`, opts: {}, synthetic: true, level: id });
       }
-      subs.set(id, { id, flexible, root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root).T0) });
+      subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root).T0) }));
       for (const [k, v] of Object.entries(r.mech?.studies ?? {})) childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}` };
       for (const rep of r.mech?.reports ?? []) childOut.reports.push({ ...rep, name: `${id}/${rep.name}` });
       for (const [k, v] of Object.entries(r.mech?.measures ?? {})) childOut.measures[`${id}/${k}`] = v;
@@ -722,9 +756,15 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
     couples: [...extra.couples, ...(own.couples ?? [])], measures: [...extra.measures, ...(own.measures ?? [])], events: [...extra.events, ...(own.events ?? [])],
     studies: [...extra.studies, ...(own.studies ?? [])], sweeps: [...extra.sweeps, ...(own.sweeps ?? [])], reports: [...extra.reports, ...(own.reports ?? [])],
     contacts: [...extra.contacts, ...(own.contacts ?? [])] };
-  return { o, comps, parts, subs, tree, presetPorts, childOut, groundId };
+  return { o, comps, parts, tree, presetPorts, childOut, groundId };
 }
-const prefixTree = (nodes, p) => nodes.map(n => ({ ...n, id: `${p}/${n.id}`, ...(n.children ? { children: prefixTree(n.children, p) } : {}) }));
+// The tree is the one record of the product structure: a subassembly's node carries its root, its placement Ts and
+// rootLocal (its frame in its root's), and expandAssembly's `subs` indexes those same nodes for the ones this level
+// solves (and may fix); nothing else keeps a copy to fall out of step with it. A rigid child's tree comes whole:
+// ids and roots under its prefix, placements in this level's frame.
+const nestTree = (nodes, p, Tp) => nodes.map(n => (n.kind === 'part' ? { ...n, id: `${p}/${n.id}` }
+  : { ...n, id: `${p}/${n.id}`, root: `${p}/${n.root}`, level: n.level ? `${p}/${n.level}` : p, Ts: K.matMul(Tp, n.Ts), children: nestTree(n.children, p, Tp) }));
+const subassemblyNodes = node => node.children.flatMap(n => (n.kind === 'assembly' ? [n, ...subassemblyNodes(n)] : []));
 // a joint end of a subassembly, as the parent names it
 function reroot(e, prefix) {
   if (e == null || e === true) return e;
@@ -757,12 +797,12 @@ const bomOf = nodes => nodes.map(n => (n.kind === 'part' ? { item: n.item, id: n
 const flatBom = rows => rows.flatMap(r => (r.kind === 'assembly' ? flatBom(r.children) : [r]));
 // { name, children: [{ kind: 'part', id, name, T, shapes } | { kind: 'assembly', id, name, T, children }] }, every T in
 // the world; a subassembly's T is where its root now puts its frame
-function structureOf(eff, comp, name) {
+function structureOf(tree, comp, name) {
   const node = n => {
     if (n.kind === 'part') { const X = comp.get(n.id); return { kind: 'part', id: n.id, name: n.item, T: X.T, res: X.res }; }
-    const S = eff.subs.get(n.id), R = comp.get(S.root);
-    const T = R ? K.matMul(R.T, K.matInverse(S.rootLocal)) : S.Ts;
+    const R = comp.get(n.root);
+    const T = R ? K.matMul(R.T, K.matInverse(n.rootLocal)) : n.Ts;
     return { kind: 'assembly', id: n.id, name: n.item, T, children: n.children.map(node) };
   };
-  return { name, children: eff.tree.children.map(node) };
+  return { name, children: tree.children.map(node) };
 }

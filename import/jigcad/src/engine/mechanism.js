@@ -359,11 +359,16 @@ export class MechanismSolver {
   // drag to pose (spec M8, as in sketch drag): move a port's origin toward a target with the drives released and the
   // joints and couplings kept. Least squares with the joint rows weighted, then a minimum-norm solve back onto the
   // joints, so the pose is the closest one the joints allow. → true when the joints hold
+  // o.guard (contact sets: { start(T), at(T), room(at, T) }, assembly.js contactGuard) speaks of motions, not poses:
+  // a step is walked from its start in pieces, each taken only when its travel fits the clearance where it starts,
+  // so no step can carry a part through another however far the target is; this.touched names the pairs that stopped it
   drag(ref, target, o = {}) {
     const P = this.port(ref);
     if (!P) throw new Error(`drag: no port '${ref}'`);
+    this.touched = [];
     if (this.bodies[P.bi].ground) return false;
-    const saved = this.drives, start = this.pose, w = o.weight ?? 1e3, blocked = o.blocked ?? (() => false);
+    const saved = this.drives, start = this.pose, w = o.weight ?? 1e3;
+    let guard = o.guard ?? null;
     this.drives = new Map(); this.clamps = new Map();
     const dist = () => len(sub(this.world(P).P, target));
     // back onto the joints, inside every limit: a joint that would pass one is held at it from then on (a clamp row)
@@ -376,22 +381,51 @@ export class MechanismSolver {
       }
       return false;
     };
+    // conservative advancement along the step dx·k from p0 (fraction 0) to its end (fraction 1): a piece is kept when
+    // the guard finds its travel inside the clearance measured where it starts, else cut to the share that fits.
+    // → { t: the fraction reached, touching: the pairs that stopped it }, with the pose left at t
+    const walk = (p0, c0, dx, k) => {
+      this.pose = p0; this.clamps = new Map(c0);
+      let t = 0, at = guard.at(this.transforms()), keep = { pose: p0, clamps: new Map(c0) };
+      for (let n = 0; t < 1 && !at.touching.length && n < 64; n++) {
+        let t1 = 1, fits = false;
+        for (let h = 0; h < 40 && t1 - t > 1e-9; h++) {
+          this.pose = p0; this.clamps = new Map(c0); this.apply(dx, k * t1);
+          if (!admit()) { t1 = t + (t1 - t) / 2; continue; }
+          const room = guard.room(at, this.transforms());
+          if (room >= 1) { fits = true; break; }
+          t1 = t + (t1 - t) * 0.95 * room;
+        }
+        if (!fits) break;
+        t = t1; keep = { pose: this.pose, clamps: new Map(this.clamps) }; at = guard.at(this.transforms());
+      }
+      this.pose = keep.pose; this.clamps = keep.clamps;
+      return { t, touching: at.touching };
+    };
     // a step along the joints' tangent space (least squares, joint rows weighted), then back onto them; a step is
-    // kept when the port ends nearer the target and no contact pair touches (o.blocked), else halved
+    // kept when the port ends nearer the target (walked by the guard when there is one), else halved
     let ok = admit(), d0 = dist();
+    if (ok && guard && !guard.start(this.transforms())) guard = null;   // every pair touches already: nothing to guard
     for (let it = 0; ok && it < (o.iters ?? 40) && d0 > 1e-7; it++) {
       const { F, J } = this.system('all'), p = this.world(P), d = sub(p.P, target);
       const rows = F.map((f) => f * w), Jw = J.map((g) => g.map((x) => x * w));
       for (let k = 0; k < 3; k++) { const e = [0, 0, 0]; e[k] = 1; const g = new Array(this.n).fill(0); this.addW(g, P.bi, cross(p.r, e)); this.addV(g, P.bi, e); Jw.push(g); rows.push(d[k]); }
       const dx = minNormStep(Jw, rows, this.n), p0 = this.pose, c0 = new Map(this.clamps);
-      let k = 1, moved = false;
+      let k = 1, moved = false, stop = null;
       for (let h = 0; h < 10; h++) {
         this.apply(dx, k);
-        if (admit() && dist() < d0 - 1e-12 && !blocked()) { moved = true; break; }
+        if (admit() && dist() < d0 - 1e-12) {
+          if (!guard) { moved = true; break; }
+          const wk = walk(p0, c0, dx, k);
+          stop = wk.touching.length ? wk.touching : null;
+          if (wk.t > 0 && dist() < d0 - 1e-12) { moved = true; break; }
+          if (stop || wk.t === 0) break;   // a shorter step would meet the same contact, or fit no better
+        }
         this.pose = p0; this.clamps = new Map(c0); k /= 2;
       }
-      if (!moved) break;
-      const d1 = dist(); if (d0 - d1 < 1e-11) { d0 = d1; break; } d0 = d1;
+      if (stop) this.touched = stop;
+      if (!moved) { this.pose = p0; this.clamps = new Map(c0); break; }
+      const d1 = dist(); if (stop || d0 - d1 < 1e-11) { d0 = d1; break; } d0 = d1;
     }
     this.limited = [...this.clamps.keys()];
     this.drives = saved; this.clamps = null;

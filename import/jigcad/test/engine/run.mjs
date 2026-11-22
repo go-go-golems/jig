@@ -986,7 +986,28 @@ return j.assembly('box')
   const c = await call('dragPose', { ref: 'lid:front', to: [0, 60, -10], reset: true });
   const deg = parseFloat(c.overrides.h);
   assert(c.ok && deg > 90 && deg < 100 && c.contacts.join() === 'lid–stop' && !c.limits.length, `contact: ${JSON.stringify(c.overrides)} ${c.contacts}`);
-  return `held at 110°, ${lim.length} study rows past it, drag stops at ${a.overrides.h}; contact at ${c.overrides.h}`;
+  // a target past the stop: the drag walks the step within the clearance, so it stops at the stop rather than
+  // jumping through it (a 2 mm slider block, a 2 mm stop at z = 10: contact at z = 8)
+  const SLIDE = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const line = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const slide = j.assembly('slide')
+  .add('rail', box('rail').port('line', line), { ground: true }).add('slider', box('slider').port('line', line))
+  .add('stop', box('stop'), { at: j.tx.move(0, 0, 10) })
+  .joint('s', j.joint.slider(), 'rail:line', 'slider:line')
+  .contact(['slider', 'stop'])
+`;
+  await compile(SLIDE + 'return slide');
+  const z = async (ref, to) => { const r = await call('dragPose', { ref, to, reset: true }); return { z: r.at[2], contacts: r.contacts.join() }; };
+  const near8 = (r, pair) => r.z > 7.99 && r.z <= 8 && r.contacts === pair;
+  const d10 = await z('slider:line', [0, 0, 10]), d20 = await z('slider:line', [0, 0, 20]), d100 = await z('slider:line', [0, 0, 100]);
+  assert(near8(d10, 'slider–stop') && near8(d20, 'slider–stop') && near8(d100, 'slider–stop'), `past the stop: ${JSON.stringify([d10, d20, d100])}`);
+  const back = await call('dragPose', { ref: 'slider:line', to: [0, 0, 4] });   // from the contact: the pair may part
+  assert(back.ok && Math.abs(back.at[2] - 4) < 1e-6 && !back.contacts.length, `back from the stop: ${back.at} ${back.contacts}`);
+  // the same slide as a flexible subassembly: its contact set comes prefixed into the parent's drag
+  await compile(SLIDE + `return j.assembly('top').add('base', box('base'), { ground: true, at: j.tx.move(50, 0, 0) }).add('sub', slide, { flexible: true })`);
+  const fx = await z('sub/slider:line', [0, 0, 20]);
+  assert(near8(fx, 'sub/slider–sub/stop'), `flexible: ${JSON.stringify(fx)}`);
+  return `held at 110°, ${lim.length} study rows past it, drag stops at ${a.overrides.h}; contact at ${c.overrides.h}; a drag to z = 100 stops at ${d100.z.toFixed(4)}`;
 });
 
 await test('54 assembly: joint ends picked on geometry (a bore’s axis, a planar face) and as-built joints', async () => {
@@ -1056,6 +1077,19 @@ await test('55 assembly: subassemblies (flexible and rigid), a nested bill of ma
   const nauo = (ex.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length;
   assert(['machine', 'wheel drive', 'bracket', 'frame', 'p2'].every(n => prods.includes(n)) && prods.length === 9 && nauo === 8 && !/DOCUMENT/.test(ex.data), `products ${prods}, ${nauo} usages`);
   assert(/product structure: 8 components, 2 subassemblies/.test(ex.report.kept.join()), ex.report.kept.join('; '));
+  // a rigid subassembly nested in a rigid one: the tree carries the inner one whole, placed as the parent moves it
+  const nest = await compile(`const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const pivot = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const inner = j.assembly('inner').add('p', box('p'), { ground: true }).add('r', box('r'), { at: j.tx.move(0, 3, 0) })
+const outer = j.assembly('outer').add('k', box('k').port('pivot', pivot), { ground: true }).add('inner', inner, { at: j.tx.move(5, 0, 0) })
+return j.assembly('top').add('base', box('base').port('pivot', pivot), { ground: true }).add('outer', outer, { at: j.tx.move(0, 20, 0) })
+  .joint('swing', j.joint.revolute(), 'base:pivot', 'outer/k:pivot').drive('swing', deg(90))`);
+  assert(errs(nest).length === 0 && nest.assembly.subassemblies.map(x => x.id).join() === 'outer,outer/inner' && nest.assembly.components.find(c => c.id === 'outer/inner/r').sub === 'outer/inner', `nested: ${JSON.stringify(nest.assembly.subassemblies)}`);
+  const st = W.currentProgram().structure(), oi = st.children[1].children[1];
+  const at = n => [n.T[12], n.T[13], n.T[14]];
+  assert(oi.id === 'outer/inner' && Math.hypot(...at(oi).map((x, k) => x - [0, 5, 0][k])) < 1e-9 && Math.hypot(...at(oi.children[1]).map((x, k) => x - [-3, 5, 0][k])) < 1e-9, `outer/inner at ${at(oi)}, its r at ${at(oi.children[1])}`);
+  const nx = await exp('step', {});
+  assert(/exact B-rep \(4 parts\); product structure: 6 components, 2 subassemblies/.test(nx.report.kept.join("; ")) && (nx.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length === 6, nx.report.kept.join('; '));
   return `spin ${J('drive/spin').toFixed(1)}°, bracket drop ${A.reports.find(r => r.name === 'bracket/drop').value.toFixed(3)} mm; STEP ${prods.length} products, ${nauo} usages`;
 });
 
