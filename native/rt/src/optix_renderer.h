@@ -27,6 +27,7 @@ class OptixRenderer {
   std::vector<float> readAccum();
   std::vector<float> readAlbedo();
   double buildMs() const { return buildMs_; }
+  double pipelineMs() const { return pipelineMs_; }   // optixModuleCreate (OptiX-IR → GPU code) + pipeline
   size_t gasBytes() const { return gasBytes_; }
   std::string log() const { return log_; }
 
@@ -45,7 +46,7 @@ class OptixRenderer {
   size_t capU_ = 0, capO_ = 0, capLI_ = 0, capBV_ = 0, capSD_ = 0, capAO_ = 0;
   std::vector<CUdeviceptr> asBuffers_;
   OptixTraversableHandle ias_ = 0;
-  double buildMs_ = 0;
+  double buildMs_ = 0, pipelineMs_ = 0;
   size_t gasBytes_ = 0;
   std::string log_;
 };

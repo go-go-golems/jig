@@ -60,3 +60,12 @@ Phase 2: wgsl2cuda + plain-CUDA target in candela-rt; 105/105 compile with NVRTC
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/cuda_runner.cpp — NVRTC compile and driver-API launch
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/wgsl2cuda.ts — WGSL to CUDA translator with side-effect sequencing
+
+## 2026-11-21
+
+Phase 3: OptiX target (RT-core traversal under the translated kernel); 104/105 presets look the same as WebGPU; --backend auto picks OptiX for meshes/many objects: 3.8-12.9x faster than Dawn
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/optix_renderer.cpp — OptiX pipeline, GAS/IAS builds, launch
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/targets/optix.ts — OptiX build inputs from pack

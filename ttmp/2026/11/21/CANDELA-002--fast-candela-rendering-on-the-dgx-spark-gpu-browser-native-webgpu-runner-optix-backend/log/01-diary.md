@@ -964,3 +964,108 @@ the @codex review review?"
 
 ### What should be done in the future
 - Work continues on `candela-rt`; read Codex's review comments on PR #1 and address them.
+
+## Step 16: Phase 3 — the OptiX target: RT-core traversal under the unchanged translated kernel
+
+Phase 3 swaps one function of the translated program, `traceAll` (the walk over Candela's top-level BVH), for
+`optixTrace` on the RT cores, and leaves everything else — `hitObj`, `finishHit`, materials, lights, the path loop —
+as translated. The user also re-set the goal mid-step: renders must *look* the same as the WebGPU prototype, not match
+per pixel, and Candela may diverge where OptiX offers something better.
+
+### Prompt Context
+**User prompt (verbatim):** "close trellis-bench. then when the servers are running, continue with phase 3-6"; later
+"wedon't need matches to be all that close, we care about the looks" and "this was a first prototype (the webgpu,
+glsl etc...) anyway, since we use a different engine, that's fine if it allows us to benefit from improvements and
+things don't look drrastically different. What of optix are we using? commit at appropriate intervals and keep a
+detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Stop trellis-bench (port 8090), serve the parity gallery and the workbench on
+bling.local, then implement phases 3–6; judge parity visually; report which OptiX features are in use.
+**Inferred user intent:** A faster renderer whose images look like the workbench's, with room to use OptiX's features.
+**Commit (code):** `9ebcbee` (OptiX target), the commit after this entry (sweep, gallery, timings).
+
+### What I did
+- Servers: stopped `trellis-bench` (pid 1674386, `--addr 0.0.0.0:8090`); `python3 -m http.server 8090 --bind 0.0.0.0
+  --directory build/parity-gallery` (gallery from `scripts/parity-gallery.ts`); `npx vite --host 0.0.0.0 --port 5173`
+  — Vite answered 403 to `Host: bling.local` until `server.allowedHosts` listed bling's names (`vite.config.ts`).
+- Read the contracts the shim must keep: `hitMesh` records `gTri` = scene-data row of the 7-row triangle record and
+  `gBary`; it ignores hits with t ≤ EPS; `pack` writes O rows `[ty, mat, light, flags] [M⁻¹ (3 rows)] [pr]
+  [irand, objectIndex, motionBase+1, bound]` and relative poses `P_k = M_k·M_c⁻¹` for moving objects.
+- `pack` also returns `boxes` (world box per packed object, swept when moving; NaN for unbounded) and `nBounded`.
+- `src/engine/targets/optix.ts` (`optixScene`): GAS input per mesh definition from `blasOf(def).tris` in record order
+  (v0, v0+e1, v0+e2); instance per mesh object (transform = `P.mats[oi]`, id = O index, mask 1|2, glowing → 1);
+  AABB per bounded analytic object (padded by 1e-4 relative); motion base of moving meshes cleared in a copy of O.
+- `native/rt/kernels/candela_traversal.inc`: `traceAll` member — loop over unbounded planes, then `optixTrace`
+  (tmin = EPS, shadow rays mask 2 + terminate on first hit), payload 0–7 (t, object, primitive, barycentrics, gTau,
+  gTime, shadow flag); sets `gTri = pr.y + 7·primitive`, `gBary`.
+- `candela_optix_programs.cuh`: raygen = WebGPU main; triangle CH; analytic IS = translated `hitObj` on the world
+  ray with a fresh `Kernel` carrying gTau/gTime from the payload; analytic CH; empty miss.
+- `optix_renderer.{h,cpp}`: OptiX context on the driver-API context, module from NVRTC OptiX-IR, 4 program groups,
+  stack sizes, SBT (hit records: triangle, analytic), GAS/IAS builds with compaction, launch per frame.
+- `candela-rt render --backend optix`, `cuda-sweep --backend optix`, `--no-motion-blur` (both renderers),
+  `parity-sweep.ts --backend optix`, an 8×8-block luminance metric in `compare-pfm.ts` and the gallery.
+
+### Why
+- Keeping `traceAll`'s contract means the OptiX target reuses every line of shading code; only traversal changes.
+
+### What worked
+- First compile of K-09's OptiX program with nvcc (2.7 s, only unused-variable warnings) and first OptiX render of
+  B-01: 100 % of pixels within 0.1 % of WebGPU at 1 spp, albedo AOV too.
+- K-09 (34 meshes, 23,701 triangles): 99.9 % of pixels within 0.1 % at 1 spp — OptiX triangles + the shim reproduce
+  `hitMesh`'s `gTri`/`gBary`.
+- `cuda-sweep --backend optix`: 105/105 compile to OptiX-IR (2.0 s mean, 3.4 s max) and create pipelines.
+- 64-spp sweep, all presets: 104/105 look the same (displayed 8×8 blocks within 2 % of white); F-03's Voronoi cells
+  take different colours (the sine hash). Gallery: http://bling.local:8090/optix/ (and /cuda/ for phase 2).
+- Register limit: `maxRegisterCount = 255` took K-09 from 2.9 s (OptiX default, 128) to 0.75 s; OptiX then beats
+  plain CUDA on meshes (K-09 0.74 s vs 0.97 s) and many objects (X-02 1.14 s vs 2.0 s).
+- `--backend auto` (default): OptiX when the scene has meshes or > 64 analytic objects, plain CUDA otherwise. At
+  960×540, 256 spp against Dawn: B-01 3.8×, K-09 7.0×, X-02 12.9×, V-04 1.7× (`various/16-phase3-optix.txt`).
+
+### What didn't work
+- X-02 (10,000 spheres): 91.6 % of pixels within 0.1 % at 1 spp although the plain-CUDA target matches 100 % and the
+  albedo AOV matches 99.9 %. Secondary paths diverge on the silhouettes of tiny spheres; the intersection program is
+  compiled by OptiX's backend from OptiX-IR, so its float arithmetic is not bit-identical to the cubin. At 64 spp the
+  mean agrees to 0.006 % and 8×8 blocks to 0.99 % — it looks the same.
+
+- OptiX at its default register limit was *slower* than plain CUDA on every scene but X-02 (B-01 904 ms vs 141, K-09
+  2,863 vs 973, V-04 7,569 vs 4,671).
+- Keeping the translated BVH walk inside the OptiX program for small scenes (`traceAllBVH`, chosen per scene) helped
+  B-01 (173 ms) but not V-04 (7.7 s) and slowed K-09 to 929 ms (bigger raygen); reverted in favour of choosing the
+  target per scene.
+- The first linear "block" metric flagged X-03 (584 %), V-04 and S-02, which look identical: a few fireflies (X-03's
+  sun glint on the sea) dominate linear differences. The metric is now computed on tone-mapped display values.
+- A Bash call with `rm -rf` was rejected by the user ("use python for dangerous commands like that"); deletions now
+  go through a Python script with explicit, checked targets (saved as a memory).
+
+### What I learned
+- Per-pixel identity is the wrong bar between compilers; the user confirmed "looks" is the bar.
+- Running the whole path tracer in the raygen program makes every `optixTrace` save and restore a lot of live
+  state; the RT cores win only where traversal dominates (meshes, thousands of objects). For compute-heavy scenes
+  with few objects (volumes), OptiX's compilation of the shading code is slower than NVRTC's cubin even without
+  traces in the hot loop.
+
+### What was tricky to build
+- The IS program runs outside the raygen's `Kernel`, so per-thread state `hitObj` reads (gTau for motion poses,
+  gTime for animated fields) travels in the payload.
+
+### What warrants a second pair of eyes
+- Moving meshes lose motion blur on OptiX (phase 6: SRT motion transforms).
+- AABB padding (1e-4 relative) is a guess; too small would drop hits at box faces.
+- `AUTO_OPTIX_MIN_OBJECTS = 64` is set from two data points (B-01, X-02); presets with 64–1,000 analytic objects
+  have not been timed.
+- OptiX module compiles take 8–17 s the first time at 255 registers; fine offline, slow for live structure edits.
+
+### What should be done in the future
+- Reduce per-trace cost: shader execution reordering (`optixTraverse`/`optixReorder`/`optixInvoke`), built-in sphere
+  primitives instead of the generic intersection program, smaller live state across traces.
+- The OptiX denoiser (AOV model with albedo and normal guides) — the largest visible improvement at low spp.
+- Phase 4 (sequences, EXR, video) and phase 5 (live server).
+
+### Code review instructions
+- `src/engine/targets/optix.ts`, `src/engine/headless.ts` ('auto'), `native/rt/kernels/candela_traversal.inc`,
+  `candela_optix_programs.cuh`, `native/rt/src/optix_renderer.cpp`, `cmdRender` in `main.cpp`.
+- Validate: `./build/rt/candela-rt cuda-sweep --backend optix` (105/105), `npx tsx scripts/parity-sweep.ts --backend
+  optix --no-motion-blur --spp 64` then `npx tsx scripts/parity-gallery.ts --in build/parity-sweep --out
+  build/parity-gallery/optix`.
+
+### Technical details
+- Evidence: `various/16-phase3-optix.txt`, `16-parity-optix-64spp.log`, `16-optix-compile-sweep.json`.

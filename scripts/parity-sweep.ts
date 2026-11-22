@@ -36,7 +36,7 @@ async function main() {
       const c = compare(readPFM(base + '.wgsl.pfm'), readPFM(`${base}.${backend}.pfm`));
       if (c.within0_1pct < 0.99 || Math.abs(c.meanRelDiff) > 0.01) sideBySide(readPFM(base + '.wgsl.pfm'), readPFM(`${base}.${backend}.pfm`), base + '.cmp.png');
       rows.push({ id: p.id, ...c, wgslMs: +r.meta.renderMs, cudaMs: cm.renderMs });
-      console.log(`${p.id.padEnd(6)} blocks ${(c.blockRelRMSE * 100).toFixed(2).padStart(6)} %  within 0.1 %: ${(c.within0_1pct * 100).toFixed(1).padStart(5)} %  within 1 %: ${(c.within1pct * 100).toFixed(1).padStart(5)} %  mean ΔL ${(c.meanRelDiff * 100).toFixed(3).padStart(7)} %  relRMSE ${(c.relRMSE * 100).toFixed(2).padStart(7)} %${c.nonFinite ? '  NON-FINITE ' + c.nonFinite : ''}${log.includes('error') ? '  ' + log.trim() : ''}`);
+      console.log(`${p.id.padEnd(6)} display ${(c.displayBlockRMSE * 100).toFixed(2).padStart(5)} %  within 0.1 %: ${(c.within0_1pct * 100).toFixed(1).padStart(5)} %  within 1 %: ${(c.within1pct * 100).toFixed(1).padStart(5)} %  mean ΔL ${(c.meanRelDiff * 100).toFixed(3).padStart(7)} %  relRMSE ${(c.relRMSE * 100).toFixed(2).padStart(7)} %${c.nonFinite ? '  NON-FINITE ' + c.nonFinite : ''}${log.includes('error') ? '  ' + log.trim() : ''}`);
     } catch (e: any) {
       const msg = String(e.stderr || e.message || e).split('\n').slice(0, 3).join(' | ');
       rows.push({ id: p.id, error: msg } as any);
@@ -46,8 +46,8 @@ async function main() {
   fs.writeFileSync(path.join(out, 'parity.json'), JSON.stringify({ size, spp, time, backend, motionBlur: !noMb, rows }, null, 1) + '\n');
   const good = rows.filter(r => !r.error);
   const exact = good.filter(r => r.within0_1pct >= 0.99).length;
-  const looks = good.filter(r => r.blockRelRMSE <= 0.02 && Math.abs(r.meanRelDiff) <= 0.01).length;
-  console.log(`${good.length}/${rows.length} rendered on both; ${looks} look the same (8×8-block rel. RMSE ≤ 2 %, mean ΔL ≤ 1 %); ${exact} with ≥ 99 % of pixels within 0.1 %; worst mean ΔL ${(Math.max(...good.map(r => Math.abs(r.meanRelDiff))) * 100).toFixed(3)} %`);
+  const looks = good.filter(r => r.displayBlockRMSE <= 0.02).length;
+  console.log(`${good.length}/${rows.length} rendered on both; ${looks} look the same (displayed 8×8 blocks within 2 % of white, RMSE); ${exact} with ≥ 99 % of pixels within 0.1 %; worst mean ΔL ${(Math.max(...good.map(r => Math.abs(r.meanRelDiff))) * 100).toFixed(3)} %`);
   device.destroy();
 }
 

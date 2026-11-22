@@ -6,12 +6,15 @@ import { cudaSource, type CudaTranslation } from '../wgsl2cuda';
 import { digestString } from '../digest';
 
 export type CudaTargetKind = 'cuda' | 'optix';
+/** 'auto': the headless driver picks OptiX when the RT cores pay off (meshes, many objects), plain CUDA otherwise */
+export type CudaTargetChoice = CudaTargetKind | 'auto';
 export interface CudaProgram { source: string; hash: string; lines: number; functions: number; omitted: string[]; translateMs: number }
 
-const TARGETS: Record<CudaTargetKind, { omit: string[]; prelude: string; kernelPrelude: string; epilogue: string }> = {
+const TARGETS: Record<CudaTargetKind, { omit: string[]; renameDefs?: Record<string, string>; prelude: string; kernelPrelude: string; epilogue: string }> = {
   // plain CUDA: the translated traceAll walks Candela's own BVH; checks the translation in isolation
   cuda: { omit: [], prelude: '#include "candela_cuda_params.h"', kernelPrelude: '#include "candela_accessors.inc"', epilogue: '#include "candela_compute.cuh"' },
-  // OptiX: traceAll comes from the traversal shim (phase 3)
+  // OptiX: traceAll comes from the traversal shim (phase 3). (Keeping the BVH walk too, as traceAllBVH, made the raygen
+  // program larger and K-09 25 % slower; small scenes use the plain-CUDA target instead, see headless.ts 'auto'.)
   optix: { omit: ['traceAll'], prelude: '#include "candela_optix_params.h"', kernelPrelude: '#include "candela_accessors.inc"\n#include "candela_traversal.inc"', epilogue: '#include "candela_optix_programs.cuh"' },
 };
 

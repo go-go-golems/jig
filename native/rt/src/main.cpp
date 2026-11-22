@@ -301,9 +301,8 @@ static int cmdRender(int argc, char** argv) {
   const int sppTarget = std::stoi(arg(argc, argv, "--spp", "64"));
   const double time = std::stod(arg(argc, argv, "--time", "0"));
   const fs::path outDir = arg(argc, argv, "--out", "build/parity");
-  const std::string backend = arg(argc, argv, "--backend", "cuda");
-  if (backend != "cuda" && backend != "optix") { fprintf(stderr, "--backend cuda|optix\n"); return 1; }
-  const bool optix = backend == "optix";
+  const std::string requested = arg(argc, argv, "--backend", "auto");
+  if (requested != "cuda" && requested != "optix" && requested != "auto") { fprintf(stderr, "--backend auto|cuda|optix\n"); return 1; }
   const std::string kdir = kernelsDir(argc, argv);
   const int w = std::stoi(size.substr(0, size.find('x'))), h = std::stoi(size.substr(size.find('x') + 1));
   bool aov = false, noMotion = false;
@@ -320,10 +319,13 @@ static int cmdRender(int argc, char** argv) {
   size_t nFiles = 0, nBytes = 0;
   auto contentObj = readContent(rt, content, &nFiles, &nBytes);
   const auto t0 = std::chrono::steady_clock::now();
-  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"time\":" + std::to_string(time) + ",\"target\":\"" + backend + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + "}");
+  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"time\":" + std::to_string(time) + ",\"target\":\"" + requested + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + "}");
   auto hr = rt.call("Candela", "openRenderPreset", {contentObj, rt.str(id), opts});
   if (!rt.get(hr, "ok")->IsTrue()) { fprintf(stderr, "%s: %s\n", id.c_str(), rt.toStdString(rt.get(hr, "error")).c_str()); return 2; }
   auto H = hr.As<v8::Object>();
+  // the engine resolves 'auto': OptiX for meshes or many objects, plain CUDA otherwise (src/engine/headless.ts)
+  const std::string backend = rt.toStdString(rt.get(H, "target"));
+  const bool optix = backend == "optix";
   const double buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
   auto prog = rt.get(H, "cuda");
   const std::string source = rt.toStdString(rt.get(prog, "source")), hash = rt.toStdString(rt.get(prog, "hash"));
@@ -365,12 +367,12 @@ static int cmdRender(int argc, char** argv) {
   writePFM(base.string() + ".pfm", w, h, acc);
   if (aov) writePFM(base.string() + ".albedo.pfm", w, h, optix ? RO->readAlbedo() : RC->readAlbedo());
   const int regs = optix ? 0 : RC->registers(), local = optix ? 0 : RC->localBytes();
-  std::ofstream(base.string() + ".json") << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0) << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << time
+  std::ofstream(base.string() + ".json") << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0) << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << time
       << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
       << ",\"renderMs\":" << renderMs << ",\"jsMs\":" << jsMs << ",\"registers\":" << regs << ",\"localBytes\":" << local
       << ",\"sppPerSec\":" << spp * double(w) * h / (renderMs / 1000) << "}\n";
-  if (optix) printf("%s optix: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms) → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
-         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), RO->buildMs(), RO->gasBytes() / 1024.0, renderMs, jsMs, base.string().c_str());
+  if (optix) printf("%s optix: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, pipeline %.0f ms, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms) → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
+         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), RO->pipelineMs(), RO->buildMs(), RO->gasBytes() / 1024.0, renderMs, jsMs, base.string().c_str());
   else printf("%s cuda/nvrtc: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), %d regs, %d B local → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
          hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), renderMs, jsMs, regs, local, base.string().c_str());
   return 0;
@@ -381,7 +383,7 @@ int main(int argc, char** argv) {
     fprintf(stderr, "usage: candela-rt digest  [--bundle f] [--content dir] [--ids a,b] [--times 0,0.37] [--json out]\n"
                     "       candela-rt session [--bundle f] [--content dir] [--ids a,b] [--frames 48] [--fps 24] [--json out]\n"
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
-                    "       candela-rt render <id> [--backend cuda|optix] [--size WxH] [--spp n] [--time t] [--out dir] [--aov] [--no-motion-blur]\n");
+                    "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--out dir] [--aov] [--no-motion-blur]\n");
     return 1;
   }
   crt::JsRuntime::initProcess(argv[0]);

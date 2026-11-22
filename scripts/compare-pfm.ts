@@ -22,7 +22,7 @@ export function readPFM(file: string): PFM {
   return { w, h, rgb };
 }
 
-export interface Comparison { width: number; height: number; meanRef: number[]; meanCand: number[]; meanRelDiff: number; relRMSE: number; within0_1pct: number; within1pct: number; nonFinite: number; blockRelRMSE: number }
+export interface Comparison { width: number; height: number; meanRef: number[]; meanCand: number[]; meanRelDiff: number; relRMSE: number; within0_1pct: number; within1pct: number; nonFinite: number; blockRelRMSE: number; displayBlockRMSE: number }
 export function compare(a: PFM, b: PFM): Comparison {
   if (a.w !== b.w || a.h !== b.h) throw new Error(`size differs: ${a.w}x${a.h} vs ${b.w}x${b.h}`);
   const n = a.w * a.h, mA = [0, 0, 0], mB = [0, 0, 0];
@@ -51,9 +51,25 @@ export function compare(a: PFM, b: PFM): Comparison {
   }
   const nb = Math.max(1, bw * bh);
   const blockRelRMSE = Math.sqrt(bse / nb) / Math.max(bsum / nb, 1e-12);
+  // the same comparison on what is displayed: tone-mapped with one exposure from the reference (sideBySide's mapping),
+  // values 0…1, so a few very bright pixels cannot dominate it
+  const k = 0.18 / Math.max(meanL, 1e-6);
+  const disp = (x: number) => { const v = Math.max(0, x * k); const r = v / (1 + v); return r <= 0.0031308 ? 12.92 * r : 1.055 * Math.pow(r, 1 / 2.4) - 0.055; };
+  let dse = 0;
+  for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+    let da = 0, db = 0;
+    for (let y = by * B; y < by * B + B; y++) for (let x = bx * B; x < bx * B + B; x++) {
+      const i = (y * a.w + x) * 3;
+      da += disp(0.2126 * a.rgb[i] + 0.7152 * a.rgb[i + 1] + 0.0722 * a.rgb[i + 2]);
+      const yb = 0.2126 * b.rgb[i] + 0.7152 * b.rgb[i + 1] + 0.0722 * b.rgb[i + 2];
+      db += disp(Number.isFinite(yb) ? yb : 0);
+    }
+    dse += ((da - db) / (B * B)) ** 2;
+  }
+  const displayBlockRMSE = Math.sqrt(dse / nb);
   const meanRef = mA.map(v => v / n), meanCand = mB.map(v => v / n);
   const lum = (m: number[]) => 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2];
-  return { width: a.w, height: a.h, meanRef, meanCand, meanRelDiff: (lum(meanCand) - lum(meanRef)) / Math.max(lum(meanRef), 1e-12), relRMSE: Math.sqrt(se / n) / Math.max(meanL, 1e-12), within0_1pct: w01 / n, within1pct: w1 / n, nonFinite: bad, blockRelRMSE };
+  return { width: a.w, height: a.h, meanRef, meanCand, meanRelDiff: (lum(meanCand) - lum(meanRef)) / Math.max(lum(meanRef), 1e-12), relRMSE: Math.sqrt(se / n) / Math.max(meanL, 1e-12), within0_1pct: w01 / n, within1pct: w1 / n, nonFinite: bad, blockRelRMSE, displayBlockRMSE };
 }
 
 /** reference | candidate | difference×10, as a PNG through ffmpeg (8-bit PPM in between) */
@@ -84,7 +100,7 @@ function main() {
   const f = (v: number[]) => v.map(x => x.toPrecision(5)).join(', ');
   console.log(`${fa} vs ${fb}: ${r.width}x${r.height}`);
   console.log(`  mean RGB  ref (${f(r.meanRef)})  cand (${f(r.meanCand)})  luminance diff ${(r.meanRelDiff * 100).toFixed(3)} %`);
-  console.log(`  8×8-block rel. RMSE ${(r.blockRelRMSE * 100).toFixed(2)} % (what the eye compares)`);
+  console.log(`  displayed 8×8 blocks: RMSE ${(r.displayBlockRMSE * 100).toFixed(2)} % of white (what the eye compares); linear 8×8-block rel. RMSE ${(r.blockRelRMSE * 100).toFixed(2)} %`);
   console.log(`  rel. RMSE ${(r.relRMSE * 100).toFixed(2)} %;  pixels within 0.1 %: ${(r.within0_1pct * 100).toFixed(1)} %, within 1 %: ${(r.within1pct * 100).toFixed(1)} %;  non-finite ${r.nonFinite}`);
   if (typeof flags.png === 'string') { sideBySide(a, b, flags.png); console.log(`  → ${flags.png}`); }
   if (typeof flags.json === 'string') fs.writeFileSync(flags.json, JSON.stringify(r) + '\n');

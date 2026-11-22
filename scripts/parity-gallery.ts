@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadCatalogFromDisk } from '../src/content/node';
-import { readPFM, sideBySide } from './compare-pfm';
+import { readPFM, sideBySide, compare } from './compare-pfm';
 import { parseArgs } from './render-preset';
 
 const { flags } = parseArgs(process.argv.slice(2));
@@ -24,13 +24,15 @@ for (const r of sweep.rows) {
   const title = esc(titles.get(r.id) || '');
   if (r.error) { cards.push(`<article class="card bad"><h2>${r.id} <span>${title}</span></h2><p class="err">${esc(r.error)}</p></article>`); continue; }
   const img = `img/${r.id}-${backend}.png`;
-  sideBySide(readPFM(path.join(inDir, `${r.id}.wgsl.pfm`)), readPFM(path.join(inDir, `${r.id}.${backend}.pfm`)), path.join(outDir, img));
-  // "looks the same": blocks of 8×8 pixels agree to 2 % and the mean to 1 % (per-pixel agreement is not required)
-  const good = r.blockRelRMSE != null ? r.blockRelRMSE <= 0.02 && Math.abs(r.meanRelDiff) <= 0.01 : r.within0_1pct >= 0.99;
+  const A = readPFM(path.join(inDir, `${r.id}.wgsl.pfm`)), Bc = readPFM(path.join(inDir, `${r.id}.${backend}.pfm`));
+  sideBySide(A, Bc, path.join(outDir, img));
+  Object.assign(r, compare(A, Bc));   // metrics recomputed from the images, so older sweeps get the current ones
+  // "looks the same": displayed (tone-mapped) 8×8 blocks agree to 2 % of white, RMSE (per-pixel agreement not required)
+  const good = r.displayBlockRMSE <= 0.02;
   cards.push(`<article class="card ${good ? '' : 'diff'}" data-good="${good}">
   <h2>${r.id} <span>${title}</span></h2>
   <img src="${img}" loading="lazy" alt="${r.id}: WebGPU, CUDA, difference">
-  <dl><div><dt>8×8-block difference</dt><dd>${r.blockRelRMSE != null ? (r.blockRelRMSE * 100).toFixed(2) + ' %' : '–'}</dd></div>
+  <dl><div><dt>displayed difference (8×8 blocks)</dt><dd>${(r.displayBlockRMSE * 100).toFixed(2)} %</dd></div>
   <div><dt>pixels within 0.1 %</dt><dd>${(r.within0_1pct * 100).toFixed(1)} %</dd></div>
   <div><dt>mean luminance Δ</dt><dd>${(r.meanRelDiff * 100).toFixed(3)} %</dd></div>
   <div><dt>render WebGPU / ${BACKEND}</dt><dd>${r.wgslMs.toFixed(0)} / ${r.cudaMs.toFixed(0)} ms</dd></div></dl>
@@ -38,7 +40,7 @@ for (const r of sweep.rows) {
   process.stdout.write('.');
 }
 const rows = sweep.rows.filter((r: any) => !r.error);
-const exact = rows.filter((r: any) => (r.blockRelRMSE != null ? r.blockRelRMSE <= 0.02 && Math.abs(r.meanRelDiff) <= 0.01 : r.within0_1pct >= 0.99)).length;
+const exact = rows.filter((r: any) => r.displayBlockRMSE <= 0.02).length;
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Candela parity: ${BACKEND}</title>
@@ -56,7 +58,7 @@ dl { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 8px 0 0; } dl div { 
 </style></head><body>
 <header><h1>Candela: WebGPU vs ${BACKEND}</h1>
 <p>Each row: WebGPU (Dawn/Vulkan) · ${BACKEND}, the scene program translated by wgsl2cuda (candela-rt) · |difference| × 10. ${esc(sweep.size)}, ${sweep.spp} spp, t = ${sweep.time}${sweep.motionBlur === false ? ', motion blur off' : ''}.
-${exact}/${rows.length} presets look the same (8×8-block luminance within 2 %, mean within 1 %); cards with an orange border do not.</p>
+${exact}/${rows.length} presets look the same (tone-mapped 8×8 blocks within 2 % of white); cards with an orange border differ more — look at them.</p>
 <label class="controls"><input type="checkbox" id="only"> show only presets that differ</label></header>
 <main class="grid">${cards.join('\n')}</main>
 <script>document.getElementById('only').addEventListener('change', e => document.body.classList.toggle('only-diff', e.target.checked));</script>

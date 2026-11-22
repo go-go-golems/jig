@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 
@@ -46,7 +47,15 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   co.logCallbackLevel = 4;
   OX(optixDeviceContextCreate(cuctx, &co, &ctx_));
 
+  const auto tp = std::chrono::steady_clock::now();
   OptixModuleCompileOptions mco = {};
+  // The whole translated path tracer runs in the raygen program, with much state live across optixTrace calls.
+  // OptiX's default limit (128 registers) spills it: K-09 at 960x540, 256 spp took 2.9 s at 128, 1.5 s at 168 and
+  // 0.75 s at 255 (the plain-CUDA kernel uses 155 registers and takes 0.97 s). The first module compile takes ~11 s,
+  // later ones come from OptiX's disk cache. CANDELA_OPTIX_MAXREG overrides the limit for experiments.
+  mco.maxRegisterCount = 255;
+  if (const char* e = getenv("CANDELA_OPTIX_MAXREG")) mco.maxRegisterCount = atoi(e);
+  mco.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
   OptixPipelineCompileOptions pco = {};
   pco.usesMotionBlur = 0;
   pco.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
@@ -77,6 +86,7 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   unsigned dcT = 0, dcS = 0, css = 0;
   OX(optixUtilComputeStackSizes(&ss, 1, 0, 0, &dcT, &dcS, &css));
   OX(optixPipelineSetStackSize(pipe_, dcT, dcS, css, 2));
+  pipelineMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tp).count();
 
   SbtRecord<Empty> rg, ms, hg[2];
   OX(optixSbtRecordPackHeader(pg_[0], &rg));
