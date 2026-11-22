@@ -957,7 +957,27 @@ await test('52 mechanism: a pin-slot joint (a Scotch yoke: the yoke moves r·cos
   // a measure named like a study column is refused
   const q = await compile(script('52-pin-slot.js').replace("measure('yokeX'", "measure('x'"));
   assert(q.diagnostics.some(d => d.kind === 'asm.measure' && /cannot be called 'x'/.test(d.message)), 'reserved measure name');
-  return `stroke ${A.reports[0].value.toFixed(6)} mm, slide ${pin.slide.toFixed(3)} mm at 30°, closed form within ${worst.toExponential(1)}`;
+  // a pin free in its slot: a drag along the slot commits the slide too ('h.slide'), so the recompile keeps the pose
+  const BOX = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const axle = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+`;
+  const PS = BOX + `return j.assembly('slot').add('yoke', box('yoke').port('slot', axle), { ground: true }).add('pin', box('pin').port('pin', axle))
+  .joint('h', j.joint.pinSlot({ slideLimits: [mm(-15), mm(15)] }), 'yoke:slot', 'pin:pin')`;
+  await compile(PS);
+  const dr = await call('dragPose', { ref: 'pin:pin', to: [10, 0, 0], reset: true });
+  assert(dr.ok && dr.pinned && dr.overrides['h.slide'] === '10 mm' && Math.abs(dr.at[0] - 10) < 1e-6, `drag: ${JSON.stringify(dr.overrides)} pinned ${dr.pinned}`);
+  const again = await compile(PS, { options: { override: dr.overrides } });
+  assert(near(again.assembly.joints[0].slide, 10, 1e-9, 1e-9), `recompiled with the drag's overrides: slide ${again.assembly.joints[0].slide}`);
+  // a slide is a coordinate like a value: .drive('h.slide', …) drives it, held at its slide limits
+  const dv = await compile(PS + ".drive('h.slide', mm(20))");
+  const held = dv.diagnostics.find(d => d.kind === 'asm.limit' && d.at === 'h.slide');
+  assert(held && /h\.slide is driven to 20 mm, past its limit 15 mm/.test(held.message) && near(dv.assembly.joints[0].slide, 15, 1e-9, 1e-9), `slide drive: ${held?.message} ${dv.assembly.joints[0].slide}`);
+  // a joint with no coordinates (planar) cannot carry a dragged pose: the drag says so rather than snapping back later
+  await compile(BOX + `return j.assembly('table').add('top', box('top').port('face', axle), { ground: true }).add('puck', box('puck').port('base', axle))
+  .joint('p', j.joint.planar(), 'top:face', 'puck:base')`);
+  const pl = await call('dragPose', { ref: 'puck:base', to: [5, 3, 0], reset: true });
+  assert(pl.ok && pl.pinned === false, `planar drag pinned: ${pl.pinned}`);
+  return `stroke ${A.reports[0].value.toFixed(6)} mm, slide ${pin.slide.toFixed(3)} mm at 30°, closed form within ${worst.toExponential(1)}; a dragged slide recompiles`;
 });
 
 await test('53 mechanism: joint limits hold drives, studies and drags; a contact set stops a drag', async () => {
@@ -1090,6 +1110,31 @@ return j.assembly('top').add('base', box('base').port('pivot', pivot), { ground:
   assert(oi.id === 'outer/inner' && Math.hypot(...at(oi).map((x, k) => x - [0, 5, 0][k])) < 1e-9 && Math.hypot(...at(oi.children[1]).map((x, k) => x - [-3, 5, 0][k])) < 1e-9, `outer/inner at ${at(oi)}, its r at ${at(oi.children[1])}`);
   const nx = await exp('step', {});
   assert(/exact B-rep \(4 parts\); product structure: 6 components, 2 subassemblies/.test(nx.report.kept.join("; ")) && (nx.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length === 6, nx.report.kept.join('; '));
+  // a flexible subassembly whose root is a subassembly (its only component), inside a rigid one: roots are components
+  const roots = await compile(`const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const inner = j.assembly('inner').add('p', box('p'), { ground: true })
+const outer = j.assembly('outer').add('inner', inner)
+const mid = j.assembly('mid').add('outer', outer, { flexible: true })
+return j.assembly('top').add('base', box('base'), { ground: true, at: j.tx.move(20, 0, 0) }).add('mid', mid)`);
+  assert(errs(roots).length === 0 && roots.assembly.subassemblies.every(x => x.root === 'mid/outer/inner/p'), `roots: ${JSON.stringify(roots.assembly.subassemblies)} ${JSON.stringify(errs(roots))}`);
+  // a value a child gives its own joint drives it when the child is flexible too; the parent's, by the prefixed id,
+  // wins; and a flexible level's value for its rigid child's joint reaches that child's solve
+  const ARM = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const axle = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const arm = j.assembly('arm').add('base', box('base').port('axle', axle), { ground: true }).add('link', box('link').port('axle', axle))
+  .joint('h', j.joint.revolute(), 'base:axle', 'link:axle').override({ h: '45 deg' })
+`;
+  const top = (sub, flex) => `return j.assembly('top').add('frame', box('frame'), { ground: true, at: j.tx.move(20, 0, 0) }).add('sub', ${sub}, { flexible: ${flex} })`;
+  const hOf = (q, id) => q.assembly.joints.find(x => x.id === id)?.value ?? q.assembly.measures?.[id];
+  const fx = await compile(ARM + top('arm', true)), fo = await compile(ARM + top('arm', true), { options: { override: { 'sub/h': '60 deg' } } });
+  assert(near(hOf(fx, 'sub/h'), 45, 1e-9, 1e-9) && near(hOf(fo, 'sub/h'), 60, 1e-9, 1e-9), `flexible child's own override ${hOf(fx, 'sub/h')}, the parent's ${hOf(fo, 'sub/h')}`);
+  const nested = await compile(ARM + `const holder = j.assembly('holder').add('arm', arm).override({ 'arm/h': '30 deg' }).measure('tip', m => m.point('arm/link', [1, 0, 0]))
+return j.assembly('top').add('frame', box('frame'), { ground: true, at: j.tx.move(20, 0, 0) }).add('sub', holder, { flexible: true })`);
+  const tip = nested.assembly.measures['sub/tip'];
+  assert(Math.hypot(tip[0] - Math.cos(Math.PI / 6), tip[1] - Math.sin(Math.PI / 6)) < 1e-9, `the flexible level's override of its rigid child: tip ${tip}`);
+  // a flexible child's declaration that has no meaning in its parent is said, not dropped
+  const ifr = await compile(ARM + top("arm.interference(['base', 'link'])", true));
+  assert(ifr.diagnostics.some(d => d.kind === 'asm.flexible' && d.level === 'warning' && /sub is flexible: its \.interference\(\) is not carried/.test(d.message)), JSON.stringify(ifr.diagnostics.map(d => d.kind)));
   return `spin ${J('drive/spin').toFixed(1)}°, bracket drop ${A.reports.find(r => r.name === 'bracket/drop').value.toFixed(3)} mm; STEP ${prods.length} products, ${nauo} usages`;
 });
 

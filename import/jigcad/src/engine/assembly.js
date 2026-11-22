@@ -8,7 +8,7 @@ import { meshBody } from './mesh.js';
 import { resolveInPart, selectInPart } from './compile.js';
 import { isDeferred, Deferred } from './geom.js';
 import { Selector } from './select.js';
-import { MechanismSolver, runStudy, studyApi, equationCount } from './mechanism.js';
+import { MechanismSolver, runStudy, studyApi, equationCount, COORDS, coordKey } from './mechanism.js';
 import { q as quantity } from './units.js';
 import { toKine } from './kine.js';
 import { gearSpecOf, meshReport } from './gears.js';
@@ -126,7 +126,8 @@ function programOf(name, solved, { t0, opts, finalize }) {
       const T = S.transforms();
       const out = { ok, transforms: Object.fromEntries(ids.map((id, i) => [id, T[i]])), ports: S.portFrames(), joints: S.jointValues(),
         overrides: Object.fromEntries(S.holds().map(h => [h.id, `${+h.shown.toFixed(4)} ${h.unit}`])), at: S.world(S.port(ref)).P,
-        limits: S.limited ?? [], contacts: S.touched ?? [] };
+        // pinned: the overrides recompile to this pose (false: a joint without coordinates, planar or ball, moved)
+        pinned: S.pinned, limits: S.limited ?? [], contacts: S.touched ?? [] };
       if (ok) dragged = S.pose;
       return out;
     } finally { S.pose = home; }
@@ -138,11 +139,10 @@ function programOf(name, solved, { t0, opts, finalize }) {
 export function solveAssembly(asm, opts, compilePart) {
   const diagnostics = [], decisions = [], trace = [];
   const placements = {}, occurrences = [];
-  const values = { ...(asm.o.params ?? {}), ...(asm.o.overrides ?? {}), ...(opts.override ?? {}) };
-  // subassemblies flattened: their components under '<sub>/<id>', a flexible one's joints, drives and readings with
-  // them, a rigid one solved on its own and held together (see expandAssembly)
-  const E = expandAssembly(asm, opts, compilePart, diagnostics, values);
-  const o = E.o, comp = E.comps, parts = E.parts, groundId = E.groundId;
+  // subassemblies flattened: their components under '<sub>/<id>', a flexible one's joints, drives, values and readings
+  // with them, a rigid one solved on its own and held together (see expandAssembly)
+  const E = expandAssembly(asm, opts, compilePart, diagnostics, { ...(asm.o.params ?? {}), ...(asm.o.overrides ?? {}), ...(opts.override ?? {}) });
+  const o = E.o, comp = E.comps, parts = E.parts, groundId = E.groundId, values = E.values;
   // the joints, solved together (mechanism.js). A joint whose value is given (a param or override named by its id,
   // the print pose, or .drive) is driven; any other starts at its first limit, or 0, and is free.
   const rad = v => num(v);
@@ -203,21 +203,28 @@ export function solveAssembly(asm, opts, compilePart) {
   // every port of every component is readable by measures (resolved lazily; failures stay quiet here)
   for (const [cid, X] of comp) for (const pt of X.c.item.meta?.ports ?? []) wantPort(cid, pt.name, null);
   const jointed = new Set(joints.flatMap(j => [j.a.split(':')[0], j.b.split(':')[0]]));
-  const driveOf = (jn) => {
-    const posed = o.pip?.pose?.[jn.id] !== undefined, usePose = posed && (opts.forPrint || values[jn.id] === undefined);
-    if (usePose) return { v: rad(o.pip.pose[jn.id]), why: 'print pose' };
-    if (values[jn.id] !== undefined) return { v: rad(values[jn.id]), why: 'override' };
-    if (o.drives?.[jn.id] !== undefined) return { v: rad(o.drives[jn.id]), why: 'drive' };
+  // every coordinate of every joint (mechanism.js COORDS: 'h', and 'h.slide' for a two-valued joint) is driven when
+  // its value is given (the print pose, a param or override by its key, or .drive) and free otherwise
+  const givenFor = (key) => {
+    const posed = o.pip?.pose?.[key] !== undefined, usePose = posed && (opts.forPrint || values[key] === undefined);
+    if (usePose) return { v: rad(o.pip.pose[key]), why: 'print pose' };
+    if (values[key] !== undefined) return { v: rad(values[key]), why: 'override' };
+    if (o.drives?.[key] !== undefined) return { v: rad(o.drives[key]), why: 'drive' };
     return null;
   };
+  const coordsOf = (j) => (COORDS[j.kind] ?? ['value']).map((part) => ({ part, key: coordKey(j.id, part), limits: part === 'value' ? j.limits : j.slideLimits }));
   const drives = new Map(), seeds = new Map(), why = new Map();
-  for (const j of joints) { const d = driveOf(j.src); if (d) { drives.set(j.id, d.v); why.set(j.id, d.why); } else seeds.set(j.id, j.asBuilt ? (j.limits ? Math.min(j.limits[1], Math.max(j.limits[0], 0)) : 0) : j.limits ? j.limits[0] : 0); }
+  for (const j of joints) for (const { part, key } of coordsOf(j)) {
+    const d = givenFor(key);
+    if (d) { drives.set(key, d.v); why.set(key, d.why); }
+    else if (part === 'value') seeds.set(j.id, j.asBuilt ? (j.limits ? Math.min(j.limits[1], Math.max(j.limits[0], 0)) : 0) : j.limits ? j.limits[0] : 0);
+  }
   // a drive past a joint's limit is held at the limit (as Fusion holds a joint at its motion limit)
-  const shownV = (j, v) => (j.kind === 'slider' ? `${+v.toFixed(3)} mm` : `${+(v * 180 / Math.PI).toFixed(3)}°`);
-  for (const j of joints) {
-    const d = drives.get(j.id); if (d == null || !j.limits) continue;
-    const [lo, hi] = j.limits, c = Math.min(hi, Math.max(lo, d));
-    if (Math.abs(c - d) > 1e-9) { drives.set(j.id, c); diagnostics.push({ level: 'warning', kind: 'asm.limit', at: j.id, message: `${j.id} is driven to ${shownV(j, d)}, past its limit ${shownV(j, c)}: held at the limit`, fix: 'drive it inside its limits, or widen them' }); }
+  const shownV = (j, part, v) => (part === 'slide' || j.kind === 'slider' ? `${+v.toFixed(3)} mm` : `${+(v * 180 / Math.PI).toFixed(3)}°`);
+  for (const j of joints) for (const { part, key, limits } of coordsOf(j)) {
+    const d = drives.get(key); if (d == null || !limits) continue;
+    const [lo, hi] = limits, c = Math.min(hi, Math.max(lo, d));
+    if (Math.abs(c - d) > 1e-9) { drives.set(key, c); diagnostics.push({ level: 'warning', kind: 'asm.limit', at: key, message: `${key} is driven to ${shownV(j, part, d)}, past its limit ${shownV(j, part, c)}: held at the limit`, fix: 'drive it inside its limits, or widen them' }); }
   }
   for (const c of o.couples ?? []) if (c.unsupported) diagnostics.push({ level: 'error', kind: 'asm.couple', at: c.at ? `line ${c.at}` : 'couple', message: 'couple takes (id, jointA, jointB, { ratio, offset }) or a coupling between gears: j.couple.gear(a, b), j.couple.rack(rack, pinion), j.couple.belt(a, b)' });
   const S = new MechanismSolver({
@@ -315,7 +322,7 @@ export function solveAssembly(asm, opts, compilePart) {
   // a pose with other joint values (the print pose), solved from this one
   const solvePose = pose => {
     const home = S.pose, homeDrives = new Map(S.drives);
-    for (const [id, v] of Object.entries(pose)) if (S.jointById.has(id)) S.drives.set(id, rad(v));
+    for (const [key, v] of Object.entries(pose)) if (S.coord(key)) S.drives.set(key, rad(v));
     S.solve();
     const Tp = S.transforms(), out = new Map([...comp.keys()].map((id, i) => [id, Tp[i]]));
     S.pose = home; S.drives = homeDrives;
@@ -663,12 +670,21 @@ function geometryFrame(X, sel, o = {}, side = 'a') {
 // brings its joints, drives, hints, couplings, readings, studies and reports into the parent's solve, prefixed.
 // Either is fixed where its `at` puts it unless a joint of the parent holds it (a rigid one: any of its components; a
 // flexible one: its root, the component it grounds).
-function expandAssembly(asm, opts, compilePart, diagnostics, values) {
+function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
   const comps = new Map(), parts = [], subs = new Map(), presetPorts = [];
+  const values = { ...declared };   // by full id: a flexible child's own values join under its prefix (gather)
   const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [] };
   const childOut = { studies: {}, reports: [], measures: {} };
   const tree = { kind: 'assembly', id: '', item: asm.name, children: [] };
   const rootOf = A => A.o.ground ?? A.o.components.find(x => x.opts.ground)?.id ?? A.o.components[0]?.id;
+  // a root is always a component: an id that names a subassembly (it grounds its parent, by .ground() or by coming
+  // first) stands for that one's root, which walk() has resolved already; one that names nothing is an error
+  const rootIn = (id, at) => {
+    const r = subs.get(id)?.root ?? id;
+    if (comps.has(r)) return r;
+    diagnostics.push({ level: 'error', kind: 'asm.ground', at, message: `${at}: its root '${r}' is not one of its components`, fix: '.ground(id) names one of its components' });
+    return null;
+  };
   const walk = (A, prefix, Tp, node, vals) => {
     for (const c of A.o.components) {
       const id = prefix ? `${prefix}/${c.id}` : c.id;
@@ -688,14 +704,16 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
       const sn = { kind: 'assembly', id, item: c.item.name, qty: c.opts.qty ?? 1, flexible, children: [] };
       node.children.push(sn);
       if (flexible) {
-        walk(c.item, id, Ts, sn, { ...(c.item.o.params ?? {}), ...(c.item.o.overrides ?? {}) });
-        gather(c.item, id);
-        const root = `${id}/${rootOf(c.item)}`;
+        const cv = scopeValues(c.item, vals, c.id);
+        walk(c.item, id, Ts, sn, cv);
+        gather(c.item, id, cv);
+        const root = rootIn(`${id}/${rootOf(c.item)}`, id);
         subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
         continue;
       }
-      // rigid: its own solve, with the parent's values for '<sub>/…' as its overrides
-      const sub = Object.fromEntries(Object.entries(values).filter(([k]) => k.startsWith(id + '/')).map(([k, v]) => [k.slice(id.length + 1), v]));
+      // rigid: its own solve, with this level's values for '<sub>/…' as its overrides (its solve layers them over its
+      // own params and overrides, as scopeValues does for a flexible one)
+      const sub = unprefix(vals, c.id);
       const r = solveAssembly(c.item, { ...opts, override: Object.keys(sub).length ? sub : null }, compilePart);
       for (const d of r.diagnostics) diagnostics.push({ ...d, at: `${id}/${d.at ?? ''}` });
       for (const [cid, X] of r.comp) {
@@ -706,38 +724,49 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
       // its tree whole, nested subassemblies and all, as this level names and places them (structure only: it moves
       // as one body here, so none of them is solved or fixed again)
       sn.children = nestTree(r.eff.tree.children, id, Ts);
-      const root = `${id}/${r.groundId}`;
-      for (const cid of r.comp.keys()) {
+      const root = rootIn(`${id}/${r.groundId}`, id);
+      for (const cid of root ? r.comp.keys() : []) {
         const gid = `${id}/${cid}`; if (gid === root) continue;
         presetPorts.push({ cid: root, name: `@rigid~${cid}`, m: K.matMul(K.matInverse(comps.get(root).T0), comps.get(gid).T0) });
         presetPorts.push({ cid: gid, name: '@rigid', m: K.IDENTITY.slice() });
         extra.joints.push({ id: `${id}/(rigid ${cid})`, kind: 'rigid', group: '{e}', dof: 0, a: `${root}:@rigid~${cid}`, b: `${gid}:@rigid`, opts: {}, synthetic: true, level: id });
       }
-      subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root).T0) }));
+      subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
       for (const [k, v] of Object.entries(r.mech?.studies ?? {})) childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}` };
       for (const rep of r.mech?.reports ?? []) childOut.reports.push({ ...rep, name: `${id}/${rep.name}` });
       for (const [k, v] of Object.entries(r.mech?.measures ?? {})) childOut.measures[`${id}/${k}`] = v;
     }
   };
-  // a flexible subassembly's own declarations, prefixed with its id
-  const gather = (A, prefix) => {
-    const P = s => `${prefix}/${s}`, o = A.o;
-    for (const jn of o.joints ?? []) {
-      const ab = jn.asBuilt ?? jn.opts?.asBuilt;
-      extra.joints.push({ ...jn, id: P(jn.id), a: reroot(jn.a, prefix), b: reroot(jn.b, prefix), asBuilt: ab && ab !== true ? reroot(ab, prefix) : ab, opts: { ...jn.opts, asBuilt: undefined }, level: prefix });
-    }
-    for (const [k, v] of Object.entries(o.drives ?? {})) extra.drives[P(k)] = v;
-    for (const [k, v] of Object.entries(o.hints ?? {})) extra.hints[P(k)] = v;
-    for (const c of o.couples ?? []) {
+  // a flexible subassembly's declarations, as its parent's: every kind of declaration has a rule (FLEXIBLE: carried
+  // prefixed, read where the child is walked, or not carried, with why), and a kind with none is reported, so a
+  // declaration a flexible child makes is never dropped without a word
+  const carry = {
+    joints: (v, P, prefix) => { for (const jn of v) { const ab = jn.asBuilt ?? jn.opts?.asBuilt; extra.joints.push({ ...jn, id: P(jn.id), a: reroot(jn.a, prefix), b: reroot(jn.b, prefix), asBuilt: ab && ab !== true ? reroot(ab, prefix) : ab, opts: { ...jn.opts, asBuilt: undefined }, level: prefix }); } },
+    drives: (v, P) => { for (const [k, x] of Object.entries(v)) extra.drives[P(k)] = x; },
+    hints: (v, P) => { for (const [k, x] of Object.entries(v)) extra.hints[P(k)] = x; },
+    couples: (v, P, prefix) => { for (const c of v) {
       if (c.spec) extra.couples.push({ ...c, id: P(c.id), spec: { ...c.spec, a: reroot(c.spec.a, prefix), b: reroot(c.spec.b, prefix), joints: c.spec.joints?.map(P) } });
       else if (!c.unsupported) extra.couples.push({ ...c, id: P(c.id), a: P(c.a), b: P(c.b) });
+    } },
+    measures: (v, P, prefix) => { for (const m of v) extra.measures.push({ name: P(m.name), fn: mm => m.fn(prefixReader(mm, prefix)) }); },
+    events: (v, P, prefix) => { for (const e of v) extra.events.push({ name: P(e.name), fn: row => e.fn(unprefixRow(row, prefix)) }); },
+    studies: (v, P) => { for (const st of v) extra.studies.push({ ...st, name: P(st.name), drive: P(st.drive) }); },
+    sweeps: (v, P) => { for (const sw of v) extra.sweeps.push({ ...sw, jointId: P(sw.jointId) }); },
+    reports: (v, P, prefix) => { for (const rp of v) extra.reports.push({ ...rp, name: P(rp.name), fn: ctx => rp.fn(unprefixCtx(ctx, prefix)) }); },
+    contacts: (v, P, prefix, A) => { for (const ct of v) extra.contacts.push({ ids: (ct.ids ?? A.o.components.map(x => x.id)).map(P) }); },
+  };
+  const gather = (A, prefix, cv) => {
+    const P = s => `${prefix}/${s}`;
+    for (const [k, v] of Object.entries(A.o)) {
+      if (v == null) continue;
+      const rule = FLEXIBLE[k];
+      if (rule === 'carried') carry[k](v, P, prefix, A);
+      else if (rule === 'walked') continue;
+      else diagnostics.push({ level: 'warning', kind: 'asm.flexible', at: prefix, message: `${prefix} is flexible: its .${k}() is not carried into ${asm.name}${rule ? ` (${rule})` : ''}`, fix: `declare it on ${asm.name} with the prefixed ids ('${prefix}/…'), or add ${prefix} rigid` });
     }
-    for (const m of o.measures ?? []) extra.measures.push({ name: P(m.name), fn: mm => m.fn(prefixReader(mm, prefix)) });
-    for (const e of o.events ?? []) extra.events.push({ name: P(e.name), fn: row => e.fn(unprefixRow(row, prefix)) });
-    for (const st of o.studies ?? []) extra.studies.push({ ...st, name: P(st.name), drive: P(st.drive) });
-    for (const sw of o.sweeps ?? []) extra.sweeps.push({ ...sw, jointId: P(sw.jointId) });
-    for (const rp of o.reports ?? []) extra.reports.push({ ...rp, name: P(rp.name), fn: ctx => rp.fn(unprefixCtx(ctx, prefix)) });
-    for (const ct of o.contacts ?? []) extra.contacts.push({ ids: (ct.ids ?? o.components.map(x => x.id)).map(P) });
+    // its values (params, overrides, and what the levels above set for it) under its prefix: a value the child gives
+    // a joint drives that joint here as it does on its own
+    for (const [k, v] of Object.entries(cv)) values[P(k)] = v;
   };
   walk(asm, '', K.IDENTITY.slice(), tree, values);
   const own = asm.o;
@@ -751,13 +780,28 @@ function expandAssembly(asm, opts, compilePart, diagnostics, values) {
     if (!held && comps.get(S.root)) comps.get(S.root).fixed = true;
   }
   let groundId = own.ground ?? own.components.find(c => c.opts.ground)?.id ?? own.components[0]?.id;
-  if (subs.has(groundId)) groundId = subs.get(groundId).root;
+  if (groundId != null) groundId = rootIn(groundId, asm.name);
   const o = { ...own, joints, drives: { ...extra.drives, ...(own.drives ?? {}) }, hints: { ...extra.hints, ...(own.hints ?? {}) },
     couples: [...extra.couples, ...(own.couples ?? [])], measures: [...extra.measures, ...(own.measures ?? [])], events: [...extra.events, ...(own.events ?? [])],
     studies: [...extra.studies, ...(own.studies ?? [])], sweeps: [...extra.sweeps, ...(own.sweeps ?? [])], reports: [...extra.reports, ...(own.reports ?? [])],
     contacts: [...extra.contacts, ...(own.contacts ?? [])] };
-  return { o, comps, parts, tree, presetPorts, childOut, groundId };
+  return { o, comps, parts, tree, presetPorts, childOut, groundId, values };
 }
+// What each declaration of a flexible subassembly becomes in its parent (expandAssembly's gather): 'carried' under its
+// prefix (by carry[kind]), 'walked' (read where the child is walked: its components, root and values), or a reason it
+// is not carried, which the compile says. A declaration kind not listed is reported too.
+const FLEXIBLE = {
+  components: 'walked', ground: 'walked', params: 'walked', overrides: 'walked',
+  joints: 'carried', drives: 'carried', hints: 'carried', couples: 'carried', measures: 'carried', events: 'carried',
+  studies: 'carried', sweeps: 'carried', reports: 'carried', contacts: 'carried',
+  pip: 'print-in-place is planned for the assembly printed', interference: 'its pairs and study are named in its own ids',
+  explode: 'an exploded view is the top assembly\'s', configs: 'configurations are chosen on the top assembly',
+};
+// the values a level sets for one of its subassemblies ('<id>/…'), as that subassembly names them
+const unprefix = (vals, id) => Object.fromEntries(Object.entries(vals).filter(([k]) => k.startsWith(id + '/')).map(([k, v]) => [k.slice(id.length + 1), v]));
+// a flexible subassembly's values as its own joints and parts see them: its params, its overrides, and what the level
+// above sets for it, which wins (the layering a rigid one's own solve makes of the same three)
+const scopeValues = (A, vals, id) => ({ ...(A.o.params ?? {}), ...(A.o.overrides ?? {}), ...unprefix(vals, id) });
 // The tree is the one record of the product structure: a subassembly's node carries its root, its placement Ts and
 // rootLocal (its frame in its root's), and expandAssembly's `subs` indexes those same nodes for the ones this level
 // solves (and may fix); nothing else keeps a copy to fall out of step with it. A rigid child's tree comes whole:
