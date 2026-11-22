@@ -5,7 +5,7 @@
 //   npx tsx scripts/wgsl-render.ts B-01 [--size 640x360] [--spp 64] [--time 0] [--out dir] [--aov]
 //
 // Output: <out>/<id>.wgsl.pfm (RGB float, mean radiance = accum.rgb / accum.a) and <id>.wgsl.json (timings, spp).
-// candela-rt render --backend cuda writes the same files with `.cuda.` for scripts/compare-pfm.ts.
+// candela-rt render writes the same files with `.cuda.` for scripts/compare-pfm.ts.
 import fs from 'node:fs';
 import path from 'node:path';
 import { create, globals } from 'webgpu';
@@ -27,26 +27,27 @@ export function meanRGB(acc: Float32Array, w: number, h: number) {
   return out;
 }
 
-async function main() {
-  const { rest, flags } = parseArgs(process.argv.slice(2));
-  const id = rest[0];
-  const [w, h] = String(flags.size || '640x360').split('x').map(Number);
-  const sppTarget = +(flags.spp || 64), time = +(flags.time || 0);
-  const outDir = String(flags.out || 'build/parity');
-  fs.mkdirSync(outDir, { recursive: true });
-  const preset = loadCatalogFromDisk().presets.find(p => p.id === id);
-  if (!preset) throw new Error(`no preset ${id}`);
-
-  const t0 = performance.now();
-  const r = await openRender(preset.files, { width: w, height: h, time, target: null });
-  if (!r.ok) throw new Error(r.error);
-  const tBuild = performance.now() - t0;
-
+// the GPU instance and adapter must stay reachable while the device is used: when the instance is garbage-collected,
+// Dawn tears it down under the device and the process crashes (seen as SIGSEGV / std::system_error)
+const keep: unknown[] = [];
+export async function dawnDevice(): Promise<GPUDevice> {
   Object.assign(globalThis, globals);
   const gpu = create([]);
   const adapter = await gpu.requestAdapter({ powerPreference: 'high-performance' });
+  keep.push(gpu, adapter);
   if (!adapter) throw new Error('no WebGPU adapter');
-  const device = await adapter.requestDevice({ requiredLimits: { maxStorageBuffersPerShaderStage: 8, maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize, maxBufferSize: adapter.limits.maxBufferSize } });
+  return adapter.requestDevice({ requiredLimits: { maxStorageBuffersPerShaderStage: 8, maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize, maxBufferSize: adapter.limits.maxBufferSize } });
+}
+
+export interface WgslRenderResult { acc: Float32Array; alb: Float32Array | null; meta: Record<string, number | string> }
+
+/** render one scene with its WGSL program on `device`; returns the accumulation buffer (RGBA sums) */
+export async function wgslRender(device: GPUDevice, files: Record<string, string>, o: { width: number; height: number; spp: number; time?: number; aov?: boolean }): Promise<WgslRenderResult> {
+  const { width: w, height: h } = o;
+  const t0 = performance.now();
+  const r = await openRender(files, { width: w, height: h, time: o.time || 0, target: null });
+  if (!r.ok) throw new Error(r.error);
+  const tBuild = performance.now() - t0;
   const t1 = performance.now();
   const mod = device.createShaderModule({ code: r.wgsl });
   const info = await mod.getCompilationInfo();
@@ -56,10 +57,12 @@ async function main() {
   const tCompile = performance.now() - t1;
 
   const S = GPUBufferUsage.STORAGE, D = GPUBufferUsage.COPY_DST, C = GPUBufferUsage.COPY_SRC;
+  const made: GPUBuffer[] = [];
   const buf = (data: Float32Array | number, usage: number) => {
     const size = Math.ceil((typeof data === 'number' ? data : data.byteLength) / 16) * 16;
     const b = device.createBuffer({ size: Math.max(16, size), usage });
     if (typeof data !== 'number') device.queue.writeBuffer(b, 0, data.buffer, data.byteOffset, data.byteLength);
+    made.push(b);
     return b;
   };
   const U0 = r.frame(); r.spp = 0;   // size the uniform buffer
@@ -72,7 +75,7 @@ async function main() {
 
   const t2 = performance.now();
   let launches = 0;
-  while (r.spp < sppTarget) {
+  while (r.spp < o.spp) {
     const U = r.frame();
     device.queue.writeBuffer(B.uni, 0, U.buffer, U.byteOffset, U.byteLength);
     const enc = device.createCommandEncoder();
@@ -85,16 +88,31 @@ async function main() {
   const read = async (b: GPUBuffer) => {
     const st = device.createBuffer({ size: w * h * 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     const enc = device.createCommandEncoder(); enc.copyBufferToBuffer(b, 0, st, 0, w * h * 16); device.queue.submit([enc.finish()]);
-    await st.mapAsync(GPUMapMode.READ); const f = new Float32Array(st.getMappedRange().slice(0)); st.unmap(); return f;
+    await st.mapAsync(GPUMapMode.READ); const f = new Float32Array(st.getMappedRange().slice(0)); st.unmap(); st.destroy(); return f;
   };
   const acc = await read(B.accum);
   const tRender = performance.now() - t2;
+  const alb = o.aov ? await read(B.aovA) : null;
+  for (const b of made) b.destroy();
+  return { acc, alb, meta: { backend: 'wgsl-dawn', width: w, height: h, time: o.time || 0, spp: r.spp, launches, buildMs: tBuild, compileMs: tCompile, renderMs: tRender, sppPerSec: r.spp * w * h / (tRender / 1000) } };
+}
+
+async function main() {
+  const { rest, flags } = parseArgs(process.argv.slice(2));
+  const id = rest[0];
+  const [w, h] = String(flags.size || '640x360').split('x').map(Number);
+  const outDir = String(flags.out || 'build/parity');
+  fs.mkdirSync(outDir, { recursive: true });
+  const preset = loadCatalogFromDisk().presets.find(p => p.id === id);
+  if (!preset) throw new Error(`no preset ${id}`);
+  const device = await dawnDevice();
+  const res = await wgslRender(device, preset.files, { width: w, height: h, spp: +(flags.spp || 64), time: +(flags.time || 0), aov: !!flags.aov });
   const base = path.join(outDir, `${id}.wgsl`);
-  writePFM(base + '.pfm', w, h, meanRGB(acc, w, h));
-  if (flags.aov) { writePFM(base + '.albedo.pfm', w, h, meanRGB(await read(B.aovA), w, h)); }
-  const meta = { id, backend: 'wgsl-dawn', width: w, height: h, time, spp: r.spp, launches, buildMs: tBuild, compileMs: tCompile, renderMs: tRender, sppPerSec: r.spp * w * h / (tRender / 1000) };
-  fs.writeFileSync(base + '.json', JSON.stringify(meta, null, 1) + '\n');
-  console.log(`${id} wgsl/dawn: ${w}x${h} ${r.spp} spp in ${launches} launches; build ${tBuild.toFixed(0)} ms, compile ${tCompile.toFixed(0)} ms, render ${tRender.toFixed(0)} ms → ${base}.pfm`);
+  writePFM(base + '.pfm', w, h, meanRGB(res.acc, w, h));
+  if (res.alb) writePFM(base + '.albedo.pfm', w, h, meanRGB(res.alb, w, h));
+  fs.writeFileSync(base + '.json', JSON.stringify({ id, ...res.meta }, null, 1) + '\n');
+  const m = res.meta as any;
+  console.log(`${id} wgsl/dawn: ${w}x${h} ${m.spp} spp in ${m.launches} launches; build ${m.buildMs.toFixed(0)} ms, compile ${m.compileMs.toFixed(0)} ms, render ${m.renderMs.toFixed(0)} ms → ${base}.pfm`);
   device.destroy();
 }
 

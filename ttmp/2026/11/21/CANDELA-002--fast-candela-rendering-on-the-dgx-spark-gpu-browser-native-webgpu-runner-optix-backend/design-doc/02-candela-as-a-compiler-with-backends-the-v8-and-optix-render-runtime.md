@@ -39,6 +39,23 @@ WhenToUse: Before changing compile/pack, before writing native/ code, and when d
 > All 105 presets build there (6.6 s in total; K-09 487 ms) and 104 match Node 26 byte for byte; the exception is
 > D-02, whose `Math.random()` makes it differ between any two runs (`various/13-phase0-v8-embedding.txt`). Embedding
 > note: the isolate uses `MicrotasksPolicy::kExplicit`, since the host drives promises itself.
+>
+> **Phase 1 (partial):** builds are deterministic (scene `Math.random` seeded per build; Node ↔ V8 105/105 identical);
+> `tests/golden-pack.test.ts` gates refactors; `src/engine/session.ts` holds the clock, behaviours, poses, the pack
+> `env` and the per-frame uniforms, used by the browser and by `candela-rt session` (6/6 moving presets identical to
+> Node frame by frame). The `lower`/`SceneIR`/target split is deferred to phase 3, where the OptiX target defines
+> what it needs.
+>
+> **Phase 2 done, with two changes to §5.6.** (1) `Gen` keeps emitting WGSL only: `wgsl2cuda.ts` translates the
+> whole program (`compiled.shared`, kernel and generated code), as `wgsl2glsl.ts` already does for WebGL2; the
+> generated code is in the same strict subset. (2) The translator sequences side effects: WGSL evaluates arguments
+> left to right and `select` evaluates all three, C++ does neither, so calls to functions that write per-thread state
+> (`rnd`, `traceAll`, … found by fixpoint) are hoisted into temporaries when a statement has two of them or one in a
+> `select`. Without this the random streams diverged (`sampleLobe(L, wo, rnd2(), rnd())`). A plain-CUDA target
+> (translated `traceAll` over Candela's BVH) runs in `candela-rt render`; `scripts/wgsl-render.ts` runs the same WGSL
+> on Dawn in Node. All 105 presets compile with NVRTC (`--use_fast_math`, 4.5 s mean) and render; at 1 spp, 101/105
+> agree with WebGPU on ≥ 99 % of pixels to 0.1 %; the other four differ only where the sine-based noise hash
+> amplifies last-bit differences of `sin` (`various/15-phase2-cuda-translation.txt`).
 
 Candela is a renderer whose scenes are JavaScript programs. Today those programs run in a web browser and are drawn
 by a path tracer written in WGSL on WebGPU (or WebGL2). This document designs the next step: a native program,
@@ -813,7 +830,7 @@ Each phase ends with a check that compares results, not only that code runs.
 | --- | --- | --- | --- |
 | 0. Spikes | V8 embedding with `libnode-dev`: run the engine bundle, build B-01 and K-09, call `animation(t)` | `native/rt/js/`, `scripts/bundle-core.ts` | K-09 builds in embedded V8; the hashes of `compiled.shared` and of `pack`'s buffers equal Node's; per-frame call < 1 ms |
 | 1. Engine split | `lower`, `SceneIR`, `FrameState`, `SceneSession`, `WebGpuTarget`; seeded `Math.random`; browser host on top of the session | `src/engine/{sceneir,session}.ts`, `src/engine/targets/webgpu.ts`, `compile.ts`, `host.ts` | 9.1 golden tests pass for every preset; the workbench behaves as before |
-| 2. CUDA target | `Dialect` in `Gen` and templates; `wgsl2cuda.ts`; vector header; traversal shim | `src/engine/{fx,compile,wgsl2cuda}.ts`, `native/rt/gpu/kernels/` | Every preset's program compiles with NVRTC for `compute_121`; compile times recorded |
+| 2. CUDA target | `wgsl2cuda.ts` over the whole program (no `Gen` dialects, see status); vector header; plain-CUDA target; Dawn reference renderer | `src/engine/{wgsl2cuda,headless}.ts`, `src/engine/targets/cuda.ts`, `native/rt/kernels/` | Every preset's program compiles with NVRTC for `sm_121`; compile times recorded; 1-spp parity with WebGPU per preset (done) |
 | 3. Offline OptiX | `OptixTarget`; `OptixRenderer`; `candela-rt render` and `check` | `src/engine/targets/optix.ts`, `native/rt/` | Image parity with WebGPU for every preset (9.3); furnace test; path-tracing speed-up measured |
 | 4. Jobs | sequences, motion samples, EXR with AOVs, NVENC | `native/rt/out/` | Lockstitch reel rendered by `candela-rt`; time vs the 230 s/stitch WebGPU baseline |
 | 5. Live | server, protocol, browser OptiX mode | `native/rt/net/`, `src/app/` | Param edits, camera orbit and playback update the OptiX view; hash handshake green for all presets |

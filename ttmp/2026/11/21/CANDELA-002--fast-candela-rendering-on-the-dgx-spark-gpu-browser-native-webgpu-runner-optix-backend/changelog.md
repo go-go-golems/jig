@@ -51,3 +51,12 @@ SceneSession: clock/behaviours/poses in the engine; candela-rt session steps 6/6
 ### Related Files
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/session.ts — SceneSession and shared pose/env/behaviour functions
+
+## 2026-11-21
+
+Phase 2: wgsl2cuda + plain-CUDA target in candela-rt; 105/105 compile with NVRTC; 1-spp parity with WebGPU 101/105, 64-spp means within 0.3 %; CUDA 1.9-7.3x faster than Dawn with the same BVH
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/cuda_runner.cpp — NVRTC compile and driver-API launch
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/wgsl2cuda.ts — WGSL to CUDA translator with side-effect sequencing

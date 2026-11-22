@@ -4,6 +4,8 @@
 #include <nvrtc.h>
 
 #include <chrono>
+#include <cstdlib>
+#include <sstream>
 #include <stdexcept>
 
 namespace crt {
@@ -17,14 +19,29 @@ namespace crt {
     }                                                                                            \
   } while (0)
 
+// --use_fast_math: sin/cos/exp/log/pow and division use the approximate hardware units and fp32 denormals flush to
+// zero. That is what NVIDIA's Vulkan driver does for the same WGSL on this GPU (the WebGPU target), so paths agree
+// (parity sweep: 101/105 presets with >= 99 % of 1-spp pixels within 0.1 %, against 85/105 with IEEE sinf), and NVRTC
+// compiles 2.5x faster. It does not assume finite math: the kernel's NaN guards keep working.
+const char* const kNvrtcOptions[] = {"-std=c++17", "--use_fast_math"};
+std::string nvrtcOptionsKey() {
+  std::string k; for (const char* x : kNvrtcOptions) { k += x; k += ' '; }
+  if (const char* e = getenv("CANDELA_NVRTC_FLAGS")) k += e;
+  return k;
+}
+
 NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch) {
   NvrtcResult res;
   const auto t0 = std::chrono::steady_clock::now();
   nvrtcProgram prog;
   if (nvrtcCreateProgram(&prog, source.c_str(), name.c_str(), 0, nullptr, nullptr) != NVRTC_SUCCESS) { res.log = "nvrtcCreateProgram failed"; return res; }
   const std::string inc = "-I" + includeDir, gpu = "--gpu-architecture=" + arch;
-  const char* opts[] = {inc.c_str(), gpu.c_str(), "-std=c++17"};
-  const nvrtcResult cr = nvrtcCompileProgram(prog, 3, opts);
+  std::vector<std::string> extra;   // CANDELA_NVRTC_FLAGS: extra options, space separated (experiments)
+  if (const char* e = getenv("CANDELA_NVRTC_FLAGS")) { std::stringstream ss(e); std::string t; while (ss >> t) extra.push_back(t); }
+  std::vector<const char*> opts = {inc.c_str(), gpu.c_str()};
+  for (const char* x : kNvrtcOptions) opts.push_back(x);
+  for (auto& x : extra) opts.push_back(x.c_str());
+  const nvrtcResult cr = nvrtcCompileProgram(prog, (int)opts.size(), opts.data());
   size_t logSize = 0;
   nvrtcGetProgramLogSize(prog, &logSize);
   if (logSize > 1) { res.log.resize(logSize); nvrtcGetProgramLog(prog, res.log.data()); res.log.resize(logSize - 1); }

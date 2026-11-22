@@ -165,7 +165,9 @@ static fs::path cacheDir(int argc, char** argv) {
 }
 // compile through the cache: <cache>/<source hash>-<headers hash>-<arch>.cubin
 static crt::NvrtcResult compileCached(const std::string& source, const std::string& hash, const std::string& name, const std::string& kdir, const std::string& arch, const fs::path& cache, bool* hit) {
-  const fs::path f = cache / (hash + "-" + headersHash(kdir) + "-" + arch + ".cubin");
+  uint64_t fh = 1469598103934665603ull; for (unsigned char c : crt::nvrtcOptionsKey()) { fh ^= c; fh *= 1099511628211ull; }
+  char fb[9]; snprintf(fb, sizeof fb, "%08x", (unsigned)(fh & 0xffffffffu));
+  const fs::path f = cache / (hash + "-" + headersHash(kdir) + "-" + arch + "-" + fb + ".cubin");
   if (fs::exists(f)) { crt::NvrtcResult r; const std::string b = readFile(f); r.cubin.assign(b.begin(), b.end()); r.ok = true; if (hit) *hit = true; return r; }
   if (hit) *hit = false;
   auto r = crt::nvrtcCompile(source, name, kdir, arch);

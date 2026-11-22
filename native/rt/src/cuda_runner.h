@@ -18,6 +18,9 @@ struct NvrtcResult {
   double ms = 0;
 };
 
+/** the NVRTC options in effect (built-in defaults + CANDELA_NVRTC_FLAGS), for cache keys */
+std::string nvrtcOptionsKey();
+
 /** compile CUDA source to a cubin for the given architecture (e.g. "sm_121"); `includeDir` holds native/rt/kernels */
 NvrtcResult nvrtcCompile(const std::string& source, const std::string& name, const std::string& includeDir, const std::string& arch);
 

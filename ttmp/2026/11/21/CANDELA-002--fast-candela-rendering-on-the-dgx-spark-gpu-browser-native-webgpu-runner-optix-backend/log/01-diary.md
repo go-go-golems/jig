@@ -834,3 +834,109 @@ now calls them) plus a `SceneSession` class for headless hosts, added a test wit
 
 ### Technical details
 - Evidence: `various/14-scene-session.txt`.
+
+## Step 14: Phase 2 — WGSL → CUDA translation, a plain-CUDA target, and pixel parity with WebGPU
+
+Phase 2 asks whether every preset's program can be compiled for CUDA. I went one step further: a plain-CUDA target
+that runs the translated program (including the translated `traceAll` over Candela's own BVH) in `candela-rt`, and a
+WebGPU reference renderer in Node (Dawn), so the translation can be checked by comparing images pixel by pixel before
+OptiX enters. The first comparison exposed a real semantic gap — evaluation order of side effects — and after fixing
+it, 101/105 presets agree with WebGPU on ≥ 99 % of pixels at 1 spp.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11)
+**Assistant interpretation:** Phase 2 of design doc 02, with a measurable exit check.
+**Inferred user intent:** A CUDA backend that renders the same images as the browser.
+**Commit (code):** `1b79006` (translator, CUDA target, B-01 parity); the commit after this entry (sweeps, fast math,
+Dawn fix, docs).
+
+### What I did
+- Inventory of the WGSL constructs the generated programs use (`scripts/10-wgsl-inventory.mts` and a stricter scratch
+  pass on code lines without comments): typed declarations only, structs with one member per line, `select`, `loop`,
+  `for (var …)`, `++`, `%` on i32 only, one private table (`ETAB`), no pointers, switches or generics.
+- Decision: translate the whole program (`compiled.shared`) rather than add `Gen` dialects (§5.6); `wgsl2glsl.ts`
+  already translates the same text for WebGL2, so the generated code is known to stay in the subset.
+- `native/rt/kernels/candela_wgsl.h`: WGSL types (`f32`, `vec3f`, …) and built-ins in namespace `wgsl`; swizzles as
+  member functions; operators as friends so `v * 2` converts like WGSL abstract ints.
+- `src/engine/wgsl2cuda.ts`: constants → `constexpr`, structs, never-written private arrays → `__constant__`; other
+  private variables and all functions → members of a per-thread `struct Kernel`; `let` → `const T`; `var x: T;` →
+  `T x{}` (WGSL zero-init); `1.0` → `1.0f`; `v.xyz` → `v.xyz()`; `select` → `?:`; `bitcast<u32>` → `bitcast_u32`.
+- `src/engine/targets/cuda.ts` (`cudaProgram`), `src/engine/headless.ts` (`openRender`: one scene packed at one time,
+  `frame()` gives each launch's uniforms), `src/engine/wgsl-entry.ts` (the WebGPU prelude/main, now shared by
+  `render.ts` and the Dawn renderer), `frameUniforms` moved from `Viewport.frame` to `session.ts`.
+- candela-rt: `cuda_runner.{h,cpp}` (NVRTC → cubin, driver API, `params` in constant memory, cubin cache in
+  `~/data/candela/cubin-cache` keyed by source, header and option hashes), `candela-rt cuda-sweep` (V8 translates all
+  presets, 10 NVRTC threads), `candela-rt render <id>` (PFM out). `JsRuntime` gained `callMethod` and `get`.
+- `scripts/wgsl-render.ts` (Dawn via the `webgpu` npm package), `scripts/compare-pfm.ts`, `scripts/parity-sweep.ts`.
+
+### Why
+- Comparing the translated program with the original on identical inputs isolates translation errors from OptiX
+  integration errors, which phase 3 would otherwise mix together.
+
+### What worked
+- First nvcc compile of B-01's translation succeeded (158 registers, 1088 B stack); W-01 and K-09 too.
+- NVRTC sweep: 105/105 translate (8–21 ms), compile and load. IEEE math: 11.7 s mean per preset under 10 threads;
+  with `--use_fast_math`: 4.5 s mean, 7.8 s max, 48.5 s wall, 152–232 registers, ≤ 1152 B local
+  (`various/15-nvrtc-sweep-fastmath.json`, measured with `CUDA_CACHE_DISABLE=1`).
+- After sequencing (below), B-01 at 1 spp: 100 % of pixels within 0.1 %, rel. RMSE 0.00 %; at 1024 spp 99.9 %,
+  rel. RMSE 0.01 %; the CUDA target took 451 ms against Dawn's 1063 ms for 1024 spp at 640×360.
+- Parity sweep at 320×180, 1 spp: IEEE math 85/105 presets with ≥ 99 % of pixels within 0.1 %; fast math 101/105
+  (`various/15-parity-1spp-*.log`). The four remaining (F-03, F-04, G-03, R-04) differ only in noise realizations
+  (`various/15-parity-residual-noise-presets.png`).
+- At 64 spp (fast math): every preset's mean luminance within 0.3 % of WebGPU (median 0.0000 %, worst R-04 +0.289 %).
+- Speed at 960×540, 256 spp, same algorithm and BVH: B-01 3.8×, K-09 5.4×, X-02 7.3×, V-04 1.9× faster than Dawn.
+- Browser unchanged after moving `frameUniforms` and the WGSL entry text: golden 105/105, B-01 and K-09 render.
+
+### What didn't work
+- First B-01 comparison: means within 0.095 %, but only 27 % of pixels within 0.1 %; at 1 spp 22 % of pixels had a
+  different *albedo AOV* — not rounding. Cause: C++ evaluates `sampleLobe(L, woL, rnd2(), rnd())`'s arguments in an
+  unspecified order, and `gTau = select(0.5, (f32(s) + rnd()) / f32(spp), …)` became a `?:` that skips `rnd()` when
+  motion blur is off, shifting the whole random stream. Fixed by sequencing (below).
+- `nvrtc: error: unrecognized option --gpu-arch=sm_121 found` → the option is `--gpu-architecture=`.
+- `scripts/wgsl-render.ts`: `TypeError: Cannot read properties of undefined (reading '0')` — `parseArgs` returns
+  `rest`, not `pos`.
+- After refactoring the Dawn renderer into `dawnDevice()`/`wgslRender()`: exit 139 (SIGSEGV) or `terminate called
+  after throwing an instance of 'std::system_error' what(): Invalid argument`. The GPU instance from `create([])` was
+  only referenced inside `dawnDevice`; once collected, Dawn tore it down under the device. Fixed by keeping the
+  instance and adapter reachable.
+- A sweep reported NVRTC times of 43–400 ms: the CUDA driver's compute cache (`~/.nv/ComputeCache`, 769 MB) also
+  serves NVRTC results. Honest numbers need `CUDA_CACHE_DISABLE=1`.
+
+### What I learned
+- NVIDIA's Vulkan driver evaluates WGSL `sin`/`cos` (and likely exp/log/division) with the approximate hardware
+  units. Candela's noise hash `fract(sin(dot(p, k)) * 43758.5453)` multiplies `sin`'s last bits by 43758, so IEEE
+  `sinf` gives unrelated noise: G-03 (terrain) was off by −17.5 % in mean luminance until `__sinf`/`__cosf`
+  (83 % of pixels within 0.1 %) and then `--use_fast_math` (87 %, 99.7 % within 1 %).
+- The same hash makes the browser's own noise differ between GPU vendors; an integer hash (the kernel already has
+  `pcgH`) would make noise identical everywhere, at the cost of changing every noise preset's look once.
+
+### What was tricky to build
+- Sequencing side effects: the translator finds impure functions by fixpoint (assigns a `var<private>` or calls an
+  impure function), splits each line into statements at top-level `;`, `{`, `}`, and, when a statement has two impure
+  calls or one inside a `select`, hoists them post-order left to right (`const auto _sN = rnd2();`). It refuses
+  (throws) where hoisting would be wrong: `else if`, `for`/`while` headers, short-circuit operators.
+- `.b` is a struct member (`Frame.b`), so only 2–4-component `xyzw` swizzles are rewritten.
+
+### What warrants a second pair of eyes
+- `--use_fast_math` as the default (`kNvrtcOptions` in `cuda_runner.cpp`): it is chosen to match WebGPU on this GPU,
+  not IEEE accuracy.
+- The sequencing pass covers the cases the presets contain; a future kernel edit with an impure call inside `&&` will
+  fail translation loudly rather than silently.
+- `candela_wgsl.h` defines `min`/`max`/`clamp` as templates returning the common type; WGSL forbids mixed vector/scalar
+  forms, so none are provided.
+
+### What should be done in the future
+- Phase 3: the OptiX target — omit `traceAll`, add the traversal shim, GAS/IAS from the pack data, then the same
+  parity sweep against WebGPU.
+- Decide on an integer noise hash (changes the look of the noise presets once; makes noise backend-independent).
+
+### Code review instructions
+- `src/engine/wgsl2cuda.ts` (`impureFunctions`, `sequence`, `stmt`, `wgslToCuda`), `native/rt/kernels/*`,
+  `native/rt/src/cuda_runner.cpp`, `native/rt/src/main.cpp` (`cmdCudaSweep`, `cmdRender`, `compileCached`).
+- Validate: `npm run bundle:core && ninja -C build/rt && ./build/rt/candela-rt cuda-sweep` (105/105), then
+  `npx tsx scripts/parity-sweep.ts --size 320x180 --spp 1` (≥ 99 % within 0.1 % for 101/105).
+
+### Technical details
+- Evidence: `various/15-phase2-cuda-translation.txt`, `15-nvrtc-sweep-fastmath.json`, `15-parity-1spp-ieee.log`,
+  `15-parity-1spp-fastmath.log`, `15-b01-before-sequencing-64spp.png`, `15-b01-after-sequencing-1spp.png`,
+  `15-parity-residual-noise-presets.png`.
