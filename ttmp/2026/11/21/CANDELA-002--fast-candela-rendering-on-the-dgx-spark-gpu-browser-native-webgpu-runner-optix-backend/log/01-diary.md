@@ -620,3 +620,6 @@ send the IR entirely to the backend? or do we have callbacks we would need to ru
 
 ### Technical details
 - Supersedes: the vault report's buffer-level `RemoteOptixBackend`; step 2 (Dawn runner) deferred (D10).
+- Upload: `remarquee upload bundle design-doc/02-… --name "CANDELA-002 candela-rt - V8 and OptiX render runtime"
+  --remote-dir /ai/2026/11/21/CANDELA-002 --toc-depth 2 --non-interactive` → `OK: uploaded CANDELA-002 candela-rt -
+  V8 and OptiX render runtime.pdf -> /ai/2026/11/21/CANDELA-002` (design commit `1d9896b`).
