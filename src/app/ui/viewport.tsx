@@ -134,7 +134,7 @@ function RemoteChips({ host }: { host: Host }) {
   const state = r.state === 'live' ? 'OptiX' : r.state === 'error' ? 'OptiX: ' + (r.message || 'error').slice(0, 80) : 'OptiX: ' + r.state + (r.message ? ' · ' + r.message.slice(0, 60) : '');
   return <>
     <span className={'chip on gpu' + (r.state === 'live' ? '' : ' busy')} title={r.server ? `candela-rt on ${r.server.gpu} · ${r.url}` : r.url}>{state}</span>
-    {f && <span className="chip ghost">{f.spp} spp · {f.width}×{f.height} · {r.built ? r.built.target : ''}{r.built && r.built.motion ? ' +motion' : ''} · {r.fps.toFixed(0)} fps</span>}
+    {f && <span className="chip ghost">{f.spp} spp · {f.width}×{f.height} · {r.built ? r.built.target : ''}{r.built && r.built.motion ? ' +motion' : ''}{f.denoise === 'ai' ? ' · AI denoised' : ''} · {r.fps.toFixed(0)} fps</span>}
     {r.mismatch && <span className="chip busy" title="the browser and candela-rt built different programs (different engine versions?)">program differs</span>}
   </>;
 }

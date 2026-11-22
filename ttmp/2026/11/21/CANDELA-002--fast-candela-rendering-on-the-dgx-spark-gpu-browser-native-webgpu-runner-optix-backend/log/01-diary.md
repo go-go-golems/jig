@@ -1308,3 +1308,62 @@ for the charts.
 
 ### What should be done in the future
 - Phase 6 resumes with the OptiX AI denoiser (AOV model, albedo and world-space normal guides).
+
+## Step 21: Phase 6 — the OptiX AI denoiser in render jobs and the live view
+
+The OptiX AI denoiser now runs between accumulation and the display program: 4 spp with it has a lower per-pixel
+error than 64 spp without it, and one 1080p stitch of the lockstitch head takes 13.9 s at 16 spp (44.9 s at 64 spp
+raw, 225.9 s in the browser).
+
+### Prompt Context
+**User prompt (verbatim):** "continue." (after the report; Step 20) and "commit at appropriate intervals and keep a
+detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Resume phase 6 with the denoiser, measure it, keep commits and the diary going.
+
+### What I did
+- `denoiser.{h,cpp}` (`AiDenoiser`): own `OptixDeviceContext` on the CUDA context (so the plain-CUDA target can use
+  it), `OPTIX_DENOISER_MODEL_KIND_AOV` with `guideAlbedo`, `guideNormal`, alpha copied; per frame
+  `optixDenoiserComputeAverageColor` then `optixDenoiserInvoke` with one beauty layer. The AOV model wants normals in
+  world space (the header: camera space only for the deprecated LDR/HDR kinds) — what `aovN` already holds.
+- `candela_guides` in `candela_post.cuh`: beauty = `cAt` (radiance average), albedo = `aAt` clamped, normal = `nAt`,
+  launched with kernel arguments (the `post` constant block unchanged).
+- `PostProcessor::run(..., ai)`: guides → denoise → display pass on the denoised radiance (`D(1).w = 1`, no à-trous).
+- `candela-rt render --denoise scene|ai|off` (default scene); `serve --denoise` (default ai); frame headers carry the
+  denoiser and its time; the workbench chip says "AI denoised".
+
+### Why
+- Before tone mapping: the AOV model works on linear HDR; the display program (exposure, AgX, user passes) then sees
+  a clean image, so the denoiser does not need to know the workbench's look.
+- An 8×8-block metric hides noise by construction; the denoiser is judged per pixel (and per block for bias).
+
+### What worked
+- Quality and cost: `various/21-ai-denoiser.txt` (K-09 S-07, 960×540 vs 4096 spp: 4 spp + AI 1.19 % per-pixel
+  RMSE, 64 spp raw 1.71 %; 5.7–8.8 ms per frame; 18.3 ms at 1080p). Crops: noise gone at 16 spp, slight smoothing at
+  4 spp (`various/21-denoiser-k09-crops-*.png`).
+- Lockstitch S-07 stitch at 1080p, 16 spp + AI: 13.9 s wall; the frame's error 0.81 % vs 1.67 % for 64 spp raw.
+- Live (test server on 8791): K-09 plays at 24 fps with 4 spp + AI per frame; a playing frame looks like the
+  converged one (`various/21-live-4spp-ai-vs-converged.png`).
+
+### What didn't work
+- Nothing failed outright. The live stream trades frame rate for quality: 33 fps at 8 spp raw became 24 fps at
+  4 spp + AI, because the batch still targets 25 ms per tick and the denoiser adds ~7 ms.
+
+### What I learned
+- At these sample counts the denoiser is worth more than a 4–16× increase in samples; for final renders the sample
+  budget should be chosen with the denoiser on.
+
+### What warrants a second pair of eyes
+- The temporal AOV model (flow vectors) would stabilise denoised animation frames; frames are denoised
+  independently now, so low-spp sequences may flicker slightly in flat regions.
+- The live server's batch target (25 ms) ignores the denoiser's cost.
+
+### What should be done in the future
+- Temporal denoising for sequences; SER and built-in spheres (next).
+
+### Code review instructions
+- `native/rt/src/denoiser.cpp`, `post.cpp` (`run`), `candela_guides` in `native/rt/kernels/candela_post.cuh`,
+  `--denoise` in `main.cpp` and `serve.cpp`.
+- Validate: `./build/rt/candela-rt render K-09 --spp 16 --denoise ai --format png --size 960x540`.
+
+### Technical details
+- Code commit `b7c151b`; evidence `various/21-*`, script `scripts/21-image-error.py`.

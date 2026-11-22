@@ -5,7 +5,7 @@
 import { digestString } from '../engine/digest';
 
 export type RemoteState = 'connecting' | 'building' | 'compiling' | 'live' | 'taken' | 'closed' | 'error';
-export interface RemoteFrame { t: number; spp: number; ev: number; width: number; height: number; renderMs: number; epoch: number; playing: boolean }
+export interface RemoteFrame { t: number; spp: number; ev: number; width: number; height: number; renderMs: number; epoch: number; playing: boolean; denoise?: string; denoiseMs?: number }
 
 /** the server's address: ?rt=ws://host:port in the page URL, else localStorage 'candela.rtUrl', else this host:8790 */
 export function remoteUrl(): string {

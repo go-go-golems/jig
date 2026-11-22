@@ -45,7 +45,7 @@ async function main() {
     if (head.epoch !== epoch && lastHead) saveLast(`e${lastHead.epoch}`);
     epoch = head.epoch; lastHead = head; lastJpg = b.subarray(4 + hl); frames++;
     if (!firstFrameAt) { firstFrameAt = Date.now(); console.log(`${stamp()} first frame ${builtAt ? Date.now() - builtAt : '?'} ms after built`); }
-    if (frames % 10 === 1 || head.spp >= 2048) console.log(`${stamp()} frame #${frames} epoch ${head.epoch} t=${head.t.toFixed(3)} spp ${head.spp} ev ${head.ev.toFixed(2)} ${head.width}x${head.height} ${lastJpg.length} B`);
+    if (frames % 10 === 1 || head.spp >= 2048) console.log(`${stamp()} frame #${frames} epoch ${head.epoch} t=${head.t.toFixed(3)} spp ${head.spp} ev ${head.ev.toFixed(2)} ${head.width}x${head.height} ${lastJpg.length} B${head.denoise ? ` · denoise ${head.denoise} ${head.denoiseMs} ms` : ''}`);
   };
   ws.onerror = e => { console.error('websocket error', (e as any).message || e); };
   await new Promise<void>(res => ws.addEventListener('open', () => res(), { once: true }));
