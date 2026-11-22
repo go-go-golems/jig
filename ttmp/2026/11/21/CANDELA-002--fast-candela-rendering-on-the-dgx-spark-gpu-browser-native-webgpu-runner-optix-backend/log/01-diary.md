@@ -1284,3 +1284,27 @@ mode; bind 0.0.0.0 so it is reachable from bling.local.
 
 ### Technical details
 - Code commit `7e05db3`; evidence `various/19-live-*.png`.
+
+## Step 20: Project report for the vault — the whole project, the NVIDIA side (milestone)
+
+A new dated report covers the project from the imported Candela workspace to the live OptiX workbench, centred on
+the NVIDIA stack (GB10, headless-shell GPU access, CUDA/NVRTC, OptiX and the register limit, SRT motion transforms,
+NVENC, nvJPEG). The denoiser work (phase 6) was paused before any code for it was written.
+
+### Prompt Context
+**User prompt (verbatim):** "actually  write a detailed project report for the obsidian vault as a deep dive
+technical analysis blog post using a textbook writing style (no analogies, see skill). Commit and push the bsidian
+vault when done (go-go-parc vault)." Follow-up: "the report is about the whole project and implementation since we
+downloaded candela and started from it. focusin on the nvidia  of things". The user installed matplotlib with apt
+for the charts.
+
+### What I did
+- `Projects/2026/11/22/PROJECT REPORT - Candela on NVIDIA - From a Browser Path Tracer to OptiX, NVENC and a Live
+  Workbench on the DGX Spark - A Technical Deep Dive.md` in go-go-parc (vault commit `0cd2a18e`), with nine figures
+  in `_assets/candela-nvidia-*`: seven copied from earlier reports and two new charts (register limit vs K-09 render
+  time; speed-up over WebGPU per preset) made by `scripts/20-report-charts.py` (palette checked with the dataviz
+  validator; aqua below 3:1 contrast, so every bar carries a value label).
+- New note rather than an edit: the vault is append-only; it links the two earlier Candela reports.
+
+### What should be done in the future
+- Phase 6 resumes with the OptiX AI denoiser (AOV model, albedo and world-space normal guides).
