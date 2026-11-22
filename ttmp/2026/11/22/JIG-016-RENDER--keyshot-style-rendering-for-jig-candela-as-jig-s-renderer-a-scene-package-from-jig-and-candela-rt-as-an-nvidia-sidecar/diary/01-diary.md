@@ -582,3 +582,101 @@ Two of the three agents reported, and both branches were reviewed and merged. Th
 - `cadpkg.js` `inferProcess` (the `add` case), `sourceOf`, and `faceRecords` (`rounds`, `across`, `typeOf`).
 - `jig-candela.js` `defOf`, `derived` and `evict`; `assembly.js` finishes.
 - Run `node --test test/render/*.test.mjs` and `node test/engine/run.mjs`.
+
+## Step 9: the Compur preset merged; one material per tool axis line; look files out of the model
+
+The Compur agent delivered preset M-11. It is the Synchro-Compur 0-MXV leaf shutter, animated by poses baked from the shutter's own planar simulation. Reviewing it turned up a general limit and a cache bug.
+- **The limit:** Candela compiles every distinct tool axis and centre into the shader, so the Compur's 3,393 faces made 540 materials and a 492 KiB shader.
+- **The workaround and its bug:** the agent's look worked around this by rewriting face metadata. It kept the worker's content keys while doing so, so the new definition cache served stale definitions.
+
+I moved the fix into the bridge for every look, removed the workaround, and fixed the host so look files are not model inputs. The Compur renders in Chromium on the Iris Xe with 82 materials.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 7.
+**Assistant interpretation:** merge the last agent's work and act on what it found.
+**Inferred user intent:** the remaining items done, including a working Compur example.
+**Commit (code):**
+- `46416aa` merge of the Compur preset (agent commits `0db5287`, `da57adf`, `764df1a`, `c91f595`);
+- `6dc5c20` "Render: one material per tool axis line; look files are not model inputs".
+
+### What I did
+**Merged the Compur branch.**
+- The preset `content/presets/M-11-synchro-compur/` holds `script.js` (61 KB), `look.js`, `compur-poses.look.js` (72 KB, 481 samples at 24 kHz of simulation time, 17 components), `notes.md` and `meta.json`.
+- The adapter is `tools/compur-poses.mjs` (it runs one 1/125 release of `web/sim.js`), and the test is `test/render/compur.test.mjs` (9 tests).
+
+**Measured the agent's material claim, in a fresh process per variant** (`scratchpad/report/mats.mjs`): with the look's workaround, 60 materials and 110 KiB of shared IR; without it, 540 and 492 KiB.
+
+**Added `toolMeta(meta)` in `jig-candela.js`, applied when definitions are made (`fromArrays`, `derived`).**
+- The axis becomes a unit vector with its first non-zero component positive.
+- The centre becomes the point of the axis line nearest the body origin, both rounded to 1e-6.
+- Faces with a process but no axis (milled B-spline flanks) lose the centre.
+- Face-milled flats are centred on the body origin.
+- Turned, ground and faced faces keep their exact lines. The package keeps each face's own centre, and the change is visible only to Candela.
+
+**Removed the look's per-part centre workaround (`dressed()`).** The compur test's limit is now < 100 materials, with the reason. A toolMeta unit test was added to `bridge.test.mjs`; it loads the bridge source with the `candela` import stubbed.
+
+**Added `src/render/files.js`** with `LOOK_FILE`, `isLookFile` and `modelFiles`.
+- `src/host/host.js` uses `modelFiles` for `dirty`, for `compile()` and for `check()`.
+- `render/host.js` re-exports the two names.
+- `test/ui/render.cjs` gains "a look edit leaves the model clean (no Run needed)".
+
+### Why
+- **The groove field depends only on the axis line.** Candela's `fx.tangent.around(axis, center)` uses the line, not the point on it, so the canonical line changes no pixels on turned and faced faces.
+- **A face-milled flat's ring centre is not something jig knows,** because the tool path is unknown. The face centre was as arbitrary a choice as the body origin, and the body origin collapses a body's flats into one material per direction.
+- **The fix belongs in the bridge, not in a look.** A look that rewrites face meta must also change `key`, or the bridge's cache returns definitions built from other meta. That is easy to get wrong, as the workaround shows.
+
+### What worked
+**Materials by step** (a fresh process for each measurement):
+
+| Step | Without the workaround | With it |
+|---|---|---|
+| Before any change | 540 materials, 492 KiB | 60, 110 KiB |
+| Canonical axis lines only | 476 | 51 |
+| Plus no centre without an axis, and face mills on the body origin | 82, 126 KiB | 36, 91 KiB |
+
+**Compur in Chromium on the Iris Xe** (`scratchpad/pw/m11.cjs`):
+- Compile 15.7 s; shader load 27.6 s; 82 materials, 32 objects; ready at 8 spp; no page errors.
+- At t = 1.65 s (4.6 ms into the release) the blades show half open through the brass mounting tube (`scratchpad/report/m11-render.png`).
+
+**Suites:** render 74/74 (32.7 s), engine 62/62, engine-core 69/69, agent/UI 90/90, and `test/ui/render.cjs` 14/14.
+
+### What didn't work
+- **The first two-variant measurement printed 60 materials for both.**
+  - Both variants ran in one process, and the workaround's dressed bodies carried the worker's `key` over different face meta. The second build got the first build's definitions from `globalThis.__jigCandelaCache`.
+  - Measuring in a fresh process per variant showed the real numbers. The removed workaround had the same latent bug in the Render view, for example after toggling `CUTAWAY`.
+- **The toolMeta test failed with `ERR_MODULE_NOT_FOUND: Cannot find package 'candela'`.** The bridge imports `candela`, which only Candela's build resolves. The test now imports the bridge source with that line replaced by stubs, through a `data:` URL.
+
+### What I learned
+- **Breakdown of the Compur's distinct tool parameters, before the change:**
+
+  | Faces | Count | Distinct parameters |
+  |---|---|---|
+  | Face-milled planes | 365 | 365 |
+  | Milled B-splines | 109 | 109 |
+  | Milled cylinders | 140 | 85 |
+  | Ground cylinders | 49 | 39 |
+  | Milled planes along a direction | 2,730 | 23 |
+
+  The two "per-face centre" kinds were 474 of the 540 materials.
+- **The real fix is in Candela:** pass finish parameters as per-material data rather than compiling them into the shader as constants. That is upstream work in pbr-spark.
+
+### What was tricky to build
+- **Keeping cache keys valid.** toolMeta runs when a definition is made, from the face meta the key already hashes, so the same key always gives the same canonical meta.
+
+### What warrants a second pair of eyes
+- **The visual change.** Face-milled flats in every model now show rings about the body origin, not about the face centre. On a small flat far from the origin the rings read as near-straight arcs.
+- **The preset's cost (agent's measurements).** M-11 compiles in 15–21 s cold, against the preset guide's 1.5 s. That adds about 20 s to every all-presets sweep (`preset-check`, `test/stage/real.cjs`) and about 138 KiB to `dist/app.js`.
+- **Display colours on steel.** The agent followed the script comments, so the gold display colours on three steel parts are not shown.
+
+### What should be done in the future
+- Candela: finish parameters as data, instead of shader constants.
+- Decide whether M-11 stays on the preset shelf or moves out of the sweeps.
+
+### Code review instructions
+- Read `jig-candela.js` `toolMeta` and its use in `fromArrays` and `derived`, `src/render/files.js`, and the `modelFiles` uses in `src/host/host.js`.
+- Validate:
+
+  ```sh
+  node --test test/render/*.test.mjs
+  NODE_PATH=<playwright> CHROMIUM=<chrome> node test/ui/render.cjs
+  ```

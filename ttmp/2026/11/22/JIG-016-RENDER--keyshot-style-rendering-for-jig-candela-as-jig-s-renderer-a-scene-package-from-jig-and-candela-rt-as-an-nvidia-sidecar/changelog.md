@@ -21,3 +21,12 @@ Implemented phases 0-5 on branch jig-016-render: Candela vendored (65d237d), CAD
 - /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/src/engine/cadpkg.js — the CAD package export
 - /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/src/render/host.js — the Render view's controller
 - /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/src/render/jig-candela.js — the bridge (Candela library module)
+
+## 2026-11-22
+
+Merged the remaining items: lockstitch comparison (586368c) with the two inferProcess gaps fixed (1358880); assembly finishes and caching between compiles (15041cb); the Render view follows the mechanism and has motion blur (260d98f); the Compur preset M-11 with poses from its own simulation (46416aa); one material per tool axis line and look files out of the model (6dc5c20). Render tests 74/74, engine 62/62, browser 14/14.
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/content/presets/M-11-synchro-compur/look.js — the Compur look playing baked poses
+- /home/manuel/code/wesen/go-go-golems/jig/import/jigcad/src/render/jig-candela.js — toolMeta, the definition cache
