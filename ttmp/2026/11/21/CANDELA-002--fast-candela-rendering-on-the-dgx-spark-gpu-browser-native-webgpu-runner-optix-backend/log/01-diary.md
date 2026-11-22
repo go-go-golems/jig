@@ -1203,3 +1203,84 @@ workbench.
 ### Technical details
 - Evidence: `various/18-phase4-jobs.txt`, `18-lockstitch-*.{json,log,png}`, `18-motion-blur-gear-*.png`,
   `18-png-stills-rt-vs-browser.png`. Code commit `dc8a3b4` (+ TextEncoder, reel font fallback in the next commit).
+
+## Step 19: Phase 5 — candela-rt serve and the workbench's OptiX mode
+
+The workbench can now render on the Spark: an "OptiX" toggle in the viewport toolbar connects to `candela-rt
+serve`, which builds the same scene in its own V8, renders it with the CUDA/OptiX target and streams progressive
+JPEG frames. The browser keeps building every scene itself (editor, diagnostics, picking) and forwards its inputs.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 16) "close trellis-bench. then when the servers are running, continue with
+phase 3-6"
+**Assistant interpretation:** Design doc 02 §7: the inputs protocol, IR-hash handshake, nvJPEG frames, browser OptiX
+mode; bind 0.0.0.0 so it is reachable from bling.local.
+
+### What I did
+- `native/rt/src/serve.cpp`: IXWebSocket v11.4.6 (CMake FetchContent, no TLS, per-message deflate off — JPEGs do
+  not compress). IX threads push messages on a queue; one session thread owns the isolate, the CUDA context, the
+  renderer, the display program and the nvJPEG encoder, alternating between messages and a render batch.
+- Protocol in: `hello`, `files {files, params, time, seed}`, `param {id, value}`, `view {view, width, height}`,
+  `clock {t, playing, rate}`; out: `hello`, `status`, `built {ok, irHash, target, …}`, `error`, and binary frames
+  (uint32 header length + header JSON + JPEG).
+- Batches adapt to ~20 ms; a frame at most every 100 ms while converging, every tick while playing; exposure
+  metered at 1, 8 and 32 spp after scene/param/view changes (not on clock ticks); `--max-spp 2048`,
+  `--max-width 1920`; frames skipped while the socket has > 8 MiB queued. The renderer is kept across rebuilds that
+  do not change the program (`target:hash`).
+- `jpeg.{h,cpp}` (nvJPEG on the default stream, primary context); the display kernel also writes packed RGB.
+- `HeadlessRender`: `irHash` (digest of `compiled.shared`), `view`/`setView`, `resize`, `setParam` → `repack` |
+  `rebuild` | `unknown`, `paramValues`; `Renderer::resize` (the base owns the image buffers).
+- Browser: `src/app/remote.ts` (`RemoteRender`: connect to `?rt=` / `localStorage candela.rtUrl` / `ws://<page
+  host>:8790`, retry every 2 s, object-URL frames), `Host.setRemote`/`remoteFiles` (files + param values after each
+  build), param forwarding in `onParam`, camera + size and clock in `tick` (deduplicated), viewport `<img
+  class="vp-remote">` overlay, OptiX toggle, chips (state, spp, size, target, fps, "program differs").
+- `scripts/live-client.ts` (protocol test without a browser), `scripts/live-browser-check.ts` (Playwright on the
+  Vite dev server: toggle, wait for frames, orbit, param, back to WebGPU).
+
+### Why
+- Keeping the session's logic in the JS `HeadlessRender` (seek, setParam, view) leaves the C++ server as a loop over
+  queued messages and render batches; message parsing uses V8's own `JSON.parse`.
+- One thread for V8 + CUDA: the isolate must be entered from one thread, and so the GPU work is ordered without locks.
+
+### What worked
+- live-client B-02: built 113 ms (+ NVRTC 3.5 s the first time), first frame 26 ms after `built`, 2048 spp at
+  960×540 in ~1.5 s; a `gloss=0.9` change → new epoch, sharper reflections.
+- live-client K-09 S-03 (OptiX + motion): play for 3 s → 98 frames (33 fps at 8 spp, 960×540), the scene time
+  advancing on the server; pause → converges (1240 spp after 4 s).
+- Browser (Playwright, `http://localhost:5173/`): B-02 OptiX mode live after 0.5 s, `irHash` = local hash
+  `9318995807c81a63`; orbit and param restart the server's epoch; K-09 live after 1.0 s on `optix +motion`, hashes
+  equal (`f714741444cb697b`); server frame and local WebGPU frame (past 512 spp) look the same.
+
+### What didn't work
+- The first frame went out at the default EV 12 before any metering (B-02's metered EV is 14.84): a bright flash.
+  The server meters at 1 sample first (the viewport meters at 2, 8, 32).
+- A K-09 test timed out with 0 frames: after the header change every program recompiled (NVRTC 2 s + OptiX module
+  9.2 s) and the client's window was 9 s; a second run (cached) was live in 1 s.
+- Comparing the server frame (2048 spp) with local WebGPU at 93 spp looked like a param mismatch (blurred
+  reflections); it was the local preview denoiser (< 512 spp). Compared past 600 spp, they match.
+
+### What I learned
+- The program hash makes a mismatch visible at once: both sides build from the same sources, so equal hashes mean
+  the same scene program, whatever the transport did.
+
+### What was tricky to build
+- IXWebSocket's message callback gives a `WebSocket&`; to keep the client alive in the session thread, the server
+  looks the matching `shared_ptr` up in `getClients()`.
+
+### What warrants a second pair of eyes
+- One client at a time (the last to speak); a second browser takes over the session.
+- `--token` is checked as a substring of the URI; fine on the local network, not real authentication.
+- The workbench's engine override (Preview/Realtime) is not forwarded; the server renders the scene's own engine.
+
+### What should be done in the future
+- "Render on the Spark" in the Render dialog (`render` jobs over the socket); asset uploads (dropped HDRIs).
+- Phase 6: the OptiX denoiser for the live view.
+
+### Code review instructions
+- `native/rt/src/serve.cpp`, `jpeg.cpp`, `src/app/remote.ts`, `Host.tick/setRemote/remoteFiles`, `RemoteChips` in
+  `src/app/ui/viewport.tsx`.
+- Validate: `./build/rt/candela-rt serve` then `npx tsx scripts/live-client.ts B-02 --tweak gloss=0.9` and
+  `npx tsx scripts/live-browser-check.ts K-09`; in a browser: http://bling.local:5173/ → OptiX.
+
+### Technical details
+- Code commit `7e05db3`; evidence `various/19-live-*.png`.

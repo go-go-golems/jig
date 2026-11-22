@@ -78,3 +78,12 @@ Phase 4: candela-rt render jobs — sequences, the workbench's display program t
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/post.cpp — the display program on the GPU
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/display.ts — display side shared by the browser and candela-rt
+
+## 2026-11-22
+
+Phase 5: candela-rt serve (IXWebSocket, nvJPEG) + the workbench's OptiX mode; IR-hash handshake equal for B-02 and K-09; K-09 plays at 33 fps on the server
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/serve.cpp — live server
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/src/app/remote.ts — browser client
