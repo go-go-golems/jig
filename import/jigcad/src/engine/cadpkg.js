@@ -9,8 +9,11 @@
 // faces turned, bores ground, milled elsewhere; design doc §6.4). The bridge that turns a package into a Candela
 // scene is src/render/jig-candela.js; Candela reads the same package in the browser and in candela-rt.
 //
-//   cadPackage(prog, { quality: 'render' | 'preview' })  → the package, arrays as typed arrays (transferable)
-//   encodeCadPackage(pkg)                               → JSON text, arrays as base64 (export('candela'))
+//   cadPackage(prog, { quality: 'render' | 'preview', studies })  → the package, arrays as typed arrays (transferable)
+//   encodeCadPackage(pkg)                                        → JSON text, arrays as base64 (export('candela'))
+//
+// An assembly's studies come with their poses (studies.<name>: drive, unit, x, and per component a float32 4×4 per
+// row, in Candela's frame), so a Candela scene plays a study back with the bridge's posesAt() and animate().
 import * as K from './kernel.js';
 import { meshBody, faceMeta } from './mesh.js';
 import { selectInPart } from './compile.js';
@@ -176,16 +179,42 @@ function faceRecords(body, m, part, appearance, types, multi, ov) {
 function boxCorners(bb) { return [0, 1].flatMap((i) => [0, 1].flatMap((j) => [0, 1].map((k) => [bb[i][0], bb[j][1], bb[k][2]]))); }
 function grow(B, p) { for (let a = 0; a < 3; a++) { B[0][a] = Math.min(B[0][a], p[a]); B[1][a] = Math.max(B[1][a], p[a]); } }
 
+// A study's poses as the package carries them: the drive values of the rows it reached (in the drive's unit, 'deg'
+// or 'mm') and, per component, its transform at each of them in Candela's frame (float32, 16 per row, column-major).
+// The engine keeps every study's poses on the worker side (assembly.js poseTrack); the package takes the ones `which`
+// names (true: all, false: none, a name or a list). A component the study does not move, at its placement in every
+// row, is left out: the bridge leaves it where the package puts it.
+function studiesOf(prog, components, which) {   // components: id → its placement (jig's frame)
+  const all = prog.studyPoses?.() ?? {};
+  const names = which === false ? [] : which == null || which === true ? Object.keys(all) : [which].flat();
+  for (const n of names) if (!all[n]) throw new Error(`candela export: no study '${n}'${Object.keys(all).length ? `; studies: ${Object.keys(all).join(', ')}` : ' (an assembly\'s .study() makes one)'}`);
+  const out = {};
+  for (const n of names) {
+    const st = all[n], rows = st.x.length, poses = {};
+    for (const [id, A] of Object.entries(st.T)) {
+      const T = components.get(id);
+      if (!T || !moves(A, T)) continue;
+      const P = new Float32Array(16 * rows);
+      for (let r = 0; r < rows; r++) P.set(toCandelaMatrix(A.subarray(16 * r, 16 * r + 16)), 16 * r);
+      poses[id] = P;
+    }
+    out[n] = { drive: st.drive, unit: st.unit, from: st.from, to: st.to, x: Array.from(st.x), poses };
+  }
+  return out;
+}
+const moves = (A, T) => { for (let i = 0; i < A.length; i++) if (Math.abs(A[i] - T[i % 16]) > 1e-9) return true; return false; };
+
 /**
  * The CAD package of a compiled program. quality 'render' tessellates at a finer angle than the stage (0.1 rad
- * instead of 0.3) so reflective bores do not show facets; 'preview' reuses the stage's meshes.
+ * instead of 0.3) so reflective bores do not show facets; 'preview' reuses the stage's meshes. studies: which of an
+ * assembly's studies carry their poses (true, the default: all; false: none; a name or a list of names).
  */
-export function cadPackage(prog, { quality = 'render' } = {}) {
+export function cadPackage(prog, { quality = 'render', studies = true } = {}) {
   const P = prog.P, data = prog.data;
   if (!P?.parts) throw new Error('candela export: nothing compiled');
   const types = featureTypes(data.graph), multi = P.parts.length > 1;
   const placement = new Map((P.bodiesData ?? []).map((b) => [b.id, b.transform]));
-  const components = new Map(), bodies = [], diagnostics = [];
+  const components = new Map(), jigPlace = new Map(), bodies = [], diagnostics = [];
   const W = [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]];
   for (const p of P.parts) {
     const meta = p.part?.meta ?? {};
@@ -197,6 +226,7 @@ export function cadPackage(prog, { quality = 'render' } = {}) {
       if (!components.has(p.name)) {
         components.set(p.name, { id: p.name, parent: p.name.includes('/') ? p.name.slice(0, p.name.lastIndexOf('/')) : null,
           transform: toCandelaMatrix(T), material: meta.material?.name ?? null, color: meta.color ?? null, look: look.meta ?? {} });
+        jigPlace.set(p.name, T);
       }
       const n = m.positions.length / 3, pos = new Float32Array(m.positions.length), nrm = new Float32Array(m.normals.length);
       for (let v = 0; v < n; v++) {
@@ -215,7 +245,7 @@ export function cadPackage(prog, { quality = 'render' } = {}) {
     source: { name: data.name, kind: data.kind, hash: data.hash },
     frame: { units: 'm', up: '+y', fromJig: 'p = 0.001 * (x, z, -y)' },
     bounds: Number.isFinite(W[0][0]) ? W : null,
-    components: [...components.values()], bodies, studies: {}, diagnostics,
+    components: [...components.values()], bodies, studies: studiesOf(prog, jigPlace, studies), diagnostics,
     views: { axo: { yaw: 38, pitch: 27 }, front: { yaw: 0, pitch: 0 }, side: { yaw: -90, pitch: 0 }, plan: { yaw: 0, pitch: 90 } },
   };
 }
@@ -228,12 +258,14 @@ const toB64 = typeof Buffer !== 'undefined' ? b64 : (a) => {
   for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
   return btoa(s);
 };
-/** the package as JSON text: typed arrays as base64 of their little-endian bytes */
+/** the package as JSON text: typed arrays (meshes, study poses) as base64 of their little-endian bytes */
 export function encodeCadPackage(pkg) {
   const bodies = pkg.bodies.map((b) => {
     const o = { ...b };
     for (const k of ARRAYS) o[k] = toB64(b[k]);
     return o;
   });
-  return JSON.stringify({ ...pkg, bodies });
+  const studies = Object.fromEntries(Object.entries(pkg.studies ?? {}).map(([k, st]) => [k,
+    { ...st, poses: Object.fromEntries(Object.entries(st.poses).map(([id, a]) => [id, typeof a === 'string' ? a : toB64(a)])) }]));
+  return JSON.stringify({ ...pkg, bodies, studies });
 }
