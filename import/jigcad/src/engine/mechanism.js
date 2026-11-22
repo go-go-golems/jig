@@ -81,14 +81,24 @@ const norm2 = (F) => F.reduce((a, b) => a + b * b, 0);
 const normInf = (F) => F.reduce((a, b) => Math.max(a, Math.abs(b)), 0);
 
 // ---------------------------------------------------------------- joints
-const COUNT = { point: 3, onAxis: 2, inPlane: 1, axis: 2, twist: 1 };
+// onLineX: b's origin on the line through a's origin along a's x (a pin in a slot), 2 equations
+const COUNT = { point: 3, onAxis: 2, onLineX: 2, inPlane: 1, axis: 2, twist: 1 };
 export const PRIMITIVES = {
   rigid: ['point', 'axis', 'twist'], snap: ['point', 'axis', 'twist'], revolute: ['point', 'axis'], slider: ['onAxis', 'axis', 'twist'],
-  cylindrical: ['onAxis', 'axis'], planar: ['axis', 'inPlane'], ball: ['point'],
+  cylindrical: ['onAxis', 'axis'], pinSlot: ['onLineX', 'axis'], planar: ['axis', 'inPlane'], ball: ['point'],
 };
 export const equationCount = (kind) => (PRIMITIVES[kind] ?? []).reduce((a, p) => a + COUNT[p], 0);
-const HAS_VALUE = new Set(['revolute', 'slider', 'cylindrical']);
-const ANGULAR = new Set(['revolute', 'cylindrical']);
+// A joint's coordinates: the scalars a drag moves and a script sets. 'value' is its turn, or a slider's travel; a
+// two-valued joint has a 'slide' too (along the port's z for a cylindrical joint, along x for a pin in a slot). Every
+// channel that carries a joint's state (drives, overrides, the holds a drag commits, limits and clamps) names a
+// coordinate by its key, 'h' for a value and 'h.slide' for a slide, so each coordinate the solver moves has a name to
+// be set by and a committed drag cannot leave one behind.
+export const COORDS = { revolute: ['value'], slider: ['value'], cylindrical: ['value', 'slide'], pinSlot: ['value', 'slide'] };
+export const coordKey = (id, part = 'value') => (part === 'value' ? id : `${id}.${part}`);
+const HAS_VALUE = new Set(Object.keys(COORDS));
+const ANGULAR = new Set(['revolute', 'cylindrical', 'pinSlot']);
+// the second value of a two-valued joint: how far b's origin has slid along a's z (cylindrical) or x (pin in slot)
+const SLIDE_AXIS = { cylindrical: 'Z', pinSlot: 'X' };
 
 // User lambdas (a measure, an event, a wrench's load) are called through one door, the solver's: a throw is kept with
 // the lambda's name and where it was read (the first time, and how many more), for the compile to report
@@ -130,10 +140,15 @@ export class MechanismSolver {
       const A = this.port(jn.a, jn.id), B = this.port(jn.b, jn.id);
       if (!A || !B || !PRIMITIVES[jn.kind]) continue;
       if (A.bi === B.bi) { this.diags.push({ level: 'error', kind: 'joint.selfJoin', at: jn.id, message: `both ports of joint ${jn.id} are on ${this.bodies[A.bi].id}` }); continue; }
-      this.joints.push({ id: jn.id, kind: jn.kind, A, B, c: equationCount(jn.kind), on: true, limits: jn.limits ?? null });
+      this.joints.push({ id: jn.id, kind: jn.kind, A, B, c: equationCount(jn.kind), on: true, limits: jn.limits ?? null, slideLimits: jn.slideLimits ?? null });
     }
     this.jointById = new Map(this.joints.map((jn) => [jn.id, jn]));
-    this.drives = new Map([...(spec.drives ?? [])].filter(([id]) => { const jn = this.jointById.get(id); if (jn && !HAS_VALUE.has(jn.kind)) { this.diags.push({ level: 'error', kind: 'asm.drive', at: id, message: `a ${jn.kind} joint has no single value to drive` }); return false; } return !!jn; }));
+    this.drives = new Map([...(spec.drives ?? [])].filter(([key]) => {
+      if (this.coord(key)) return true;
+      const jn = this.jointById.get(key);
+      if (jn) this.diags.push({ level: 'error', kind: 'asm.drive', at: key, message: `a ${jn.kind} joint has no single value to drive` });
+      return false;
+    }));
     this.hints = new Map(spec.hints ?? []);
     this.seeds = new Map(spec.seeds ?? []);
     this.couples = (spec.couples ?? []).filter((c) => {
@@ -151,6 +166,22 @@ export class MechanismSolver {
     (this._ports ??= new Map()).set(ref, out);
     void at; return out;
   }
+  // 'h' → { jn, part: 'value' }, 'h.slide' → { jn, part: 'slide' }; null when no joint has that coordinate
+  coord(key) {
+    const memo = (this._coords ??= new Map());
+    if (memo.has(key)) return memo.get(key);
+    let c = null;
+    const jn = this.jointById.get(key);
+    if (jn) c = COORDS[jn.kind]?.includes('value') ? { jn, part: 'value', key } : null;
+    else {
+      const i = String(key).lastIndexOf('.'), base = i > 0 ? this.jointById.get(key.slice(0, i)) : null, part = String(key).slice(i + 1);
+      if (base && part !== 'value' && COORDS[base.kind]?.includes(part)) c = { jn: base, part, key };
+    }
+    memo.set(key, c);
+    return c;
+  }
+  coordValue(jn, part) { if (part !== 'slide') return this.value(jn); const a = this.world(jn.A), b = this.world(jn.B); return dot(sub(b.P, a.P), a[SLIDE_AXIS[jn.kind]]); }
+  linear(jn, part) { return part === 'slide' || jn.kind === 'slider'; }
   world(P) { const b = this.bodies[P.bi], r = mv(b.R, P.o); return { P: add(r, b.t), r, X: mv(b.R, P.x), Y: mv(b.R, P.y), Z: mv(b.R, P.z) }; }
   value(jn) {
     const a = this.world(jn.A), b = this.world(jn.B);
@@ -173,13 +204,19 @@ export class MechanismSolver {
       const a = this.world(jn.A), b = this.world(jn.B), d = sub(b.P, a.P);
       for (const prim of PRIMITIVES[jn.kind]) {
         if (prim === 'point') for (let k = 0; k < 3; k++) { const e = [0, 0, 0]; e[k] = 1; const g = row(); this.addW(g, jn.B.bi, cross(b.r, e)); this.addV(g, jn.B.bi, e); this.addW(g, jn.A.bi, cross(a.r, e), -1); this.addV(g, jn.A.bi, e, -1); F.push(d[k]); J.push(g); tag.push(jn.id); }
-        if (prim === 'onAxis' || prim === 'inPlane') for (const u of prim === 'onAxis' ? [a.X, a.Y] : [a.Z]) { const g = row(); this.dU(g, jn, a, b, u); F.push(dot(d, u)); J.push(g); tag.push(jn.id); }
+        if (prim === 'onAxis' || prim === 'onLineX' || prim === 'inPlane') for (const u of prim === 'onAxis' ? [a.X, a.Y] : prim === 'onLineX' ? [a.Y, a.Z] : [a.Z]) { const g = row(); this.dU(g, jn, a, b, u); F.push(dot(d, u)); J.push(g); tag.push(jn.id); }
         if (prim === 'axis') for (const w of [b.X, b.Y]) { const g = row(); this.addW(g, jn.A.bi, cross(a.Z, w)); this.addW(g, jn.B.bi, cross(w, a.Z)); F.push(dot(a.Z, w)); J.push(g); tag.push(jn.id); }
         if (prim === 'twist') { const g = row(); this.addW(g, jn.A.bi, cross(a.X, b.Y)); this.addW(g, jn.B.bi, cross(b.Y, a.X)); F.push(dot(a.X, b.Y)); J.push(g); tag.push(jn.id); }
       }
     }
     if (which === 'all') {
-      for (const [id, target] of this.drives) { const jn = this.jointById.get(id); if (!jn.on) continue; const g = row(); this.valueGrad(jn, g); const v = this.value(jn); F.push(jn.kind === 'slider' ? v - target : wrap(v - target)); J.push(g); tag.push(`drive ${id}`); }
+      for (const [key, target] of this.drives) {
+        const c = this.coord(key); if (!c || !c.jn.on) continue;
+        const g = row(); this.limitGrad(c.jn, c.part, g); const v = this.coordValue(c.jn, c.part);
+        F.push(this.linear(c.jn, c.part) ? v - target : wrap(v - target)); J.push(g); tag.push(`drive ${key}`);
+      }
+      // a joint held at a limit while a drag pushes past it (see drag): one equation on that value
+      for (const [key, c] of this.clamps ?? []) { const g = row(); this.limitGrad(c.jn, c.part, g); F.push(this.limitValue(c.jn, c.part) - c.at); J.push(g); tag.push(`limit ${key}`); }
       for (const c of this.couples) {
         if (!c.on) continue;
         const ja = this.jointById.get(c.a), jb = this.jointById.get(c.b), g = row(), ga = row();
@@ -196,7 +233,27 @@ export class MechanismSolver {
   set pose(p) { p.forEach((q, i) => { this.bodies[i].R = q.R.map((r) => r.slice()); this.bodies[i].t = q.t.slice(); }); if (p.unw) p.unw.forEach((u, i) => { this.joints[i].unw = u; }); }
   // a coupled angular joint's value counted in turns: unwrapped from the value at the last solved pose
   uvalue(jn) { const v = this.value(jn); return ANGULAR.has(jn.kind) && jn.unw != null ? jn.unw + wrap(v - jn.unw) : v; }
-  settle() { for (const c of this.couples) for (const id of [c.a, c.b]) { const jn = this.jointById.get(id); if (ANGULAR.has(jn.kind)) jn.unw = this.uvalue(jn); } }
+  tracked(jn) { return ANGULAR.has(jn.kind) && (!!jn.limits || this.couples.some((c) => c.a === jn.id || c.b === jn.id)); }
+  settle() { for (const jn of this.joints) if (this.tracked(jn)) jn.unw = this.uvalue(jn); }
+  // ---- limits: [lo, hi] on a joint's value (turned, for an angle) and slideLimits on the slide of a two-valued joint
+  limitValue(jn, part) { return part === 'slide' ? this.coordValue(jn, part) : this.uvalue(jn); }
+  limitGrad(jn, part, row) {
+    if (part === 'slide') { const a = this.world(jn.A), b = this.world(jn.B); this.dU(row, jn, a, b, a[SLIDE_AXIS[jn.kind]]); } else this.valueGrad(jn, row);
+  }
+  // the limits a pose breaks: [{ id, part, value, bound, side }]
+  limitViolations(tol = 1e-7) {
+    const out = [];
+    for (const jn of this.joints) {
+      if (!jn.on) continue;
+      for (const [part, L] of [['value', jn.limits], ['slide', SLIDE_AXIS[jn.kind] ? jn.slideLimits : null]]) {
+        if (!L) continue;
+        const v = this.limitValue(jn, part), [lo, hi] = L;
+        if (v < lo - tol) out.push({ id: jn.id, part, value: v, bound: lo, side: 'lo', jn });
+        else if (v > hi + tol) out.push({ id: jn.id, part, value: v, bound: hi, side: 'hi', jn });
+      }
+    }
+    return out;
+  }
   apply(dx, k = 1) {
     for (const b of this.bodies) {
       if (b.off < 0) continue;
@@ -258,18 +315,21 @@ export class MechanismSolver {
       const jn = order.find((q) => known.has(q.A.bi) !== known.has(q.B.bi));
       if (!jn) break;
       const ka = known.has(jn.A.bi), v = startValue(jn.id);
+      // a slide given (driven or hinted, 'h.slide') places the body there too
+      const sk = coordKey(jn.id, 'slide'), sl = COORDS[jn.kind]?.includes('slide') ? (this.drives.get(sk) ?? this.hints.get(sk) ?? 0) : 0;
       const th = ANGULAR.has(jn.kind) ? v : 0, s = jn.kind === 'slider' ? v : 0, T = rotZ(th);
+      const off = jn.kind === 'pinSlot' ? [sl, 0, 0] : [0, 0, jn.kind === 'cylindrical' ? sl : s];
       if (ka) {
-        const a = this.world(jn.A), Ra = cols(a.X, a.Y, a.Z), Rb = mm(Ra, T), ob = add(a.P, mv(Ra, [0, 0, s]));
+        const a = this.world(jn.A), Ra = cols(a.X, a.Y, a.Z), Rb = mm(Ra, T), ob = add(a.P, mv(Ra, off));
         const B = this.bodies[jn.B.bi]; B.R = mm(Rb, tr(cols(jn.B.x, jn.B.y, jn.B.z))); B.t = sub(ob, mv(B.R, jn.B.o)); known.add(jn.B.bi);
       } else {
-        const b = this.world(jn.B), Rb = cols(b.X, b.Y, b.Z), Ra = mm(Rb, tr(T)), oa = sub(b.P, mv(Ra, [0, 0, s]));
+        const b = this.world(jn.B), Rb = cols(b.X, b.Y, b.Z), Ra = mm(Rb, tr(T)), oa = sub(b.P, mv(Ra, off));
         const A = this.bodies[jn.A.bi]; A.R = mm(Ra, tr(cols(jn.A.x, jn.A.y, jn.A.z))); A.t = sub(oa, mv(A.R, jn.A.o)); known.add(jn.A.bi);
       }
       this.tree.add(jn.id); if (ANGULAR.has(jn.kind)) jn.unw = v;
       this.treeEdges.push({ id: jn.id, parent: ka ? jn.A.bi : jn.B.bi, child: ka ? jn.B.bi : jn.A.bi, childIsB: ka });
     }
-    for (const c of this.couples) for (const id of [c.a, c.b]) { const jn = this.jointById.get(id); if (ANGULAR.has(jn.kind) && jn.unw == null) jn.unw = this.value(jn); }
+    for (const jn of this.joints) if (this.tracked(jn) && jn.unw == null) jn.unw = this.value(jn);
     this.start = this.pose;
   }
   // place and close. A drive far from where the walk puts its loop can leave Gauss–Newton in a local minimum,
@@ -337,11 +397,11 @@ export class MechanismSolver {
   // move the drives to new values from the current pose in steps of at most 2° (or 1 mm), halving a step that fails
   driveTo(values, o = {}) {
     const maxA = o.maxStep ?? (2 * Math.PI / 180), maxL = o.maxStepMm ?? 1;
-    const ids = Object.keys(values).filter((id) => this.jointById.has(id));
-    const from = new Map(ids.map((id) => [id, this.drives.has(id) ? this.drives.get(id) : this.value(this.jointById.get(id))]));
+    const ids = Object.keys(values).filter((key) => this.coord(key));
+    const from = new Map(ids.map((key) => { const c = this.coord(key); return [key, this.drives.has(key) ? this.drives.get(key) : this.coordValue(c.jn, c.part)]; }));
     const setAt = (k) => { for (const id of ids) { const v0 = from.get(id); this.drives.set(id, v0 + (values[id] - v0) * k); } };
     let steps = 1;
-    for (const id of ids) { const jn = this.jointById.get(id), d = Math.abs(values[id] - from.get(id)); steps = Math.max(steps, Math.ceil(d / (jn.kind === 'slider' ? maxL : maxA))); }
+    for (const id of ids) { const c = this.coord(id), d = Math.abs(values[id] - from.get(id)); steps = Math.max(steps, Math.ceil(d / (this.linear(c.jn, c.part) ? maxL : maxA))); }
     const go = (k0, k1, depth) => {
       const saved = this.pose; setAt(k1);
       if (this.solve({ maxIter: o.maxIter ?? 80 })) return true;
@@ -356,48 +416,97 @@ export class MechanismSolver {
   // drag to pose (spec M8, as in sketch drag): move a port's origin toward a target with the drives released and the
   // joints and couplings kept. Least squares with the joint rows weighted, then a minimum-norm solve back onto the
   // joints, so the pose is the closest one the joints allow. → true when the joints hold
+  // o.guard (contact sets: { start(T), at(T), room(at, T) }, assembly.js contactGuard) speaks of motions, not poses:
+  // a step is walked from its start in pieces, each taken only when its travel fits the clearance where it starts,
+  // so no step can carry a part through another however far the target is; this.touched names the pairs that stopped it
   drag(ref, target, o = {}) {
     const P = this.port(ref);
     if (!P) throw new Error(`drag: no port '${ref}'`);
+    this.touched = [];
     if (this.bodies[P.bi].ground) return false;
     const saved = this.drives, start = this.pose, w = o.weight ?? 1e3;
-    this.drives = new Map();
+    let guard = o.guard ?? null;
+    this.drives = new Map(); this.clamps = new Map();
     const dist = () => len(sub(this.world(P).P, target));
+    // back onto the joints, inside every limit: a joint that would pass one is held at it from then on (a clamp row)
+    const admit = () => {
+      for (let round = 0; round < 4; round++) {
+        if (!this.solve({ maxIter: 40 })) return false;
+        const over = this.limitViolations();
+        if (!over.length) return true;
+        for (const v of over) this.clamps.set(`${v.id}.${v.part}`, { jn: v.jn, part: v.part, at: v.bound });
+      }
+      return false;
+    };
+    // conservative advancement along the step dx·k from p0 (fraction 0) to its end (fraction 1): a piece is kept when
+    // the guard finds its travel inside the clearance measured where it starts, else cut to the share that fits.
+    // → { t: the fraction reached, touching: the pairs that stopped it }, with the pose left at t
+    const walk = (p0, c0, dx, k) => {
+      this.pose = p0; this.clamps = new Map(c0);
+      let t = 0, at = guard.at(this.transforms()), keep = { pose: p0, clamps: new Map(c0) };
+      for (let n = 0; t < 1 && !at.touching.length && n < 64; n++) {
+        let t1 = 1, fits = false;
+        for (let h = 0; h < 40 && t1 - t > 1e-9; h++) {
+          this.pose = p0; this.clamps = new Map(c0); this.apply(dx, k * t1);
+          if (!admit()) { t1 = t + (t1 - t) / 2; continue; }
+          const room = guard.room(at, this.transforms());
+          if (room >= 1) { fits = true; break; }
+          t1 = t + (t1 - t) * 0.95 * room;
+        }
+        if (!fits) break;
+        t = t1; keep = { pose: this.pose, clamps: new Map(this.clamps) }; at = guard.at(this.transforms());
+      }
+      this.pose = keep.pose; this.clamps = keep.clamps;
+      return { t, touching: at.touching };
+    };
     // a step along the joints' tangent space (least squares, joint rows weighted), then back onto them; a step is
-    // kept when the port ends nearer the target, else halved
-    let ok = this.solve({ maxIter: 60 }), d0 = dist();
+    // kept when the port ends nearer the target (walked by the guard when there is one), else halved
+    let ok = admit(), d0 = dist();
+    if (ok && guard && !guard.start(this.transforms())) guard = null;   // every pair touches already: nothing to guard
     for (let it = 0; ok && it < (o.iters ?? 40) && d0 > 1e-7; it++) {
       const { F, J } = this.system('all'), p = this.world(P), d = sub(p.P, target);
       const rows = F.map((f) => f * w), Jw = J.map((g) => g.map((x) => x * w));
       for (let k = 0; k < 3; k++) { const e = [0, 0, 0]; e[k] = 1; const g = new Array(this.n).fill(0); this.addW(g, P.bi, cross(p.r, e)); this.addV(g, P.bi, e); Jw.push(g); rows.push(d[k]); }
-      const dx = minNormStep(Jw, rows, this.n), p0 = this.pose;
-      let k = 1, moved = false;
+      const dx = minNormStep(Jw, rows, this.n), p0 = this.pose, c0 = new Map(this.clamps);
+      let k = 1, moved = false, stop = null;
       for (let h = 0; h < 10; h++) {
         this.apply(dx, k);
-        if (this.solve({ maxIter: 40 }) && dist() < d0 - 1e-12) { moved = true; break; }
-        this.pose = p0; k /= 2;
+        if (admit() && dist() < d0 - 1e-12) {
+          if (!guard) { moved = true; break; }
+          const wk = walk(p0, c0, dx, k);
+          stop = wk.touching.length ? wk.touching : null;
+          if (wk.t > 0 && dist() < d0 - 1e-12) { moved = true; break; }
+          if (stop || wk.t === 0) break;   // a shorter step would meet the same contact, or fit no better
+        }
+        this.pose = p0; this.clamps = new Map(c0); k /= 2;
       }
-      if (!moved) break;
-      const d1 = dist(); if (d0 - d1 < 1e-11) { d0 = d1; break; } d0 = d1;
+      if (stop) this.touched = stop;
+      if (!moved) { this.pose = p0; this.clamps = new Map(c0); break; }
+      const d1 = dist(); if (stop || d0 - d1 < 1e-11) { d0 = d1; break; } d0 = d1;
     }
-    this.drives = saved;
+    this.limited = [...this.clamps.keys()];
+    this.drives = saved; this.clamps = null;
     if (!ok) this.pose = start;
     return ok;
   }
-  // the joints whose values pin this pose: the drives, then tree joints in order while each adds to the rank
+  // the coordinates whose values pin this pose: the drives, then every joint's coordinates in order while each adds
+  // to the rank. → [{ id: key ('h', 'h.slide'), value, unit, shown }]; this.pinned says whether they pin it whole (a
+  // planar or ball joint has no coordinates to carry its pose, and a drag of one is not kept)
   holds() {
-    const saved = this.drives, ids = [...saved.keys()];
-    this.drives = new Map(ids.map((id) => [id, this.uvalue(this.jointById.get(id))]));
+    const held = (key) => { const { jn, part } = this.coord(key); return part === 'value' ? this.uvalue(jn) : this.coordValue(jn, part); };
+    const saved = this.drives, keys = [...saved.keys()].filter((k) => this.coord(k));
+    this.drives = new Map(keys.map((k) => [k, held(k)]));
     let rk = this.rank(this.system('all').J);
-    for (const jn of this.joints) {
+    const cands = this.joints.flatMap((jn) => (COORDS[jn.kind] ?? []).map((part) => ({ jn, part, key: coordKey(jn.id, part) })));
+    for (const { jn, part, key } of cands) {
       if (rk >= this.n) break;
-      if (!HAS_VALUE.has(jn.kind) || this.drives.has(jn.id) || this.couples.some((c) => c.b === jn.id)) continue;
-      this.drives.set(jn.id, this.uvalue(jn));
+      if (this.drives.has(key) || (part === 'value' && this.couples.some((c) => c.b === jn.id))) continue;
+      this.drives.set(key, held(key));
       const r2 = this.rank(this.system('all').J);
-      if (r2 > rk) { rk = r2; ids.push(jn.id); } else this.drives.delete(jn.id);
+      if (r2 > rk) { rk = r2; keys.push(key); } else this.drives.delete(key);
     }
-    this.drives = saved;
-    return ids.map((id) => { const jn = this.jointById.get(id), v = this.uvalue(jn); return { id, value: v, unit: jn.kind === 'slider' ? 'mm' : 'deg', shown: jn.kind === 'slider' ? v : v * 180 / Math.PI }; });
+    this.drives = saved; this.pinned = rk >= this.n;
+    return keys.map((key) => { const { jn, part } = this.coord(key), v = held(key), lin = this.linear(jn, part); return { id: key, value: v, unit: lin ? 'mm' : 'deg', shown: lin ? v : v * 180 / Math.PI }; });
   }
   reader() {
     const S = this, ref = (r) => { const P = S.port(r); if (!P) throw new Error(`measure: no port '${r}'`); return S.world(P); };
@@ -418,7 +527,9 @@ export class MechanismSolver {
   jointValues() {
     return this.joints.map((jn) => {
       const v = this.value(jn), a = this.world(jn.A), b = this.world(jn.B);
+      const slide = SLIDE_AXIS[jn.kind] ? dot(sub(b.P, a.P), a[SLIDE_AXIS[jn.kind]]) : null;
       return { id: jn.id, kind: jn.kind, a: jn.A.ref, b: jn.B.ref, equations: jn.c, value: v == null ? null : jn.kind === 'slider' ? v : v * 180 / Math.PI, unit: v == null ? '' : jn.kind === 'slider' ? 'mm' : '°',
+        slide, slideAxis: jn.kind === 'pinSlot' ? a.X : null,
         driven: this.drives.has(jn.id), tree: this.tree?.has(jn.id) ?? false, at: a.P, atB: b.P, axis: a.Z };
     });
   }
@@ -437,17 +548,21 @@ export function runStudy(S, st, measures, events) {
   if (!jn) return { name: st.name, error: `study ${st.name}: no joint '${id}'`, rows: [], keys: [], events: [], gaps: [] };
   const ang = jn.kind !== 'slider', from = st.from, to = st.to, steps = st.steps ?? 360, k2u = ang ? 180 / Math.PI : 1;
   const home = S.pose, homeDrives = new Map(S.drives);
-  const rows = [], gaps = [];
+  const rows = [], gaps = [], limited = [];
   if (!S.drives.has(id)) S.drives.set(id, S.value(jn));
   // the start: when continuation cannot reach `from`, driveTo leaves the drive at the last value it reached, so the
   // first row is a gap rather than a pose at some other drive value
   const reached = S.driveTo({ [id]: from });
   let prev = null, jump = null;
   for (let k = 0; k <= steps; k++) {
-    const q = from + (to - from) * k / steps, failing = rows.length && !rows[rows.length - 1].ok;
-    const ok = k === 0 ? reached && S.solve() : S.driveTo({ [id]: q }, failing ? { depth: 1, maxIter: 25 } : {});
+    const q = from + (to - from) * k / steps, failing = rows.length && !rows[rows.length - 1].ok && !rows[rows.length - 1].limit;
+    const solved = k === 0 ? reached && S.solve() : S.driveTo({ [id]: q }, failing ? { depth: 1, maxIter: 25 } : {});
+    // a pose past a joint's limit closes, but the machine cannot be there: a gap marked with the joint
+    const over = solved ? S.limitViolations() : [];
+    const ok = solved && !over.length;
     const row = { x: q * k2u, q, ok };
-    if (ok) Object.assign(row, S.read(measures)); else gaps.push(q * k2u);
+    if (over.length) { row.limit = [...new Set(over.map((v) => v.id))].join(', '); limited.push({ at: q * k2u, ids: row.limit }); }
+    if (ok) Object.assign(row, S.read(measures)); else if (!over.length) gaps.push(q * k2u);
     const now = S.bodies.map((b) => b.t.slice());
     if (prev && ok) {
       row.move = Math.max(...now.map((p, i) => len(sub(p, prev[i]))));
@@ -477,7 +592,7 @@ export function runStudy(S, st, measures, events) {
     return { min: { at: lo.x, value: lo[name] }, max: { at: hi.x, value: hi[name] } };
   };
   const extrema = Object.fromEntries(keys.map((k) => [k, extremaOf(k)]));
-  return { name: st.name, drive: id, unit: ang ? '°' : 'mm', from: from * k2u, to: to * k2u, steps, rows, keys, events: evs, gaps, jump, extrema };
+  return { name: st.name, drive: id, unit: ang ? '°' : 'mm', from: from * k2u, to: to * k2u, steps, rows, keys, events: evs, gaps, limited, jump, extrema };
 }
 // the helpers a report sees for one study
 export function studyApi(st) {

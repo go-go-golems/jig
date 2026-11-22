@@ -325,7 +325,7 @@ The orientation decision reads like `lexicographic: support 0 mm³ → bed conta
 - `.joint(id, kind, 'a:port', 'b:port')` ✓ (joint ends must be ports): join two ports. Example: `.joint('h', j.joint.revolute(), 'base:hinge', 'lid:hinge')`.
 - `.printInPlace(ids, { clearance, pose })` ✓: one print with fit-class gaps, in a pose. Example: `.printInPlace(['base', 'lid'], { pose: { h: deg(180) } })`.
 - `.ground .interference .sweep .explode .params .configs .override .use .with` ✓: more assembly settings. Example: `.ground('base')`.
-- `j.joint.rigid revolute slider cylindrical planar ball snap` ✓: joints with DOF 0, 1, 1, 2, 3, 3, 0. Example: `j.joint.revolute({ limits: [deg(0), deg(180)] })`.
+- `j.joint.rigid revolute slider cylindrical pinSlot planar ball snap` ✓: joints with DOF 0, 1, 1, 2, 2, 3, 3, 0; limits hold (drives, studies, drags). Example: `j.joint.revolute({ limits: [deg(0), deg(180)] })`.
 - `.drive(jointId, value) .hint(jointId, value)` ✓: a drive fixes a joint's value (one equation); a hint only seeds the start pose, so it picks a loop's branch. Example: `.drive('main', deg(30)).hint('pin', deg(180))`.
 - `.couple(id, jointA, jointB, { ratio, offset })` ✓: value(B) = ratio · value(A) + offset, on turned values. Example: `.couple('hook', 'main', 'hookShaft', { ratio: 2 })`.
 - `j.couple.gear(a, b) .rack(rack, pinion) .belt(a, b, { ratio })` ✓: a coupling between gear components; the ratio comes from the teeth and its sign from the axes; checked against the gears' mesh. Example: `.couple(j.couple.gear('pinion', 'wheel'))`.
@@ -335,7 +335,11 @@ The orientation decision reads like `lexicographic: support 0 mm³ → bed conta
 - `.speed(jointId, rate)` ✓: the drive's rate, so accelerations and inertia enter (without it the forces are static). Example: `.speed('main', turn(3000).div(minute(1)))`.
 - `.gravity(dir | vector)` ✓: weight, 1 g along a direction (`'-Z'` by default once forces are asked for: jig's +Z is up), or a vector in g that keeps its length (`[0, 0, -2]` is 2 g), read as a stress study reads it; `.gravity(false)` leaves it out. Example: `.gravity('-Y')`.
 - `.wrench('comp:port', vector | row => vector | null, { label, at })` ✓: a load on a component at a port (or a local point `at`), a lambda of the study row when it depends on the pose. Example: `.wrench('bar:tip', r => r.z < -70 ? [0, 0, N(4)] : null)`.
-- nested assemblies ✗.
+- `.add(id, assembly, { at, flexible })` ✓: a subassembly; its components are `'<id>/<comp>'`; rigid by default (solved on its own, moved as one body), `flexible: true` brings its joints, drives, values (its params and overrides; the parent's `'<id>/h'` wins), readings and forces (`.wrench`, `.reactions`, `.speed` when the parent sets none) into this solve. A flexible one's `.gravity()`, `.interference()`, `.printInPlace()`, `.explode()` and `.configs()` are not carried, and the compile says so. Example: `.add('hook', hookDrive, { at: j.tx.move(40, 0, 0), flexible: true })`.
+- `j.on(comp, sel)` as a joint end ✓: a bore's axis, a circular edge's centre, a planar face (faces meet face to face); `j.frame.on(j.on(…), { flip, at, offset })` adjusts it. Example: `.joint('pin', j.joint.revolute(), j.on('plate', j.sel.faces('%cylinder')), j.on('arm', j.sel.faces('%cylinder')))`.
+- `j.joint.revolute({ asBuilt: true })` ✓: an as-built joint: the components stay where their `at` puts them. Example: `.joint('h', j.joint.revolute({ asBuilt: j.on('base', j.sel.faces('%cylinder')) }), 'base', 'arm')`.
+- `j.joint.pinSlot({ limits, slideLimits })` ✓: turns about z and slides along x. Its slide is a coordinate of its own, `'<id>.slide'` (as is a cylindrical joint's): `.drive('pin.slide', mm(4))` or an override drives it, and a drag commits it. Example: `.joint('pin', j.joint.pinSlot(), 'yoke:slot', 'crank:pin')`.
+- `.contact(ids)` ✓: a contact set; a drag stops where two of them would touch, however far past the obstacle the target is (each step is walked within the parts' clearance). Pairs touching when a drag starts may part. A flexible subassembly's sets join the parent's. Example: `.contact(['lid', 'stop'])`.
 
 ## Stress studies
 

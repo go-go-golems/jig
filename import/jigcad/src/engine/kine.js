@@ -73,7 +73,7 @@ export function jigOps(registry, T) {
 export function toKine(S, info = {}, o = {}) {
   const notes = [], r = { name: info.name || 'assembly' };
   if (!info.assembled) throw new Error('the assembly does not assemble');
-  const input = o.input || [...S.drives.keys()][0];
+  const input = o.input || [...S.drives.keys()].find((k) => S.jointById.has(k));   // a joint's value, not a slide ('h.slide')
   if (!input || !S.drives.has(input)) throw new Error('compile needs a driven joint as the input');
   if (S.mobility && S.mobility.left > 0) throw new Error(`${S.mobility.left} free motion(s) left after the drives: not a mechanism`);
   const inJ = S.jointById.get(input), inType = inJ.kind === 'slider' ? 'length' : 'angle';
