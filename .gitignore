@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-single/
+test-results/
+shots/
+*.log
+# raw imported archive: the extracted tree under sources/candela is the reviewable copy; the zip lives in ~/data/pbr-spark
+ttmp/**/sources/local/*.zip
+# build output inside the imported original (regenerable with its build/build.js)
+ttmp/**/sources/candela/dist/
