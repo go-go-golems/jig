@@ -6,7 +6,6 @@ import { Host, store } from './host';
 import { App } from './ui/app';
 import { captureWorkbench } from './ui/capture';
 import { saveFile } from './ui/common';
-import { zipStore } from '../engine/output';
 import { CANDELA_DATA } from '../content/browser';
 import 'katex/dist/katex.min.css';
 import './kiln.css';
@@ -15,18 +14,13 @@ import './candela.css';
 
 const D = CANDELA_DATA;
 const host = new Host({ presets: D.presets, docs: D.docs, reference: D.reference });
-window.workbench = host;      // for the curious, in the console
+(window as any).workbench = host;      // for the curious, in the console
 host.captureWorkbench = (maxW) => captureWorkbench(host, maxW);
 const MIME = n => (/\.png$/.test(n) ? 'image/png' : /\.zip$/.test(n) ? 'application/zip' : /\.exr$/.test(n) ? 'image/x-exr' : 'application/octet-stream');
-// inside claude.ai a page may save only some file types (.exr is not one): those files travel in a .zip
-const SAVABLE = /\.(png|jpe?g|webp|gif|zip|json|txt|md|csv|html|svg|pdf)$/i;
-host.saveFiles = async files => {
-  let list = (files || []).slice();
-  if (window.claude) {
-    const other = list.filter(f => !SAVABLE.test(f.name));
-    if (other.length) list = list.filter(f => SAVABLE.test(f.name)).concat([{ name: other[0].name.replace(/\.[^.]+$/, '') + (other.length > 1 ? '-files' : '') + '.' + other[0].name.split('.').pop() + '.zip', data: zipStore(other) }]);
-  }
-  let ok = true; for (const f of list) ok = (await saveFile(host, f.name, new Blob([f.data], { type: MIME(f.name) }))) && ok; return ok;
+host.saveFiles = async (files: { name: string; data: Uint8Array | Blob | string }[]) => {
+  let ok = true;
+  for (const f of files || []) ok = (await saveFile(host, f.name, new Blob([f.data as BlobPart], { type: MIME(f.name) }))) && ok;
+  return ok;
 };
 const fromHash = (location.hash || '').replace(/^#/, '');
 const first = (fromHash && host.presetById(fromHash) && fromHash) || store.get('preset', null) || D.presets[0].id;
@@ -38,4 +32,4 @@ window.addEventListener('message', e => {
   try { host.setPoses(m.poses && typeof m.poses === 'object' ? m.poses : null); } catch (x) { host.toast('poses: ' + x.message, true); }
 });
 window.addEventListener('hashchange', () => { const id = location.hash.replace(/^#/, ''); if (id && host.presetById(id) && host.preset.id !== id) host.loadPreset(id); });
-ReactDOM.createRoot(document.getElementById('root')).render(<App host={host} />);
+ReactDOM.createRoot(document.getElementById('root')!).render(<App host={host} />);

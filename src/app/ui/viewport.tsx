@@ -1,6 +1,7 @@
 // viewport.jsx — the render: a progressive path tracer on the GPU, framed like a drawing sheet. Drag to orbit,
 // Shift- or right-drag to pan, wheel to zoom, click to select, Alt-click to meter a point.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect, useRef } = React;
 import { useHost, Seg, Tog, Menu, saveFile } from './common';
 import { Slider, fmt } from './slider';
@@ -9,7 +10,7 @@ const ENGINES = [{ value: 'scene', label: 'Scene', title: "the scene file's own 
 const AOVS = [{ value: 'beauty', label: 'Beauty' }, { value: 'albedo', label: 'Albedo' }, { value: 'normal', label: 'Normal' }, { value: 'depth', label: 'Depth' }, { value: 'ids', label: 'IDs', title: 'a colour per instance and CAD face: the id pass that EXR output writes' }];
 const TMS = [['', 'scene'], ['agx', 'AgX'], ['aces', 'ACES'], ['neutral', 'PBR Neutral'], ['filmic', 'Filmic'], ['reinhard', 'Reinhard'], ['linear', 'Linear (clip)']];
 
-export function ViewportView({ host }) {
+export function ViewportView({ host }: { host: Host }) {
   useHost(host, 6);
   const wrap = useRef<any>(null), [meter, setMeter] = useState<any>(null), [pickInfo, setPickInfo] = useState<any>(null), [dropOn, setDropOn] = useState(false);
   useEffect(() => {
@@ -78,7 +79,7 @@ export function ViewportView({ host }) {
   }, [host, host.view.aov]);
   const vp = host.vp, V = host.view, p = host.preset;
   const cam = vp && vp.cam, err = host.compileError, buildErr = host.result && !host.result.ok ? host.diags.find(d => d.severity === 'error') : null;
-  const shot = async () => { try { const c = await host.screenshotViewport(4096); const blob = await new Promise(r => c.toBlob(r, 'image/png')); await saveFile(host, `${p ? p.id : 'render'}-${vp ? vp.spp : 0}spp.png`, blob); } catch (e) { host.toast('Screenshot failed: ' + e.message, true); } };
+  const shot = async () => { try { const c = await host.screenshotViewport(4096); const blob = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png')); await saveFile(host, `${p ? p.id : 'render'}-${vp ? vp.spp : 0}spp.png`, blob); } catch (e) { host.toast('Screenshot failed: ' + e.message, true); } };
   return <div className="tabbody col vpview">
     <div className="toolbar">
       <Seg small value={V.engine} options={ENGINES} onChange={v => host.setView('engine', v)} label="Engine" />
@@ -95,7 +96,7 @@ export function ViewportView({ host }) {
       <button className="btn sm" onClick={() => host.focus({ view: 'render' })} title="Stills, sequences and EXR passes at a fixed size">Render…</button>
     </div>
     <div className={'vpwrap' + (dropOn ? ' dragover' : '')} ref={wrap} onPointerDown={down} onContextMenu={e => e.preventDefault()} onDoubleClick={() => host.resetCamera()}
-      onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDropOn(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropOn(false); }}
+      onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDropOn(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn(false); }}
       onDrop={async e => { e.preventDefault(); setDropOn(false); for (const f of e.dataTransfer.files) { try { await host.addAssetFile(f); } catch (x) { host.toast(`${f.name}: ${x.message}`, true); } } }}>
       {V.aov === 'ids' && <canvas ref={idCanvas} className="vp-ids" aria-label="Instance and face ids" />}
       <div className="chip-row">
@@ -116,7 +117,7 @@ export function ViewportView({ host }) {
         <div className="row"><button className="link" onClick={() => { host.focus({ view: 'scene' }); setPickInfo(null); }}>inspect</button>{pickInfo.p.id && <button className="link" onClick={() => { host.focus({ view: 'code', file: 'scene.js', find: `'${pickInfo.p.id}'` }); setPickInfo(null); }}>find in code</button>}<button className="link" onClick={() => setPickInfo(null)}>close</button></div>
       </div>}
       {meter && <div className="pickcard meter" style={{ left: meter.x + 12, top: meter.y + 12 }} onPointerDown={e => { e.stopPropagation(); setMeter(null); }}>
-        <b>{fmt(meter.L)} nit</b><span>EV100 {meter.ev.toFixed(1)} (reflected, K = 12.5)</span><span>{(Math.log2(meter.L / (0.125 * Math.pow(2, vp.exposureEV())))).toFixed(1)} stops from middle grey</span>
+        <b>{fmt(meter.L)} nit</b><span>EV100 {meter.ev.toFixed(1)} (reflected, K = 12.5)</span><span>{(Math.log2(meter.L / (0.125 * Math.pow(2, vp!.exposureEV())))).toFixed(1)} stops from middle grey</span>
       </div>}
       {err && <button className="ovl-box failbanner" onClick={() => host.focus({ view: 'shader' })}><b>Shader compile failed.</b> {err.message.slice(0, 300)} — open the Shader view</button>}
       {!err && buildErr && <button className="ovl-box failbanner" onClick={() => buildErr.loc && host.focus({ view: 'code', file: buildErr.loc.file, line: buildErr.loc.line })}><b>{buildErr.code}</b> {buildErr.message}{buildErr.loc ? ` — ${buildErr.loc.file}:${buildErr.loc.line}` : ''}. The view keeps the last good build.</button>}

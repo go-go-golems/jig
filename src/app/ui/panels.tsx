@@ -1,6 +1,7 @@
 // panels.jsx — the build's other faces: the console (diagnostics, logs, explain), the IR as text and as a DAG,
 // the generated shaders, the scene outline with live handles, and the lab (physical tests, readings).
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useMemo, useRef, useEffect } = React;
 import { useHost, useFocus, Seg, Tog, copyText } from './common';
 import { highlight } from '../highlight';
@@ -8,7 +9,7 @@ import { formatDiag, test, API } from '../host';
 import { Slider, fmt } from './slider';
 
 // ---------- console ----------
-export function ConsoleView({ host }) {
+export function ConsoleView({ host }: { host: Host }) {
   useHost(host, 3);
   const [tab, setTab] = useState('diags');
   const d = host.diags, logs = host.logs || [];
@@ -34,7 +35,7 @@ export function ConsoleView({ host }) {
 }
 
 // ---------- IR ----------
-export function IRView({ host }) {
+export function IRView({ host }: { host: Host }) {
   useHost(host, 2);
   const txt = host.irText();
   return <div className="tabbody col">
@@ -45,7 +46,7 @@ export function IRView({ host }) {
 
 // ---------- the DAG ----------
 const KIND_ORDER = ['scene', 'group', 'shape', 'light', 'camera', 'material', 'bsdf'];
-export function GraphView({ host }) {
+export function GraphView({ host }: { host: Host }) {
   useHost(host, 1);
   const g = useMemo(() => host.irGraph(), [host.result]);
   const [hov, setHov] = useState<any>(null);
@@ -73,7 +74,7 @@ export function GraphView({ host }) {
 }
 
 // ---------- shaders ----------
-export function ShaderView({ host }) {
+export function ShaderView({ host }: { host: Host }) {
   useHost(host, 1);
   const [lang, setLang] = useState('wgsl'), [q, setQ] = useState('');
   const c = host.result && host.result.compiled, vp = host.vp, err = host.compileError;
@@ -101,11 +102,11 @@ import { wgslToGlsl } from '../../engine/wgsl2glsl';
 const require_glsl = s => wgslToGlsl(s);
 
 // ---------- scene outline: live handles ----------
-export function SceneView({ host }) {
+export function SceneView({ host }: { host: Host }) {
   useHost(host, 4);
   const c = host.result && host.result.compiled;
   if (!c) return <div className="tabbody col"><p className="empty padded">No scene.</p></div>;
-  const w = host.world();
+  const w: any = host.world();
   const sel = host.selection;
   const objs = c.objects.filter(o => !o.mediumBox && !o.bulb);
   const lights = c.lightsMeta.filter(l => l.kind !== 'emit');
@@ -134,7 +135,7 @@ export function SceneView({ host }) {
       <div className="block"><header><h2>Assets</h2><span className="sub">images for light.env.hdri('name') — or drop them on the viewport</span></header>
         {host.assetList().map(a => <div key={a.name} className="row"><b>{a.name}</b><span className="dim">{a.width}×{a.height}</span><code>light.env.hdri('{a.name}')</code></div>)}
         {!host.assetList().length && <p className="note">None yet. Radiance .hdr files keep their range; .png and .jpg are read as sRGB and are only as bright as white.</p>}
-        <div className="row"><label className="btn sm">Add image…<input type="file" accept=".hdr,.pic,.png,.jpg,.jpeg,.webp" hidden onChange={async e => { for (const f of e.target.files) { try { await host.addAssetFile(f); } catch (x) { host.toast(`${f.name}: ${x.message}`, true); } } e.target.value = ''; }} /></label></div>
+        <div className="row"><label className="btn sm">Add image…<input type="file" accept=".hdr,.pic,.png,.jpg,.jpeg,.webp" hidden onChange={async e => { for (const f of e.target.files || []) { try { await host.addAssetFile(f); } catch (x) { host.toast(`${f.name}: ${x.message}`, true); } } e.target.value = ''; }} /></label></div>
       </div>
       {sel && <div className="block"><header><h2>Selected {sel}</h2></header><pre className="logs">{(() => { try { return sel.startsWith('#') ? JSON.stringify(w.$(sel).props, null, 1) : 'Give the node an .id() to read its handle.'; } catch (e) { return e.message; } })()}</pre></div>}
     </div>
@@ -142,7 +143,7 @@ export function SceneView({ host }) {
 }
 
 // ---------- lab: physical tests and readings ----------
-export function LabView({ host }) {
+export function LabView({ host }: { host: Host }) {
   useHost(host, 2);
   const [rows, setRows] = useState<any>(null), [busy, setBusy] = useState(false), [ms, setMs] = useState(true);
   const run = () => { setBusy(true); setTimeout(() => { const r = test.sweep(x => API.bsdf.conductor.schlick({ f0: 1, roughness: x, multiscatter: ms }), { roughness: [0.25, 0.5, 0.75, 1], angles: [0, 45, 75, 85], spp: 1 << 15, multiscatter: ms }); setRows(r); setBusy(false); }, 30); };

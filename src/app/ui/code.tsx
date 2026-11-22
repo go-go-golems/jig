@@ -1,6 +1,7 @@
 // code.jsx — the scene's files in an editor. Ctrl+Enter runs: the files re-run, the scene recompiles, and only
 // changed shaders are rebuilt. Diagnostics mark their lines; click one to jump to it.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
 import { useHost, useFocus, Menu } from './common';
 import { highlightLines } from '../highlight';
@@ -10,16 +11,16 @@ export const fileOrder = files => Object.keys(files).sort((a, b) => { const ia =
 const LH = 18;
 const ui = { open: ['scene.js'], active: 'scene.js' };   // survives the view being closed and reopened
 
-export function CodeView({ host }) {
+export function CodeView({ host }: { host: Host }) {
   useHost(host, 4);
   const [, force] = useState(0); const rerender = () => force(x => x + 1);
   const [text, setText] = useState(host.files[ui.active] ?? '');
-  const ta = useRef<any>(null), pre = useRef<any>(null), gut = useRef<any>(null), sent = useRef(text), pendingLine = useRef<any>(null);
+  const ta = useRef<any>(null), pre = useRef<any>(null), gut = useRef<any>(null), sent = useRef<string | null>(text), pendingLine = useRef<any>(null);
   const [cursor, setCursor] = useState({ ln: 1, col: 1 });
   const path = ui.active;
   if (host.files[path] == null) { ui.active = 'scene.js'; if (!ui.open.includes('scene.js')) ui.open.unshift('scene.js'); }
   // pick up changes made elsewhere (the agent, a revert, a preset)
-  if (host.files[ui.active] !== sent.current && host.files[ui.active] != null) { sent.current = host.files[ui.active]; if (text !== sent.current) setTimeout(() => setText(sent.current), 0); }
+  if (host.files[ui.active] !== sent.current && host.files[ui.active] != null) { sent.current = host.files[ui.active]; if (text !== sent.current) setTimeout(() => setText(sent.current as string), 0); }
   const open = (p, line?, find?) => {
     if (host.files[p] == null) return;
     if (!ui.open.includes(p)) ui.open.push(p);
@@ -99,7 +100,7 @@ export function CodeView({ host }) {
         <pre ref={pre} aria-hidden="true">{lines.map((h, i) => <div key={i} className={errLines.has(i + 1) ? 'ln-err' : ''} dangerouslySetInnerHTML={{ __html: h || ' ' }} />)}</pre>
         <textarea ref={ta} value={text} spellCheck={false} autoCapitalize="off" autoComplete="off" autoCorrect="off" wrap="off" aria-label={'Source of ' + path}
           onChange={e => change(e.target.value)} onKeyDown={onKey} onScroll={sync}
-          onSelect={e => { const v = e.target.value.slice(0, e.target.selectionStart).split('\n'); setCursor({ ln: v.length, col: v[v.length - 1].length + 1 }); }} />
+          onSelect={e => { const t = e.target as HTMLTextAreaElement; const v = t.value.slice(0, t.selectionStart).split('\n'); setCursor({ ln: v.length, col: v[v.length - 1].length + 1 }); }} />
       </div>
     </div>
     {allDiags.length > 0 && <div className="diags">{allDiags.map((d, i) => <button key={i} className={'diag' + (d.severity === 'error' ? ' bad' : '')} onClick={() => d.loc && host.files[d.loc.file] != null && open(d.loc.file, d.loc.line)}><b>{d.severity === 'error' ? '×' : '!'}</b><span className="ln">{d.code}{d.loc ? ` ${d.loc.file}:${d.loc.line}` : ''}</span><span>{d.message}{d.suggest && d.suggest.length ? ` Did you mean ${d.suggest.map(x => `'${x}'`).join(' or ')}?` : ''}</span></button>)}</div>}

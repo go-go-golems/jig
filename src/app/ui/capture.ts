@@ -1,10 +1,12 @@
 // capture.js — a picture of the whole workbench: the DOM cloned into an SVG foreignObject with the page's own
 // stylesheets, canvases swapped for their pixels, scroll positions kept, then rasterised onto a canvas.
-export async function captureWorkbench(host, maxW = 1400) {
-  const root = document.getElementById('app');
+import type { Host } from '../host';
+
+export async function captureWorkbench(host: Host, maxW = 1400): Promise<HTMLCanvasElement> {
+  const root = document.getElementById('app')!;
   const rect = root.getBoundingClientRect();
   const W = Math.round(rect.width), H = Math.round(rect.height);
-  const clone = root.cloneNode(true);
+  const clone = root.cloneNode(true) as HTMLElement;
   // canvases: the viewport through the renderer's readback, others through toDataURL
   const src = [...root.querySelectorAll('canvas')], dst = [...clone.querySelectorAll('canvas')];
   for (let i = 0; i < src.length; i++) {
@@ -17,13 +19,13 @@ export async function captureWorkbench(host, maxW = 1400) {
     dst[i].replaceWith(img);
   }
   // form state and scroll positions
-  const sAll = [...root.querySelectorAll('*')], dAll = [...clone.querySelectorAll('*')];
+  const sAll = [...root.querySelectorAll<HTMLElement>('*')], dAll = [...clone.querySelectorAll<HTMLElement>('*')];
   for (let i = 0; i < sAll.length && i < dAll.length; i++) {
     const s = sAll[i], d = dAll[i];
-    if (s.tagName === 'TEXTAREA') d.textContent = s.value;
-    else if (s.tagName === 'INPUT' && s.type !== 'file') d.setAttribute('value', s.value);
-    else if (s.tagName === 'SELECT') { const o = d.querySelectorAll('option')[s.selectedIndex]; if (o) o.setAttribute('selected', 'selected'); }
-    if ((s.scrollTop || s.scrollLeft) && d.children.length) { d.style.overflow = 'hidden'; for (const c of d.children) c.style.transform = `translate(${-s.scrollLeft}px, ${-s.scrollTop}px)`; }
+    if (s instanceof HTMLTextAreaElement) d.textContent = s.value;
+    else if (s instanceof HTMLInputElement && s.type !== 'file') d.setAttribute('value', s.value);
+    else if (s instanceof HTMLSelectElement) { const o = d.querySelectorAll('option')[s.selectedIndex]; if (o) o.setAttribute('selected', 'selected'); }
+    if ((s.scrollTop || s.scrollLeft) && d.children.length) { d.style.overflow = 'hidden'; for (const c of d.children) (c as HTMLElement).style.transform = `translate(${-s.scrollLeft}px, ${-s.scrollTop}px)`; }
   }
   const css = [...document.querySelectorAll('style')].map(s => s.textContent).join('\n').replace(/@import[^;]+;/g, '');
   const theme = document.documentElement.dataset.theme;
@@ -35,8 +37,8 @@ export async function captureWorkbench(host, maxW = 1400) {
   await img.decode();
   const k = Math.min(1, maxW / W);
   const c = document.createElement('canvas'); c.width = Math.round(W * k); c.height = Math.round(H * k);
-  const ctx = c.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
+  const ctx = c.getContext('2d')!; ctx.fillStyle = bg; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0, c.width, c.height);
   // a tainted canvas (some browsers taint foreignObject drawings) would throw here: fall back to the viewport
-  try { c.getContext('2d').getImageData(0, 0, 1, 1); } catch (e) { return host.screenshotViewport(maxW); }
+  try { c.getContext('2d')!.getImageData(0, 0, 1, 1); } catch (e) { return host.screenshotViewport(maxW); }
   return c;
 }

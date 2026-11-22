@@ -10,7 +10,8 @@ const fromT = (t, min, max, log) => log && min > 0 ? min * Math.pow(max / min, t
 const nice = (v, step) => { if (step) { const k = Math.round(v / step) * step; return +k.toFixed(Math.max(0, -Math.floor(Math.log10(step)) + 1)); } const a = Math.abs(v); return +v.toPrecision(a >= 100 ? 5 : 4); };
 export const fmt = (v, d?) => { if (!Number.isFinite(v)) return '—'; const a = Math.abs(v); if (d != null) return v.toFixed(d); return a >= 1000 ? Math.round(v).toLocaleString() : a >= 100 ? v.toFixed(1) : a >= 10 ? v.toFixed(2) : v.toFixed(3); };
 
-export function Slider({ value, min = 0, max = 1, step, def, log, unit, onChange, onCommit, label, disabled, ticks = 4, compact, digits, title, origin }) {
+export interface SliderProps { value: number; min?: number; max?: number; step?: number; def?: number; log?: boolean; unit?: string; onChange: (v: number) => void; onCommit?: (v?: number) => void; label?: React.ReactNode; disabled?: boolean; ticks?: number; compact?: boolean; digits?: number; title?: string; origin?: number }
+export function Slider({ value, min = 0, max = 1, step, def, log, unit, onChange, onCommit, label, disabled, ticks = 4, compact, digits, title, origin }: SliderProps) {
   const ref = useRef<any>(null), [edit, setEdit] = useState<any>(null), [active, setActive] = useState(false);
   const t = clamp(toT(value, min, max, log), 0, 1), td = def != null ? clamp(toT(def, min, max, log), 0, 1) : null;
   const setT = (tt, fine?) => { const v = fromT(clamp(tt, 0, 1), min, max, log); onChange(nice(v, step)); };
@@ -41,7 +42,7 @@ export function Slider({ value, min = 0, max = 1, step, def, log, unit, onChange
   const commitEdit = () => { const n = parseFloat(edit); if (Number.isFinite(n)) onChange(clamp(n, Math.min(min, max), Math.max(min, max))); setEdit(null); onCommit && onCommit(); };
   const T = [...Array(ticks + 1)].map((_, i) => i / ticks);
   return <div className={'sl2' + (compact ? ' compact' : '') + (disabled ? ' dis' : '') + (active ? ' act' : '')} title={title}>
-    <div ref={ref} className="rule" role="slider" tabIndex={disabled ? -1 : 0} aria-label={label} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value}
+    <div ref={ref} className="rule" role="slider" tabIndex={disabled ? -1 : 0} aria-label={label as string} aria-valuemin={min} aria-valuemax={max} aria-valuenow={value}
       onPointerDown={down} onKeyDown={key} onDoubleClick={() => def != null && onChange(def)}>
       <span className="base" />
       {T.map(x => <span key={x} className={'tick' + (x === 0 || x === 1 ? ' end' : '')} style={{ left: x * 100 + '%' }} />)}
@@ -59,6 +60,6 @@ export function Swatch({ hex, onChange, label }) {
   return <label className="swatch" title={label}>
     <span className="chip" style={{ background: hex }} />
     <code>{hex}</code>
-    <input type="color" value={hex} onChange={e => onChange(e.target.value)} aria-label={label} />
+    <input type="color" value={hex} onChange={e => onChange(e.target.value)} aria-label={label as string} />
   </label>;
 }

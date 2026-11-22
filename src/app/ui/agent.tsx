@@ -1,22 +1,50 @@
 // agent.jsx — a chat agent with two tools: `eval`, which runs JavaScript in the workbench with the Candela API
 // and the workbench in scope, and `screenshot`, which captures the render or the whole workbench and hands the
 // picture back to the agent in its next round. You can attach images too: paste, drop, or pick them.
+// Standalone: the model connection is ./claude.ts (Anthropic SDK, the user's API key), configured in this panel.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect, useRef } = React;
 import { useHost, useFocus, Seg, copyText } from './common';
 import { store, API, test, fragments, formatDiag } from '../host';
 import { render } from '../markdown';
 import { highlight } from '../highlight';
 import { captureWorkbench } from './capture';
+import { createSampler, TIER_MODELS, type AgentConnection, type Sampler, type Tier, type SampleOptions, type SampleTurn, type SampleLimits } from '../claude';
 
-const S = { threads: store.get('threads', null) || [{ id: 'a1', title: 'New thread', turns: ([] as any[]) }], active: store.get('thread', 'a1'), settings: Object.assign({ mode: 'auto', tier: 'default', effort: '' }, store.get('agentSettings', {})) };
+/** one tool call the agent made, as the panel shows it */
+interface AgentStep {
+  kind: 'eval' | 'screenshot';
+  code: string;
+  target?: string;
+  result: string | null;
+  running: boolean;
+  ms?: number;
+  error?: boolean;
+  /** files before the step, for "revert" (not persisted) */
+  snapshot?: { files: Record<string, string> };
+  changed?: boolean;
+  reverted?: boolean;
+  /** Ask mode: waiting for the person's approval */
+  asking?: boolean;
+  resolve?: (ok: boolean) => void;
+  /** screenshot: the image id in IMGS */
+  image?: string;
+}
+interface AgentTurn { role: 'user' | 'agent'; text: string; images?: string[]; auto?: boolean; sent?: boolean; steps: AgentStep[]; pending?: boolean; note?: string }
+interface Thread { id: string; title: string; turns: AgentTurn[] }
+interface AgentSettings { mode: 'auto' | 'ask' | 'read'; tier: Tier; effort: '' | 'low' | 'medium' | 'high' }
+
+const S: { threads: Thread[]; active: string; settings: AgentSettings } = { threads: store.get('threads', null) || [{ id: 'a1', title: 'New thread', turns: ([] as any[]) }], active: store.get('thread', 'a1'), settings: Object.assign({ mode: 'auto', tier: 'default', effort: '' }, store.get('agentSettings', {})) };
 if (!S.threads.find(t => t.id === S.active)) S.active = S.threads[0].id;
 const IMGS = new Map();   // image id → { url, blob } (kept for this page's life; threads store ids only)
 const persist = () => { store.set('threads', S.threads.slice(-12).map(t => ({ ...t, turns: t.turns.slice(-30).map(u => ({ ...u, pending: false, steps: (u.steps || []).map(s => ({ ...s, snapshot: undefined, resolve: undefined, result: s.result && s.result.length > 3000 ? s.result.slice(0, 3000) + '\n…' : s.result })) })) }))); store.set('thread', S.active); store.set('agentSettings', S.settings); };
-let sampleP: any = null;
-const getSample = () => sampleP || (sampleP = (async () => { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } })());
-let limitsP: any = null;
-const getLimits = () => limitsP || (limitsP = (async () => { const s = await getSample(); if (!s || !s.limits) return null; try { return await s.limits(); } catch (e) { return null; } })());
+// the connection (key, optional proxy, model overrides) lives in this browser's storage only
+let CONN: AgentConnection = Object.assign({ apiKey: '', baseURL: '', models: {} }, store.get('agentConnection', {}));
+let sampler: Sampler | null = null;
+const setConnection = (c: AgentConnection) => { CONN = c; sampler = null; store.set('agentConnection', c); };
+const getSample = async (): Promise<Sampler | null> => { if (!CONN.apiKey && !CONN.baseURL) return null; return sampler || (sampler = createSampler(CONN)); };
+const getLimits = async () => { const s = await getSample(); return s ? s.limits() : null; };
 const addImage = (blob) => { const id = 'img' + Math.random().toString(36).slice(2, 9); const url = URL.createObjectURL(blob); IMGS.set(id, { url, blob }); return id; };
 
 // ---------- eval: run code with the API and the workbench in scope ----------
@@ -33,7 +61,7 @@ function yaml(v, ind = '', depth = 0, seen = new Set()) {
   if (seen.has(v)) return '[circular]';
   if (depth > 5) return Array.isArray(v) ? `[array ${v.length}]` : '{…}';
   if (v instanceof Map) v = Object.fromEntries(v); if (v instanceof Set) v = [...v];
-  if (ArrayBuffer.isView(v)) v = Array.from(v.slice(0, 64));
+  if (ArrayBuffer.isView(v)) v = Array.from((v as unknown as Float32Array).slice(0, 64));
   seen.add(v);
   if (Array.isArray(v)) {
     if (!v.length) return '[]';
@@ -173,16 +201,17 @@ function toTurns(host, thread, imagesOn) {
   return merged;
 }
 
-const OFF = { not_granted: 'Claude is not allowed for this page. You can allow it from the artifact’s permissions.', sampling_disabled: 'Claude is not available for this account.', not_declared: 'This page no longer asks for Claude.', capability_disabled: 'Claude is unavailable in this view.', tools_unavailable: 'This view cannot run the agent’s tools.', capability_removed: 'This app version cannot run the agent.' };
+const OFF: Record<string, string> = { not_granted: 'The Anthropic API refused the key (or this model). Check it under Connection.' };
 
-export function AgentView({ host }) {
+export function AgentView({ host }: { host: Host }) {
   useHost(host, 2);
   const [, force] = useState(0); const re = () => { force(x => x + 1); };
-  const [draft, setDraft] = useState(''), [busy, setBusy] = useState(false), [off, setOff] = useState<any>(null), [avail, setAvail] = useState(undefined), [lim, setLim] = useState<any>(null), [atts, setAtts] = useState([]), [dragOver, setDragOver] = useState(false);
+  const [draft, setDraft] = useState(''), [busy, setBusy] = useState(false), [off, setOff] = useState<any>(null), [avail, setAvail] = useState<boolean | undefined>(undefined), [lim, setLim] = useState<SampleLimits | null>(null), [atts, setAtts] = useState<string[]>([]), [dragOver, setDragOver] = useState(false);
   const ctl = useRef<any>(null), logRef = useRef<any>(null), fileRef = useRef<any>(null);
-  useEffect(() => { getSample().then(s => setAvail(!!s)); getLimits().then(setLim); }, []);
+  const [connV, setConnV] = useState(0), [showConn, setShowConn] = useState(!CONN.apiKey && !CONN.baseURL);
+  useEffect(() => { setOff(null); getSample().then(s => setAvail(!!s)); getLimits().then(setLim); }, [connV]);
   useFocus(host, 'agent', r => { if (r.ask) { setDraft(r.ask); } });
-  const th = S.threads.find(t => t.id === S.active);
+  const th = S.threads.find(t => t.id === S.active)!;   // S.active always names a thread (fixed up at load and on close)
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; });
   const imagesOn = !!(lim && lim.images);
   const maxImgs = lim && lim.images ? lim.images.maxCount : 0;
@@ -200,10 +229,10 @@ export function AgentView({ host }) {
     text = (text != null ? text : draft).trim();
     const imgs = o.images || atts;
     if ((!text && !imgs.length) || busy) return;
-    const sample = await getSample(); if (!sample) { setOff('Claude is not available here, so the agent is off. Everything else in the workbench works.'); return; }
-    th.turns.push({ role: 'user', text: text || '(image)', images: imgs, auto: !!o.auto });
+    const sample = await getSample(); if (!sample) { setShowConn(true); setOff('Add an Anthropic API key under Connection to turn the agent on. Everything else in the workbench works.'); return; }
+    th.turns.push({ role: 'user', text: text || '(image)', images: imgs, auto: !!o.auto, steps: [] });
     if (th.title === 'New thread') th.title = (text || 'image').slice(0, 32);
-    const turn = { role: 'agent', text: '', steps: ([] as any[]), pending: true }; th.turns.push(turn);
+    const turn: AgentTurn = { role: 'agent', text: '', steps: [], pending: true }; th.turns.push(turn);
     if (!o.auto) { setDraft(''); setAtts([]); }
     setBusy(true); persist(); re();
     ctl.current = new AbortController();
@@ -214,7 +243,7 @@ export function AgentView({ host }) {
       inputSchema: { type: 'object', properties: { code: { type: 'string', description: 'the body of an async function; return what you want to see' } }, required: ['code'] },
       execute: async ({ code }, c) => {
         code = String(code || '');
-        const step = { kind: 'eval', code, result: null, running: true, ms: 0, snapshot: { files: Object.assign({}, host.files) } };
+        const step: AgentStep = { kind: 'eval', code, result: null, running: true, ms: 0, snapshot: { files: Object.assign({}, host.files) } };
         turn.steps.push(step); re();
         if (S.settings.mode === 'ask') {
           step.asking = true; re();
@@ -224,7 +253,8 @@ export function AgentView({ host }) {
         }
         const r = await runEval(host, code, S.settings.mode === 'read');
         Object.assign(step, { running: false, result: r.out, error: r.error, ms: r.ms });
-        step.changed = Object.keys(host.files).some(k => step.snapshot.files[k] !== host.files[k]) || Object.keys(step.snapshot.files).some(k => !(k in host.files));
+        const before = step.snapshot!.files;
+        step.changed = Object.keys(host.files).some(k => before[k] !== host.files[k]) || Object.keys(before).some(k => !(k in host.files));
         re(); persist();
         return r.out;
       },
@@ -234,7 +264,7 @@ export function AgentView({ host }) {
       description: imagesOn ? 'Capture the viewport render (target "viewport", default) or the whole workbench UI (target "workbench"). Optionally wait until the render has minSpp samples. The image is sent back to you at the start of your next round; end this turn briefly after calling it.' : 'Capture the viewport (images cannot be returned in this view; returns size and sample count only).',
       inputSchema: { type: 'object', properties: { target: { type: 'string', enum: ['viewport', 'workbench'] }, minSpp: { type: 'number', description: 'wait for this many samples per pixel first (viewport only), up to 15 s' } } },
       execute: async ({ target = 'viewport', minSpp = 0 }) => {
-        const step = { kind: 'screenshot', target, code: `screenshot ${target}`, running: true, result: null };
+        const step: AgentStep = { kind: 'screenshot', target, code: `screenshot ${target}`, running: true, result: null };
         turn.steps.push(step); re();
         try {
           if (target === 'viewport' && minSpp && host.vp) { const t0 = performance.now(); while (host.vp.spp < minSpp && performance.now() - t0 < 15000) await new Promise(r => setTimeout(r, 100)); }
@@ -252,10 +282,10 @@ export function AgentView({ host }) {
     };
     try {
       const turns = toTurns(host, th, imagesOn);
-      const opts = { signal: ctl.current.signal, modelTier: S.settings.tier, tools: [evalTool, shotTool], onText: ({ text }) => { turn.text = text; re(); } };
+      const opts: SampleOptions = { signal: ctl.current.signal, modelTier: S.settings.tier, tools: [evalTool, shotTool], onText: ({ text }) => { turn.text = text; re(); } };
       if (S.settings.effort) opts.effort = S.settings.effort;
       if (imgs.length && imagesOn) opts.images = imgs.map(id => IMGS.get(id) && IMGS.get(id).blob).filter(Boolean);
-      const res = await sample(turns, opts);
+      const res = await sample(turns as SampleTurn[], opts);
       turn.text = res.text; if (res.truncated) turn.note = 'The answer hit the length limit.';
     } catch (e) {
       const code = e && e.code;
@@ -287,14 +317,16 @@ export function AgentView({ host }) {
   const closeThread = id => { S.threads = S.threads.filter(t => t.id !== id); if (!S.threads.length) S.threads.push({ id: 'a1', title: 'New thread', turns: ([] as any[]) }); if (S.active === id) S.active = S.threads[S.threads.length - 1].id; persist(); re(); };
   const tries = (host.preset && host.preset.tries || []).concat(['Take a screenshot and tell me what to improve physically', 'Explain every default this scene assumed']).slice(0, 6);
   const thumb = (id, k) => { const im = IMGS.get(id); return im ? <img key={k} className="thumb" src={im.url} alt="" /> : <span key={k} className="thumb gone" title="image from an earlier session">▢</span>; };
-  return <div className={'tabbody col agent-panel' + (dragOver ? ' dragover' : '')} onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDragOver(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }} onDrop={e => { e.preventDefault(); setDragOver(false); attach(e.dataTransfer.files); }}>
+  return <div className={'tabbody col agent-panel' + (dragOver ? ' dragover' : '')} onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDragOver(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false); }} onDrop={e => { e.preventDefault(); setDragOver(false); attach(e.dataTransfer.files); }}>
     <div className="threads">{S.threads.map(t => <span key={t.id} className={'th' + (t.id === S.active ? ' on' : '')}><button onClick={() => { S.active = t.id; persist(); re(); }}>{t.title}</button><button className="x" aria-label="close thread" onClick={() => closeThread(t.id)}>×</button></span>)}<button className="new" onClick={newThread} disabled={busy}>+ New</button></div>
     <div className="agent-set">
       <span className="ctl-l">Mode</span><Seg small value={S.settings.mode} onChange={v => { S.settings.mode = v; persist(); re(); }} options={[{ value: 'auto', label: 'Auto', title: 'runs each step' }, { value: 'ask', label: 'Ask', title: 'you approve each step' }, { value: 'read', label: 'Read-only', title: 'no edits' }]} />
       <span className="ctl-l">Model</span><Seg small value={S.settings.tier} onChange={v => { S.settings.tier = v; persist(); re(); }} options={[{ value: 'quick', label: 'Fast' }, { value: 'default', label: 'Balanced' }, { value: 'complex', label: 'Deep' }]} />
       <span className="ctl-l">Thinking</span><Seg small value={S.settings.effort} onChange={v => { S.settings.effort = v; persist(); re(); }} options={[{ value: '', label: 'Auto' }, { value: 'low', label: 'Low' }, { value: 'medium', label: 'Med' }, { value: 'high', label: 'High' }]} />
+      <button className={'btn sm' + (showConn ? ' on' : '')} onClick={() => setShowConn(v => !v)} title="API key, proxy and models">Connection</button>
     </div>
-    {(off || avail === false) && <div className="agent-off"><b>The agent is off here.</b>{off || 'Claude is not available in this view, so the agent cannot run. Everything else in the workbench works.'}</div>}
+    {showConn && <ConnectionForm onSave={c => { setConnection(c); setConnV(v => v + 1); setShowConn(false); host.toast('Agent connection saved in this browser'); }} />}
+    {(off || avail === false) && <div className="agent-off"><b>The agent is off.</b>{off || 'Add an Anthropic API key under Connection to turn it on. Everything else in the workbench works.'}</div>}
     <div className="agent-log" ref={logRef}>
       {!th.turns.length && <div className="agent-empty">
         <p>Ask for a change and the agent edits the scene, rebuilds, measures the render and looks at it. It works through two tools: <b>eval</b>, with the API you see in the Reference, and <b>screenshot</b>, which shows it the viewport or the whole workbench.{imagesOn ? ' Paste or drop an image to show it a reference photo.' : ''}</p>
@@ -314,7 +346,7 @@ export function AgentView({ host }) {
               <div className="row">{s.changed && !s.reverted && s.snapshot && <button className="link" onClick={() => revert(t, k)}>revert files to before this step</button>}{s.reverted && <span className="dim">reverted</span>}<button className="link" onClick={() => copyText(s.code, host)}>copy code</button></div>
             </div>
           </details>)}
-          {t.text ? <div className="md doc-inline" onClick={e => { const a = e.target.closest('a'); if (a && a.dataset.lab) { e.preventDefault(); host.link(a.dataset.lab); } }} dangerouslySetInnerHTML={{ __html: render(t.text, { highlight, toc: false }).html }} /> : t.pending ? <span className="thinking">{t.steps.length ? 'Working' : 'Thinking'}</span> : null}
+          {t.text ? <div className="md doc-inline" onClick={e => { const a = (e.target as HTMLElement).closest('a'); if (a && a.dataset.lab) { e.preventDefault(); host.link(a.dataset.lab); } }} dangerouslySetInnerHTML={{ __html: render(t.text, { highlight, toc: false }).html }} /> : t.pending ? <span className="thinking">{t.steps.length ? 'Working' : 'Thinking'}</span> : null}
           {t.note && <span className="note">{t.note}</span>}
         </div>)}
     </div>
@@ -323,10 +355,25 @@ export function AgentView({ host }) {
       <textarea value={draft} placeholder={'Ask the agent: “make the copper look aged”, “light this like golden hour”, “why is the glass dark?”' + (imagesOn ? ' — paste or drop a reference image' : '')} onChange={e => setDraft(e.target.value)} onPaste={onPaste} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} aria-label="Message to the agent" />
       <div className="row">
         {imagesOn && <><button className="btn sm" onClick={() => fileRef.current && fileRef.current.click()} title={`Attach images (up to ${maxImgs})`}>Image…</button><input ref={fileRef} type="file" accept={(lim.images.mediaTypes || ['image/png', 'image/jpeg']).join(',')} multiple hidden onChange={e => { attach(e.target.files); e.target.value = ''; }} /></>}
-        {imagesOn && <button className="btn sm" disabled={busy || !host.vp} onClick={async () => { try { const c = await host.screenshotViewport(1200); const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9)); setAtts(a => a.concat([addImage(b)]).slice(0, maxImgs || 4)); } catch (e) { host.toast(e.message, true); } }} title="Attach a picture of the current render">+ Render</button>}
+        {imagesOn && <button className="btn sm" disabled={busy || !host.vp} onClick={async () => { try { const c = await host.screenshotViewport(1200); const b = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/jpeg', 0.9)); setAtts(a => a.concat([addImage(b)]).slice(0, maxImgs || 4)); } catch (e) { host.toast(e.message, true); } }} title="Attach a picture of the current render">+ Render</button>}
         <span className="meta">Enter sends · Shift+Enter new line · {S.settings.mode === 'auto' ? 'steps run as they come' : S.settings.mode === 'ask' ? 'you approve each step' : 'read-only'}</span>
         {busy ? <button className="btn danger" onClick={() => ctl.current && ctl.current.abort()}>Stop</button> : <button className="btn primary" onClick={() => send()} disabled={(!draft.trim() && !atts.length) || avail === false}>Send</button>}
       </div>
     </div>
   </div>;
+}
+
+// the agent's connection: an Anthropic API key (kept in this browser's localStorage, sent only to the API or the
+// proxy below), an optional proxy base URL, and optional model ids per Model setting
+function ConnectionForm({ onSave }: { onSave: (c: AgentConnection) => void }) {
+  const [key, setKey] = useState(CONN.apiKey), [base, setBase] = useState(CONN.baseURL);
+  const [models, setModels] = useState<Partial<Record<Tier, string>>>(Object.assign({}, CONN.models));
+  const tiers: [Tier, string][] = [['quick', 'Fast'], ['default', 'Balanced'], ['complex', 'Deep']];
+  return <form className="agent-conn" onSubmit={e => { e.preventDefault(); const m: Partial<Record<Tier, string>> = {}; for (const [t] of tiers) if (models[t] && models[t]!.trim()) m[t] = models[t]!.trim(); onSave({ apiKey: key.trim(), baseURL: base.trim(), models: m }); }}>
+    <label><span>Anthropic API key</span><input type="password" autoComplete="off" value={key} placeholder="sk-ant-…" onChange={e => setKey(e.target.value)} /></label>
+    <label><span>Proxy base URL <i>(optional)</i></span><input value={base} placeholder="https://api.anthropic.com" onChange={e => setBase(e.target.value)} /></label>
+    {tiers.map(([t, label]) => <label key={t}><span>{label} model</span><input value={models[t] || ''} placeholder={TIER_MODELS[t]} onChange={e => setModels(m => Object.assign({}, m, { [t]: e.target.value }))} /></label>)}
+    <p className="note">The key is stored in this browser only and sent directly to the Anthropic API (or the proxy). Anyone with access to this browser profile can read it.</p>
+    <div className="row"><button className="btn primary sm" type="submit">Save</button>{(CONN.apiKey || CONN.baseURL) && <button className="btn sm" type="button" onClick={() => { setKey(''); setBase(''); setModels({}); onSave({ apiKey: '', baseURL: '', models: {} }); }}>Forget key</button>}</div>
+  </form>;
 }

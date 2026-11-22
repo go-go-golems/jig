@@ -162,6 +162,8 @@ function preetham(T, thetaS) {
 }
 
 // ---------- the compiler ----------
+/** the compiled scene the viewport loads: shader sources, packed data, slots, ids, stats */
+export type Compiled = ReturnType<typeof compile>;
 export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
   const sc = compOf(sceneB);
   if (!sc || sc.kind !== 'scene') throw new CandelaError('E121', 'compile(scene, engine): the first argument must be a scene()');
@@ -550,7 +552,8 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
     pack: (env: Record<string, any> = {}) => pack(S, env, nU),
   };
   compiled.stats.lines = shared.split('\n').length;
-  return compiled;
+  // `animation` is attached by build() when the scene exports one
+  return compiled as typeof compiled & { animation?: ((t: number) => any) | null };
 }
 
 function material_plainLambert() { return { [Symbol.for('candela.comp')]: new Comp('material.plain', { surface: new Comp('bsdf.lambert', { rho: constNode([0.5, 0.5, 0.5]) }, { frags: ([] as any[]), loc: null, unchecked: ([] as any[]) }) }, { frags: ([] as any[]), loc: null, unchecked: ([] as any[]) }) }; }

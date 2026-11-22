@@ -10,14 +10,14 @@ export interface Preset {
   title: string;
   group: string;
   about: string;
-  tries: string[];
-  docs: string[];
-  focus: string[];
+  tries?: string[];
+  docs?: string[];
+  focus?: string[];
   /** project files: 'scene.js' plus optional 'lib/*.js' */
   files: Record<string, string>;
   notes: string;
-  paused: boolean;
-  time: number;
+  paused?: boolean;
+  time?: number;
 }
 
 export interface Doc {
@@ -92,7 +92,7 @@ export function loadDocs(content: Record<string, string>): Doc[] {
 
 export function checkDocRefs(presets: Preset[], docs: Doc[]): void {
   const ids = new Set(docs.map(d => d.id));
-  for (const p of presets) for (const d of p.docs) if (!ids.has(d)) throw new Error(`${p.id}: unknown doc '${d}'`);
+  for (const p of presets) for (const d of p.docs || []) if (!ids.has(d)) throw new Error(`${p.id}: unknown doc '${d}'`);
 }
 
 export function loadCatalog(content: Record<string, string>): CandelaData {

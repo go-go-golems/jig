@@ -1,6 +1,7 @@
 // notes.jsx — the preset's notes, the docs (the API's design and the physics under it), and the reference.
 // Markdown with KaTeX; lab: links open files, set params, switch views and load presets.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect, useRef, useMemo } = React;
 import { useHost, useFocus, Tog } from './common';
 import { render } from '../markdown';
@@ -21,7 +22,7 @@ export function Doc({ host, md, prefix = '', scrollRef }) {
   return <article className="doc" onClick={onClick} dangerouslySetInnerHTML={{ __html: r.html }} />;
 }
 
-export function NotesView({ host }) {
+export function NotesView({ host }: { host: Host }) {
   useHost(host, 2);
   const [edit, setEdit] = useState(false), sc = useRef<any>(null);
   const p = host.preset;
@@ -41,7 +42,7 @@ export function NotesView({ host }) {
 }
 
 let lastDoc: any = null;
-export function DocsView({ host }) {
+export function DocsView({ host }: { host: Host }) {
   useHost(host, 1);
   const [id, setId] = useState(lastDoc || (host.docs[0] && host.docs[0].id)), [q, setQ] = useState(''), [nav, setNav] = useState(0), sc = useRef<any>(null), pendingAnchor = useRef<any>(null);
   useFocus(host, 'docs', r => { if (r.doc) { setId(r.doc); lastDoc = r.doc; pendingAnchor.current = r.anchor || null; setNav(k => k + 1); } });
@@ -65,7 +66,7 @@ export function DocsView({ host }) {
   </div>;
 }
 
-export function ReferenceView({ host }) {
+export function ReferenceView({ host }: { host: Host }) {
   const sc = useRef<any>(null);
   return <div className="tabbody col"><div className="scroll" ref={sc}><Doc host={host} md={host.reference} prefix="r-" scrollRef={sc} /></div></div>;
 }

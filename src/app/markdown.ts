@@ -33,7 +33,7 @@ export function inline(s) {
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => keep[+i]);
 }
 
-const CALLOUTS = [[/^(try it|try|play)\b/i, 'try'], [/^(exercise|exercises|challenge)\b/i, 'exercise'], [/^(caveat|careful|warning|watch out|note)\b/i, 'caveat']];
+const CALLOUTS: [RegExp, string][] = [[/^(try it|try|play)\b/i, 'try'], [/^(exercise|exercises|challenge)\b/i, 'exercise'], [/^(caveat|careful|warning|watch out|note)\b/i, 'caveat']];
 
 export function render(md, o: Record<string, any> = {}) {
   const lines = String(md || '').replace(/\r/g, '').split('\n');
@@ -141,7 +141,7 @@ export function sanitizeSvg(src) {
   const p = 'f' + hash(s) + '-';
   s = s.replace(/\sid\s*=\s*"([^"]+)"/g, ` id="${p}$1"`).replace(/url\(#([^)]+)\)/g, `url(#${p}$1)`).replace(/(\s(?:xlink:)?href\s*=\s*")#([^"]+)"/g, `$1#${p}$2"`);
   // size: the root's width (or its viewBox width) becomes a max-width; the figure scales down to fit
-  const root = s.match(/^<svg\b[^>]*>/)[0];
+  const root = s.match(/^<svg\b[^>]*>/)![0];
   const vb = (root.match(/viewBox\s*=\s*"([^"]+)"/) || [])[1], w = +((root.match(/\swidth\s*=\s*"([\d.]+)/) || [])[1] || (vb ? vb.trim().split(/[\s,]+/)[2] : 0));
   let r = root.replace(/\s(width|height|style|class)\s*=\s*"[^"]*"/g, '');
   if (!/xmlns=/.test(r)) r = r.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');

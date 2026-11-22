@@ -1,5 +1,6 @@
 // scripts/shot.ts [presetId] [out.png] [w h waitMs light|dark webgl2|webgpu] — screenshot the built workbench
 // (dist/, from `npm run build`) in headless Chromium with SwiftShader, and print the page's console errors.
+// Env: DIST (default dist), CLICK (comma-separated visible texts to click first).
 // Port of the original test/shot.js; serves dist/ itself, so no preview server is needed.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -36,6 +37,8 @@ async function main() {
   await page.addInitScript(b => { try { localStorage.setItem('candela.v1.backend', JSON.stringify(b)); } catch { /* none */ } }, backend);
   await page.goto(`http://localhost:${port}/index.html` + (hash ? '#' + hash : ''));
   await page.waitForTimeout(+wait);
+  // CLICK='Agent,Connection': click elements by their visible text, in order, before the screenshot
+  for (const label of (process.env.CLICK || '').split(',').map(x => x.trim()).filter(Boolean)) { await page.getByText(label, { exact: true }).first().click(); await page.waitForTimeout(300); }
   const info = await page.evaluate(() => {
     const wb = (window as any).workbench;
     const vp = wb && wb.vp;

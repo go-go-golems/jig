@@ -1,19 +1,21 @@
 // render.jsx — output: stills and frame sequences at a fixed size, sample count and seed, as PNG or as OpenEXR
 // with the passes a compositor wants (beauty, albedo, N, Z, instance and face ids); jobs run one after another.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect } = React;
 import { useHost, Seg, Tog } from './common';
+import type { SegOption } from './common';
 import { Slider } from './slider';
 import { store } from '../host';
 import { videoSupport, videoBitrate } from '../../engine/video';
 
 const SIZES = [['1920×1080', 1920, 1080], ['1280×720', 1280, 720], ['3840×2160', 3840, 2160], ['1080×1080', 1080, 1080], ['1080×1350', 1080, 1350], ['640×360', 640, 360]];
 const DEF = { kind: 'still', size: '1920×1080', w: 1920, h: 1080, spp: 256, seed: 1, format: 'png', exposure: 'exposed', start: 0, end: 2, fps: 24, seedMode: 'per-frame', packaging: 'zip', timeMode: 'now', time: 0, autosave: true, quality: 'high', keyframe: 2 };
-const FORMATS_STILL = [{ value: 'png', label: 'PNG' }, { value: 'exr', label: 'EXR passes' }, { value: 'both', label: 'Both' }];
+const FORMATS_STILL: SegOption[] = [{ value: 'png', label: 'PNG' }, { value: 'exr', label: 'EXR passes' }, { value: 'both', label: 'Both' }];
 const FORMATS_SEQ = FORMATS_STILL.concat([{ value: 'mp4', label: 'MP4', title: 'H.264 video' }, { value: 'webm', label: 'WebM', title: 'VP9 video' }]);
 const isVideo = f => f === 'mp4' || f === 'webm';
 
-export function RenderView({ host }) {
+export function RenderView({ host }: { host: Host }) {
   useHost(host, 6);
   const [o, setO] = useState(() => Object.assign({}, DEF, store.get('render', {})));
   const set = (k, v?) => { const n = Object.assign({}, o, typeof k === 'object' ? k : { [k]: v }); setO(n); store.set('render', n); };
@@ -28,7 +30,7 @@ export function RenderView({ host }) {
   const save = j => host.saveFiles(j.files);
   const go = () => {
     try {
-      const opts = { kind: o.kind, width: ew, height: eh, spp: o.spp, seed: o.seed, format: fmt, exposure: o.exposure, name: host.preset ? host.preset.id : 'candela', autosave: o.autosave };
+      const opts: Record<string, any> = { kind: o.kind, width: ew, height: eh, spp: o.spp, seed: o.seed, format: fmt, exposure: o.exposure, name: host.preset ? host.preset.id : 'candela', autosave: o.autosave };
       if (o.kind === 'sequence') Object.assign(opts, { start: o.start, end: o.end, fps: o.fps, seedMode: o.seedMode, packaging: o.packaging });
       if (video) Object.assign(opts, { quality: o.quality, keyframeInterval: o.keyframe });
       else opts.time = o.timeMode === 'now' ? host.time : o.time;
@@ -47,14 +49,14 @@ export function RenderView({ host }) {
       <div className="block">
         <header><h2>Image</h2><span className="sub">{ew}×{eh} · {mp} MP · the camera's own framing{video && (ew !== o.w || eh !== o.h) ? ' · rounded to even for video' : ''}</span></header>
         <div className="row">{SIZES.map(([l, w, h]) => <button key={l} className={'btn sm' + (o.size === l ? ' on' : '')} onClick={() => set({ size: l, w, h })}>{l}</button>)}
-          <button className={'btn sm' + (o.size === 'view' ? ' on' : '')} disabled={!ok} onClick={() => set({ size: 'view', w: vp.backend.w, h: vp.backend.h })} title="the viewport's current pixel size">viewport</button></div>
+          <button className={'btn sm' + (o.size === 'view' ? ' on' : '')} disabled={!ok} onClick={() => set({ size: 'view', w: vp!.backend.w, h: vp!.backend.h })} title="the viewport's current pixel size">viewport</button></div>
         <div className="row"><label className="lbl">width <input className="num" type="number" min="16" max="8192" value={o.w} onChange={e => set({ size: 'custom', w: Math.max(16, +e.target.value | 0) })} /></label>
           <label className="lbl">height <input className="num" type="number" min="16" max="8192" value={o.h} onChange={e => set({ size: 'custom', h: Math.max(16, +e.target.value | 0) })} /></label></div>
         <div className="kv2"><span>samples</span><Slider value={o.spp} min={4} max={8192} log step={1} def={256} digits={0} unit="spp" onChange={v => set('spp', Math.round(v))} label="Samples per pixel" /></div>
         <div className="row"><label className="lbl" title="the random sequence: the same seed, scene and settings give the same image">seed <input className="num" type="number" min="0" value={o.seed} onChange={e => set('seed', Math.max(0, +e.target.value | 0))} /></label>
           {o.kind === 'sequence' && <Seg small value={o.seedMode} options={[{ value: 'per-frame', label: 'seed + frame', title: 'noise changes each frame (reads as grain)' }, { value: 'fixed', label: 'same seed', title: 'the same noise pattern every frame' }]} onChange={v => set('seedMode', v)} label="Seed per frame" />}</div>
         {(fmt === 'exr' || fmt === 'both') && <div className="row"><span className="lbl">EXR beauty</span><Seg small value={o.exposure} options={[{ value: 'exposed', label: '× exposure', title: 'scene-linear, scaled by the camera exposure: mid-grey ≈ 0.18' }, { value: 'absolute', label: 'nits', title: 'absolute luminance, cd/m²' }]} onChange={v => set('exposure', v)} label="EXR beauty scale" />
-          <span className="note">channels R G B A · albedo · N · Z · id.instance · id.face{window.claude ? ' — saved inside a .zip here' : ''}</span></div>}
+          <span className="note">channels R G B A · albedo · N · Z · id.instance · id.face</span></div>}
       </div>
       {o.kind === 'still' ? <div className="block">
         <header><h2>Time</h2><span className="sub">poses, behaviours and fields of time are evaluated here</span></header>

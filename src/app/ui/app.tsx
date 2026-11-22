@@ -1,5 +1,6 @@
 // app.jsx — the workbench: a header (presets, build, status, layouts) over a dock of tiled, draggable views.
 import React from 'react';
+import type { Host } from '../host';
 const { useState, useEffect, useRef, useMemo } = React;
 import { useHost, Menu, saveFile } from './common';
 import { Dock, tile, split, normalize, tileOf, tilesOf, addView, activate, openViews } from './dock';
@@ -24,7 +25,7 @@ export const LAYOUTS = [
 ];
 const NEAR = { viewport: ([] as any[]), code: ['notes', 'agent'], params: ['scene', 'lab'], notes: ['code', 'docs'], agent: ['code', 'notes'], console: ['ir', 'shader'], scene: ['params'], render: ['params', 'scene'], ir: ['graph', 'console'], graph: ['ir'], shader: ['console', 'ir'], lab: ['params'], docs: ['notes', 'reference'], reference: ['docs', 'notes'] };
 
-export function App({ host }) {
+export function App({ host }: { host: Host }) {
   useHost(host, 4);
   const [layout, setLayoutRaw] = useState(() => normalize(store.get('layout', null) || LAYOUTS[0].make(), KNOWN));
   const setLayout = l => { setLayoutRaw(l); store.set('layout', l); };
@@ -101,7 +102,7 @@ function Header({ host, setLayout }) {
   </header>;
 }
 
-function PresetMenu({ host }) {
+function PresetMenu({ host }: { host: Host }) {
   const p = host.preset; const [title, setTitle] = useState(''), [q, setQ] = useState(''); const fileRef = useRef<any>(null);
   if (!p) return null;
   const all = host.allPresets().filter(x => !q || (x.id + ' ' + x.title + ' ' + x.about + ' ' + x.group).toLowerCase().includes(q.toLowerCase()));

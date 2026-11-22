@@ -10,6 +10,7 @@ import { isParam } from '../engine/params';
 import { rayMesh } from '../engine/mesh';
 import { assets, parseHDR, fromRGBA8 } from '../engine/hdri';
 import { RenderQueue } from '../engine/output';
+import type { Preset, Doc } from '../content/catalog';
 
 const NS = 'candela.v1.';
 export const store = {
@@ -18,16 +19,21 @@ export const store = {
 };
 
 export class Host {
-  builtins: any;
-  docs: any;
-  reference: any;
-  mine: any;
+  // set by the UI: the viewport's canvas, whether the user is dragging the camera, the workbench capture
+  canvas: HTMLCanvasElement | null;
+  interacting: boolean;
+  captureWorkbench: (maxW?: number) => Promise<HTMLCanvasElement>;
+  builtins: Preset[];
+  docs: Doc[];
+  reference: string;
+  mine: Preset[];
   listeners: Set<any>;
   version: number;
   toasts: any;
-  preset: any;
-  files: any;
-  notes: any;
+  preset: Preset;
+  /** the project's files: path → source (edits included) */
+  files: Record<string, string>;
+  notes: string;
   result: any;
   diags: any;
   logs: any;
@@ -63,7 +69,7 @@ export class Host {
     this.builtins = presets; this.docs = docs; this.reference = reference;
     this.mine = store.get('mine', []);
     this.listeners = new Set(); this.version = 0; this.toasts = [];
-    this.preset = null; this.files = {}; this.notes = '';
+    this.preset = null!; this.files = {}; this.notes = '';   // preset: set by loadPreset() before first use
     this.result = null; this.diags = []; this.logs = []; this.buildInfo = null; this.compileError = null;
     this.vp = null; this.running = true; this.time = 0; this.speed = 1; this.selection = null; this.focusReq = null;
     this.view = { aov: 'beauty', tonemap: null, falseColor: null, denoise: null, evComp: 0, engine: store.get('engineMode', 'scene'), backend: store.get('backend', 'auto'), quality: 1 };
@@ -97,7 +103,7 @@ export class Host {
     this.notify();
     return p;
   }
-  isDirty(path) { const orig = this.preset.files; return path ? orig[path] !== this.files[path] : Object.keys(this.files).some(k => orig[k] !== this.files[k]) || Object.keys(orig).some(k => !(k in this.files)); }
+  isDirty(path?: string) { const orig = this.preset.files; return path ? orig[path] !== this.files[path] : Object.keys(this.files).some(k => orig[k] !== this.files[k]) || Object.keys(orig).some(k => !(k in this.files)); }
   notesDirty() { return (this.preset.notes || '') !== this.notes; }
   saveEdits() { const orig = this.preset.files, files: Record<string, any> = {}; for (const [k, v] of Object.entries(this.files)) if (orig[k] !== v) files[k] = v; const notes = this.notesDirty() ? this.notes : null; store.set('edits:' + this.preset.id, Object.keys(files).length || notes != null ? { files, notes } : undefined); }
   saveEditsSoon() { clearTimeout(this._saveT); this._saveT = setTimeout(() => this.saveEdits(), 400); }
@@ -142,8 +148,8 @@ export class Host {
   async loadIntoViewport(compiled, seq?) {
     try {
       this.compiling = true; this.notify();
-      await this.vp.load(compiled, { time: this.time });
-      if (this.freeCam) this.vp.setView(this.freeCam);
+      await this.vp!.load(compiled, { time: this.time });
+      if (this.freeCam) this.vp!.setView(this.freeCam);
       this.applyView();
       this.compileError = null;
     } catch (e) {
@@ -230,7 +236,7 @@ export class Host {
     if (/\.hdr$|\.pic$/i.test(file.name)) img = parseHDR(new Uint8Array(await file.arrayBuffer()));
     else {
       const bmp = await createImageBitmap(file); const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
-      const g = c.getContext('2d'); g.drawImage(bmp, 0, 0); img = fromRGBA8(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+      const g = c.getContext('2d')!; g.drawImage(bmp, 0, 0); img = fromRGBA8(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
     }
     img.name = name; assets.set(name, img); this.assetVersion++;
     this.toast(`Asset '${name}' (${img.width}×${img.height}) — use it with light.env.hdri('${name}')`);
@@ -317,10 +323,10 @@ export class Host {
         if (v === undefined && !(k in c.props)) throw new CandelaError('E104', `'${k}' is not an attribute of ${c.kind}`, { suggest: didYouMean(k, Object.keys(c.props).concat(['position', 'material'])) });
         return showVal(v);
       },
-      set(_, k, v) { host.patch(sel, b => { if (k === 'position') return b.at(...([] as any[]).concat(v)); if (typeof b[k] !== 'function') throw new CandelaError('E104', `cannot set '${k}' on ${sel}`); return b[k](parseQuantity(v)); }, `${sel}.${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`); return true; },
+      set(_, k: any, v) { host.patch(sel, b => { if (k === 'position') return b.at(...([] as any[]).concat(v)); if (typeof b[k] !== 'function') throw new CandelaError('E104', `cannot set '${k}' on ${sel}`); return b[k](parseQuantity(v)); }, `${sel}.${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`); return true; },
     });
-    const matHandle = (sel, c) => new Proxy({}, { get(_, k) { if (typeof k === 'symbol') return undefined; const m = c.props.material; return m ? showVal(m.props[k]) : undefined; }, set(_, k, v) { host.patch(sel, b => b.material(b.props.material ? wrapComp(c.props.material)[k](parseQuantity(v)) : API.material.pbr()[k](v)), `${sel}.material.${k} = ${v}`); return true; } });
-    const posHandle = (sel, c) => { const p = (c.props.at || [0, 0, 0]).map(x => +showVal(x) || 0); return new Proxy(p, { set(t, k, v) { const q = t.slice(); q[{ x: 0, y: 1, z: 2 }[k] ?? +k] = +v; host.patch(sel, b => b.at(...q), `${sel}.position.${k} = ${v}`); return true; }, get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; } }); };
+    const matHandle = (sel, c) => new Proxy({}, { get(_, k: any) { if (typeof k === 'symbol') return undefined; const m = c.props.material; return m ? showVal(m.props[k]) : undefined; }, set(_, k: any, v) { host.patch(sel, b => b.material(b.props.material ? wrapComp(c.props.material)[k](parseQuantity(v)) : API.material.pbr()[k](v)), `${sel}.material.${k} = ${v}`); return true; } } as ProxyHandler<any>);
+    const posHandle = (sel, c) => { const p = (c.props.at || [0, 0, 0]).map(x => +showVal(x) || 0); return new Proxy(p, { set(t, k: any, v) { const q = t.slice(); q[{ x: 0, y: 1, z: 2 }[k] ?? +k] = +v; host.patch(sel, b => b.at(...q), `${sel}.position.${k} = ${v}`); return true; }, get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; } }); };
     return {
       $: handle, $$: sel => { const sc = sceneOf(); return sc ? collect(compOf(sc), sel).map(c => handle(c.props.id ? '#' + c.props.id : sel)) : ([] as any[]); },
       ids: () => { const sc = sceneOf(); return sc ? allIds(compOf(sc)) : ([] as any[]); },
@@ -373,7 +379,7 @@ export class Host {
 }
 
 const vecHandle = a => new Proxy(a, { get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; }, set(t, k, v) { const i = { x: 0, y: 1, z: 2 }[k]; if (i != null) t[i] = +v; else t[k] = v; return true; } });
-function downscale(c, maxW) { if (c.width <= maxW) return c; const k = maxW / c.width; const d = document.createElement('canvas'); d.width = Math.round(c.width * k); d.height = Math.round(c.height * k); d.getContext('2d').drawImage(c, 0, 0, d.width, d.height); return d; }
+function downscale(c, maxW) { if (c.width <= maxW) return c; const k = maxW / c.width; const d = document.createElement('canvas'); d.width = Math.round(c.width * k); d.height = Math.round(c.height * k); d.getContext('2d')!.drawImage(c, 0, 0, d.width, d.height); return d; }
 function findComp(sc, sel) { let hit: any = null; const v = c => { if (hit) return; if (matches(c, sel)) { hit = c; return; } (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (!hit && sc.props.camera && matches(sc.props.camera, sel)) hit = sc.props.camera; return hit; }
 function collect(sc, sel) { const out: any[] = []; const v = c => { if (matches(c, sel)) out.push(c); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); return out; }
 const wrapComp = c => ({ [Symbol.for('candela.comp')]: c });

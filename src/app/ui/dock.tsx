@@ -185,7 +185,7 @@ function Tile({ t, layout, setLayout, byId, known, render, startDrag, maxed, set
   const closed = known.filter(v => !openViews(layout).includes(v));
   const isMax = maxed === t.id;
   return <section className={'tile' + (isMax ? ' maxed' : '') + (maxed && !isMax ? ' under' : '')} data-tile={t.id}>
-    <div className="dstrip" onDoubleClick={e => { if (e.target === e.currentTarget || e.target.classList.contains('dfill')) setMax(isMax ? null : t.id); }}>
+    <div className="dstrip" onDoubleClick={e => { if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('dfill')) setMax(isMax ? null : t.id); }}>
       {!single && <button className="grip" title="Drag the whole tile: onto another tile's tabs to merge, its middle to swap, an edge to dock" aria-label="Move tile" onPointerDown={e => startDrag(e, null, t.id, true)}>⠿</button>}
       <div className="dtabs" role="tablist">
         {t.views.map(v => { const d = byId[v] || { title: v }; const badge = d.badge ? d.badge() : null; return <div key={v} className={'dtab' + (t.active === v ? ' on' : '')}>

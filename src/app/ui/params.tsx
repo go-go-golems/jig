@@ -1,6 +1,7 @@
 // params.jsx — every param the scene declares, as a control: sliders with units for numbers, swatches for
 // colours, toggles for switches, segments for choices. Dynamic params write a uniform; static ones rebuild.
 import React from 'react';
+import type { Host } from '../host';
 const { useState } = React;
 import { useHost, useFocus, Seg, Tog } from './common';
 import { Slider, Swatch } from './slider';
@@ -20,7 +21,7 @@ export function ParamControl({ h, host }) {
     onChange={x => h.set(h.undisp(x))} digits={h.int ? 0 : undefined} />;
 }
 
-export function ParamsView({ host }) {
+export function ParamsView({ host }: { host: Host }) {
   useHost(host, 8);
   const [q, setQ] = useState(''), [changed, setChanged] = useState(false), [flash, setFlash] = useState<any>(null);
   useFocus(host, 'params', r => { if (r.id) { setFlash(r.id); setTimeout(() => setFlash(null), 1600); } });
