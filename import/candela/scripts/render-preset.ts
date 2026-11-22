@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { serve } from './shot';
-import { parseArgs } from './args';
+import { parseArgs, isMain } from './args';
 
 /** headless-shell flags that reach the NVIDIA GPU on the DGX Spark (CANDELA-002 various/01-gpu-probe.txt) */
 export const GPU_ARGS = ['--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
@@ -198,4 +198,4 @@ async function main() {
   console.log(`done in ${(r.ms / 1000).toFixed(1)} s (${(samples / (r.ms / 1000)).toFixed(1)} spp/s incl. encode) → ${r.files.join(', ')}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(String(e.message || e)); process.exit(1); });
+if (isMain('render-preset')) main().catch(e => { console.error(String(e.message || e)); process.exit(1); });

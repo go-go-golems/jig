@@ -44,9 +44,8 @@ updated at the end of JIG-017 (see the ticket's diary for the evidence of each s
 
 - **Done in JIG-017:** Candela's repository (pbr-spark) moved into jig at `import/candela` with its history; jig
   builds both Candela bundles from that tree and the vendored copy is gone; Candela's core is written where Candela's
-  tools and candela-rt look for it and copied into jig's `dist/`; Candela's engine tests run from jig (`make
-  test-candela`, part of `make test`, and their own CI workflow) without npm, against a golden baseline per CPU
-  architecture; Candela's tickets joined jig's `ttmp`; `make candela-rt` builds the native renderer; `jigcad serve`
+  tools and candela-rt look for it and copied into jig's `dist/`; Candela's engine tests run in jig's `make test-js`
+  and CI without npm, in about 13 s, against a golden baseline per CPU architecture; Candela's tickets joined jig's `ttmp`; `make candela-rt` builds the native renderer; `jigcad serve`
   also finds candela-rt next to its own binary; a GPU CI workflow is ready for a self-hosted `nvidia` runner.
 - **Designed here, not built yet (Part 8):** candela-rt rendering a jig CAD package (scope, poses, jobs), the Render
   view's OptiX mode through `/rt`, rendering on a remote GPU, and a release artifact for candela-rt.
@@ -468,7 +467,7 @@ jig/
     dist-core/                generated: candela-core.js (by jig's make web)
     build/                    generated: rt/candela-rt (make candela-rt), node-tests/
   ttmp/                       every ticket, CANDELA-001/002 included (2026/11/21)
-  .github/workflows/          push.yml, lint.yml, candela.yml (engine tests), candela-rt.yml (GPU runner)
+  .github/workflows/          push.yml (make test-js, Candela's tests included), lint.yml, candela-rt.yml (GPU runner)
 ```
 
 ### 7.3 Step 1: the move, with history
@@ -554,9 +553,10 @@ Two details made it work:
   `core-digest.ts`, which the golden test imports, now loads no npm package. `render-preset.ts` re-exports it, so the
   other scripts are unchanged.
 
-`make test-candela` runs them, and `make test` runs `test-go`, `test-js` and `test-candela`. The golden test
-compiles and packs 105 presets at three times and takes about seven minutes, so it is not part of `make test-js`
-and has its own CI workflow (§7.9). Its baseline turned out to depend on the CPU architecture (§7.10).
+`make test-candela` runs them (about 13 s: the golden test compiles and packs 105 presets at three times in about
+10 s), and `make test-js` ends with `test-candela`, so every pull request's CI runs them. Getting there took two
+fixes and one finding, which §7.10 explains: a bundling bug that ran a second, slower test inside the golden test,
+a 30× slowdown of Node's `vm` contexts, and a baseline that depends on the CPU architecture.
 
 ### 7.7 Step 5: building and finding candela-rt
 
@@ -589,9 +589,8 @@ and its `log` doc type joined jig's vocabulary; the duplicate scaffolding (ident
 
 ### 7.9 Step 7: CI, and what was verified
 
-`.github/workflows/candela.yml` runs `make test-candela` on `ubuntu-latest` (x86-64) when a change touches
-`import/candela/**`, `import/jigcad/build.mjs`, the Makefile or the workflow; `JIG_SKIP_CARGO=1` skips jig's Rust
-module, which the engine tests do not need. `push.yml` is unchanged: jig's own suites run on every pull request.
+`.github/workflows/push.yml` runs `make test-js` on every pull request, on `ubuntu-latest` (x86-64); that now
+includes Candela's engine tests, checked against the x86-64 golden baseline.
 
 `.github/workflows/candela-rt.yml` is the GPU job. It runs on a runner labelled `self-hosted, linux, nvidia` and
 only when the repository variable `NVIDIA_RUNNER` is `true`:
@@ -613,12 +612,67 @@ Verification during JIG-017 (details and failures in the diary):
 |---|---|
 | jig render tests (`node --test test/render/*.test.mjs`) on the moved engine | 74/74 |
 | Render view in Chromium on the GPU (`test/ui/render.cjs`) | 14/14 |
-| Candela `session` test through `node-tests.mjs` | passed |
-| Candela `golden-pack` test through `node-tests.mjs` | see the diary (step on the golden test) |
-| `core-digest.ts --compare` of a Node run against itself (B-01, K-09) | 2/2 identical |
+| Candela `session` test through `node-tests.mjs` | passed (1.9 s) |
+| Candela `golden-pack` test, x86-64 baseline | 105/105 identical (9.9 s) |
+| HEAD's engine against an x86-64 baseline recorded at the arm64 baseline's own commit (`19f016a`) | 105/105 identical |
+| `core-digest.ts` (Node in `vm`), every preset, with builtins bound locally, against the run without | 105/105 identical; 585 s → 18.5 s |
+| `make test-js` (all of jig's suites and Candela's) | exit 0 in 241 s: 90 + 74 + 17 `node --test` tests, engine core 69 and engine 62 checks, Candela golden 105/105 and session |
 | Go tests (`pkg/render`, `pkg/server`) | ok |
 | actionlint on all workflows | clean |
 | The GPU workflow and `make candela-rt` | not run: no NVIDIA GPU on the development machine |
+
+### 7.10 The golden test: one bug, one slowdown, one baseline per architecture
+
+The first full run of Candela's golden test in jig failed: `golden pack: 95/105 identical in 452.8 s`, with ten
+presets differing (F-08 `meta`, R-05 `O`, and K-01, K-03 … K-09 `SDs`). Two questions followed, and their answers
+changed the test setup.
+
+**Did moving the engine change its output?** No. The test was run at three pbr-spark commits in temporary
+worktrees: the merge of #1 (`db9b0a8`), the last commit of #2 (`24c02e2`) and the commit that recorded the
+baseline's current form (`19f016a`). All three gave the same ten differences, so no engine change since the baseline
+explains them. Running the same bundle under Node 20, 22, 24 and 26 (V8 11.3, 12.4, 13.6, 14.6) on this x86-64
+machine gave the same ten differences again, so the V8 version does not explain them either. What remains is the
+machine: the baseline was recorded on the DGX Spark, an arm64 machine, where candela-rt's V8 and Node also agreed
+with it. The x86-64 baseline was made at `19f016a`: the ten presets re-recorded there on x86-64 with `--update --ids …`, the
+other 95 kept (they hash the same on both machines). Compared with HEAD's engine it gives `105/105 identical`. The
+digests hash raw float buffers, and a handful of values in ten presets come out with different bits on the two
+architectures; which values, the hashes cannot say, and it was not traced further. The test now reads
+`tests/golden/pack-digests.json` on arm64 and `tests/golden/pack-digests.<arch>.json` elsewhere
+(`pack-digests.x64.json` is committed). A change that is meant to alter output must update both baselines: on the
+Spark and on an x86-64 machine, with `--update`.
+
+**Why did it take 450 s, when the Spark's diary records 8 s?** A CPU profile of the golden test on one preset
+(B-01, 4.1 s) put 92 % of the time in `ggxAlbedoTable`, the GGX albedo table that every compile recomputes, but in
+frames of `candela-core.js`, which the golden test does not load. The cause was the bundling of §7.6. The test
+imports `compareDigests` from `scripts/core-digest.ts`, and that script ends with the usual entry guard:
+
+```ts
+if (import.meta.url === `file://${process.argv[1]}`) main();
+```
+
+Under `tsx` every module has its own `import.meta.url`, so the guard is false for an imported script. In an esbuild
+bundle every module shares the bundle's `import.meta.url`, which is exactly `argv[1]`, so core-digest's `main()`
+ran alongside the test: a second, complete digest of every preset, inside a Node `vm` context. The fix is a name
+test, `isMain('core-digest')` in `scripts/args.ts`, comparing the base name of `argv[1]` (which is
+`core-digest.ts` under tsx and `core-digest.mjs` as a bundle). The six scripts with such a guard all use it now.
+The golden test takes 9.9 s.
+
+**Why was the `vm` half so slow?** The same function, `ggxAlbedoTable`, takes 125 ms in a normal script and 3,670 ms
+in a `vm` context. In a `vm` context every lookup of a global name (`Math`, `Object`, `Float32Array` …) goes through
+the contextified global object instead of a fast property load. Binding the context's own builtins once as
+parameters of a wrapper function makes the lookups local and leaves the objects unchanged:
+
+```ts
+// scripts/core-digest.ts, digestInVm (sketch)
+const names = BUILTINS.join(', ');                       // 'Math, Object, Array, …'
+const src = `(function (${names}) {\n${bundleSource}\nglobalThis.Candela = Candela;\n}).call(globalThis, ${names});`;
+vm.runInContext(src, ctx);                                // evaluated in the context: these are the context's builtins
+```
+
+`core-digest` over every preset went from 585 s to 18.5 s, with all 105 digests identical to those of the unwrapped
+run. The `vm` context exists to prove that the core needs only the globals candela-rt provides; the wrapper keeps
+that property, because it passes only names the context already has. candela-rt itself is not affected: it runs the
+bundle in an ordinary V8 context.
 
 ## 8. What comes next
 
@@ -774,9 +828,9 @@ Environment: `JIGCAD_CANDELA_RT` (a candela-rt binary for `--render auto`), `JIG
 | `make web` | builds `import/jigcad/dist/` and `import/candela/dist-core/candela-core.js` |
 | `make serve [RENDER=…]` | runs `jigcad serve` on the built files |
 | `make candela-rt [OPTIX_DIR=…]` | builds `import/candela/build/rt/candela-rt` (NVIDIA machine) |
-| `make test` | `test-go`, `test-js` and `test-candela` |
-| `make test-js` | jig's JavaScript suites |
-| `make test-candela` | Candela's session and golden tests in Node (about seven minutes) |
+| `make test` | `test-go` and `test-js` |
+| `make test-js` | jig's JavaScript suites, then `test-candela` |
+| `make test-candela` | Candela's session and golden tests in Node (about 13 s) |
 | `make test-go`, `make build-bin`, `make lint`, `make clean` | as before |
 
 ## 10. File reference
@@ -794,13 +848,12 @@ Environment: `JIGCAD_CANDELA_RT` (a candela-rt binary for `--render auto`), `JIG
 | `import/candela/src/engine/mesh.ts`, `finish.ts` | CAD meshes, picking, finishes from metadata |
 | `import/candela/native/rt/src/main.cpp`, `serve.cpp`, `js_runtime.cpp`, `optix_renderer.cpp`, `cuda_runner.cpp` | candela-rt |
 | `import/candela/native/rt/CMakeLists.txt`, `kernels/` | its build and run-time headers |
-| `import/candela/scripts/node-tests.mjs`, `args.ts`, `core-digest.ts`, `bundle-core.ts` | tests and tools |
+| `import/candela/scripts/node-tests.mjs`, `args.ts` (`parseArgs`, `isMain`), `core-digest.ts`, `bundle-core.ts` | tests and tools |
 | `import/candela/tests/` | golden and session tests |
 | `import/jigcad/build.mjs` | jig's build, Candela's bundles included |
 | `import/jigcad/src/render/` | Candela in jig: entry, bridge, Render view controller, frame change, look files |
 | `import/jigcad/src/engine/cadpkg.js` | the CAD package |
 | `pkg/render/` | candela-rt supervisor and proxy (`find.go`, `render.go`, `proxy.go`) |
-| `.github/workflows/candela.yml` | Candela's engine tests in CI (x86-64) |
 | `.github/workflows/candela-rt.yml`, `.github/actionlint.yaml` | GPU CI |
 | `import/candela/tests/golden/pack-digests.json`, `pack-digests.x64.json` | golden baselines (arm64, x86-64) |
 
@@ -817,6 +870,8 @@ Environment: `JIGCAD_CANDELA_RT` (a candela-rt binary for `--render auto`), `JIG
 | D7 | one docmgr root | tickets searchable from jig's root |
 | D8 | the GPU job is gated by `vars.NVIDIA_RUNNER` | no jobs queued forever before a runner exists |
 | D9 | native code unchanged in JIG-017 | no NVIDIA GPU to build or test it on the development machine |
+| D10 | one golden baseline per CPU architecture | the same commit hashes differently on arm64 and x86-64 in 10 presets; one shared baseline would fail on one of them |
+| D11 | Candela's tests in `make test-js`, no separate workflow | after the two fixes of §7.10 they take 13 s |
 
 ## 12. Glossary
 

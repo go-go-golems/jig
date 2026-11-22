@@ -12,6 +12,7 @@ import { create, globals } from 'webgpu';
 import { loadCatalogFromDisk } from '../src/content/node';
 import { openRender } from '../src/engine/headless';
 import { parseArgs } from './render-preset';
+import { isMain } from './args';
 
 /** PFM, the float image format ffmpeg and most image tools read: rows bottom to top */
 export function writePFM(file: string, w: number, h: number, rgb: Float32Array) {
@@ -116,4 +117,4 @@ async function main() {
   device.destroy();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().then(() => process.exit(0), e => { console.error(e); process.exit(1); });
+if (isMain('wgsl-render')) main().then(() => process.exit(0), e => { console.error(e); process.exit(1); });

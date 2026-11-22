@@ -24,7 +24,7 @@ What jig builds and runs from this directory, with no npm install (jig's own esb
 | from jig's root | what it does |
 | --- | --- |
 | `make web` | jig's `dist/`, including `dist/candela.js` (engine + browser layer) and the core, written to `import/candela/dist-core/candela-core.js` and copied to jig's `dist/` |
-| `make test-candela` | `tests/session.test.ts` and `tests/golden-pack.test.ts` through `scripts/node-tests.mjs` |
+| `make test-candela` | `tests/session.test.ts` and `tests/golden-pack.test.ts` through `scripts/node-tests.mjs` (about 13 s; part of `make test-js`) |
 | `make candela-rt [OPTIX_DIR=…]` | `import/candela/build/rt/candela-rt` (NVIDIA machine; prerequisites below) |
 | `make serve RENDER=import/candela/build/rt/candela-rt` | jig with the native renderer behind `/rt` |
 
@@ -33,8 +33,8 @@ What jig builds and runs from this directory, with no npm install (jig's own esb
 `.bin/esbuild/node_modules/esbuild/lib/main.js`, as `make test-candela` does).
 
 The golden baseline is per CPU architecture: `tests/golden/pack-digests.json` was recorded on the DGX Spark
-(arm64) and `tests/golden/pack-digests.x64.json` on x86-64; 10 of the 105 presets differ in the last bits of a few
-floats between the two.
+(arm64) and `tests/golden/pack-digests.x64.json` on x86-64; the buffers of 10 of the 105 presets hash differently on
+the two at the same commit.
 
 Everything below — the React workbench, `npm run …`, the screenshot and parity tools — is Candela's own development
 setup, and still works as before after `npm install` in this directory. jig does not build or ship the workbench.

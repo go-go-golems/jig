@@ -204,3 +204,110 @@ This step made jig able to build and run candela-rt from its own tree and test i
 
 ### Code review instructions
 - `pkg/render/find.go`, `Makefile`, `.github/workflows/candela-rt.yml`.
+
+## Step 4: the golden test — one bundling bug, a 30× vm slowdown, and a baseline per CPU architecture
+
+Step 2's golden failure turned out to be three separate things.
+- **Architecture.** The ten differences are not caused by any engine change. The arm64 baseline from the Spark and x86-64 hash ten presets differently at the same commit, so the test now has a baseline per architecture.
+- **A bug I introduced.** The 450 s runtime came from bundling: core-digest's entry guard became true inside the golden bundle, so a second, full digest of every preset ran alongside the test.
+- **Node's `vm` contexts.** That second digest was slow because global lookups inside a `vm` context are about 30× slower than in a normal script.
+
+With all three handled, Candela's tests take 13 s and run in `make test-js`, and the separate `candela.yml` workflow is gone.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 1.
+**Assistant interpretation:** make Candela's tests a real, passing part of jig's gate, not one that fails or is skipped.
+**Inferred user intent:** a clean integration means its tests pass in jig's CI and their failures mean something.
+**Commit (code):** the commit after `e9c9f3c`, recorded in Step 5.
+
+### What I did
+**Finding the ten differences.** The full run said `golden pack: 95/105 identical in 452.8 s`, then:
+
+```
+DIFFERS F-08: t=0 meta
+DIFFERS R-05: t=0 O
+DIFFERS K-01: t=0 SDs
+… K-03 … K-09: t=0 SDs
+```
+
+**Bisect over commits.** I created temporary worktrees at three pbr-spark commits:
+- `db9b0a8`, the merge of #1;
+- `24c02e2`, the end of #2;
+- `19f016a`, the last change to the baseline.
+
+Each got that commit's own core bundle, and Playwright stubbed in a throwaway `node_modules` (`render-preset.ts` still imported it). F-08, R-05, K-01 and K-09 differed at all three commits, `0/4 identical` each time.
+
+**Field diff.** A small script compared each digest field with the baseline:
+- F-08 `meta`: `271ee42d…` now, `22f38a1f…` in the baseline;
+- R-05 `O`: `3c1e53df…` now, `d1e39800…`;
+- K-01 `SDs`: `d1ed6ee8…` now, `0eaf08aa…`.
+
+The WGSL hash and every other buffer matched.
+
+**Node versions.** I ran the same bundle under nvm's Node v20.8.0, v22.22.1 and v26.13.0 (V8 11.3, 12.4, 14.6) with `--ids F-08,R-05,K-01,B-01`. All gave `1/4 identical`, with the same three differences.
+
+**x86-64 baseline.** At `19f016a` I ran `--update --ids` for the ten presets, which writes only those ids and keeps the others. HEAD's engine against that file: `golden pack: 105/105 identical in 465.2 s`. It is committed as `tests/golden/pack-digests.x64.json`, and the test picks `pack-digests.json` on arm64 and `pack-digests.<arch>.json` elsewhere.
+
+**The runtime.**
+- `node --cpu-prof` on B-01 alone (4.1 s) showed 3,695 ms in `ggxAlbedoTable` and 1,981 ms in `lam2`, both in `candela-core.js` frames. The golden test does not load `candela-core.js`.
+- Reading the bundle explained it: `compareDigests` comes from `scripts/core-digest.ts`, whose last line is ``if (import.meta.url === `file://${process.argv[1]}`) main()``. Bundled, every module's `import.meta.url` is the bundle's URL, which is `argv[1]`, so core-digest's `main()` ran its full Node-in-`vm` digest.
+- Fix: `isMain(name)` in `scripts/args.ts` compares the base name of `argv[1]`. All six scripts with that guard use it now: `compare-pfm`, `core-digest`, `render-preset`, `scene-package`, `shot`, `wgsl-render`.
+
+**The `vm` slowdown.** `ggxAlbedoTable` copied into a plain script took `main: 125 ms`, and in `vm.createContext` it took `vm: 3670 ms`.
+- `microtaskMode` and setting a global from inside the context made no difference (3,823 ms and 3,889 ms).
+- Wrapping the script as `(function(Math){…})(Math)` took 155 ms.
+- `digestInVm` now runs the bundle inside a function that receives the context's own builtins (`Math`, `Object`, `Array`, the typed arrays …) as parameters, then sets `globalThis.Candela`.
+
+**Make and CI.**
+- `make test-js` ends with `$(MAKE) --no-print-directory test-candela`, and `make test` is `test-go test-js` again.
+- `.github/workflows/candela.yml` (from Step 3, never pushed) is deleted.
+- `push.yml`'s step name now mentions Candela's engine.
+
+### Why
+- **A baseline per architecture, not a tolerance.** The test's value is that it is exact: any change to generated code or packed bytes shows up. Comparing with a tolerance would need the raw buffers, which the baseline does not keep, and would loosen the check everywhere.
+- **Bind the builtins, don't change the context.** The `vm` context exists to prove the core needs only the globals candela-rt provides (`console`, `performance`, `atob`, `btoa`). Binding builtins the context already has keeps that proof. Adding globals would weaken it.
+
+### What worked
+- `make test-candela` printed `ok   candela golden-pack (10.8 s)`, then `ok   candela session (1.9 s)`, in `13.10 s` total.
+- `golden-pack.mjs` reported `golden pack: 105/105 identical in 9.9 s`, and the arm64 baseline was unchanged (`git diff --quiet`).
+- `core-digest` over every preset took 584.73 s before the wrapper and 18.53 s after: `compare with build/node-digest-all.json: 105/105 identical`.
+- `actionlint`: clean.
+- **`make test-js`, the whole gate:** exit 0 in 241.09 s.
+  - jig's suites: `ℹ tests 90 · pass 90` (agent and UI), `74/74` (render), `17/17` (agent-eval), engine core `69 passed, 0 failed`, engine `62 passed, 0 failed`;
+  - Candela: `golden pack: 105/105 identical in 32.4 s` (slower because other runs shared the CPU), and `session: all checks passed`.
+
+### What didn't work
+- **Bisect, first attempt.** The worktrees printed nothing. Running one directly showed only the start of the bundle: the old `core-digest.ts` imported `parseArgs` from `render-preset.ts`, which imports Playwright. Copying `scripts/args.ts` in and rewriting the import fixed it.
+- **Bisect, second attempt.** It failed with `Error: ENOENT … gold-db9b0a8/dist-core/candela-core.js`, because each worktree needs its own core. Building it with jig's esbuild fixed that.
+- **First `ggx.js` extraction.** `SyntaxError: Unexpected end of input`: my `sed` range stopped one line before the function's closing brace.
+- **Stopping the old run.** `pkill -f "scripts/node-tests.mjs"` killed my own shell (exit 144), because the pattern also matched the Bash command line. `kill <pid>` worked.
+
+### What I learned
+- **Entry guards don't survive bundling.** ``import.meta.url === `file://${argv[1]}` `` is a tsx/Node idiom that breaks under any bundler that merges modules: every module becomes "main".
+- **Node `vm` global lookups are expensive.** They go through the contextified global's interceptors, about 30× slower here. Code meant for an embedded V8 runs much faster when checked in a `vm` context with its builtins bound locally.
+- **The Spark's 8.0 s was the real cost all along.** CANDELA-002's diary has `golden pack: 105/105 identical in 8.0 s`; this machine does it in 9.9 s once the extra digest is gone.
+
+### What was tricky to build
+- **Telling the hypotheses apart.** "The baseline is stale", "V8 changed" and "the architecture differs" all produce the same `DIFFERS` lines.
+  - The worktrees at older commits ruled out code changes.
+  - nvm's Node versions ruled out V8.
+  - The x86-64 baseline recorded at the baseline's own commit is the positive proof.
+- **What the difference actually is.** The hashes can't show which floats differ, and there is no arm64 machine here to dump the buffers. "Hashes differently" is as far as the evidence goes.
+
+### What warrants a second pair of eyes
+- **The `BUILTINS` list in `core-digest.ts`.** A builtin the core uses but the list leaves out still works, through the slow global lookup. The list only affects speed, never results.
+- **Two baselines to maintain.** An intended output change now needs `--update` on both architectures. Both the README and the test's header comment say so.
+
+### Code review instructions
+- Files:
+  - `import/candela/scripts/args.ts` (`isMain`);
+  - `import/candela/scripts/core-digest.ts` (`BUILTINS`, `digestInVm`);
+  - `import/candela/tests/golden-pack.test.ts` (`GOLDEN`);
+  - `import/candela/tests/golden/pack-digests.x64.json`;
+  - `Makefile` (`test-js`).
+- Validate:
+
+  ```sh
+  make test-candela
+  cd import/candela && ESBUILD=../../.bin/esbuild/node_modules/esbuild/lib/main.js node scripts/node-tests.mjs --run scripts/core-digest.ts -- --ids B-01,K-09
+  ```

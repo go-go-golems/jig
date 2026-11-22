@@ -20,6 +20,7 @@ import { build } from '../src/engine/candela';
 import { cameraUniforms, inv34 } from '../src/engine/compile';
 import { loadCatalogFromDisk } from '../src/content/node';
 import { parseArgs } from './render-preset';
+import { isMain } from './args';
 
 const TYPE_NAMES = ['sphere', 'plane', 'rect', 'disk', 'box', 'cylinder', 'capsule', 'torus', 'roundbox', 'cone', 'prism', 'sdf', 'heightfield', 'mesh'];
 
@@ -109,4 +110,4 @@ async function main() {
   console.log(`${id} t=${header.time}: ${header.meshes.length} meshes, ${header.instances.length} instances, ${header.triangles} triangles, skipped ${JSON.stringify(header.skipped)} → ${out}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(String(e.stack || e)); process.exit(1); });
+if (isMain('scene-package')) main().catch(e => { console.error(String(e.stack || e)); process.exit(1); });

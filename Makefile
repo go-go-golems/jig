@@ -4,7 +4,7 @@
 #   make build         go build ./... (the server reads dist/ from disk: jigcad serve --dist)
 #   make candela-rt    the native NVIDIA renderer from import/candela/native/rt (CUDA 13, OptiX SDK, libnode-dev)
 #   make build-bin     ./dist/jigcad with the workbench embedded (-tags embed; runs `make web` first)
-#   make test          Go tests, the JavaScript suites that need no network, and Candela's engine tests
+#   make test          Go tests and the JavaScript suites that need no network (Candela's engine tests included)
 #   make lint          golangci-lint (pinned in .golangci-lint-version) and gofmt
 #   make goreleaser    a local snapshot release for this platform (no publishing)
 #
@@ -79,7 +79,7 @@ candela-rt:
 
 # ── tests ────────────────────────────────────────────────────────────────────
 
-test: test-go test-js test-candela
+test: test-go test-js
 
 test-go:
 	GOWORK=off go test $(GO_PACKAGES) -count=1
@@ -93,9 +93,10 @@ test-js: web
 	cd $(WEB) && node --test test/agent-eval/harness.test.mjs test/agent-eval/fea.test.mjs
 	cd $(WEB) && node test/engine-core/run.mjs
 	cd $(WEB) && node test/engine/run.mjs
+	$(MAKE) --no-print-directory test-candela
 
-# Candela's engine tests (tests/session.test.ts, and tests/golden-pack.test.ts: every preset, ~7 min) in plain Node
-# through jig's esbuild; CI runs them in their own job
+# Candela's engine tests (tests/session.test.ts; tests/golden-pack.test.ts, every preset at three times, ~10 s) in
+# plain Node through jig's esbuild
 test-candela: web
 	cd $(CANDELA) && ESBUILD=$(ESBUILD) node scripts/node-tests.mjs
 

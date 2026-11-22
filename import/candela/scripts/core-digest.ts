@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { parseArgs } from './args';
+import { parseArgs, isMain } from './args';
 
 type Digest = { id: string; ok: boolean; error?: string; shared?: string; lines?: number; nU?: number; frames?: { t: number; d: Record<string, string> }[]; buildMs?: number; frameMs?: number };
 
@@ -23,6 +23,10 @@ export function readContent(dir: string, base = ''): Record<string, string> {
   return out;
 }
 
+const BUILTINS = ['Math', 'Object', 'Array', 'Number', 'String', 'Boolean', 'JSON', 'Map', 'Set', 'WeakMap', 'Promise', 'Error',
+  'TypeError', 'RangeError', 'Symbol', 'Reflect', 'Date', 'RegExp', 'ArrayBuffer', 'DataView', 'Float32Array', 'Float64Array',
+  'Int32Array', 'Uint32Array', 'Uint16Array', 'Uint8Array', 'Uint8ClampedArray', 'isFinite', 'isNaN', 'parseFloat', 'parseInt'];
+
 export async function digestInVm(bundle: string, content: Record<string, string>, ids: string[], times: number[]): Promise<Digest[]> {
   const ctx = vm.createContext({
     console,
@@ -30,7 +34,13 @@ export async function digestInVm(bundle: string, content: Record<string, string>
     atob: (s: string) => Buffer.from(s, 'base64').toString('latin1'),
     btoa: (s: string) => Buffer.from(s, 'latin1').toString('base64'),
   });
-  vm.runInContext(fs.readFileSync(bundle, 'utf8'), ctx, { filename: bundle });
+  // Inside a vm context every lookup of a global (Math, Object, …) goes through the contextified global object, about
+  // 30× slower than in a plain script: the compiler's ggxAlbedoTable took 4.1 s instead of 0.13 s, and a digest of every
+  // preset 585 s (JIG-017 diary). So the bundle runs inside a function that receives the context's own builtins as
+  // parameters: lookups become local, and the objects are still the context's, so the engine sees nothing different.
+  const names = BUILTINS.join(', ');
+  const src = `(function (${names}) {\n${fs.readFileSync(bundle, 'utf8')}\nglobalThis.Candela = Candela;\n}).call(globalThis, ${names});`;
+  vm.runInContext(src, ctx, { filename: bundle, lineOffset: -1 });
   // JSON round trip: plain data, like candela-rt's JSON.stringify
   return JSON.parse(JSON.stringify(await (ctx as any).Candela.digestCatalog(content, ids, times)));
 }
@@ -88,4 +98,4 @@ async function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main().catch(e => { console.error(e); process.exit(1); });
+if (isMain('core-digest')) main().catch(e => { console.error(e); process.exit(1); });

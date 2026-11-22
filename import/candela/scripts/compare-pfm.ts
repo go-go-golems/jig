@@ -9,6 +9,7 @@
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { parseArgs } from './render-preset';
+import { isMain } from './args';
 
 export interface PFM { w: number; h: number; rgb: Float32Array }   // rows top to bottom
 export function readPFM(file: string): PFM {
@@ -106,4 +107,4 @@ function main() {
   if (typeof flags.json === 'string') fs.writeFileSync(flags.json, JSON.stringify(r) + '\n');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main();
+if (isMain('compare-pfm')) main();

@@ -21,3 +21,12 @@ jigcad --render auto also finds candela-rt next to the jigcad binary (468928c); 
 
 - /home/manuel/code/wesen/go-go-golems/jig/.github/workflows/candela-rt.yml — GPU CI
 - /home/manuel/code/wesen/go-go-golems/jig/pkg/render/find.go — auto lookup order
+
+## 2026-11-22
+
+Golden test fixed: the 10 differences are CPU architecture (arm64 baseline vs x86-64; 105/105 against an x86-64 baseline made at the baseline's own commit), so one baseline per architecture; a bundling bug ran core-digest's main inside the golden test (isMain fixes it); core-digest's vm is 30x faster with builtins bound locally (585 s -> 18.5 s). Candela's tests (13 s) now run in make test-js; candela.yml removed
+
+### Related Files
+
+- /home/manuel/code/wesen/go-go-golems/jig/import/candela/scripts/core-digest.ts — vm builtins bound locally
+- /home/manuel/code/wesen/go-go-golems/jig/import/candela/tests/golden-pack.test.ts — per-architecture baseline

@@ -13,7 +13,10 @@ import { loadCatalogFromDisk } from '../src/content/node';
 import { digestPreset, type PresetDigest } from '../src/engine/digest';
 import { compareDigests } from '../scripts/core-digest';
 
-const GOLDEN = path.resolve('tests/golden/pack-digests.json');
+// The digests hash float buffers, and 10 of the 105 presets hash differently on the DGX Spark (arm64) and on x86-64
+// (F-08, R-05, K-01, K-03…K-09: SDs, O or meta), at the same commit, while V8 11.3 to 14.6 agree on x86-64 (JIG-017
+// diary). So each architecture has its own baseline: pack-digests.json for arm64, pack-digests.<arch>.json for others.
+const GOLDEN = path.resolve(process.arch === 'arm64' ? 'tests/golden/pack-digests.json' : `tests/golden/pack-digests.${process.arch}.json`);
 const TIMES = [0, 0.37, 1.5];
 const args = process.argv.slice(2);
 const update = args.includes('--update');
@@ -35,6 +38,7 @@ if (update) {
   fs.writeFileSync(GOLDEN, JSON.stringify(merged, null, 1) + '\n');
   console.log(`recorded ${res.length} presets (${res.filter(r => !r.ok).length} failing builds) → ${path.relative(process.cwd(), GOLDEN)} in ${secs} s`);
 } else {
+  if (!fs.existsSync(GOLDEN)) { console.log(`golden pack: no baseline for ${process.arch} (${path.relative(process.cwd(), GOLDEN)}); record one with --update`); process.exit(1); }
   const golden: PresetDigest[] = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
   const diffs = compareDigests(res as any, golden as any);
   console.log(`golden pack: ${res.length - diffs.length}/${res.length} identical in ${secs} s`);
