@@ -397,7 +397,7 @@ static int cmdRender(int argc, char** argv) {
   crt::OptixRenderer* RO = nullptr;
   auto X = rt.get(H, "optix");
   if (optix) {
-    auto ro = std::make_unique<crt::OptixRenderer>(cuda.ctx(), comp.cubin, w, h, rt.get(X, "motion")->IsTrue());
+    auto ro = std::make_unique<crt::OptixRenderer>(cuda.ctx(), comp.cubin, w, h, rt.get(X, "motion")->IsTrue(), rt.get(X, "builtinSpheres")->IsTrue());
     RO = ro.get();
     std::vector<crt::OptixMeshInput> meshes;
     auto ma = rt.get(X, "meshes").As<v8::Array>();
@@ -416,7 +416,8 @@ static int cmdRender(int argc, char** argv) {
     const double v = num(H, "version");
     if (v == lastVersion) return;
     lastVersion = v;
-    if (RO) RO->setFrame(rt.view<float>(rt.get(X, "instances")), rt.view<float>(rt.get(X, "srt")), (int)num(X, "motionKeys"), rt.view<float>(rt.get(X, "aabbs")), rt.view<int>(rt.get(X, "aabbObjects")));
+    if (RO) RO->setFrame(rt.view<float>(rt.get(X, "instances")), rt.view<float>(rt.get(X, "srt")), (int)num(X, "motionKeys"), rt.view<float>(rt.get(X, "aabbs")), rt.view<int>(rt.get(X, "aabbObjects")),
+                  rt.view<float>(rt.get(X, "spheres")), rt.view<int>(rt.get(X, "sphereObjects")), (int)num(X, "glowSpheres"));
     R->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
   };
   std::unique_ptr<crt::VideoWriter> video;
@@ -492,6 +493,7 @@ static int cmdRender(int argc, char** argv) {
   else printf("%s cuda/nvrtc: %dx%d %s%d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), output %.0f ms, %d regs, %d B local → %s\n", id.c_str(), w, h, what.c_str(), spp, launches, buildMs,
          msText(hit, comp.ms).c_str(), renderMs, jsMs, outMs, regs, local, (outDir / stem).string().c_str());
   if (display && !postHit) printf("  display program: nvrtc %.0f ms\n", postMs);
+  if (RO && RO->spheres()) printf("  built-in spheres: %d (custom primitives: %d)\n", (int)rt.view<int>(rt.get(X, "sphereObjects")).size(), (int)rt.view<int>(rt.get(X, "aabbObjects")).size());
   if (ai) printf("  AI denoiser: setup %.0f ms, %.1f ms per frame\n", ai->setupMs(), denoiseMs / frames);
   return 0;
 }
@@ -503,8 +505,8 @@ int main(int argc, char** argv) {
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
                     "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--param id=value]… [--seed n]\n"
                     "                 [--format pfm,png,exr,mp4] [--sequence --start s --end s | --frames n] [--fps 24] [--fixed-seed]\n"
-                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--denoise scene|ai|off] [--ser auto|on|off] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
-                    "       candela-rt serve [--port 8790] [--bind 0.0.0.0] [--denoise ai|scene|off] [--ser auto|on|off] [--token t] [--max-spp 2048] [--max-width 1920]\n");
+                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--denoise scene|ai|off] [--ser auto|on|off] [--spheres builtin|custom] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
+                    "       candela-rt serve [--port 8790] [--bind 0.0.0.0] [--denoise ai|scene|off] [--ser auto|on|off] [--spheres builtin|custom] [--token t] [--max-spp 2048] [--max-width 1920]\n");
     return 1;
   }
   crt::JsRuntime::initProcess(argv[0]);

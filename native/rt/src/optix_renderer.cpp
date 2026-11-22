@@ -32,6 +32,7 @@ struct HostParams {
   CUdeviceptr U, O, LI, BV, SD, accum, aovA, aovN;
   OptixTraversableHandle ias;
   CUdeviceptr aabbObjects;
+  CUdeviceptr sphereObjects;
 };
 
 template <class T> struct SbtRecord { alignas(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE]; T data; };
@@ -39,7 +40,7 @@ struct Empty {};
 
 static char logBuf[8192];
 
-OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int width, int height, bool motion) : motion_(motion) {
+OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int width, int height, bool motion, bool spheres) : motion_(motion), spheres_(spheres) {
   logBuf[0] = 0;
   OX(optixInit());
   OptixDeviceContextOptions co = {};
@@ -64,40 +65,54 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   pco.numAttributeValues = 2;
   pco.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
   pco.pipelineLaunchParamsVariableName = "params";
-  pco.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE | OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
+  pco.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE | OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM | (spheres_ ? OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE : 0u);
   size_t n = sizeof logBuf;
   OX(optixModuleCreate(ctx_, &mco, &pco, ir.data(), ir.size(), logBuf, &n, &mod_));
   log_ = logBuf;
+  if (spheres_) {
+    OptixBuiltinISOptions bo = {};
+    bo.builtinISModuleType = OPTIX_PRIMITIVE_TYPE_SPHERE;
+    bo.usesMotionBlur = 0;   // no vertex motion: moving spheres stay custom primitives
+    bo.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;   // as buildAS builds the GAS
+    OX(optixBuiltinISModuleGet(ctx_, &mco, &pco, &bo, &sphereMod_));
+  }
 
   OptixProgramGroupOptions pgo = {};
-  OptixProgramGroupDesc d[4] = {};
+  OptixProgramGroupDesc d[5] = {};
   d[0].kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN; d[0].raygen.module = mod_; d[0].raygen.entryFunctionName = "__raygen__candela";
   d[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS; d[1].miss.module = mod_; d[1].miss.entryFunctionName = "__miss__candela";
   d[2].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP; d[2].hitgroup.moduleCH = mod_; d[2].hitgroup.entryFunctionNameCH = "__closesthit__triangle";
   d[3].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP; d[3].hitgroup.moduleCH = mod_; d[3].hitgroup.entryFunctionNameCH = "__closesthit__analytic";
   d[3].hitgroup.moduleIS = mod_; d[3].hitgroup.entryFunctionNameIS = "__intersection__analytic";
+  if (spheres_) {
+    d[4].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP; d[4].hitgroup.moduleCH = mod_; d[4].hitgroup.entryFunctionNameCH = "__closesthit__sphere";
+    d[4].hitgroup.moduleIS = sphereMod_; d[4].hitgroup.entryFunctionNameIS = nullptr;
+    nPg_ = 5;
+  }
   n = sizeof logBuf;
-  OX(optixProgramGroupCreate(ctx_, d, 4, &pgo, logBuf, &n, pg_));
+  OX(optixProgramGroupCreate(ctx_, d, (unsigned)nPg_, &pgo, logBuf, &n, pg_));
   OptixPipelineLinkOptions plo = {};
   plo.maxTraceDepth = 1;
   n = sizeof logBuf;
-  OX(optixPipelineCreate(ctx_, &pco, &plo, pg_, 4, logBuf, &n, &pipe_));
+  OX(optixPipelineCreate(ctx_, &pco, &plo, pg_, (unsigned)nPg_, logBuf, &n, &pipe_));
   OptixStackSizes ss = {};
-  for (auto& g : pg_) OX(optixUtilAccumulateStackSizes(g, &ss, pipe_));
+  for (int g = 0; g < nPg_; g++) OX(optixUtilAccumulateStackSizes(pg_[g], &ss, pipe_));
   unsigned dcT = 0, dcS = 0, css = 0;
   OX(optixUtilComputeStackSizes(&ss, 1, 0, 0, &dcT, &dcS, &css));
   OX(optixPipelineSetStackSize(pipe_, dcT, dcS, css, motion_ ? 4 : 2));
   pipelineMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tp).count();
 
-  SbtRecord<Empty> rg, ms, hg[2];
+  SbtRecord<Empty> rg, ms, hg[3];
   OX(optixSbtRecordPackHeader(pg_[0], &rg));
   OX(optixSbtRecordPackHeader(pg_[1], &ms));
   OX(optixSbtRecordPackHeader(pg_[2], &hg[0]));
   OX(optixSbtRecordPackHeader(pg_[3], &hg[1]));
+  if (spheres_) OX(optixSbtRecordPackHeader(pg_[4], &hg[2]));
+  const unsigned nHg = spheres_ ? 3 : 2;
   auto up = [&](const void* p, size_t b) { CUdeviceptr x = alloc(b); CU_(cuMemcpyHtoD(x, p, b)); return x; };
   sbt_.raygenRecord = up(&rg, sizeof rg);
   sbt_.missRecordBase = up(&ms, sizeof ms); sbt_.missRecordStrideInBytes = sizeof ms; sbt_.missRecordCount = 1;
-  sbt_.hitgroupRecordBase = up(hg, sizeof hg); sbt_.hitgroupRecordStrideInBytes = sizeof hg[0]; sbt_.hitgroupRecordCount = 2;
+  sbt_.hitgroupRecordBase = up(hg, nHg * sizeof hg[0]); sbt_.hitgroupRecordStrideInBytes = sizeof hg[0]; sbt_.hitgroupRecordCount = nHg;
 
   allocImages(width, height);
   params_ = alloc(sizeof(HostParams));
@@ -106,10 +121,11 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
 OptixRenderer::~OptixRenderer() {
   for (CUdeviceptr p : meshBuffers_) cuMemFree(p);
   for (CUdeviceptr p : frameBuffers_) cuMemFree(p);
-  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, aabbObj_, params_, sbt_.raygenRecord, sbt_.missRecordBase, sbt_.hitgroupRecordBase}) if (p) cuMemFree(p);
+  for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, aabbObj_, sphereObj_, params_, sbt_.raygenRecord, sbt_.missRecordBase, sbt_.hitgroupRecordBase}) if (p) cuMemFree(p);
   if (pipe_) optixPipelineDestroy(pipe_);
   for (auto g : pg_) if (g) optixProgramGroupDestroy(g);
   if (mod_) optixModuleDestroy(mod_);
+  if (sphereMod_) optixModuleDestroy(sphereMod_);
   if (ctx_) optixDeviceContextDestroy(ctx_);
 }
 
@@ -173,7 +189,8 @@ void OptixRenderer::buildMeshes(const std::vector<OptixMeshInput>& meshes) {
 // motion transform with `keys` keys whose child is the static transform; both 64-byte aligned
 static size_t align64(size_t b) { return (b + OPTIX_TRANSFORM_BYTE_ALIGNMENT - 1) / OPTIX_TRANSFORM_BYTE_ALIGNMENT * OPTIX_TRANSFORM_BYTE_ALIGNMENT; }
 
-void OptixRenderer::setFrame(std::span<const float> instances, std::span<const float> srt, int keys, std::span<const float> aabbs, std::span<const int> aabbObjects) {
+void OptixRenderer::setFrame(std::span<const float> instances, std::span<const float> srt, int keys, std::span<const float> aabbs, std::span<const int> aabbObjects,
+                             std::span<const float> spheres, std::span<const int> sphereObjects, int glowSpheres) {
   const auto t0 = std::chrono::steady_clock::now();
   for (CUdeviceptr p : frameBuffers_) cuMemFree(p);
   frameBuffers_.clear(); gasBytes_ = meshBytes_;
@@ -263,6 +280,36 @@ void OptixRenderer::setFrame(std::span<const float> instances, std::span<const f
     o.instanceId = 0; o.visibilityMask = 3; o.sbtOffset = 1; o.flags = OPTIX_INSTANCE_FLAG_NONE; o.traversableHandle = h;
     inst.push_back(o);
   }
+  // built-in spheres: world centre + radius; shadow-casting ones (mask camera|shadow) and glowing ones (camera only,
+  // as traceAll skips flags & 1 for shadow rays) in two GASes; primitiveIndexOffset continues the numbering, so the
+  // closest-hit program indexes sphereObjects with optixGetPrimitiveIndex() for both
+  const unsigned nS = (unsigned)sphereObjects.size();
+  if (nS && !spheres_) throw std::runtime_error("OptixRenderer: spheres in a pipeline built without the sphere intersector");
+  put(sphereObj_, capSO_, sphereObjects.data(), sphereObjects.size_bytes());
+  if (nS) {
+    std::vector<float> c(size_t(nS) * 3), r(nS);
+    for (unsigned i = 0; i < nS; i++) { c[i * 3] = spheres[i * 4]; c[i * 3 + 1] = spheres[i * 4 + 1]; c[i * 3 + 2] = spheres[i * 4 + 2]; r[i] = spheres[i * 4 + 3]; }
+    CUdeviceptr cb = alloc(c.size() * 4), rb = alloc(r.size() * 4);
+    CU_(cuMemcpyHtoD(cb, c.data(), c.size() * 4)); CU_(cuMemcpyHtoD(rb, r.data(), r.size() * 4));
+    const unsigned nSolid = nS - (unsigned)glowSpheres;
+    for (int part = 0; part < 2; part++) {
+      const unsigned first = part ? nSolid : 0, count = part ? (unsigned)glowSpheres : nSolid;
+      if (!count) continue;
+      CUdeviceptr vb = cb + size_t(first) * 12, wb = rb + size_t(first) * 4;
+      OptixBuildInput bi = {};
+      bi.type = OPTIX_BUILD_INPUT_TYPE_SPHERES;
+      auto& s = bi.sphereArray;
+      s.vertexBuffers = &vb; s.numVertices = count; s.radiusBuffers = &wb; s.singleRadius = 0;
+      unsigned flags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT};
+      s.flags = flags; s.numSbtRecords = 1; s.primitiveIndexOffset = first;
+      OptixTraversableHandle h = buildAS(bi, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, frameBuffers_);
+      OptixInstance o = {};
+      std::memcpy(o.transform, id, sizeof id);
+      o.instanceId = 0; o.visibilityMask = part ? 1u : 3u; o.sbtOffset = 2; o.flags = OPTIX_INSTANCE_FLAG_NONE; o.traversableHandle = h;
+      inst.push_back(o);
+    }
+    cuMemFree(cb); cuMemFree(rb);
+  }
   ias_ = 0;
   if (!inst.empty()) {
     CUdeviceptr ib = alloc(inst.size() * sizeof(OptixInstance));
@@ -286,7 +333,7 @@ void OptixRenderer::upload(std::span<const float> O, std::span<const float> LI, 
 
 void OptixRenderer::launch(std::span<const float> U) {
   put(U_, capU_, U.data(), U.size_bytes());
-  HostParams p = {U_, O_, LI_, BV_, SD_, acc_, aovA_, aovN_, ias_, aabbObj_};
+  HostParams p = {U_, O_, LI_, BV_, SD_, acc_, aovA_, aovN_, ias_, aabbObj_, sphereObj_};
   CU_(cuMemcpyHtoD(params_, &p, sizeof p));
   logBuf[0] = 0;
   OX(optixLaunch(pipe_, 0, params_, sizeof p, &sbt_, (unsigned)w_, (unsigned)h_, 1));

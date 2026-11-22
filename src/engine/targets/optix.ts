@@ -36,6 +36,12 @@ export interface OptixFrame {
   aabbs: Float32Array;
   /** the object index in O of each AABB */
   aabbObjects: Int32Array;
+  /** built-in sphere primitives (phase 6): per sphere 4 floats, world centre and radius — shadow-casting spheres
+   *  first, then `glowSpheres` glowing ones (flags & 1: shadow rays skip them, so they get their own GAS) */
+  spheres: Float32Array;
+  /** the object index in O of each sphere (primitive index → object, across both GASes) */
+  sphereObjects: Int32Array;
+  glowSpheres: number;
   nBounded: number;
   nObjects: number;
   movingMeshes: number;
@@ -46,6 +52,30 @@ export interface OptixScene extends OptixFrame {
   meshes: OptixMesh[];
   /** the pipeline needs motion support (motion blur on and meshes that can move) */
   motion: boolean;
+  /** the pipeline includes OptiX's built-in sphere intersector (the first frame has spheres that qualify) */
+  builtinSpheres: boolean;
+}
+
+/** a packed sphere (type 0) that OptiX's built-in intersector can take: bounded, not moving within the shutter, and a
+ *  similarity transform (rotation, uniform scale, translation), so it is a sphere in world space too. Returns
+ *  [cx, cy, cz, r] or null. O rows 1–3 hold world→object A·x + b, so A = R/s: A·Aᵀ = I/s², centre = −A⁻¹b = −s²·Aᵀb. */
+function worldSphere(O: Float32Array, k: number, materials: any[]): number[] | null {
+  const b = k * 24;
+  if (O[b] !== 0 || O[b + 22] > 0) return null;
+  // rays inside the sphere (glass, thin shells, media, subsurface walks) must hit it from within: custom primitive
+  const m = materials && materials[O[b + 1]];
+  if (!m || m.enterable !== false) return null;
+  const A = [O[b + 4], O[b + 5], O[b + 6], O[b + 8], O[b + 9], O[b + 10], O[b + 12], O[b + 13], O[b + 14]];
+  const t = [O[b + 7], O[b + 11], O[b + 15]];
+  const row = (i: number, j: number) => A[i * 3] * A[j * 3] + A[i * 3 + 1] * A[j * 3 + 1] + A[i * 3 + 2] * A[j * 3 + 2];
+  const c = row(0, 0);
+  if (!(c > 0)) return null;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (Math.abs(row(i, j) - (i === j ? c : 0)) > 1e-5 * c) return null;
+  const s2 = 1 / c;
+  const cx = -s2 * (A[0] * t[0] + A[3] * t[1] + A[6] * t[2]);
+  const cy = -s2 * (A[1] * t[0] + A[4] * t[1] + A[7] * t[2]);
+  const cz = -s2 * (A[2] * t[0] + A[5] * t[1] + A[8] * t[2]);
+  return [cx, cy, cz, O[b + 16] * Math.sqrt(s2)];
 }
 
 const MASK_CAMERA = 1, MASK_SHADOW = 2;
@@ -102,11 +132,12 @@ function srtKeys(SD: Float32Array, mb: number, K: number, out: number[]) {
 }
 
 /** the frame-dependent OptiX inputs from one pack (SD: static head + dynamic tail, as uploaded) */
-export function optixFrame(compiled: any, P: any, SD: Float32Array, o: { motion: boolean }): OptixFrame {
+export function optixFrame(compiled: any, P: any, SD: Float32Array, o: { motion: boolean; spheres?: boolean }): OptixFrame {
   const objs = compiled.objects as any[], t = meshTable(compiled);
   const O = P.O.slice();
   const K = Math.max(0, Math.round(P.U[24 * 4 + 1] || 0));
   const inst: number[] = [], srt: number[] = [], aabbs: number[] = [], aabbObjects: number[] = [];
+  const sph: number[] = [], sphObj: number[] = [], glow: number[] = [], glowObj: number[] = [];
   let stilled = 0, moving = 0;
   for (let k = 0; k < P.nObjs; k++) {
     const oi = P.order[k], ob = objs[oi];
@@ -122,6 +153,11 @@ export function optixFrame(compiled: any, P: any, SD: Float32Array, o: { motion:
       const mask = (ob.flags & 1) ? MASK_CAMERA : MASK_CAMERA | MASK_SHADOW;
       inst.push(mi, k, mask, slot, ...P.mats[oi]);
     } else if (k < P.nBounded) {
+      const ws = o.spheres ? worldSphere(O, k, compiled.materials) : null;
+      if (ws) {
+        if (O[k * 24 + 3] & 1) { glow.push(...ws); glowObj.push(k); } else { sph.push(...ws); sphObj.push(k); }
+        continue;
+      }
       const b = P.boxes.subarray(k * 6, k * 6 + 6);
       // pad by a relative epsilon: the box is computed in double precision, the intersection in float
       const pad = 1e-4 * Math.max(1, Math.abs(b[0]), Math.abs(b[1]), Math.abs(b[2]), Math.abs(b[3]), Math.abs(b[4]), Math.abs(b[5]));
@@ -133,12 +169,14 @@ export function optixFrame(compiled: any, P: any, SD: Float32Array, o: { motion:
   let n = 0; for (let r = 0; r < inst.length; r += 16) if (inst[r + 3] > 0) inst[r + 3] = ++n;
   return {
     O, instances: new Float32Array(inst), srt: new Float32Array(srt), motionKeys: K, aabbs: new Float32Array(aabbs), aabbObjects: new Int32Array(aabbObjects),
+    spheres: new Float32Array(sph.concat(glow)), sphereObjects: new Int32Array(sphObj.concat(glowObj)), glowSpheres: glowObj.length,
     nBounded: P.nBounded, nObjects: P.nObjs, movingMeshes: moving, stilledMeshes: stilled,
   };
 }
 
 /** everything the OptiX target needs for the first frame; `motion`: build the pipeline with motion transforms */
-export function optixScene(compiled: any, P: any, SD: Float32Array, o: { motion: boolean }): OptixScene {
+export function optixScene(compiled: any, P: any, SD: Float32Array, o: { motion: boolean; spheres?: boolean }): OptixScene {
   const meshes = optixMeshes(compiled, P);
-  return { meshes, motion: o.motion, ...optixFrame(compiled, P, SD, o) };
+  const fr = optixFrame(compiled, P, SD, { motion: o.motion, spheres: o.spheres !== false });
+  return { meshes, motion: o.motion, builtinSpheres: fr.sphereObjects.length > 0, ...fr };
 }

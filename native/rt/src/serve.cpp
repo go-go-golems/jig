@@ -222,10 +222,11 @@ class Live {
     const std::string key = target_ + ":" + str(prog, "hash");
     auto X = rt().get(Hn, "optix");
     const bool motion = optix && rt().get(X, "motion")->IsTrue();
-    if (!R_ || key != programKey_ || (optix && RO_->motion() != motion)) {
+    const bool spheres = optix && rt().get(X, "builtinSpheres")->IsTrue();
+    if (!R_ || key != programKey_ || (optix && (RO_->motion() != motion || RO_->spheres() != spheres))) {
       R_.reset(); RO_ = nullptr;
       const auto t2 = Clock::now();
-      if (optix) { auto ro = std::make_unique<crt::OptixRenderer>(cuda_->ctx(), comp.cubin, w_, h_, motion); RO_ = ro.get(); R_ = std::move(ro); }
+      if (optix) { auto ro = std::make_unique<crt::OptixRenderer>(cuda_->ctx(), comp.cubin, w_, h_, motion, spheres); RO_ = ro.get(); R_ = std::move(ro); }
       else R_ = std::make_unique<crt::CudaRenderer>(comp.cubin, w_, h_);
       pipelineMs_ = ms(t2, Clock::now());
       programKey_ = key;
@@ -272,7 +273,8 @@ class Live {
     version_ = v;
     if (RO_) {
       auto X = rt().get(Hn, "optix");
-      RO_->setFrame(rt().view<float>(rt().get(X, "instances")), rt().view<float>(rt().get(X, "srt")), (int)num(X, "motionKeys"), rt().view<float>(rt().get(X, "aabbs")), rt().view<int>(rt().get(X, "aabbObjects")));
+      RO_->setFrame(rt().view<float>(rt().get(X, "instances")), rt().view<float>(rt().get(X, "srt")), (int)num(X, "motionKeys"), rt().view<float>(rt().get(X, "aabbs")), rt().view<int>(rt().get(X, "aabbObjects")),
+                  rt().view<float>(rt().get(X, "spheres")), rt().view<int>(rt().get(X, "sphereObjects")), (int)num(X, "glowSpheres"));
     }
     R_->upload(rt().view<float>(rt().get(Hn, "O")), rt().view<float>(rt().get(Hn, "LI")), rt().view<float>(rt().get(Hn, "BV")), rt().view<float>(rt().get(Hn, "SD")));
   }

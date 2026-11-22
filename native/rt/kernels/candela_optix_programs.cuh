@@ -3,6 +3,8 @@
 //   triangle CH  object = instance id (the object's index in O), primitive = triangle record index, barycentrics
 //   analytic IS  the translated hitObj on the world ray (it applies the object's transform and motion poses)
 //   analytic CH  object = the attribute the IS reported
+//   sphere CH    OptiX's built-in sphere intersector (static spheres with a similarity transform, world space);
+//                object = sphereObjects[primitive index]
 //   miss         leaves payload 1 at ~0u
 namespace wgsl {
 __device__ __forceinline__ float4 f4o(vec4f v) { return make_float4(v.x, v.y, v.z, v.w); }
@@ -50,6 +52,12 @@ extern "C" __global__ void __intersection__analytic() {
 extern "C" __global__ void __closesthit__analytic() {
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
   optixSetPayload_1(optixGetAttribute_0());
+  optixSetPayload_2(~0u);
+}
+
+extern "C" __global__ void __closesthit__sphere() {
+  optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
+  optixSetPayload_1((unsigned)params.sphereObjects[optixGetPrimitiveIndex()]);
   optixSetPayload_2(~0u);
 }
 

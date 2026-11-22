@@ -1416,3 +1416,59 @@ for scenes without meshes; the images do not change.
 
 ### Technical details
 - Gates: typecheck, golden 105/105, session, unit tests pass. Branch `candela-rt-ser` (PR #1 stays at `562fb3e`).
+
+## Step 23: Phase 6 — OptiX built-in spheres, and a refined SER rule
+
+Spheres that are spheres in world space now go to OptiX's built-in sphere intersector instead of the custom
+intersection program. On X-02 (10,000 spheres) that is 27 % faster than custom primitives, and it removes the
+reason SER helped there, so the SER rule now also requires many custom primitives. The first version broke glass
+and subsurface spheres; those now stay custom primitives.
+
+### Prompt Context
+**User prompt (verbatim):** "ok continue" (after Step 22)
+**Assistant interpretation:** The last phase-6 item: built-in sphere primitives, measured; keep it where it helps.
+
+### What I did
+- `targets/optix.ts worldSphere`: a packed sphere (type 0) qualifies when bounded, without shutter motion, with a
+  similarity transform (A·Aᵀ = c·I within 1e-5; centre −Aᵀb/c, radius r/√c), and a material that cannot let a path
+  in. `optixFrame` returns `spheres` (centre, radius), `sphereObjects`, `glowSpheres`; `optixScene.builtinSpheres`.
+- `compile.ts enterableMaterial(code)`: lobe kind 3 without the reflect-only flag, kind 5, kind 6, or an interior
+  medium (`L.med` ≠ −1); exposed as `compiled.materials[i].enterable`.
+- `OptixRenderer(…, spheres)`: `OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE`, `optixBuiltinISModuleGet`, a third hit group
+  (`__closesthit__sphere`: object = `sphereObjects[primitive index]`); per frame two sphere GASes, shadow-casting
+  (mask camera|shadow) and glowing (camera only), the second with `primitiveIndexOffset` so one table serves both.
+- `--backend auto` counts spheres with custom primitives; `--spheres builtin|custom`; the render summary prints the
+  sphere count.
+
+### Why
+- The custom intersection program is a full program call per candidate; the built-in intersector runs in the RT
+  core path with no program until the closest hit.
+
+### What worked
+- X-02: 1161 → 849 ms (SER off); with SER on, 858 ms — no gain any more, so `--ser auto` now needs > 64 custom
+  primitives (G-05, F-08 keep SER; X-02 drops it). X-02 by default: 849 ms, 17.5× WebGPU.
+- After the material rule, every preset with built-in spheres agrees with custom primitives within 0.29 % (displayed).
+
+### What didn't work
+- First sweep (all qualifying spheres): R-03 19.4 %, S-01 13.8 %, M-11 12.1 %, M-04 5.7 %, S-03 2.7 %, E-01/E-05/E-07
+  ~2 %, M-10 1.8 % displayed difference. R-03's subsurface spheres rendered as glowing balls, S-01's glass ball
+  refracted once (`various/23-builtin-spheres-inside-rays-*.png`): rays that start inside a sphere get no hit from
+  the built-in intersector, so the random walk never finds the exit and refracted rays never leave.
+
+### What I learned
+- The built-in sphere is a surface seen from outside only; anything a path can enter needs the custom program.
+- Optimisations interact: SER paid on X-02 because of the custom intersection calls; removing those removed SER's gain.
+
+### What warrants a second pair of eyes
+- `enterableMaterial` reads the generated WGSL text; a new lobe kind that transmits would have to be added there.
+
+### What should be done in the future
+- Temporal denoising for sequences; Render-dialog jobs over the live connection.
+
+### Code review instructions
+- `src/engine/targets/optix.ts` (`worldSphere`, `optixFrame`), `src/engine/compile.ts` (`enterableMaterial`),
+  `native/rt/src/optix_renderer.cpp` (constructor, `setFrame` spheres), `candela_optix_programs.cuh`.
+- Validate: `scripts/23-sphere-parity.sh X-02` and `S-01` (custom vs builtin), `--spheres custom` timings.
+
+### Technical details
+- Evidence `various/23-builtin-spheres.txt`; gates: typecheck, golden 105/105, session, unit, validate 105/105.

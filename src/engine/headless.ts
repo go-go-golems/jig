@@ -20,9 +20,12 @@ export interface HeadlessOptions {
   target?: CudaTargetChoice | null;
   /** false: render without motion blur (parity checks) */
   motionBlur?: boolean;
-  /** shader execution reordering on the OptiX target: 'auto' (default) = only for scenes without meshes, where it
-   *  measured faster (X-02 −21 %, M-07 −12 %; mesh scenes +24–39 %, CANDELA-002 diary step 22) */
+  /** shader execution reordering on the OptiX target: 'auto' (default) = scenes without meshes and with more than 64
+   *  custom primitives, where it measured faster (G-05 −21 %, F-08 −12 %; mesh scenes +24–39 %; X-02 with built-in
+   *  spheres no gain; CANDELA-002 diary steps 22–23) */
   ser?: boolean | 'auto';
+  /** false: render every analytic object through the custom intersection program, spheres included (A/B checks) */
+  builtinSpheres?: boolean;
   /** param values by id, set before the build (numbers, booleans, strings for choices, [r,g,b] for colours) */
   params?: Record<string, any>;
 }
@@ -103,8 +106,8 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
   const motion = o.motionBlur !== false && K >= 2 && canMove;
   // 'auto': the RT cores pay off with triangle meshes (hardware intersection) or many objects; for a handful of
   // analytic objects the plain-CUDA target's inline BVH walk is faster (measured, CANDELA-002 diary step 16)
-  const scene = o.target === 'optix' || o.target === 'auto' ? optixScene(s.compiled, P, SD, { motion }) : null;
-  const target: CudaTargetKind | null = o.target === null ? null : o.target === 'auto' ? (scene!.meshes.length > 0 || scene!.aabbObjects.length > AUTO_OPTIX_MIN_OBJECTS ? 'optix' : 'cuda') : (o.target || 'cuda');
+  const scene = o.target === 'optix' || o.target === 'auto' ? optixScene(s.compiled, P, SD, { motion, spheres: o.builtinSpheres !== false }) : null;
+  const target: CudaTargetKind | null = o.target === null ? null : o.target === 'auto' ? (scene!.meshes.length > 0 || scene!.aabbObjects.length + scene!.sphereObjects.length > AUTO_OPTIX_MIN_OBJECTS ? 'optix' : 'cuda') : (o.target || 'cuda');
   const optix = target === 'optix' ? scene : null;
   const ps = postSettings(s.compiled.engine);
   let cam: any = null, meteredEV = 12;
@@ -112,7 +115,7 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     ok: true, width: o.width, height: o.height, time: o.time || 0, seed: seed0,
     wgsl: WGSL_PRELUDE + s.compiled.shared + WGSL_MAIN,
     target,
-    cuda: target === null ? null : cudaProgram(s.compiled, target, { ser: o.ser === true || ((o.ser === undefined || o.ser === 'auto') && !!optix && optix.meshes.length === 0) }),
+    cuda: target === null ? null : cudaProgram(s.compiled, target, { ser: o.ser === true || ((o.ser === undefined || o.ser === 'auto') && !!optix && optix.meshes.length === 0 && optix.aabbObjects.length > AUTO_OPTIX_MIN_OBJECTS) }),
     post: target === null ? null : cudaPostProgram(displaySource(ps.userPasses)),
     optix,
     O: nonEmpty(optix ? optix.O : P.O), LI: nonEmpty(P.LI), BV: nonEmpty(P.BV), SD,
@@ -137,7 +140,7 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
       ({ P, SD } = packAt(t, seed));
       h.time = t; h.seed = seed; h.spp = 0;
       let fr: OptixFrame | null = null;
-      if (optix) { fr = optixFrame(s.compiled, P, SD, { motion }); Object.assign(optix, fr); }
+      if (optix) { fr = optixFrame(s.compiled, P, SD, { motion, spheres: optix.builtinSpheres }); Object.assign(optix, fr); }
       h.O = nonEmpty(fr ? fr.O : P.O); h.LI = nonEmpty(P.LI); h.BV = nonEmpty(P.BV); h.SD = SD;
       h.version++;
     },
