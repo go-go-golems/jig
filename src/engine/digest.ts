@@ -28,9 +28,22 @@ export function digestString(s: string): string {
   return digestBytes(u16);
 }
 
-/** hashes of everything `pack` returns at one moment (poses from the scene's animation, as the viewport does) */
+/** the `env` the viewport passes to `pack` at time t (Viewport.repack, src/engine/viewport.ts): poses from the scene's
+ *  animation, the seed, and motion-blur samples across the shutter when the camera asks for them */
+export function packEnv(compiled: any, animation: ((t: number) => any) | null, time: number, seed = 0): Record<string, any> {
+  const poses = (t: number) => (animation ? animation(t) : null);
+  const env: Record<string, any> = { time, overrides: null, poses: poses(time), seed };
+  const mb = compiled.motionBlur;
+  if (mb && mb.interval > 0 && mb.steps >= 2) {
+    const K = mb.steps;
+    env.motion = { samples: Array.from({ length: K }, (_, k) => { const tk = time + (k / (K - 1) - 0.5) * mb.interval; return { time: tk, poses: poses(tk) }; }) };
+  }
+  return env;
+}
+
+/** hashes of everything `pack` returns at one moment, with the viewport's env */
 export function packDigest(compiled: any, animation: ((t: number) => any) | null, time: number): Record<string, string> {
-  const P = compiled.pack({ time, poses: animation ? animation(time) : null });
+  const P = compiled.pack(packEnv(compiled, animation, time));
   const out: Record<string, string> = {};
   for (const k of ['U', 'O', 'LI', 'BV', 'SDs', 'SDd']) out[k] = digestBytes(P[k]);
   out.meta = digestString(JSON.stringify({ dynBase: P.dynBase, nObjs: P.nObjs, order: P.order, sunDir: P.sunDir, sunElev: P.sunElev, envType: P.envType, moving: P.moving, mats: P.mats }));
@@ -60,7 +73,7 @@ export async function digestPreset(id: string, files: Record<string, string>, ti
   const c = r.compiled, anim = r.animation || null;
   const frames = times.map(t => ({ t, d: packDigest(c, anim, t) }));
   const t1 = now();
-  for (let i = 0; i < reps; i++) c.pack({ time: i / 24, poses: anim ? anim(i / 24) : null });
+  for (let i = 0; i < reps; i++) c.pack(packEnv(c, anim, i / 24));
   const frameMs = (now() - t1) / reps;
   return { id, ok: true, shared: digestString(c.shared), lines: c.stats.lines, nU: c.nU, frames, buildMs, frameMs };
 }
