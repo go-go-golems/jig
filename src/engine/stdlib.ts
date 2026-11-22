@@ -32,7 +32,7 @@ export const pbr = material.define('pbr', {
   const aniso = !isConst(m.anisotropy, 0);
   const k = aniso ? m.anisotropy.mul(-0.9).add(1).pow(0.25) : null;
   const r = aniso ? [m.roughness.mul(k).clamp(0, 1), m.roughness.div(k).clamp(0, 1)] : m.roughness;
-  const tan = aniso ? { tangent: m.tangent, rotation: m.anisotropyRotation } : {};
+  const tan = aniso ? { tangent: m.tangent, rotation: m.anisotropyRotation } : ({} as Record<string, any>);
   // dielectric F0 = 0.08 · specular → 0.04 by default (IOR 1.5)
   const dielectricBase = bsdf.layer(bsdf.dielectric(Object.assign({ f0: m.specular.mul(0.08), roughness: r }, tan)), bsdf.lambert(m.baseColor));
   let metal = bsdf.conductor.schlick(Object.assign({ f0: m.baseColor, roughness: r }, tan));
@@ -48,9 +48,9 @@ material.pbr = pbr;
 // sugar: the materials people reach for first
 material.diffuse = (c = 0.8) => material(bsdf.lambert(c));
 material.plastic = (c = '#b3261e', r = 0.3) => pbr().baseColor(c).roughness(r);
-material.metal = (name = 'Au', o = {}) => material(bsdf.conductor({ ior: ior.metal(name), roughness: o.roughness != null ? o.roughness : 0.25 }));
+material.metal = (name = 'Au', o: Record<string, any> = {}) => material(bsdf.conductor({ ior: ior.metal(name), roughness: o.roughness != null ? o.roughness : 0.25 }));
 material.mirror = () => material(bsdf.conductor.schlick({ f0: 0.97, roughness: 0 }));
-material.glass = (o = {}) => {
+material.glass = (o: Record<string, any> = {}) => {
   const g = material(bsdf.dielectric({ ior: o.ior != null ? o.ior : 1.5, roughness: o.roughness || 0, tint: o.tint }));
   return o.absorb ? g.interior(medium.absorbing({ tint: o.absorb, distance: o.distance || u.cm(5) })) : g;
 };
@@ -60,14 +60,14 @@ material.emissive = (c = '#ffffff', L = u.nit(1000)) => material(bsdf.lambert(0)
 // Inversion from Chiang, Kutz & Burley 2016 (also used by Kulla & Conty 2017).
 const ssAlbedo = A => 1 - Math.pow(4.09712 + 4.20863 * A - Math.sqrt(Math.max(0, 9.59217 + 41.6808 * A + 17.7126 * A * A)), 2);
 const toSS = a => { const c = typeof a === 'string' ? parseColor(a) : typeof a === 'number' ? [a, a, a] : Array.isArray(a) ? a : null; return c ? c.map(x => Math.max(0, Math.min(0.9999, ssAlbedo(Math.max(0, Math.min(1, x)))))) : a; };
-material.subsurface = (o = {}) => material(bsdf.dielectric({ ior: o.ior || 1.4, roughness: o.roughness != null ? o.roughness : 0.3 }))
+material.subsurface = (o: Record<string, any> = {}) => material(bsdf.dielectric({ ior: o.ior || 1.4, roughness: o.roughness != null ? o.roughness : 0.3 }))
   .interior(medium.homogeneous({ albedo: toSS(o.albedo || [0.9, 0.8, 0.7]), meanFreePath: o.meanFreePath || u.mm(5), phase: phase.hg(o.g || 0) }));
 material.velvet = (c = '#5b1a3a') => material(bsdf.layer(bsdf.sheen({ color: 1, roughness: 0.35 }), bsdf.lambert(c)));
-material.carPaint = (pigment = '#7a0c12', o = {}) => material(bsdf.layer(
+material.carPaint = (pigment = '#7a0c12', o: Record<string, any> = {}) => material(bsdf.layer(
   bsdf.dielectric({ ior: 1.5, roughness: o.coatRoughness != null ? o.coatRoughness : 0.02 }),
   bsdf.mix(bsdf.lambert(pigment), bsdf.conductor({ ior: ior.metal('Al'), roughness: 0.3 }), o.flakes != null ? o.flakes : 0.3),
   { thickness: u.um(40), tint: o.tint || '#fffaf0' }));
-material.soapFilm = (o = {}) => material(bsdf.thinDielectric({ ior: 1.33 }).thinFilm({ thickness: o.thickness != null ? o.thickness : u.nm(400), ior: 1.33 }));
+material.soapFilm = (o: Record<string, any> = {}) => material(bsdf.thinDielectric({ ior: 1.33 }).thinFilm({ thickness: o.thickness != null ? o.thickness : u.nm(400), ior: 1.33 }));
 material.ceramic = (c = '#f2efe8') => pbr().baseColor(c).roughness(0.35).coat(1).coatRoughness(0.02);
 material.rubber = (c = 0.04) => pbr().baseColor(c).roughness(0.85);
 material.chalk = (c = 0.85) => material(bsdf.lambert(c));

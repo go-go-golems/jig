@@ -7,9 +7,14 @@ import { isQ, Quantity } from './units';
 let NID = 0;
 const TABLE = new Map();
 export class Node {
+  op: any;
+  type: any;
+  args: any;
+  x: any;
+  id: number;
   constructor(op, type, args, x) { this.op = op; this.type = type; this.args = args; this.x = x; this.id = 0; }
 }
-export function node(op, type, args = [], x = null) {
+export function node(op, type, args: any[] = [], x = null) {
   const key = op + '|' + type + '|' + (x == null ? '' : JSON.stringify(x)) + '|' + args.map(a => a.id).join(',');
   let n = TABLE.get(key);
   if (n) return n;
@@ -58,11 +63,11 @@ const handler = {
     throw new CandelaError('E104', `'${k}' is not a method of a ${tname(n.type)} field`, { suggest: didYouMean(k, Object.keys(METHODS)), hint: 'fields have methods (add, mul, mix, smoothstep, sin, …) and swizzles (.x, .xz, .rgb)' });
   },
   has(t, k) { return k === EXPR || Object.prototype.hasOwnProperty.call(METHODS, k); },
-  ownKeys() { return []; },
+  ownKeys() { return ([] as any[]); },
   getOwnPropertyDescriptor() { return undefined; },
   set(t, k) { throw new CandelaError('E105', `fields are immutable values: cannot set '${String(k)}'`, { hint: 'make a new field: const b = a.mul(2)' }); },
 };
-export function E(n) { const t = {}; t[EXPR] = n; return new Proxy(t, handler); }
+export function E(n) { const t: Record<string, any> = {}; t[EXPR] = n; return new Proxy(t, handler); }
 
 // ---------- lifting JS values to nodes ----------
 const NAMED = { white: [1, 1, 1], black: [0, 0, 0], grey: [0.18, 0.18, 0.18], gray: [0.18, 0.18, 0.18], red: [0.8, 0.04, 0.04], green: [0.05, 0.6, 0.08], blue: [0.03, 0.08, 0.75] };
@@ -77,12 +82,12 @@ export function parseColor(s) {
   return null;
 }
 export const PARAM = Symbol.for('candela.param');
-let paramResolver = null;              // set by params.js: (param) => node (uniform or constant for static)
+let paramResolver: any = null;              // set by params.js: (param) => node (uniform or constant for static)
 export const setParamResolver = f => { paramResolver = f; };
-let tracer = null;                     // set while tracing a lambda: () => context proxy
+let tracer: any = null;                     // set while tracing a lambda: () => context proxy
 export const constNode = v => typeof v === 'number' ? node('const', 'f', [], v) : typeof v === 'boolean' ? node('const', 'b', [], v) : node('const', vecOf(v.length), [], v.slice());
 
-export function lift(v, want) {
+export function lift(v, want?) {
   const n = nodeOf(v); if (n) return n;
   if (v && v[PARAM]) return paramResolver(v);
   if (typeof v === 'number') { if (!Number.isFinite(v)) throw new CandelaError('E121', `field constant must be finite, got ${v}`); return want && isVec(want) ? constNode(new Array(SIZE[want]).fill(v)) : constNode(v); }
@@ -97,11 +102,11 @@ export function lift(v, want) {
   if (typeof v === 'function') return traceLambda(v);
   throw new CandelaError('E121', `cannot use ${v === null ? 'null' : typeof v} as a field value`);
 }
-export const liftE = (v, want) => E(lift(v, want));
+export const liftE = (v, want?) => E(lift(v, want));
 
 // ---------- tracing ----------
 // a lambda given where a field is expected is called once with a symbolic context
-export function traceLambda(fn, ctx) {
+export function traceLambda(fn, ctx?) {
   const c = ctx || (tracer ? tracer() : surfaceContext());
   const r = fn(c);
   if (r === undefined) throw new CandelaError('E206', 'the pattern lambda returned nothing: return a field (p => p.uv.x.mul(8).floor())');
@@ -187,7 +192,7 @@ export const METHODS = {
   maxComponent: n => { scalarOf(n, 'maxComponent'); return node('maxc', 'f', [n]); },
   at: n => n,
 };
-export function mixNodes(a, b, t, forceT) {
+export function mixNodes(a, b, t, forceT?) {
   const ty = forceT || bcast(a.type, b.type);
   if (!ty) throw new CandelaError('E122', `mix(${tname(a.type)}, ${tname(b.type)}, …)`);
   if (t.type !== 'f' && t.type !== ty) throw new CandelaError('E122', `mix factor must be a Float or a ${tname(ty)}`);
@@ -203,7 +208,7 @@ const L = liftE;
 const scalarFn = op => (x, ...r) => E(METHODS[op](lift(x), ...r));
 export const fx = {
   float: x => E(lift(x, 'f')), vec2: (x, y) => E(lift([x, y ?? x])), vec3: (x, y, z) => E(lift(y == null ? [x, x, x] : [x, y, z])), vec4: (x, y, z, w) => E(lift([x, y, z, w])),
-  color: (r, g, b) => {
+  color: (r, g?, b?) => {
     if (typeof r === 'number' && g == null) return E(constNode([r, r, r]));
     if (g != null) return E(lift([r, g, b]));
     const n = lift(r); if (n.type === 'f') return E(node('splat', 'v3', [n])); return E(n);
@@ -230,9 +235,9 @@ export const fx = {
   },
   noise: {
     perlin: p => E(node('noise', 'f', [as3(p)])),
-    fbm: (p, o = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, ridged: !!o.ridged })),
-    ridged: (p, o = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, ridged: true })),
-    turbulence: (p, o = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, turb: true })),
+    fbm: (p, o: Record<string, any> = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, ridged: !!o.ridged })),
+    ridged: (p, o: Record<string, any> = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, ridged: true })),
+    turbulence: (p, o: Record<string, any> = {}) => E(node('fbm', 'f', [as3(p)], { oct: o.octaves || 5, lac: o.lacunarity || 2, gain: o.gain || 0.5, turb: true })),
     voronoi: p => { const v = node('voronoi', 'v4', [as3(p)]); const pp = as3(p); return { dist: E(node('swz', 'f', [v], 'x')), edge: E(node('swz', 'f', [v], 'y')), cellRandom: E(node('swz', 'f', [v], 'z')), randomVec3: E(node('voronoiVec', 'v3', [pp])) }; },
     worley: p => E(node('swz', 'f', [node('voronoi', 'v4', [as3(p)])], 'x')),
   },
@@ -265,7 +270,7 @@ export const fx = {
   // CPU only: real JS per shading point on the reference CPU engine
   host: f => E(node('host', 'v3', [], { tag: freshTag(), fn: hostFns.push(f) - 1 })),
 };
-export const hostFns = [];
+export const hostFns: any[] = [];
 function as3(p) { const n = lift(p); if (n.type === 'v3') return n; if (n.type === 'v2') return node('vec', 'v3', [node('swz', 'f', [n], 'x'), node('swz', 'f', [n], 'y'), constNode(0)]); if (n.type === 'f') return node('splat', 'v3', [n]); return node('swz', 'v3', [n], 'xyz'); }
 
 // ---------- blackbody (used for colour temperatures) ----------
@@ -295,8 +300,17 @@ const lit = (v, t) => t === 'f' ? fl(v) : t === 'b' ? String(v) : `${WT[t]}(${v.
 const sp = (code, from, to) => from === to || to === 'f' || to === 'b' ? code : from === 'f' ? `${WT[to]}(${code})` : code;
 
 export class Gen {
+  ctx: any;
+  uniform: any;
+  lines: any;
+  names: any;
+  prefix: any;
+  k: number;
+  label: any;
+  subs: any;
+  onBump: any;
   // ctx: name → code for the context fields; uniform(id, type) → code reading the param's slot
-  constructor(o = {}) { this.ctx = o.ctx || {}; this.uniform = o.uniform; this.lines = []; this.names = new Map(); this.prefix = o.prefix || 't'; this.k = 0; this.label = o.label || 'this context'; this.subs = o.subs || null; this.onBump = o.onBump; }
+  constructor(o: Record<string, any> = {}) { this.ctx = o.ctx || {}; this.uniform = o.uniform; this.lines = []; this.names = new Map(); this.prefix = o.prefix || 't'; this.k = 0; this.label = o.label || 'this context'; this.subs = o.subs || null; this.onBump = o.onBump; }
   ref(n) {
     if (n.op === 'const') return lit(n.x, n.type);
     if (n.op === 'ctx') { const c = this.ctx[n.x]; if (c == null) throw new CandelaError('E207', `p.${n.x === 'irand' ? 'instance.random' : n.x} is not available in ${this.label}`); return c; }
@@ -349,7 +363,7 @@ export class Gen {
   }
 }
 // generate a standalone function of named arguments (used for bump heights, densities, SDFs, passes)
-export function genFunction(name, args, ret, root, o = {}) {
+export function genFunction(name, args, ret, root, o: Record<string, any> = {}) {
   const ctx = Object.assign({}, o.ctx || {});
   const gen = new Gen({ ctx, uniform: o.uniform, prefix: 'q', label: o.label, onBump: o.onBump });
   const r = gen.ref(root);
@@ -373,10 +387,10 @@ export const H = {
   voronoi3(x) { const n = x.map(Math.floor), f = x.map((v, k) => v - n[k]); let md = 8, md2 = 8, cell = [0, 0, 0]; for (let k = -1; k <= 1; k++) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const g = [i, j, k], h = H.hash3([n[0] + i, n[1] + j, n[2] + k]); const r = [0, 1, 2].map(c => g[c] + h[c] * 0.5 + 0.5 - f[c]); const d = r[0] * r[0] + r[1] * r[1] + r[2] * r[2]; if (d < md) { md2 = md; md = d; cell = [n[0] + i, n[1] + j, n[2] + k]; } else if (d < md2) md2 = d; } return [Math.sqrt(md), Math.sqrt(md2) - Math.sqrt(md), fractJ(Math.sin(cell[0] * 7.1 + cell[1] * 157.3 + cell[2] * 113.7) * 43758.5453), 0]; },
   hash13(p) { return fractJ(Math.sin(p[0] * 12.9898 + p[1] * 78.233 + p[2] * 37.719) * 43758.5453); },
 };
-export function evalNode(root, env = {}, memo = new Map()) {
+export function evalNode(root, env: Record<string, any> = {}, memo = new Map()) {
   const ev = n => {
     if (memo.has(n.id)) return memo.get(n.id);
-    let v;
+    let v: any;
     const a = () => n.args.map(ev);
     switch (n.op) {
       case 'const': v = n.x; break;
@@ -436,7 +450,7 @@ export function intervalOf(root, env) {
   const lift2 = (x, y, f) => { const X = Array.isArray(x[0]), Y = Array.isArray(y[0]); if (!X && !Y) return f(x, y); const n = X ? x.length : y.length; return Array.from({ length: n }, (_, i) => f(X ? x[i] : x, Y ? y[i] : y)); };
   const ev = n => {
     if (memo.has(n.id)) return memo.get(n.id);
-    let v; const a = () => n.args.map(ev);
+    let v: any; const a = () => n.args.map(ev);
     switch (n.op) {
       case 'const': v = Array.isArray(n.x) ? n.x.map(c => [c, c]) : [+n.x, +n.x]; break;
       case 'ctx': v = env[n.x] || (n.type === 'f' ? [0, 1e4] : [[-1e4, 1e4], [-1e4, 1e4], [-1e4, 1e4]]); break;

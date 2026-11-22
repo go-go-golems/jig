@@ -27,9 +27,9 @@ const API = Object.assign({}, candela, { candela, default: candela });
 
 // ---------- modules ----------
 function transform(src) {
-  const tail = [];
+  const tail: any[] = [];
   const out = src.split('\n').map(line => {
-    let m;
+    let m: any;
     if ((m = line.match(/^(\s*)import\s+(\w+)\s*,\s*{([^}]*)}\s*from\s*['"]([^'"]+)['"]\s*;?\s*$/))) return `${m[1]}const ${m[2]} = __def(__req(${JSON.stringify(m[4])})), {${names(m[3])}} = __req(${JSON.stringify(m[4])});`;
     if ((m = line.match(/^(\s*)import\s*{([^}]*)}\s*from\s*['"]([^'"]+)['"]\s*;?\s*$/))) return `${m[1]}const {${names(m[2])}} = __req(${JSON.stringify(m[3])});`;
     if ((m = line.match(/^(\s*)import\s+\*\s+as\s+(\w+)\s+from\s*['"]([^'"]+)['"]\s*;?\s*$/))) return `${m[1]}const ${m[2]} = __req(${JSON.stringify(m[3])});`;
@@ -52,8 +52,8 @@ const SCOPE_NAMES = Object.keys(API).filter(k => /^[A-Za-z_$][\w$]*$/.test(k) &&
   try { userFiles.add('probe.js'); const f = new Function('"use strict";\nthrow new Error("probe");\n//# sourceURL=probe.js'); f(); }
   catch (e) { const m = String(e.stack).match(/probe\.js:(\d+)/); if (m) lineOffset.n = +m[1] - 2; }
 })();
-export async function runFiles(files, main = 'scene.js', extraScope = {}) {
-  const cache = new Map(), logs = [];
+export async function runFiles(files, main = 'scene.js', extraScope: Record<string, any> = {}) {
+  const cache = new Map(), logs: any[] = [];
   const consoleShim = { log: (...a) => logs.push(a.map(fmtLog).join(' ')), info: (...a) => logs.push(a.map(fmtLog).join(' ')), warn: (...a) => logs.push('warn: ' + a.map(fmtLog).join(' ')), error: (...a) => logs.push('error: ' + a.map(fmtLog).join(' ')) };
   const req = (from) => async (spec) => resolve(spec, from);
   const LIB = { candela: API, 'candela/fragments': fragments, 'candela/test': { test, default: test }, 'candela/units': { u, default: u } };
@@ -71,9 +71,9 @@ export async function runFiles(files, main = 'scene.js', extraScope = {}) {
   const order = Object.keys(files).filter(f => f !== main && /\.js$/.test(f)).sort();
   const evalModule = async (path) => {
     userFiles.add(path); sources.set(path, files[path]);
-    const exportsObj = {};
+    const exportsObj: Record<string, any> = {};
     const body = transform(files[path]);
-    let fn;
+    let fn: any;
     try { fn = new Function('__req', '__exports', '__def', 'console', ...SCOPE_NAMES, ...Object.keys(extraScope), '"use strict";\nreturn (async () => {\n' + body + '\n})();\n//# sourceURL=' + path); }
     catch (e) { const m = e.message; const err = new CandelaError('E001', `${path}: syntax error: ${m}`, { loc: syntaxLoc(files[path], e, path) }); throw err; }
     loading.set(path, true);
@@ -98,11 +98,11 @@ function syntaxLoc(src, e, path) {
 const fmtLog = x => typeof x === 'string' ? x : x && x[Symbol.for('candela.comp')] ? `[${compOf(x).kind}]` : (() => { try { return JSON.stringify(x, (k, v) => typeof v === 'number' ? +v.toFixed(5) : v); } catch (e) { return String(x); } })();
 
 // ---------- build: files → scene → compiled ----------
-export async function build(files, o = {}) {
+export async function build(files, o: Record<string, any> = {}) {
   const t0 = performance.now();
   paramStore.beginBuild(); derivedRegistry.clear(); clearGlobalFragments();
   for (const k of [...sources.keys()]) sources.delete(k);
-  let res, diags = [], logs = [], sceneB = null, engineB = null, compiled = null, error = null, animation = null;
+  let res: any, diags: any[] = [], logs: any[] = [], sceneB: any = null, engineB: any = null, compiled: any = null, error: any = null, animation: any = null;
   try {
     const r = await collectingAsync(async () => {
       const { exports, logs: lg } = await runFiles(files, o.main || 'scene.js', o.scope || {});
@@ -117,9 +117,9 @@ export async function build(files, o = {}) {
       compiled = compile(sceneB, engineB || o.engine || engine.realtime(), { defaultCamera: null });
       if (animation) {
         // poses at t = 0: catch malformed poses and ids that name no node now, not every frame
-        let P0;
+        let P0: any;
         try { P0 = normPoses(animation(0)); } catch (e) { throw e instanceof CandelaError ? e : new CandelaError('E163', `animation(0) threw: ${e.message}`); }
-        const unknown = P0 ? [...P0.keys()].filter(k => !compiled.poseIds.has(k)) : [];
+        const unknown = P0 ? [...P0.keys()].filter(k => !compiled.poseIds.has(k)) : ([] as any[]);
         if (unknown.length) report('warning', 'W170', `animation: no node has the id${unknown.length > 1 ? 's' : ''} ${unknown.slice(0, 6).map(k => `'${k}'`).join(', ')}${unknown.length > 6 ? ' …' : ''}`, { suggest: didYouMean(unknown[0], [...compiled.poseIds]), hint: 'poses are keyed by .id() on shapes and groups' });
         compiled.animation = animation;
       }

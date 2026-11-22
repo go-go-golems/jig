@@ -6,7 +6,7 @@ const { useState, useEffect, useRef, useCallback } = React;
 export function useHost(host, hz = 8) {
   const [, setV] = useState(0);
   useEffect(() => {
-    let pending = null, last = 0;
+    let pending: any = null, last = 0;
     const off = host.subscribe(() => {
       const now = performance.now(), wait = Math.max(0, 1000 / hz - (now - last));
       if (pending) return;
@@ -40,7 +40,7 @@ export function Seg({ value, options, onChange, small, label }) {
 }
 export function Tog({ on, onClick, children, title }) { return <button className={'tog' + (on ? ' on' : '')} aria-pressed={!!on} title={title} onClick={onClick}>{children}</button>; }
 export function Menu({ label, className, btnClass, children, align, title }) {
-  const [open, setOpen] = useState(false), ref = useRef(null);
+  const [open, setOpen] = useState(false), ref = useRef<any>(null);
   useOutside(ref, () => setOpen(false), open);
   return <div className="rel" ref={ref}>
     <button className={btnClass || 'btn'} onClick={() => setOpen(!open)} aria-expanded={open} title={title}>{label}</button>
@@ -53,12 +53,12 @@ export async function copyText(text, host) {
   try { await navigator.clipboard.writeText(text); host && host.toast('Copied'); return true; }
   catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); host && host.toast('Copied'); } catch (e2) { host && host.toast('Copy failed: select the text and copy it', true); } ta.remove(); return false; }
 }
-let downloadsNS;
+let downloadsNS: any;
 // offer a file to the viewer: the page's downloads capability when it has one; a plain download link when the page
 // runs outside claude.ai; otherwise text is copied to the clipboard
 export async function saveFile(host, filename, data) {
   const ext = (filename.match(/\.(\w+)$/) || [])[1] || '';
-  let ns = null;
+  let ns: any = null;
   try { if (downloadsNS === undefined) downloadsNS = window.claude && window.claude.use ? await window.claude.use('downloads') : null; ns = downloadsNS; } catch (e) { ns = null; }
   if (ns) {
     try { await ns.save({ filename, data }); return true; }

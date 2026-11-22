@@ -18,6 +18,47 @@ export const store = {
 };
 
 export class Host {
+  builtins: any;
+  docs: any;
+  reference: any;
+  mine: any;
+  listeners: Set<any>;
+  version: number;
+  toasts: any;
+  preset: any;
+  files: any;
+  notes: any;
+  result: any;
+  diags: any;
+  logs: any;
+  buildInfo: any;
+  compileError: any;
+  vp: Viewport | null;
+  running: any;
+  time: any;
+  speed: number;
+  selection: any;
+  focusReq: any;
+  view: any;
+  freeCam: any;
+  history: any;
+  assetVersion: number;
+  queue: RenderQueue;
+  _timeBefore: any;
+  rendering: boolean;
+  saveFiles: any;
+  anim: any;
+  state: any;
+  _bErr: boolean;
+  _saveT: ReturnType<typeof setTimeout>;
+  _seq: any;
+  building: boolean;
+  behaviors: any;
+  compiling: boolean;
+  _vpReady: any;
+  _pt: ReturnType<typeof setTimeout>;
+  _raf: number;
+  _panelT: ReturnType<typeof setTimeout>;
   constructor({ presets, docs, reference }) {
     this.builtins = presets; this.docs = docs; this.reference = reference;
     this.mine = store.get('mine', []);
@@ -41,7 +82,7 @@ export class Host {
   // ---------- presets ----------
   allPresets() { return this.builtins.concat(this.mine); }
   presetById(id) { return this.allPresets().find(p => p.id === id) || null; }
-  loadPreset(id, o = {}) {
+  loadPreset(id, o: Record<string, any> = {}) {
     const p = this.presetById(id) || this.builtins[0];
     this.preset = p; store.set('preset', p.id);
     const ed = o.discard ? null : store.get('edits:' + p.id, null);
@@ -51,14 +92,14 @@ export class Host {
     // some presets open on a still frame (it converges; motion blur still shows the motion): Pause runs the clock
     this.running = !p.paused;
     this.view.evComp = 0;
-    if (p.focus) for (const v of [].concat(p.focus)) this.focus({ view: v });
+    if (p.focus) for (const v of ([] as any[]).concat(p.focus)) this.focus({ view: v });
     this.build({ fresh: true });
     this.notify();
     return p;
   }
   isDirty(path) { const orig = this.preset.files; return path ? orig[path] !== this.files[path] : Object.keys(this.files).some(k => orig[k] !== this.files[k]) || Object.keys(orig).some(k => !(k in this.files)); }
   notesDirty() { return (this.preset.notes || '') !== this.notes; }
-  saveEdits() { const orig = this.preset.files, files = {}; for (const [k, v] of Object.entries(this.files)) if (orig[k] !== v) files[k] = v; const notes = this.notesDirty() ? this.notes : null; store.set('edits:' + this.preset.id, Object.keys(files).length || notes != null ? { files, notes } : undefined); }
+  saveEdits() { const orig = this.preset.files, files: Record<string, any> = {}; for (const [k, v] of Object.entries(this.files)) if (orig[k] !== v) files[k] = v; const notes = this.notesDirty() ? this.notes : null; store.set('edits:' + this.preset.id, Object.keys(files).length || notes != null ? { files, notes } : undefined); }
   saveEditsSoon() { clearTimeout(this._saveT); this._saveT = setTimeout(() => this.saveEdits(), 400); }
   setFile(path, src) { this.files[path] = src; this.saveEditsSoon(); this.notify(); }
   setNotes(md) { this.notes = md; this.saveEditsSoon(); this.notify(); }
@@ -76,7 +117,7 @@ export class Host {
   importProject(obj) { if (!obj || obj.format !== 'candela-project' || !obj.files) throw new Error('not a Candela project file'); const n = this.mine.length + 1, id = 'U-' + String(n).padStart(2, '0'); const p = { id, title: (obj.title || 'Imported') + ' (imported)', group: 'Mine', about: 'Imported', files: obj.files, notes: obj.notes || '' }; this.mine.push(p); store.set('mine', this.mine); this.loadPreset(id); return p; }
 
   // ---------- build ----------
-  async build(o = {}) {
+  async build(o: Record<string, any> = {}) {
     const seq = this._seq = (this._seq || 0) + 1;
     this.building = true; this.notify();
     const files = Object.assign({}, this.files);
@@ -98,7 +139,7 @@ export class Host {
     this.building = false; this.notify();
     return r;
   }
-  async loadIntoViewport(compiled, seq) {
+  async loadIntoViewport(compiled, seq?) {
     try {
       this.compiling = true; this.notify();
       await this.vp.load(compiled, { time: this.time });
@@ -185,7 +226,7 @@ export class Host {
   // ---------- assets: images dropped on the workbench (HDRIs) ----------
   async addAssetFile(file) {
     const name = file.name.replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-') || 'image';
-    let img;
+    let img: any;
     if (/\.hdr$|\.pic$/i.test(file.name)) img = parseHDR(new Uint8Array(await file.arrayBuffer()));
     else {
       const bmp = await createImageBitmap(file); const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
@@ -276,13 +317,13 @@ export class Host {
         if (v === undefined && !(k in c.props)) throw new CandelaError('E104', `'${k}' is not an attribute of ${c.kind}`, { suggest: didYouMean(k, Object.keys(c.props).concat(['position', 'material'])) });
         return showVal(v);
       },
-      set(_, k, v) { host.patch(sel, b => { if (k === 'position') return b.at(...[].concat(v)); if (typeof b[k] !== 'function') throw new CandelaError('E104', `cannot set '${k}' on ${sel}`); return b[k](parseQuantity(v)); }, `${sel}.${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`); return true; },
+      set(_, k, v) { host.patch(sel, b => { if (k === 'position') return b.at(...([] as any[]).concat(v)); if (typeof b[k] !== 'function') throw new CandelaError('E104', `cannot set '${k}' on ${sel}`); return b[k](parseQuantity(v)); }, `${sel}.${k} = ${typeof v === 'object' ? JSON.stringify(v) : v}`); return true; },
     });
     const matHandle = (sel, c) => new Proxy({}, { get(_, k) { if (typeof k === 'symbol') return undefined; const m = c.props.material; return m ? showVal(m.props[k]) : undefined; }, set(_, k, v) { host.patch(sel, b => b.material(b.props.material ? wrapComp(c.props.material)[k](parseQuantity(v)) : API.material.pbr()[k](v)), `${sel}.material.${k} = ${v}`); return true; } });
     const posHandle = (sel, c) => { const p = (c.props.at || [0, 0, 0]).map(x => +showVal(x) || 0); return new Proxy(p, { set(t, k, v) { const q = t.slice(); q[{ x: 0, y: 1, z: 2 }[k] ?? +k] = +v; host.patch(sel, b => b.at(...q), `${sel}.position.${k} = ${v}`); return true; }, get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; } }); };
     return {
-      $: handle, $$: sel => { const sc = sceneOf(); return sc ? collect(compOf(sc), sel).map(c => handle(c.props.id ? '#' + c.props.id : sel)) : []; },
-      ids: () => { const sc = sceneOf(); return sc ? allIds(compOf(sc)) : []; },
+      $: handle, $$: sel => { const sc = sceneOf(); return sc ? collect(compOf(sc), sel).map(c => handle(c.props.id ? '#' + c.props.id : sel)) : ([] as any[]); },
+      ids: () => { const sc = sceneOf(); return sc ? allIds(compOf(sc)) : ([] as any[]); },
       get time() { return host.time; },
     };
   }
@@ -310,7 +351,7 @@ export class Host {
   }
   // ---------- links from notes, docs and the agent ----------
   link(href) {
-    let u; try { u = new URL(href.replace(/^lab:/, 'lab://x/')); } catch (e) { return false; }
+    let u: any; try { u = new URL(href.replace(/^lab:/, 'lab://x/')); } catch (e) { return false; }
     const what = u.pathname.replace(/^\//, ''), q = Object.fromEntries(u.searchParams.entries());
     switch (what) {
       case 'open': return this.focus({ view: 'code', file: q.file || 'scene.js', line: +q.line || 1, find: q.find });
@@ -328,16 +369,16 @@ export class Host {
   }
   explain() { return this.result && this.result.scene ? explain(this.result.scene, this.result.compiled, this.vp) : ''; }
   irText() { return this.result && this.result.scene ? irText(this.result.scene, this.result.compiled) : ''; }
-  irGraph() { return this.result && this.result.scene ? irGraph(this.result.scene) : { nodes: [], edges: [] }; }
+  irGraph() { return this.result && this.result.scene ? irGraph(this.result.scene) : { nodes: ([] as any[]), edges: ([] as any[]) }; }
 }
 
 const vecHandle = a => new Proxy(a, { get(t, k) { if (k === 'x') return t[0]; if (k === 'y') return t[1]; if (k === 'z') return t[2]; return t[k]; }, set(t, k, v) { const i = { x: 0, y: 1, z: 2 }[k]; if (i != null) t[i] = +v; else t[k] = v; return true; } });
 function downscale(c, maxW) { if (c.width <= maxW) return c; const k = maxW / c.width; const d = document.createElement('canvas'); d.width = Math.round(c.width * k); d.height = Math.round(c.height * k); d.getContext('2d').drawImage(c, 0, 0, d.width, d.height); return d; }
-function findComp(sc, sel) { let hit = null; const v = c => { if (hit) return; if (matches(c, sel)) { hit = c; return; } (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (!hit && sc.props.camera && matches(sc.props.camera, sel)) hit = sc.props.camera; return hit; }
-function collect(sc, sel) { const out = []; const v = c => { if (matches(c, sel)) out.push(c); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); return out; }
+function findComp(sc, sel) { let hit: any = null; const v = c => { if (hit) return; if (matches(c, sel)) { hit = c; return; } (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (!hit && sc.props.camera && matches(sc.props.camera, sel)) hit = sc.props.camera; return hit; }
+function collect(sc, sel) { const out: any[] = []; const v = c => { if (matches(c, sel)) out.push(c); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); return out; }
 const wrapComp = c => ({ [Symbol.for('candela.comp')]: c });
 function showVal(v) { if (v == null) return v; if (typeof v === 'number') return +v.toFixed(6); if (isQ(v)) return v.toString(); if (isParam(v)) return v.value; if (Array.isArray(v)) return v.map(showVal); if (v.kind) return `[${v.kind}]`; if (v.op) return `[field ${v.op}]`; return v; }
-function describeProps(c) { const o = {}; for (const [k, v] of Object.entries(c.props)) { if (['nodes', 'children', 'behaviors'].includes(k)) continue; o[k] = showVal(v); } return o; }
+function describeProps(c) { const o: Record<string, any> = {}; for (const [k, v] of Object.entries(c.props)) { if (['nodes', 'children', 'behaviors'].includes(k)) continue; o[k] = showVal(v); } return o; }
 // CPU intersection in object space (picking only)
 function hitLocal(ty, o, d, pr, bound) {
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];

@@ -12,6 +12,15 @@ const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / 
 
 // ---------- the part definition ----------
 export class MeshDef {
+  name: any;
+  tris: any;
+  triFace: any;
+  faces: any;
+  meta: any;
+  count: any;
+  revision: number;
+  bounds: any;
+  radius: number;
   // tris: Float32Array, 24 floats per triangle: p0 p1 p2 (9) n0 n1 n2 (9) uv0 uv1 uv2 (6); triFace: face index
   constructor({ name, tris, triFace, faces, meta }) {
     this.name = name || 'part';
@@ -48,6 +57,12 @@ export function matchFace(f, sel) {
 
 // ---------- building ----------
 class Builder {
+  name: any;
+  meta: any;
+  data: any;
+  tf: any;
+  faces: any;
+  fmap: any;
   constructor(name, meta) { this.name = name; this.meta = meta || {}; this.data = []; this.tf = []; this.faces = []; this.fmap = new Map(); }
   face(id, meta) { if (this.fmap.has(id)) return this.fmap.get(id); const k = this.faces.length; this.faces.push({ id, meta: Object.assign({}, meta || {}) }); this.fmap.set(id, k); return k; }
   // a triangle whose winding is made to agree with its vertex normals (so front faces face outward)
@@ -65,9 +80,9 @@ class Builder {
 // a solid of revolution about +y: profile [[r, y], …] walked so the material is on the left (axis-bottom → out →
 // up the outside → in over the top); each segment is a CAD face (names[i] or 'f<i>'), and segments sharing a name
 // are smoothed into one face (a torus, a fillet)
-function revolve(profile, o = {}) {
+function revolve(profile, o: Record<string, any> = {}) {
   const N = o.segments || 64, names = o.faces || [], B = new Builder(o.name || 'revolved', o.meta);
-  const segs = [];
+  const segs: any[] = [];
   for (let i = 0; i + 1 < profile.length; i++) {
     const [r0, y0] = profile[i], [r1, y1] = profile[i + 1];
     const dr = r1 - r0, dy = y1 - y0, L = Math.hypot(dr, dy);
@@ -102,7 +117,7 @@ function defaultRevolvedMeta(s) { return Math.abs(s.ny) > 0.999 ? { process: 'fa
 
 // a star-shaped outline about the y axis, extruded over [-h/2, h/2], with an optional round bore: gears, hex
 // heads, nuts, washers. outline: [{ a, r, tag }] sorted by angle a ∈ [0, 2π); tags name the side faces
-function polarExtrude(outline, h, o = {}) {
+function polarExtrude(outline, h, o: Record<string, any> = {}) {
   const B = new Builder(o.name || 'extruded', o.meta), n = outline.length, y0 = -h / 2, y1 = h / 2, bore = o.bore || 0;
   const pt = (q, y) => [q.r * Math.cos(q.a), y, q.r * Math.sin(q.a)];
   const top = B.face(o.top || 'top', { process: 'faced', axis: [0, 1, 0], surface: 'planar' }), bot = B.face(o.bottom || 'bottom', { process: 'faced', axis: [0, 1, 0], surface: 'planar' });
@@ -118,7 +133,7 @@ function polarExtrude(outline, h, o = {}) {
     }
   }
   // side wall: per-edge normals, averaged at vertices whose two edges carry the same tag
-  const en = [];
+  const en: any[] = [];
   for (let i = 0; i < n; i++) { const a = pt(outline[i], 0), b = pt(outline[(i + 1) % n], 0); const t = norm(sub(b, a)); en.push(norm([t[2], 0, -t[0]])); }
   // make the edge normals point outward
   { const a = pt(outline[0], 0), b = pt(outline[1 % n], 0), mid = [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2]; if (dot(en[0], mid) < 0) for (const e of en) { e[0] = -e[0]; e[2] = -e[2]; } }
@@ -153,7 +168,7 @@ const involute = a => Math.tan(a) - a;
 // ---------- the public generators ----------
 export const mesh = {
   // a box with six faces: right, left, top, bottom, front, back (milled, with their machining direction)
-  box(w = 1, h = w, d = w, o = {}) {
+  box(w = 1, h = w, d = w, o: Record<string, any> = {}) {
     const B = new Builder(o.name || 'box', o.meta), x = w / 2, y = h / 2, z = d / 2;
     const F = [
       ['right', [1, 0, 0], [[x, -y, -z], [x, y, -z], [x, y, z], [x, -y, z]], [0, 0, 1]],
@@ -167,33 +182,33 @@ export const mesh = {
     return B.done();
   },
   revolve,
-  cylinder(r = 0.5, h = 1, o = {}) { return revolve([[0, -h / 2], [r, -h / 2], [r, h / 2], [0, h / 2]], Object.assign({ name: 'cylinder', faces: ['bottom', 'side', 'top'] }, o)); },
+  cylinder(r = 0.5, h = 1, o: Record<string, any> = {}) { return revolve([[0, -h / 2], [r, -h / 2], [r, h / 2], [0, h / 2]], Object.assign({ name: 'cylinder', faces: ['bottom', 'side', 'top'] }, o)); },
   // a tube / bushing / bearing race: outer, bore, and two annular ends
-  tube(ro = 0.5, ri = 0.3, h = 1, o = {}) { return revolve([[ri, -h / 2], [ro, -h / 2], [ro, h / 2], [ri, h / 2], [ri, -h / 2]], Object.assign({ name: 'tube', faces: ['bottom', 'outer', 'top', 'bore'] }, o)); },
+  tube(ro = 0.5, ri = 0.3, h = 1, o: Record<string, any> = {}) { return revolve([[ri, -h / 2], [ro, -h / 2], [ro, h / 2], [ri, h / 2], [ri, -h / 2]], Object.assign({ name: 'tube', faces: ['bottom', 'outer', 'top', 'bore'] }, o)); },
   // a shaft with steps: [[length, radius], …] along +y from 0, chamfer-free; each diameter is its own turned face
-  shaft(steps, o = {}) {
+  shaft(steps, o: Record<string, any> = {}) {
     const prof = [[0, 0]], names = ['end-0'];
     let y = 0;
     steps.forEach(([len, r], k) => { prof.push([r, y]); names.push(`d${k}`); y += len; prof.push([r, y]); names.push(k + 1 < steps.length ? `shoulder-${k}` : 'end-1'); });
     prof.push([0, y]);
     return revolve(prof, Object.assign({ name: 'shaft', faces: names }, o));
   },
-  torus(R = 0.5, r = 0.1, o = {}) {
-    const n = o.minor || 24, prof = [];
+  torus(R = 0.5, r = 0.1, o: Record<string, any> = {}) {
+    const n = o.minor || 24, prof: any[] = [];
     for (let k = 0; k <= n; k++) { const a = -Math.PI / 2 - (k / n) * Math.PI * 2; prof.push([R + r * Math.cos(a), r * Math.sin(a)]); }
     return revolve(prof, Object.assign({ name: 'torus', faces: prof.map(() => 'surface'), closed: true, faceMeta: { surface: { process: 'molded' } } }, o));
   },
   // an involute spur gear in the xz plane (axis +y): teeth z, module m (metres), face width, bore radius
-  gear(o = {}) {
+  gear(o: Record<string, any> = {}) {
     const z = o.teeth || 20, m = o.module || 0.004, width = o.width || 0.02, bore = o.bore != null ? o.bore : m * z * 0.15;
     const alpha = o.pressure != null ? o.pressure : 20 * Math.PI / 180;
     const rp = m * z / 2, ra = rp + m, rf = Math.max(rp - 1.25 * m, bore + m * 0.5), rb = rp * Math.cos(alpha);
     const half = Math.PI / (2 * z) + involute(alpha);           // half tooth angle at the base circle, measured from the tooth centre
     const psi = r => (r <= rb ? half : half - involute(Math.acos(rb / r)));
-    const S = o.flankSamples || 8, out = [];
+    const S = o.flankSamples || 8, out: any[] = [];
     for (let t = 0; t < z; t++) {
       const c = (t / z) * Math.PI * 2;
-      const rs = []; for (let k = 0; k <= S; k++) rs.push(Math.max(rf, rb * 0.999) + (ra - Math.max(rf, rb * 0.999)) * (k / S));
+      const rs: any[] = []; for (let k = 0; k <= S; k++) rs.push(Math.max(rf, rb * 0.999) + (ra - Math.max(rf, rb * 0.999)) * (k / S));
       // root land from the previous tooth to this one's leading flank
       out.push({ a: c - Math.PI / z, r: rf, tag: 'root' });
       out.push({ a: c - psi(rs[0]) - 0.0001, r: rf, tag: 'flank' });
@@ -211,8 +226,8 @@ export const mesh = {
     return def;
   },
   // a regular polygon prism (hex heads, nuts): across-flats, height, optional bore
-  prism(sides = 6, acrossFlats = 0.013, h = 0.005, o = {}) {
-    const R = acrossFlats / 2 / Math.cos(Math.PI / sides), out = [];
+  prism(sides = 6, acrossFlats = 0.013, h = 0.005, o: Record<string, any> = {}) {
+    const R = acrossFlats / 2 / Math.cos(Math.PI / sides), out: any[] = [];
     const subd = o.subdivide || 4;
     for (let k = 0; k < sides; k++) for (let j = 0; j < subd; j++) {
       const a0 = (k / sides) * Math.PI * 2 + Math.PI / sides * (o.rotate ? 1 : 0), a1 = ((k + 1) / sides) * Math.PI * 2 + Math.PI / sides * (o.rotate ? 1 : 0);
@@ -224,17 +239,17 @@ export const mesh = {
     return polarExtrude(out, h, Object.assign({ name: o.name || 'prism', sideProcess: 'milled' }, o));
   },
   // ISO-ish hex bolt along +y (head on top): thread diameter d, shank length, head height ≈ 0.65 d
-  hexBolt(o = {}) {
+  hexBolt(o: Record<string, any> = {}) {
     const d = o.d || 0.008, len = o.length || d * 4, hh = o.head || d * 0.65, s = o.acrossFlats || d * 1.6;
     return mesh.merge([
       { mesh: mesh.prism(6, s, hh, { name: 'head', top: 'head-top', bottom: 'head-bearing' }), at: [0, hh / 2, 0], prefix: '' },
       { mesh: revolve([[0, -len], [d / 2 * 0.92, -len], [d / 2, -len + d * 0.08], [d / 2, 0], [0, 0]], { faces: ['point', 'chamfer', 'shank', 'under-head'], segments: 32 }), at: [0, 0, 0], prefix: '' },
     ], { name: o.name || `M${Math.round(d * 1000)}×${Math.round(len * 1000)} bolt`, meta: Object.assign({ material: 'steel', finish: 'black-oxide', standard: 'ISO 4017' }, o.meta || {}) });
   },
-  nut(o = {}) { const d = o.d || 0.008; return mesh.prism(6, o.acrossFlats || d * 1.6, o.height || d * 0.8, { name: o.name || `M${Math.round(d * 1000)} nut`, bore: d / 2, meta: Object.assign({ material: 'steel', finish: 'zinc' }, o.meta || {}) }); },
-  washer(o = {}) { const d = o.d || 0.008; return mesh.tube(o.outer || d * 1.05, d / 2 * 1.08, o.thickness || d * 0.2, { name: o.name || `M${Math.round(d * 1000)} washer`, segments: 32, meta: Object.assign({ material: 'steel', finish: 'zinc' }, o.meta || {}) }); },
+  nut(o: Record<string, any> = {}) { const d = o.d || 0.008; return mesh.prism(6, o.acrossFlats || d * 1.6, o.height || d * 0.8, { name: o.name || `M${Math.round(d * 1000)} nut`, bore: d / 2, meta: Object.assign({ material: 'steel', finish: 'zinc' }, o.meta || {}) }); },
+  washer(o: Record<string, any> = {}) { const d = o.d || 0.008; return mesh.tube(o.outer || d * 1.05, d / 2 * 1.08, o.thickness || d * 0.2, { name: o.name || `M${Math.round(d * 1000)} washer`, segments: 32, meta: Object.assign({ material: 'steel', finish: 'zinc' }, o.meta || {}) }); },
   // a ball bearing: outer race, inner race, balls (one part definition, faces per element)
-  bearing(o = {}) {
+  bearing(o: Record<string, any> = {}) {
     const D = o.outer || 0.035, d = o.inner || 0.015, B = o.width || 0.011, n = o.balls || 9;
     const rm = (D + d) / 4, rb = Math.min((D - d) / 4 * 0.55, B * 0.38);
     const parts = [
@@ -246,7 +261,7 @@ export const mesh = {
     return mesh.merge(parts, { name: o.name || `bearing ${Math.round(d * 1000)}×${Math.round(D * 1000)}×${Math.round(B * 1000)}`, meta: Object.assign({ material: 'bearing-steel', finish: 'ground' }, o.meta || {}) });
   },
   // several definitions as one part: translated, optionally rotated about y, face ids prefixed
-  merge(parts, o = {}) {
+  merge(parts, o: Record<string, any> = {}) {
     const B = new Builder(o.name || 'merged', o.meta);
     for (const p of parts) {
       const m = p.mesh, at = p.at || [0, 0, 0], ry = p.rotateY || 0, rx = p.rotateX || 0, c = Math.cos(ry), s = Math.sin(ry), cx = Math.cos(rx), sx = Math.sin(rx);
@@ -267,7 +282,7 @@ export const mesh = {
   fromArrays(o) {
     const P = o.positions, I = o.indices || Array.from({ length: P.length / 3 }, (_, i) => i), Nn = o.normals, T = o.uvs, F = o.faceIds;
     if (!P || P.length % 3) throw new CandelaError('E121', 'mesh.fromArrays({ positions: [x, y, z, …], indices, normals?, uvs?, faceIds?, faces? })');
-    const faces = o.faces ? o.faces.map((f, k) => (typeof f === 'string' ? { id: f, meta: {} } : { id: f.id != null ? String(f.id) : 'f' + k, meta: f.meta || {} })) : null;
+    const faces = o.faces ? o.faces.map((f, k) => (typeof f === 'string' ? { id: f, meta: ({} as Record<string, any>) } : { id: f.id != null ? String(f.id) : 'f' + k, meta: f.meta || {} })) : null;
     const B = new Builder(o.name || 'mesh', o.meta);
     const fidx = new Map();
     const faceOf = t => { const k = F ? F[t] : 0; if (!fidx.has(k)) fidx.set(k, B.face(faces && faces[k] ? faces[k].id : F ? 'f' + k : 'surface', faces && faces[k] ? faces[k].meta : {})); return fidx.get(k); };
@@ -284,8 +299,8 @@ export const mesh = {
     return B.done();
   },
   // Wavefront OBJ: v / vn / vt / f, with g, o or usemtl naming the faces
-  fromOBJ(text, o = {}) {
-    const P = [], N = [], T = [], pos = [], nrm = [], uv = [], idx = [], faceIds = [], faces = [], fmap = new Map();
+  fromOBJ(text, o: Record<string, any> = {}) {
+    const P: any[] = [], N: any[] = [], T: any[] = [], pos: any[] = [], nrm: any[] = [], uv: any[] = [], idx: any[] = [], faceIds: any[] = [], faces: any[] = [], fmap = new Map();
     let cur = 'default', hasN = false;
     const faceK = id => { if (!fmap.has(id)) { fmap.set(id, faces.length); faces.push({ id, meta: {} }); } return fmap.get(id); };
     for (const line of String(text).split('\n')) {
@@ -317,7 +332,7 @@ export function blasOf(def) {
     bmn[t * 3 + i] = Math.min(a, b, c); bmx[t * 3 + i] = Math.max(a, b, c); cen[t * 3 + i] = (a + b + c) / 3;
   }
   const order = new Uint32Array(n); for (let i = 0; i < n; i++) order[i] = i;
-  const nodes = []; // [mn0,mn1,mn2,a, mx0,mx1,mx2,cnt]
+  const nodes: any[] = []; // [mn0,mn1,mn2,a, mx0,mx1,mx2,cnt]
   const area = (mn, mx) => { const d0 = mx[0] - mn[0], d1 = mx[1] - mn[1], d2 = mx[2] - mn[2]; return d0 * d1 + d1 * d2 + d2 * d0; };
   const BINS = 12, LEAF = 4;
   const bounds = (lo, hi) => { const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], cm = [Infinity, Infinity, Infinity], cx = [-Infinity, -Infinity, -Infinity]; for (let k = lo; k < hi; k++) { const t = order[k]; for (let i = 0; i < 3; i++) { if (bmn[t * 3 + i] < mn[i]) mn[i] = bmn[t * 3 + i]; if (bmx[t * 3 + i] > mx[i]) mx[i] = bmx[t * 3 + i]; const c = cen[t * 3 + i]; if (c < cm[i]) cm[i] = c; if (c > cx[i]) cx[i] = c; } } return { mn, mx, cm, cx }; };
@@ -372,7 +387,7 @@ export function blasOf(def) {
 export function rayMesh(def, o, d, tmax = Infinity) {
   const B = blasOf(def), N = B.nodes, T = B.tris;
   const inv = [1 / (d[0] || 1e-12), 1 / (d[1] || 1e-12), 1 / (d[2] || 1e-12)];
-  let best = tmax, hit = null;
+  let best = tmax, hit: any = null;
   const st = [0];
   while (st.length) {
     const ni = st.pop(), b = ni * 8;

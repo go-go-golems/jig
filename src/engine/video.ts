@@ -33,6 +33,13 @@ export const videoBitrate = (w, h, fps, quality = 'high') => w * h * fps * (VIDE
 
 // ---------- the writer ----------
 export class VideoWriter {
+  keyEvery: number;
+  enc: VideoEncoder;
+  desc: any;
+  colorSpace: VideoColorSpaceInit;
+  error: DOMException;
+  canvas: any;
+  ctx: any;
   // o: { container: 'mp4' | 'webm', width, height, fps, bitrate (bits/s) | quality, keyframeInterval (s) }
   static async create(o) {
     if (!hasWebCodecs()) throw new CandelaError('E730', 'video export needs WebCodecs (Chrome, Edge, Safari 17+, Firefox 130+); render PNG frames instead', { hint: 'the frames can be joined later: ffmpeg -framerate 24 -i name.%04d.png -pix_fmt yuv420p name.mp4' });
@@ -40,7 +47,7 @@ export class VideoWriter {
     const { width: w, height: h } = o, fps = o.fps || 24;
     if (w % 2 || h % 2) throw new CandelaError('E121', `video: ${w}×${h} — width and height must be even`);
     const bitrate = o.bitrate || videoBitrate(w, h, fps, o.quality);
-    let codec = null;
+    let codec: any = null;
     for (const c of candidates(container, w, h, fps)) { try { const s = await VideoEncoder.isConfigSupported(encCfg(c, w, h, fps, bitrate)); if (s.supported) { codec = c; break; } } catch (e) { /* next */ } }
     if (!codec) throw new CandelaError('E730', `this browser cannot encode ${container === 'mp4' ? 'H.264 (MP4)' : 'VP9 or VP8 (WebM)'} at ${w}×${h}`, { hint: container === 'mp4' ? 'try WebM, or PNG frames' : 'try MP4, or PNG frames' });
     return new VideoWriter(container, codec, w, h, fps, bitrate, o.keyframeInterval || 2);
@@ -147,7 +154,7 @@ export function muxMP4({ width, height, fps, chunks, description, colorSpace }) 
 const ebmlId = id => { const n = id >= 0x1000000 ? 4 : id >= 0x10000 ? 3 : id >= 0x100 ? 2 : 1; return be(id, n); };
 const size8 = n => { const b = be(n, 8); b[0] = 0x01; return b; };                       // an 8-byte EBML length
 const el = (id, ...parts) => { const body = cat(parts.flat()); return cat([ebmlId(id), size8(body.length), body]); };
-const uint = (id, v, n) => { let k = n || 1; if (!n) while (k < 8 && v >= 2 ** (8 * k)) k++; return el(id, be(v, k)); };
+const uint = (id, v, n?) => { let k = n || 1; if (!n) while (k < 8 && v >= 2 ** (8 * k)) k++; return el(id, be(v, k)); };
 const f64 = (id, v) => { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, v); return el(id, b); };
 const str = (id, s) => el(id, new TextEncoder().encode(s));
 export function muxWebM({ width, height, fps, chunks, colorSpace, codec }) {
@@ -158,10 +165,10 @@ export function muxWebM({ width, height, fps, chunks, colorSpace, codec }) {
   const video = el(0xe0, uint(0xb0, width), uint(0xba, height), cs ? el(0x55b0, uint(0x55b1, cs.m), uint(0x55b9, cs.full ? 2 : 1), uint(0x55ba, cs.t), uint(0x55bb, cs.p)) : []);
   const tracks = el(0x1654ae6b, el(0xae, uint(0xd7, 1), uint(0x73c5, 1), uint(0x83, 1), str(0x86, codec.startsWith('vp09') ? 'V_VP9' : 'V_VP8'), uint(0x23e383, Math.round(1e9 / fps)), video));
   // clusters: one per keyframe (and at least every 30 s, so block offsets fit in 16 bits)
-  const clusters = []; let cur = null;
+  const clusters: any[] = []; let cur: any = null;
   chunks.forEach(c => {
     const t = ms(c);
-    if (!cur || c.key || t - cur.t > 30000) { cur = { t, blocks: [] }; clusters.push(cur); }
+    if (!cur || c.key || t - cur.t > 30000) { cur = { t, blocks: ([] as any[]) }; clusters.push(cur); }
     const rel = new Uint8Array(2); new DataView(rel.buffer).setInt16(0, t - cur.t);
     cur.blocks.push(el(0xa3, u8(0x81), rel, u8(c.key ? 0x80 : 0), c.data));
   });

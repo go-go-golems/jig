@@ -9,25 +9,29 @@ import { resolveImage } from './hdri';
 
 export const COMP = Symbol.for('candela.comp');
 export const compOf = x => (x && x[COMP]) || null;
-export const isComp = (x, prefix) => { const c = compOf(x); return !!c && (!prefix || c.kind === prefix || c.kind.startsWith(prefix + '.')); };
+export const isComp = (x, prefix?) => { const c = compOf(x); return !!c && (!prefix || c.kind === prefix || c.kind.startsWith(prefix + '.')); };
 
 let CID = 0;
 class Comp {
-  constructor(kind, props, meta) { this.kind = kind; this.props = Object.freeze(props); this.meta = meta || { frags: [], loc: null, unchecked: [] }; this.cid = ++CID; }
+  kind: any;
+  props: any;
+  meta: any;
+  cid: number;
+  constructor(kind, props, meta) { this.kind = kind; this.props = Object.freeze(props); this.meta = meta || { frags: ([] as any[]), loc: null, unchecked: ([] as any[]) }; this.cid = ++CID; }
   with(k, v) { return new Comp(this.kind, Object.assign({}, this.props, { [k]: v }), this.meta); }
   withMeta(m) { return new Comp(this.kind, this.props, Object.assign({}, this.meta, m)); }
 }
 
 // ---------- method specs per kind ----------
 const SPECS = new Map();        // kind → { methods: {name: (comp, ...args) => Comp | value}, getters: {name: comp => value}, family }
-const FAMILY = {};              // family → shared methods
-const globalFrags = [];         // candela.use(fragment)
+const FAMILY: Record<string, any> = {};              // family → shared methods
+const globalFrags: any[] = [];         // candela.use(fragment)
 export function useFragment(f) { if (!globalFrags.includes(f)) globalFrags.push(f); return f; }
 export const clearGlobalFragments = () => { globalFrags.length = 0; };
 
-function spec(kind, family, methods = {}, getters = {}) { SPECS.set(kind, { methods, getters, family }); }
+function spec(kind, family, methods: Record<string, any> = {}, getters: Record<string, any> = {}) { SPECS.set(kind, { methods, getters, family }); }
 function methodsOf(c) {
-  const s = SPECS.get(c.kind) || { methods: {}, getters: {}, family: null };
+  const s = SPECS.get(c.kind) || { methods: ({} as Record<string, any>), getters: ({} as Record<string, any>), family: null };
   const fam = FAMILY[s.family] || {};
   const m = Object.assign({}, COMMON, fam, s.methods);
   for (const f of fragsOf(c)) { if (f.targetsKind(c.kind)) { Object.assign(m, f.methodTable()); } }
@@ -113,28 +117,28 @@ FAMILY.shape = Object.assign({}, FAMILY.placed, {
 
 // ---------- shapes ----------
 const pos = (v, what) => { v = parseQuantity(v); if (isParam(v)) return v; const x = expectDim(v, 'length', what); if (typeof x === 'number' && !(x > 0)) throw new CandelaError('E121', `${what} must be > 0, got ${x}`); return x; };
-const mkShape = (kind, props) => wrap(new Comp('shape.' + kind, Object.assign({ at: [0, 0, 0] }, props), { frags: [], loc: callSite(), unchecked: [] }));
+const mkShape = (kind, props) => wrap(new Comp('shape.' + kind, Object.assign({ at: [0, 0, 0] }, props), { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 export const shape = {
   sphere: (r = 1) => mkShape('sphere', { r: pos(r, 'shape.sphere(r)') }),
-  plane: (size) => mkShape('plane', { size: size == null ? 0 : pos(size, 'shape.plane(size)') }),
+  plane: (size?) => mkShape('plane', { size: size == null ? 0 : pos(size, 'shape.plane(size)') }),
   rect: (w = 1, h = 1) => mkShape('rect', { w: pos(w, 'shape.rect(w)'), h: pos(h, 'shape.rect(h)') }),
   disk: (r = 1) => mkShape('disk', { r: pos(r, 'shape.disk(r)') }),
-  box: (w = 1, h, d) => mkShape('box', { size: [pos(w, 'shape.box(w)'), pos(h == null ? w : h, 'shape.box(h)'), pos(d == null ? w : d, 'shape.box(d)')] }),
+  box: (w = 1, h?, d?) => mkShape('box', { size: [pos(w, 'shape.box(w)'), pos(h == null ? w : h, 'shape.box(h)'), pos(d == null ? w : d, 'shape.box(d)')] }),
   cube: (s = 1) => mkShape('box', { size: [pos(s, 'shape.cube(s)'), pos(s, 's'), pos(s, 's')] }),
   cylinder: (r = 0.5, h = 1) => mkShape('cylinder', { r: pos(r, 'shape.cylinder(r)'), h: pos(h, 'shape.cylinder(h)') }),
   capsule: (r = 0.3, h = 1) => mkShape('capsule', { r: pos(r, 'shape.capsule(r)'), h: pos(h, 'shape.capsule(h)') }),
   torus: (R = 1, r = 0.25) => mkShape('torus', { R: pos(R, 'shape.torus(R)'), r: pos(r, 'shape.torus(r)') }),
   roundedBox: (w = 1, h, d, radius = 0.05) => mkShape('roundbox', { size: [pos(w, 'w'), pos(h == null ? w : h, 'h'), pos(d == null ? w : d, 'd')], rr: pos(radius, 'radius') }),
   cone: (r = 0.5, h = 1) => mkShape('cone', { r: pos(r, 'shape.cone(r)'), h: pos(h, 'shape.cone(h)') }),
-  prism: (o = {}) => mkShape('prism', { apex: o.apex != null ? ang(o.apex, 'apex') : Math.PI / 3, size: o.size != null ? pos(o.size, 'size') : 0.1, depth: o.depth != null ? pos(o.depth, 'depth') : null }),
+  prism: (o: Record<string, any> = {}) => mkShape('prism', { apex: o.apex != null ? ang(o.apex, 'apex') : Math.PI / 3, size: o.size != null ? pos(o.size, 'size') : 0.1, depth: o.depth != null ? pos(o.depth, 'depth') : null }),
   // a signed distance field, traced from a lambda of the local position; `bound` is a bounding-sphere radius
-  sdf: (fn, o = {}) => {
+  sdf: (fn, o: Record<string, any> = {}) => {
     if (typeof fn !== 'function' && !isExpr(fn)) throw new CandelaError('E121', 'shape.sdf(p => distance, { bound }) takes a lambda of p.P (local position)');
     const n = typeof fn === 'function' ? traceLambda(fn, pointContext('an SDF')) : nodeOf(fn);
     if (n.type !== 'f') throw new CandelaError('E122', 'an SDF returns a Float (signed distance in metres)');
     return mkShape('sdf', { sdf: n, bound: o.bound != null ? pos(o.bound, 'bound') : 1.5, steps: o.steps || 160, smooth: o.lipschitz || 1 });
   },
-  heightfield: (h, o = {}) => {
+  heightfield: (h, o: Record<string, any> = {}) => {
     const n = typeof h === 'function' ? traceLambda(h, pointContext('a heightfield')) : lift(h);
     const size = o.size != null ? pos(o.size, 'size') : 20, amp = o.height != null ? +parseQuantity(o.height) : 2;
     return mkShape('heightfield', { h: n, size, amp });
@@ -164,7 +168,7 @@ spec('shape.mesh', 'shape', {
 });
 
 // ---------- the BSDF algebra ----------
-const field = (v, what, o = {}) => {
+const field = (v, what, o: Record<string, any> = {}) => {
   v = parseQuantity(v);
   if (isComp(v)) throw new CandelaError('E121', `${what} takes a field (number, colour, param or pattern), not a ${compOf(v).kind}`);
   const n = lift(v, o.type);
@@ -173,35 +177,35 @@ const field = (v, what, o = {}) => {
   if (o.range && n.op === 'const' && typeof n.x === 'number' && (n.x < o.range[0] || n.x > o.range[1])) throw new CandelaError('E121', `${what} ∈ [${o.range[0]}, ${o.range[1]}]${o.note ? ' (' + o.note + ')' : ''}. Got ${n.x}.`);
   return n;
 };
-const mkB = (kind, props) => wrap(new Comp('bsdf.' + kind, props, { frags: [], loc: callSite(), unchecked: [] }));
+const mkB = (kind, props) => wrap(new Comp('bsdf.' + kind, props, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 const surf = (b, what) => { if (isComp(b, 'bsdf')) return compOf(b); if (isComp(b, 'material')) throw new CandelaError('E121', `${what} takes a BSDF (bsdf.lambert(…), …); a material is not a BSDF — use material.surface() to get one`); throw new CandelaError('E121', `${what} takes a BSDF; got ${typeof b}`); };
 const rough = (v, what) => Array.isArray(v) ? [field(v[0], what + '[0]', { type: 'f', range: [0, 1] }), field(v[1], what + '[1]', { type: 'f', range: [0, 1] })] : field(v == null ? 0 : v, what, { type: 'f', range: [0, 1], note: 'perceptual; α = roughness²' });
 const iorArg = (v, what) => { if (v && !isParam(v) && !isExpr(v) && v.__ior) return v; v = parseQuantity(v); if (typeof v === 'number' && v <= 0) throw new CandelaError('E121', `${what} must be > 0`); return field(v, what, { type: 'f' }); };
 FAMILY.bsdf = {
   normal: (c, n) => c.with('normal', field(n, '.normal', { type: 'v3' })),
   scale: (c, k) => new Comp('bsdf.scale', { a: c, k: field(k, 'scale(k)', { type: 'f', range: [0, 1] }) }, c.meta),
-  thinFilm: (c, o = {}) => c.with('film', { thickness: field(o.thickness != null ? parseQuantity(o.thickness) : u.nm(400), 'thinFilm thickness', { type: 'f' }), ior: field(o.ior || 1.33, 'thinFilm ior', { type: 'f' }) }),
+  thinFilm: (c, o: Record<string, any> = {}) => c.with('film', { thickness: field(o.thickness != null ? parseQuantity(o.thickness) : u.nm(400), 'thinFilm thickness', { type: 'f' }), ior: field(o.ior || 1.33, 'thinFilm ior', { type: 'f' }) }),
   multiscatter: (c, how = 'kulla-conty') => c.with('ms', how !== false && how !== 'none'),
   over: (c, bottom) => compOf(bsdf.layer(wrap(c), bottom)),
 };
 export const bsdf = {
   lambert: (rho = 0.8) => mkB('lambert', { rho: field(rho, 'bsdf.lambert(ρ)', { type: 'v3' }) }),
   diffuse: (rho = 0.8) => bsdf.lambert(rho),
-  dielectric: (o = {}) => {
+  dielectric: (o: Record<string, any> = {}) => {
     if (o.ior != null && o.f0 != null) throw new CandelaError('E121', 'bsdf.dielectric: give ior or f0, not both');
     const ior = o.f0 != null ? null : iorArg(o.ior != null ? o.ior : 1.5, 'dielectric ior');
     return mkB('dielectric', { ior, f0: o.f0 != null ? field(o.f0, 'f0', { type: 'f', range: [0, 1] }) : null, roughness: rough(o.roughness, 'dielectric roughness'), tint: o.tint != null ? field(o.tint, 'tint', { type: 'v3' }) : null, reflectOnly: !!o.reflectOnly, ...tangentOpts(o) });
   },
-  conductor: (o = {}) => {
+  conductor: (o: Record<string, any> = {}) => {
     if (typeof o === 'string') o = { ior: ior.metal(o) };
     const m = o.ior && o.ior.__ior ? o.ior : o.ior ? ior.metal(o.ior) : null;
     return mkB('conductor', { ior: m, f0: o.f0 != null ? field(o.f0, 'f0', { type: 'v3' }) : null, roughness: rough(o.roughness, 'conductor roughness'), ms: o.multiscatter !== false, ...tangentOpts(o) });
   },
-  sheen: (o = {}) => mkB('sheen', { color: field(o.color != null ? o.color : 1, 'sheen color', { type: 'v3' }), roughness: rough(o.roughness != null ? o.roughness : 0.5, 'sheen roughness') }),
-  thinDielectric: (o = {}) => mkB('thin', { ior: iorArg(o.ior || 1.5, 'thinDielectric ior'), tint: o.tint != null ? field(o.tint, 'tint', { type: 'v3' }) : null }),
+  sheen: (o: Record<string, any> = {}) => mkB('sheen', { color: field(o.color != null ? o.color : 1, 'sheen color', { type: 'v3' }), roughness: rough(o.roughness != null ? o.roughness : 0.5, 'sheen roughness') }),
+  thinDielectric: (o: Record<string, any> = {}) => mkB('thin', { ior: iorArg(o.ior || 1.5, 'thinDielectric ior'), tint: o.tint != null ? field(o.tint, 'tint', { type: 'v3' }) : null }),
   mirror: () => bsdf.conductor.schlick({ f0: 1, roughness: 0 }),
   mix: (a, b, t = 0.5) => mkB('mix', { a: surf(a, 'mix(a, …)'), b: surf(b, 'mix(…, b, …)'), t: field(t, 'mix t', { type: 'f', range: [0, 1] }) }),
-  layer: (top, bottom, o = {}) => {
+  layer: (top, bottom, o: Record<string, any> = {}) => {
     const t = surf(top, 'layer(top, …)');
     if (t.kind !== 'bsdf.dielectric' && t.kind !== 'bsdf.sheen') throw new CandelaError('E133', `layer(top, bottom): the top must be a dielectric coat (or sheen); got ${t.kind}`, { hint: 'bsdf.layer(bsdf.dielectric({ ior: 1.5, roughness: 0.05 }), base)' });
     const thick = o.thickness != null ? expectDim(o.thickness, 'length', 'layer thickness') : 30e-6;
@@ -209,11 +213,11 @@ export const bsdf = {
   },
   add: (a, b) => mkB('add', { a: surf(a, 'add(a, …)'), b: surf(b, 'add(…, b)'), loc: callSite() }),
 };
-bsdf.conductor.schlick = (o = {}) => mkB('conductor', { ior: null, f0: field(o.f0 != null ? o.f0 : 0.9, 'f0', { type: 'v3' }), roughness: rough(o.roughness, 'conductor roughness'), ms: o.multiscatter !== false, ...tangentOpts(o) });
+bsdf.conductor.schlick = (o: Record<string, any> = {}) => mkB('conductor', { ior: null, f0: field(o.f0 != null ? o.f0 : 0.9, 'f0', { type: 'v3' }), roughness: rough(o.roughness, 'conductor roughness'), ms: o.multiscatter !== false, ...tangentOpts(o) });
 // anisotropic lobes: roughness [along, across] is measured along `tangent` (an object-space direction field, the
 // grooves of a turned, milled or brushed surface), turned by `rotation` turns about the normal
 function tangentOpts(o) {
-  const r = {};
+  const r: Record<string, any> = {};
   if (o.tangent != null) r.tangent = field(o.tangent, 'tangent', { type: 'v3' });
   if (o.rotation != null) r.rotation = field(o.rotation, 'rotation (turns)', { type: 'f' });
   return r;
@@ -254,11 +258,11 @@ export const ior = {
 ior.glass = (name = 'N-BK7') => { const g = GLASSES[name]; if (!g) throw new CandelaError('E121', `ior.glass('${name}')`, { suggest: didYouMean(name, Object.keys(GLASSES)) }); return ior.sellmeier(g); };
 
 // ---------- media ----------
-const mkM = (kind, props) => wrap(new Comp('medium.' + kind, props, { frags: [], loc: callSite(), unchecked: [] }));
+const mkM = (kind, props) => wrap(new Comp('medium.' + kind, props, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 export const phase = { hg: (g = 0) => { if (!(g > -1 && g < 1)) throw new CandelaError('E121', `phase.hg(g): g ∈ (−1, 1); got ${g}`); return { __phase: 'hg', g }; }, isotropic: () => ({ __phase: 'hg', g: 0 }) };
 function mediumProps(o, what) {
   const albedo = o.albedo != null ? field(o.albedo, what + ' albedo', { type: 'v3' }) : constNode([0.9, 0.9, 0.9]);
-  let sigmaT;
+  let sigmaT: any;
   if (o.meanFreePath != null) { const mfp = Array.isArray(o.meanFreePath) ? o.meanFreePath.map(x => expectDim(x, 'length', 'meanFreePath')) : expectDim(o.meanFreePath, 'length', 'meanFreePath'); sigmaT = Array.isArray(mfp) ? mfp.map(x => 1 / x) : [1 / mfp, 1 / mfp, 1 / mfp]; }
   else if (o.sigmaT != null) sigmaT = Array.isArray(o.sigmaT) ? o.sigmaT : [o.sigmaT, o.sigmaT, o.sigmaT];
   else sigmaT = [1, 1, 1];
@@ -267,17 +271,17 @@ function mediumProps(o, what) {
   return { albedo, sigmaT, g: ph.g, extent };
 }
 export const medium = {
-  homogeneous: (o = {}) => mkM('homogeneous', mediumProps(o, 'medium')),
+  homogeneous: (o: Record<string, any> = {}) => mkM('homogeneous', mediumProps(o, 'medium')),
   // colored glass: what fraction of each channel survives `distance`
-  absorbing: (o = {}) => { const tint = parseColor(o.tint) || (Array.isArray(o.tint) ? o.tint : [0.8, 0.9, 0.85]); const d = o.distance != null ? expectDim(o.distance, 'length', 'distance') : 0.05; return mkM('homogeneous', { albedo: constNode([0, 0, 0]), sigmaT: tint.map(t => -Math.log(Math.max(1e-4, Math.min(1, t))) / d), g: 0, absorbing: true }); },
-  heterogeneous: (o = {}) => {
+  absorbing: (o: Record<string, any> = {}) => { const tint = parseColor(o.tint) || (Array.isArray(o.tint) ? o.tint : [0.8, 0.9, 0.85]); const d = o.distance != null ? expectDim(o.distance, 'length', 'distance') : 0.05; return mkM('homogeneous', { albedo: constNode([0, 0, 0]), sigmaT: tint.map(t => -Math.log(Math.max(1e-4, Math.min(1, t))) / d), g: 0, absorbing: true }); },
+  heterogeneous: (o: Record<string, any> = {}) => {
     if (o.density == null) throw new CandelaError('E121', 'medium.heterogeneous({ density: fx.field(p => …), bounds: shape.box(…) })');
     const dn = typeof o.density === 'function' ? traceLambda(o.density, pointContext('a density field')) : lift(o.density);
     if (dn.type !== 'f') throw new CandelaError('E122', 'density is a Float field (σt in m⁻¹)');
     const b = o.bounds ? compOf(o.bounds) : compOf(shape.box(2));
     return mkM('heterogeneous', Object.assign(mediumProps(o, 'medium'), { density: dn, bounds: b, majorant: o.majorant == null ? 'auto' : o.majorant, emission: o.emission || null }));
   },
-  fog: (o = {}) => medium.homogeneous(Object.assign({ albedo: 0.95, meanFreePath: u.m(40), phase: phase.hg(0.6) }, o)),
+  fog: (o: Record<string, any> = {}) => medium.homogeneous(Object.assign({ albedo: 0.95, meanFreePath: u.m(40), phase: phase.hg(0.6) }, o)),
   water: () => medium.absorbing({ tint: [0.45, 0.85, 0.9], distance: u.m(1) }),
 };
 spec('medium.homogeneous', null); spec('medium.heterogeneous', null);
@@ -302,28 +306,28 @@ spec('material.plain', 'material', {}, MAT_GET);
 
 export function material(b) {
   if (!isComp(b, 'bsdf')) throw new CandelaError('E121', `material(bsdf) takes a BSDF — bsdf.lambert(0.5), bsdf.layer(…) — or use material.pbr()`);
-  return wrap(new Comp('material.plain', { surface: compOf(b) }, { frags: [], loc: callSite(), unchecked: [] }));
+  return wrap(new Comp('material.plain', { surface: compOf(b) }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 }
 // a material kind defined by params and a body over them: its params become fluent methods, sliders and attributes
 const DEFINED = new Map();
 material.define = (name, specp, body) => {
   if (typeof body !== 'function') throw new CandelaError('E121', 'material.define(name, { attr: param.float(…) }, m => surface)');
-  const attrs = {};
+  const attrs: Record<string, any> = {};
   for (const [k, d] of Object.entries(specp)) { const def = d && d.__def; if (!def) throw new CandelaError('E121', `material.define: attribute '${k}' needs a param definition`); attrs[k] = { kind: def.kind, def: def.def, range: def.cfg.range, type: def.kind === 'color' ? 'v3' : 'f' }; }
   const kind = 'material.' + name;
-  const methods = {};
+  const methods: Record<string, any> = {};
   for (const [k, a] of Object.entries(attrs)) methods[k] = (c, v) => c.with(k, field(v, `${name}.${k}`, { type: a.type, range: a.range && a.kind !== 'color' ? a.range : null }));
   spec(kind, 'material', methods, MAT_GET);
   DEFINED.set(kind, { name, attrs, body });
-  const make = (init = {}) => { let c = new Comp(kind, {}, { frags: [], loc: callSite(), unchecked: [] }); for (const [k, v] of Object.entries(init)) { if (!methods[k]) throw new CandelaError('E104', `${name}: no attribute '${k}'`, { suggest: didYouMean(k, Object.keys(methods)) }); c = methods[k](c, v); } return wrap(c); };
+  const make = (init: Record<string, any> = {}) => { let c = new Comp(kind, {}, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }); for (const [k, v] of Object.entries(init)) { if (!methods[k]) throw new CandelaError('E104', `${name}: no attribute '${k}'`, { suggest: didYouMean(k, Object.keys(methods)) }); c = methods[k](c, v); } return wrap(c); };
   make.attrs = attrs; make.kind = kind;
   return make;
 };
 export const definedMaterial = kind => DEFINED.get(kind);
 
 // ---------- lights ----------
-const mkL = (kind, props) => wrap(new Comp('light.' + kind, props, { frags: [], loc: callSite(), unchecked: [] }));
-const photo = (v, dim, what, hints) => { v = parseQuantity(v); if (isParam(v)) return v; return expectDim(v, dim, what, { hints }); };
+const mkL = (kind, props) => wrap(new Comp('light.' + kind, props, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
+const photo = (v, dim, what, hints?) => { v = parseQuantity(v); if (isParam(v)) return v; return expectDim(v, dim, what, { hints }); };
 const colorArg = v => { if (isParam(v)) return v; const c = parseColor(v) || (Array.isArray(v) ? v : typeof v === 'number' ? [v, v, v] : null); if (!c) throw new CandelaError('E121', `.color(…) takes '#rrggbb' or [r, g, b]`); return c; };
 FAMILY.light = Object.assign({}, FAMILY.placed, {
   temperature: (c, k) => c.with('temperature', isParam(k) ? k : expectDim(parseQuantity(k), 'temperature', '.temperature')).with('color', null),
@@ -365,21 +369,21 @@ export const light = {
   spot: () => mkL('spot', { at: [0, 3, 0], power: 1200, temperature: 3000, cone: Math.PI / 6, soft: 0.07, target: [0, 0, 0] }),
   area: () => mkL('area', { power: 3000, temperature: 4000 }),
   sun: () => mkL('sun', { elevation: Math.PI / 4, azimuth: Math.PI * 0.75, illuminance: null, diam: 0.53 * Math.PI / 180 }),
-  sky: { physical: (o = {}) => mkL('sky', { turbidity: o.turbidity || 3, fromSun: o.sunElevation == null, elevation: o.sunElevation != null ? ang(o.sunElevation, 'sunElevation') : null, azimuth: o.sunAzimuth != null ? ang(o.sunAzimuth, 'sunAzimuth') : null, scale: 1 }) },
+  sky: { physical: (o: Record<string, any> = {}) => mkL('sky', { turbidity: o.turbidity || 3, fromSun: o.sunElevation == null, elevation: o.sunElevation != null ? ang(o.sunElevation, 'sunElevation') : null, azimuth: o.sunAzimuth != null ? ang(o.sunAzimuth, 'sunAzimuth') : null, scale: 1 }) },
   env: {
     uniform: (L = 1) => mkL('env', { env: 'uniform', luminance: photo(L, 'luminance', 'env.uniform') }),
-    studio: (o = {}) => mkL('env', { env: 'studio', luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'studio intensity') : 800, rotation: o.rotate != null ? ang(o.rotate, 'rotate') : 0 }),
-    gradient: (o = {}) => mkL('env', { env: 'gradient', top: parseColor(o.top || '#9ab8e0'), bottom: parseColor(o.bottom || '#2a2622'), luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'intensity') : 1000 }),
+    studio: (o: Record<string, any> = {}) => mkL('env', { env: 'studio', luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'studio intensity') : 800, rotation: o.rotate != null ? ang(o.rotate, 'rotate') : 0 }),
+    gradient: (o: Record<string, any> = {}) => mkL('env', { env: 'gradient', top: parseColor(o.top || '#9ab8e0'), bottom: parseColor(o.bottom || '#2a2622'), luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'intensity') : 1000 }),
     // an equirectangular HDRI: an asset name (a dropped .hdr), hdri.studio(), hdri.outdoor() or hdri.parse(buffer).
     // Its texels are radiance; `intensity` multiplies them, or `luminance` scales the image to that average.
-    hdri: (src, o = {}) => {
+    hdri: (src, o: Record<string, any> = {}) => {
       const img = resolveImage(src);
       return mkL('env', { env: 'hdri', image: img, imageName: typeof src === 'string' ? src : img.name || 'image', luminance: o.intensity != null ? (isParam(o.intensity) ? o.intensity : +o.intensity) : 1, average: o.luminance != null ? photo(o.luminance, 'luminance', 'env.hdri luminance') : null, rotation: o.rotate != null ? ang(o.rotate, 'rotate') : 0 });
     },
-    night: (o = {}) => mkL('env', { env: 'night', luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'intensity') : 0.05 }),
+    night: (o: Record<string, any> = {}) => mkL('env', { env: 'night', luminance: o.intensity != null ? photo(o.intensity, 'luminance', 'intensity') : 0.05 }),
   },
   // sun + physical sky, as one call
-  daylight: (o = {}) => scene.group([
+  daylight: (o: Record<string, any> = {}) => scene.group([
     light.sun().elevation(o.elevation != null ? o.elevation : u.deg(40)).azimuth(o.azimuth != null ? o.azimuth : u.deg(140)),
     light.sky.physical({ turbidity: o.turbidity || 3 }),
   ]),
@@ -399,7 +403,7 @@ const CAM = {
   blades: (c, n) => c.with('blades', n), bladeRotation: (c, a) => c.with('bladeRot', ang(a, 'bladeRotation')),
   // motion blur: the scene is sampled at `steps` instants across `shutter` seconds of scene time (or a shutter
   // angle at a frame rate); each path sees the scene at its own instant. Independent of the exposure's shutter.
-  motionBlur: (c, o = {}) => {
+  motionBlur: (c, o: Record<string, any> = {}) => {
     if (o === false) return c.with('motion', null);
     let iv = o.shutter != null ? +parseQuantity(o.shutter) : null;
     if (iv == null && o.angle != null) iv = (ang(o.angle, 'motionBlur angle') / (Math.PI * 2)) / (o.fps || 24);
@@ -417,8 +421,8 @@ const camGet = {
 };
 spec('camera.thinLens', null, CAM, camGet); spec('camera.pinhole', null, CAM, camGet);
 export const camera = {
-  thinLens: () => wrap(new Comp('camera.thinLens', { at: [0, 1.2, 5], target: [0, 0.5, 0], focal: 0.05, fstop: 8, shutter: 1 / 125, iso: 100, exposure: 'auto', sensor: 0.036, focus: null, focusOn: null, blades: 0, bladeRot: 0 }, { frags: [], loc: callSite(), unchecked: [] })),
-  pinhole: () => wrap(new Comp('camera.pinhole', { at: [0, 1.2, 5], target: [0, 0.5, 0], focal: 0.05, fstop: 8, shutter: 1 / 125, iso: 100, exposure: 'auto', sensor: 0.036, pinhole: true, blades: 0, bladeRot: 0 }, { frags: [], loc: callSite(), unchecked: [] })),
+  thinLens: () => wrap(new Comp('camera.thinLens', { at: [0, 1.2, 5], target: [0, 0.5, 0], focal: 0.05, fstop: 8, shutter: 1 / 125, iso: 100, exposure: 'auto', sensor: 0.036, focus: null, focusOn: null, blades: 0, bladeRot: 0 }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) })),
+  pinhole: () => wrap(new Comp('camera.pinhole', { at: [0, 1.2, 5], target: [0, 0.5, 0], focal: 0.05, fstop: 8, shutter: 1 / 125, iso: 100, exposure: 'auto', sensor: 0.036, pinhole: true, blades: 0, bladeRot: 0 }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) })),
 };
 
 // ---------- scene, groups, scatter ----------
@@ -428,8 +432,8 @@ FAMILY.group = Object.assign({}, FAMILY.placed, {
   material: (c, m) => c.with('material', compOf(m)),
 });
 spec('group', 'group');
-export function scene(opts = {}) {
-  return wrap(new Comp('scene', { nodes: [], lights: [], camera: null, medium: null, params: [], units: opts.units || 'photometric', name: opts.name || null }, { frags: [], loc: callSite(), unchecked: [] }));
+export function scene(opts: Record<string, any> = {}) {
+  return wrap(new Comp('scene', { nodes: ([] as any[]), lights: ([] as any[]), camera: null, medium: null, params: ([] as any[]), units: opts.units || 'photometric', name: opts.name || null }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 }
 spec('scene', null, {
   add: (c, ...n) => { const nodes = n.flat().filter(x => x != null).map(x => nodeArg(x, 'scene.add')); return c.with('nodes', c.props.nodes.concat(nodes)); },
@@ -439,15 +443,15 @@ spec('scene', null, {
   medium: (c, ...ms) => { let r = c; for (const m of ms.flat()) { if (!isComp(m, 'medium')) throw new CandelaError('E121', 'scene.medium(medium.homogeneous({…}))'); const mc = compOf(m); r = r.with('media', (r.props.media || []).concat([mc])); if (mc.kind !== 'medium.heterogeneous') r = r.with('medium', mc); } return r; },
   params: (c, P) => c.with('params', c.props.params.concat([P])),
   edit: (c, sel, fn) => editScene(c, sel, fn),
-  ground: (c, o = {}) => c.with('nodes', c.props.nodes.concat([compOf(shape.plane().material(material.pbr().baseColor(o.color != null ? o.color : 0.18).roughness(o.roughness != null ? o.roughness : 0.8)).id('ground'))])),
+  ground: (c, o: Record<string, any> = {}) => c.with('nodes', c.props.nodes.concat([compOf(shape.plane().material(material.pbr().baseColor(o.color != null ? o.color : 0.18).roughness(o.roughness != null ? o.roughness : 0.8)).id('ground'))])),
 }, {
   cameraNode: c => c.props.camera ? wrap(c.props.camera) : null,
   nodes: c => c.props.nodes.map(wrap),
 });
 scene.group = (fnOrNodes) => {
-  let g = new Comp('group', { nodes: [], at: [0, 0, 0] }, { frags: [], loc: callSite(), unchecked: [] });
+  let g = new Comp('group', { nodes: ([] as any[]), at: [0, 0, 0] }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) });
   if (typeof fnOrNodes === 'function') {
-    const coll = []; let seed = 1; const rng = makeRng(seed);
+    const coll: any[] = []; let seed = 1; const rng = makeRng(seed);
     const gb = { add: (...n) => { coll.push(...n.flat().map(x => nodeArg(x, 'g.add'))); return gb; } };
     withBuildLambda(() => fnOrNodes(gb, { rng }));
     g = g.with('nodes', coll);
@@ -455,11 +459,11 @@ scene.group = (fnOrNodes) => {
   return wrap(g);
 };
 // scatter: place instances on a surface; density is a traced pattern evaluated now, on the CPU
-scene.scatter = (o = {}) => {
+scene.scatter = (o: Record<string, any> = {}) => {
   const { count = 100, seed = 1, place, area = [10, 10], center = [0, 0, 0] } = o;
   if (typeof place !== 'function') throw new CandelaError('E121', 'scene.scatter({ count, place: (i, { rng, P }) => node })');
   const rng = makeRng(seed); const dens = o.density ? (typeof o.density === 'function' && !isExpr(o.density) ? traceLambda(o.density) : lift(o.density)) : null;
-  const coll = [];
+  const coll: any[] = [];
   withBuildLambda(() => {
     let tries = 0;
     while (coll.length < count && tries < count * 30) {
@@ -470,9 +474,9 @@ scene.scatter = (o = {}) => {
       if (n) coll.push(nodeArg(n, 'scatter place()'));
     }
   });
-  return wrap(new Comp('group', { nodes: coll, at: [0, 0, 0] }, { frags: [], loc: callSite(), unchecked: [] }));
+  return wrap(new Comp('group', { nodes: coll, at: [0, 0, 0] }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
 };
-let evalField = null; export const setEvalField = f => { evalField = f; };
+let evalField: any = null; export const setEvalField = f => { evalField = f; };
 export function makeRng(seed = 1) {
   let s = (seed >>> 0) || 1;
   const r = () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return (s >>> 0) / 4294967296; };
@@ -507,15 +511,15 @@ export function matches(c, sel) {
   if (sel.startsWith('.')) return (c.props.tags || []).includes(sel.slice(1));
   return c.kind === sel || c.kind.startsWith(sel + '.') || c.kind.split('.').pop() === sel;
 }
-export function allIds(sc) { const out = []; const v = c => { if (c.props.id) out.push(c.props.id); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (sc.props.camera && sc.props.camera.props.id) out.push(sc.props.camera.props.id); return out; }
+export function allIds(sc) { const out: any[] = []; const v = c => { if (c.props.id) out.push(c.props.id); (c.props.nodes || []).forEach(v); (c.props.children || []).forEach(v); }; sc.props.nodes.forEach(v); if (sc.props.camera && sc.props.camera.props.id) out.push(sc.props.camera.props.id); return out; }
 
 // ---------- fragments ----------
-export function fragment(name, o = {}) {
+export function fragment(name, o: Record<string, any> = {}) {
   if (typeof name !== 'string') throw new CandelaError('E121', "fragment('name')");
-  const F = { __fragment: true, name, kinds: [], req: [], ps: {}, ms: {}, ar: {}, lowers: [], vals: [], override: !!o.override, renames: {} };
+  const F = { __fragment: true, name, kinds: ([] as any[]), req: ([] as any[]), ps: ({} as Record<string, any>), ms: ({} as Record<string, any>), ar: ({} as Record<string, any>), lowers: ([] as any[]), vals: ([] as any[]), override: !!o.override, renames: ({} as Record<string, any>) };
   F.targetsKind = k => F.kinds.length === 0 || F.kinds.some(t => k === t || k.startsWith(t + '.') || (t === 'material' && k.startsWith('material')));
   F.methodTable = () => {
-    const t = {};
+    const t: Record<string, any> = {};
     for (const [k, d] of Object.entries(F.ps)) { const nm = F.renames[k] || k; t[nm] = (c, v) => c.with('frag:' + name + ':' + k, isParam(v) ? v : field(v, `${name}.${k}`, { type: d.type })); }
     for (const [k, f] of Object.entries(F.ms)) { const nm = F.renames[k] || k; t[nm] = (c, ...a) => compOrValue(f(wrap(c), ...a)); }
     return t;
@@ -540,22 +544,22 @@ export const fragInternals = f => f._F;
 
 // ---------- engines, integrators, passes ----------
 export const integrator = {
-  path: (o = {}) => ({ __integrator: 'path', maxDepth: o.maxDepth || 8, nee: o.nee !== false, mis: o.mis || 'power', rrAfter: (o.rr && o.rr.after) || 3, clamp: o.clamp || 0 }),
+  path: (o: Record<string, any> = {}) => ({ __integrator: 'path', maxDepth: o.maxDepth || 8, nee: o.nee !== false, mis: o.mis || 'power', rrAfter: (o.rr && o.rr.after) || 3, clamp: o.clamp || 0 }),
   direct: () => ({ __integrator: 'path', maxDepth: 1, nee: true, mis: 'power', rrAfter: 99 }),
   albedo: () => ({ __integrator: 'albedo' }), normals: () => ({ __integrator: 'normals' }), depth: () => ({ __integrator: 'depth' }),
-  ao: (o = {}) => ({ __integrator: 'ao', radius: o.radius != null ? expectDim(parseQuantity(o.radius), 'length', 'ao radius') : 0.5 }),
+  ao: (o: Record<string, any> = {}) => ({ __integrator: 'ao', radius: o.radius != null ? expectDim(parseQuantity(o.radius), 'length', 'ao radius') : 0.5 }),
   // returns the integrator itself, also callable (toon or toon()) to match pass.define's factories
-  define: (name, o = {}) => { if (typeof o.kernel !== 'function') throw new CandelaError('E121', 'integrator.define(name, { kernel: ({ ray, scene, sampler }) => colour })'); const base = { __integrator: 'custom', name, kernel: o.kernel, params: o.params || {} }; const f = (opts = {}) => Object.assign({}, base, { opts }); for (const [k, v] of Object.entries(base)) Object.defineProperty(f, k, { value: v, enumerable: true, configurable: true }); return f; },
+  define: (name, o: Record<string, any> = {}) => { if (typeof o.kernel !== 'function') throw new CandelaError('E121', 'integrator.define(name, { kernel: ({ ray, scene, sampler }) => colour })'); const base = { __integrator: 'custom', name, kernel: o.kernel, params: o.params || {} }; const f = (opts: Record<string, any> = {}) => Object.assign({}, base, { opts }); for (const [k, v] of Object.entries(base)) Object.defineProperty(f, k, { value: v, enumerable: true, configurable: true }); return f; },
 };
 const TONEMAPS = ['agx', 'aces', 'neutral', 'reinhard', 'filmic', 'linear'];
 export const pass = {
   tonemap: (op = 'agx') => { if (!TONEMAPS.includes(op)) throw new CandelaError('E121', `tonemap('${op}')`, { suggest: didYouMean(op, TONEMAPS), hint: TONEMAPS.join(', ') }); return { __pass: 'tonemap', op }; },
-  denoise: (o = {}) => ({ __pass: 'denoise', strength: o.strength || 1, iterations: o.iterations || 4 }),
-  bloom: (o = {}) => ({ __pass: 'bloom', strength: o.strength != null ? o.strength : 0.04, threshold: o.threshold || 'physical' }),
+  denoise: (o: Record<string, any> = {}) => ({ __pass: 'denoise', strength: o.strength || 1, iterations: o.iterations || 4 }),
+  bloom: (o: Record<string, any> = {}) => ({ __pass: 'bloom', strength: o.strength != null ? o.strength : 0.04, threshold: o.threshold || 'physical' }),
   falseColor: () => ({ __pass: 'falseColor' }),
-  vignette: (o = {}) => ({ __pass: 'vignette', strength: o.strength != null ? o.strength : 1 }),
-  grain: (o = {}) => ({ __pass: 'grain', amount: o.amount != null ? o.amount : 0.03 }),
-  define: (name, o = {}) => { if (typeof o.kernel !== 'function') throw new CandelaError('E121', 'pass.define(name, { kernel: ({ color, uv }) => colour })'); const f = (opts = {}) => ({ __pass: 'custom', name, kernel: o.kernel, params: o.params || {}, stage: o.stage || 'hdr', opts }); f.__passFactory = true; return f; },
+  vignette: (o: Record<string, any> = {}) => ({ __pass: 'vignette', strength: o.strength != null ? o.strength : 1 }),
+  grain: (o: Record<string, any> = {}) => ({ __pass: 'grain', amount: o.amount != null ? o.amount : 0.03 }),
+  define: (name, o: Record<string, any> = {}) => { if (typeof o.kernel !== 'function') throw new CandelaError('E121', 'pass.define(name, { kernel: ({ color, uv }) => colour })'); const f = (opts: Record<string, any> = {}) => ({ __pass: 'custom', name, kernel: o.kernel, params: o.params || {}, stage: o.stage || 'hdr', opts }); f.__passFactory = true; return f; },
   encode: (cs = 'srgb') => ({ __pass: 'encode', cs }),
 };
 export const post = pass;
@@ -563,11 +567,11 @@ function engineBuilder(cfg) {
   const B = {
     __engine: true, cfg,
     integrator: i => { if (!i || !i.__integrator) throw new CandelaError('E121', '.integrator(integrator.path({…}))'); return engineBuilder(Object.assign({}, cfg, { integrator: i })); },
-    spectral: (o = {}) => engineBuilder(Object.assign({}, cfg, { spectral: o === false ? false : { mode: o.mode || 'hero' } })),
+    spectral: (o: Record<string, any> = {}) => engineBuilder(Object.assign({}, cfg, { spectral: o === false ? false : { mode: o.mode || 'hero' } })),
     post: (...p) => { for (const x of p) if (!x || !x.__pass) throw new CandelaError('E121', '.post(pass.tonemap(\'agx\'), …) takes passes'); return engineBuilder(Object.assign({}, cfg, { post: p })); },
     backend: b => { if (!['auto', 'webgpu', 'webgl2'].includes(b)) throw new CandelaError('E121', ".backend('auto' | 'webgpu' | 'webgl2')"); return engineBuilder(Object.assign({}, cfg, { backend: b })); },
     spp: n => engineBuilder(Object.assign({}, cfg, { spp: n })), sppPerFrame: n => engineBuilder(Object.assign({}, cfg, { sppPerFrame: n })),
-    scale: s => engineBuilder(Object.assign({}, cfg, { scale: s })), film: (o = {}) => engineBuilder(Object.assign({}, cfg, { scale: o.scale || cfg.scale })),
+    scale: s => engineBuilder(Object.assign({}, cfg, { scale: s })), film: (o: Record<string, any> = {}) => engineBuilder(Object.assign({}, cfg, { scale: o.scale || cfg.scale })),
     maxDepth: d => engineBuilder(Object.assign({}, cfg, { integrator: Object.assign({}, cfg.integrator, { maxDepth: d }) })),
     denoise: (on = true) => engineBuilder(Object.assign({}, cfg, { denoise: on, post: on ? ((cfg.post || []).some(p => p.__pass === 'denoise') ? cfg.post : [pass.denoise()].concat(cfg.post || [])) : (cfg.post || []).filter(p => p.__pass !== 'denoise') })),
     with: f => engineBuilder(Object.assign({}, cfg, { frags: (cfg.frags || []).concat([f]) })),
@@ -586,7 +590,7 @@ export const isEngine = x => !!(x && x.__engine);
 // the surface of a plain or defined material, as a builder (for tests and composition)
 function lowerSurfaceOnly(c) { if (c.kind === 'material.plain') return c.props.surface; const d = DEFINED.get(c.kind); if (!d) return null; return compOf(d.body(attrsOf(c, d))); }
 export function attrsOf(c, d) {
-  const m = {};
+  const m: Record<string, any> = {};
   for (const [k, a] of Object.entries(d.attrs)) { const v = c.props[k]; m[k] = E(v != null ? v : (a.kind === 'color' ? constNode(a.def) : typeof a.def === 'boolean' ? constNode(a.def ? 1 : 0) : constNode(a.def))); }
   return m;
 }

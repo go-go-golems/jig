@@ -9,10 +9,40 @@ import { CandelaError } from './diag';
 const WB = (() => { const s = [0, 0, 0]; for (let l = 380; l < 780; l += 1) { const c = xyzToLinearSRGB(cmf(l + 0.5)); for (let i = 0; i < 3; i++) s[i] += c[i]; } return s.map(v => 106.857 / v); })();
 
 export class Viewport {
+  canvas: any;
+  backend: any;
+  spp: number;
+  frameN: number;
+  ev: number;
+  evComp: number;
+  target: number;
+  lastMs: number;
+  compiled: any;
+  listeners: Set<any>;
+  status: string;
+  metering: boolean;
+  view: any;
+  scale: number;
+  dynScale: number;
+  paused: boolean;
+  notes: any;
+  engine: any;
+  post: any;
+  userPasses: any;
+  compileMs: number;
+  time: number;
+  packed: any;
+  poseError: any;
+  externalPoses: any;
+  seed: number;
+  metered: number;
+  cam: any;
+  lastMeter: any;
+  exclusive: boolean;
   constructor(canvas) { this.canvas = canvas; this.backend = null; this.spp = 0; this.frameN = 0; this.ev = 12; this.evComp = 0; this.target = 0; this.lastMs = 0; this.compiled = null; this.listeners = new Set(); this.status = 'idle'; this.metering = false; this.view = null; this.scale = 1; this.dynScale = 1; this.paused = false; }
   async init(prefer = 'auto') {
     if (this.backend) return this.backend;
-    let b = null; this.notes = [];
+    let b: any = null; this.notes = [];
     if (prefer !== 'webgl2') { try { b = await GPURenderer.create(this.canvas); } catch (e) { this.notes.push('WebGPU: ' + e.message); b = null; } if (!b && prefer === 'webgpu') this.notes.push('WebGPU is not available in this browser; using WebGL2'); }
     if (!b) {
       // a canvas that was given to WebGPU cannot become WebGL2: swap in a fresh one
@@ -27,14 +57,14 @@ export class Viewport {
   emit() { for (const f of this.listeners) try { f(this); } catch (e) { console.error(e); } }
 
   // ---- scene ----
-  async load(compiled, opts = {}) {
+  async load(compiled, opts: Record<string, any> = {}) {
     const t0 = performance.now();
     this.compiled = compiled; this.engine = compiled.engine;
     const eng = compiled.engine;
     // post passes: tone map, denoise, bloom, false colour, vignette, grain, and user passes compiled from their kernels
     const post = eng.post || [];
     this.post = { tonemap: 'agx', denoise: !!eng.denoise, bloom: 0, falseColor: false, vignette: 0, grain: 0 };
-    const user = [];
+    const user: any[] = [];
     for (const p of post) {
       if (p.__pass === 'tonemap') this.post.tonemap = p.op;
       else if (p.__pass === 'denoise') this.post.denoise = true;
@@ -70,7 +100,7 @@ export class Viewport {
   // (setPoses: a map, or a function of time), which win
   posesFor(t) {
     const a = this.compiled && this.compiled.animation, x = this.externalPoses;
-    let P = null;
+    let P: any = null;
     if (a) { try { P = a(t); this.poseError = null; } catch (e) { this.poseError = e.message; } }
     if (x) { const X = typeof x === 'function' ? x(t) : x; const obj = m => (m instanceof Map ? Object.fromEntries(m) : m || {}); P = Object.assign({}, obj(P), obj(X)); }
     return P;
@@ -82,11 +112,11 @@ export class Viewport {
   setView(v) { this.view = v; this.reset(); }
 
   // ---- per frame ----
-  frame(o = {}) {
+  frame(o: Record<string, any> = {}) {
     const b = this.backend; if (!b || !this.compiled || b.lost) return false;
     if (this.exclusive && !o.exclusive) return false;
     if (!o.force && b.busy && b.busy()) return false;
-    let w, h;
+    let w: any, h: any;
     if (this.fixedSize) [w, h] = this.fixedSize;
     else {
       const rect = this.canvas.parentElement ? this.canvas.parentElement.getBoundingClientRect() : { width: 640, height: 400 };
@@ -123,12 +153,12 @@ export class Viewport {
     return true;
   }
   exposureEV() {
-    const cam = this.cam || {};
+    const cam = this.cam || ({} as Record<string, any>);
     const ev = cam.ev != null && cam.mode !== 'auto' ? cam.ev : this.ev;
     return ev - (this.evComp || 0);
   }
   show() {
-    const b = this.backend, w = b.w, h = b.h, cam = this.cam || {};
+    const b = this.backend, w = b.w, h = b.h, cam = this.cam || ({} as Record<string, any>);
     const ev = this.exposureEV();
     const D = new Float32Array(32 * 4);
     D.set([w, h, Math.max(1, this.spp), 1 / (1.2 * Math.pow(2, ev))], 0);
@@ -145,7 +175,7 @@ export class Viewport {
     try {
       const f = await this.backend.readAccum(); const w = this.backend.w, h = this.backend.h;
       // average luminance over blocks first (a log of noisy samples is biased low), then a centre-weighted log-average
-      const BX = 48, BY = 32, bw = w / BX, bh = h / BY; let s = 0, n = 0; const means = [];
+      const BX = 48, BY = 32, bw = w / BX, bh = h / BY; let s = 0, n = 0; const means: any[] = [];
       for (let by = 0; by < BY; by++) for (let bx = 0; bx < BX; bx++) {
         let sum = 0, cnt = 0;
         const x0 = Math.floor(bx * bw), x1 = Math.max(x0 + 1, Math.floor((bx + 1) * bw)), y0 = Math.floor(by * bh), y1 = Math.max(y0 + 1, Math.floor((by + 1) * bh));
@@ -224,7 +254,7 @@ function compileUserPass(p, k) {
   // each pass gets four rows of the display uniforms, one per param: a scalar in .x or a colour in .xyz
   const names = Object.keys(p.params || {}).slice(0, 4);
   const isCol = n => { const d = p.params[n]; return !!(d && d.__def && d.__def.kind === 'color'); };
-  const pv = {};
+  const pv: Record<string, any> = {};
   names.forEach((n, i) => { pv[n] = E(node('ctx', isCol(n) ? 'v3' : 'f', [], '__p' + i)); });
   const ctx = { color: E(node('ctx', 'v3', [], 'color')), uv: E(node('ctx', 'v2', [], 'uv')), albedo: E(node('ctx', 'v3', [], 'alb')), normal: E(node('ctx', 'v3', [], 'nrm')), luminance: E(node('dot', 'f', [node('ctx', 'v3', [], 'color'), constNode([0.2126, 0.7152, 0.0722])])) };
   const root = lift(p.kernel(ctx, pv));

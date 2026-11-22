@@ -16,10 +16,10 @@ const isVideo = f => f === 'mp4' || f === 'webm';
 export function RenderView({ host }) {
   useHost(host, 6);
   const [o, setO] = useState(() => Object.assign({}, DEF, store.get('render', {})));
-  const set = (k, v) => { const n = Object.assign({}, o, typeof k === 'object' ? k : { [k]: v }); setO(n); store.set('render', n); };
+  const set = (k, v?) => { const n = Object.assign({}, o, typeof k === 'object' ? k : { [k]: v }); setO(n); store.set('render', n); };
   const vp = host.vp, ok = !!(vp && vp.compiled);
   // which video formats this browser can encode (WebCodecs), checked once
-  const [vs, setVs] = useState(null);
+  const [vs, setVs] = useState<any>(null);
   useEffect(() => { let live = true; videoSupport(1280, 720, 24).then(v => live && setVs(v)).catch(() => live && setVs({ mp4: null, webm: null })); return () => { live = false; }; }, []);
   const fmt = o.kind === 'still' && isVideo(o.format) ? 'png' : o.format, video = isVideo(fmt);
   const ew = video ? o.w - (o.w % 2) : o.w, eh = video ? o.h - (o.h % 2) : o.h;

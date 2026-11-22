@@ -22,11 +22,11 @@ export function ParamControl({ h, host }) {
 
 export function ParamsView({ host }) {
   useHost(host, 8);
-  const [q, setQ] = useState(''), [changed, setChanged] = useState(false), [flash, setFlash] = useState(null);
+  const [q, setQ] = useState(''), [changed, setChanged] = useState(false), [flash, setFlash] = useState<any>(null);
   useFocus(host, 'params', r => { if (r.id) { setFlash(r.id); setTimeout(() => setFlash(null), 1600); } });
   const all = host.params();
   const list = all.filter(h => (!q || (h.id + ' ' + h.label + ' ' + h.about).toLowerCase().includes(q.toLowerCase())) && (!changed || h.isChanged()));
-  const groups = []; for (const h of list) { const g = h.group || (h.isStatic ? 'Static — rebuilds the kernel' : 'Live'); let x = groups.find(y => y.name === g); if (!x) groups.push(x = { name: g, items: [] }); x.items.push(h); }
+  const groups: any[] = []; for (const h of list) { const g = h.group || (h.isStatic ? 'Static — rebuilds the kernel' : 'Live'); let x = groups.find(y => y.name === g); if (!x) groups.push(x = { name: g, items: ([] as any[]) }); x.items.push(h); }
   const nChanged = all.filter(h => h.isChanged()).length;
   return <div className="tabbody col paramsview">
     <div className="toolbar">

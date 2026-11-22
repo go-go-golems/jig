@@ -6,7 +6,7 @@ const RE = /(\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$))|('(?:[^'\\\n]|\\.)*'?|"(?:[^"\\\
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function tokens(src) {
-  const out = []; let m; RE.lastIndex = 0;
+  const out: any[] = []; let m: any; RE.lastIndex = 0;
   while ((m = RE.exec(src))) {
     const t = m[0];
     if (m[1]) out.push(['tk-c', t]);

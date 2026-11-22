@@ -6,12 +6,12 @@ import { VideoWriter } from './video';
 
 // ---------- OpenEXR: scanline, uncompressed, 32-bit float channels ----------
 // channels: [{ name, data: Float32Array(width·height) }] in any order (written sorted, as the format requires)
-export function writeEXR({ width, height, channels, attributes = {} }) {
+export function writeEXR({ width, height, channels, attributes = ({} as Record<string, any>) }) {
   if (!(width > 0 && height > 0)) throw new CandelaError('E121', 'writeEXR: width and height must be positive');
   const ch = channels.slice().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const c of ch) if (!c.data || c.data.length < width * height) throw new CandelaError('E121', `writeEXR: channel '${c.name}' has ${c.data ? c.data.length : 0} values, needs ${width * height}`);
   const enc = new TextEncoder();
-  const parts = []; let size = 0;
+  const parts: any[] = []; let size = 0;
   const push = u8 => { parts.push(u8); size += u8.length; };
   const i32 = v => { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v, true); return b; };
   const f32 = v => { const b = new Uint8Array(4); new DataView(b.buffer).setFloat32(0, v, true); return b; };
@@ -47,13 +47,13 @@ export function readEXR(u8) {
   const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
   if (dv.getUint32(0, true) !== 20000630) throw new CandelaError('E121', 'readEXR: not an OpenEXR file');
   let p = 8; const str = () => { let s = ''; while (u8[p]) s += String.fromCharCode(u8[p++]); p++; return s; };
-  const H = {};
+  const H: Record<string, any> = {};
   for (;;) { const name = str(); if (!name) break; const type = str(), n = dv.getInt32(p, true); p += 4; H[name] = { type, at: p, n }; p += n; }
   if (u8[H.compression.at] !== 0) throw new CandelaError('E121', 'readEXR: only uncompressed files');
-  const chans = []; { let q = H.channels.at; const end = q + H.channels.n - 1; while (q < end) { let s = ''; while (u8[q]) s += String.fromCharCode(u8[q++]); q++; chans.push({ name: s, type: dv.getInt32(q, true) }); q += 16; } }
+  const chans: any[] = []; { let q = H.channels.at; const end = q + H.channels.n - 1; while (q < end) { let s = ''; while (u8[q]) s += String.fromCharCode(u8[q++]); q++; chans.push({ name: s, type: dv.getInt32(q, true) }); q += 16; } }
   const b = H.dataWindow.at, x0 = dv.getInt32(b, true), y0 = dv.getInt32(b + 4, true), w = dv.getInt32(b + 8, true) - x0 + 1, h = dv.getInt32(b + 12, true) - y0 + 1;
-  const attrs = {}; for (const [k, v] of Object.entries(H)) if (v.type === 'string') attrs[k] = new TextDecoder().decode(u8.subarray(v.at, v.at + v.n));
-  const out = {}; for (const c of chans) { if (c.type !== 2) throw new CandelaError('E121', 'readEXR: only 32-bit float channels'); out[c.name] = new Float32Array(w * h); }
+  const attrs: Record<string, any> = {}; for (const [k, v] of Object.entries(H)) if (v.type === 'string') attrs[k] = new TextDecoder().decode(u8.subarray(v.at, v.at + v.n));
+  const out: Record<string, any> = {}; for (const c of chans) { if (c.type !== 2) throw new CandelaError('E121', 'readEXR: only 32-bit float channels'); out[c.name] = new Float32Array(w * h); }
   for (let y = 0; y < h; y++) {
     const off = Number(dv.getBigUint64(p + y * 8, true)), yy = dv.getInt32(off, true) - y0;
     chans.forEach((c, j) => { const s = off + 8 + j * w * 4; for (let x = 0; x < w; x++) out[c.name][yy * w + x] = dv.getFloat32(s + x * 4, true); });
@@ -63,7 +63,7 @@ export function readEXR(u8) {
 
 // the passes as EXR channels. Beauty is scene-linear: 'exposed' (default) multiplies by the camera's exposure,
 // so a mid-grey card reads about 0.18 as in a photograph; 'absolute' keeps nits
-export function passesToEXR(P, ids, o = {}) {
+export function passesToEXR(P, ids, o: Record<string, any> = {}) {
   const n = P.width * P.height, k = o.exposure === 'absolute' ? 1 : P.exposureScale;
   const split = (src, comps, scale = 1) => comps.map((_, j) => { const a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = src[i * comps.length + j] * scale; return a; });
   const [R, G, B] = split(P.beauty, [0, 1, 2], k), [aR, aG, aB] = split(P.albedo, [0, 1, 2]), [nX, nY, nZ] = split(P.normal, [0, 1, 2]);
@@ -84,7 +84,7 @@ export function passesToEXR(P, ids, o = {}) {
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 export function crc32(u8) { let c = 0xffffffff; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
 export function zipStore(files) {
-  const enc = new TextEncoder(), recs = [], d = new Date();
+  const enc = new TextEncoder(), recs: any[] = [], d = new Date();
   const dosT = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), dosD = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
   let size = 0; for (const f of files) size += 30 + enc.encode(f.name).length + f.data.length + 46 + enc.encode(f.name).length;
   if (size + 22 > 0xffffffff) throw new CandelaError('E121', 'zip: more than 4 GB — render the sequence as separate files');
@@ -141,13 +141,13 @@ export async function runRender(o, ctx) {
   if (W * H > 16e6) throw new CandelaError('E121', `render: ${W}×${H} is more than 16 megapixels`);
   const state = { size: vp.fixedSize, seed: vp.seed, lock: vp.lockEV, ev: vp.ev, view: vp.view };
   vp.exclusive = true; vp.fixedSize = [W, H];
-  const out = [];
-  let writer = null;
+  const out: any[] = [];
+  let writer: any = null;
   try {
     const frames = o.kind === 'sequence' ? (o.frames != null ? o.frames : Math.max(1, Math.round(((o.end ?? 1) - (o.start ?? 0)) * (o.fps || 24)) + 1)) : 1;
     const fps = o.fps || 24, t0 = o.kind === 'sequence' ? (o.start ?? 0) : (o.time ?? null);
     if (video) writer = await VideoWriter.create({ container: fmt, width: W, height: H, fps, bitrate: o.bitrate, quality: o.quality, keyframeInterval: o.keyframeInterval });
-    let lockedEV = null;
+    let lockedEV: any = null;
     for (let f = 0; f < frames; f++) {
       if (signal && signal.aborted) throw aborted();
       const t = o.kind === 'sequence' ? t0 + f / fps : t0;
@@ -178,6 +178,11 @@ export async function runRender(o, ctx) {
 
 // one job after another; jobs: { id, kind, opts, status: queued | running | done | failed | cancelled, progress, note, files }
 export class RenderQueue {
+  jobs: any;
+  ctxOf: any;
+  onChange: any;
+  n: number;
+  busy: boolean;
   constructor(ctxOf, onChange) { this.jobs = []; this.ctxOf = ctxOf; this.onChange = onChange || (() => {}); this.n = 0; }
   add(opts) { const j = { id: ++this.n, kind: opts.kind || 'still', opts, status: 'queued', progress: 0, note: '', files: null, added: Date.now() }; this.jobs.push(j); this.onChange(); this.pump(); return j; }
   cancel(id) { const j = this.jobs.find(x => x.id === id); if (!j) return; if (j.status === 'queued') { j.status = 'cancelled'; this.onChange(); } else if (j.status === 'running' && j.ctrl) j.ctrl.abort(); }
@@ -186,9 +191,9 @@ export class RenderQueue {
   async pump() {
     if (this.busy) return; this.busy = true;
     try {
-      for (let j; (j = this.jobs.find(x => x.status === 'queued'));) {
+      for (let j: any; (j = this.jobs.find(x => x.status === 'queued'));) {
         j.status = 'running'; j.ctrl = new AbortController(); j.started = Date.now(); this.onChange();
-        let ctx = null;
+        let ctx: any = null;
         try {
           ctx = Object.assign({}, this.ctxOf(j), { signal: j.ctrl.signal, onProgress: (p, note) => { j.progress = p; j.note = note || ''; this.onChange(); } });
           j.files = await runRender(Object.assign({ kind: j.kind }, j.opts), ctx);

@@ -1478,7 +1478,7 @@ fn atrousW(c0: vec3f, c1: vec3f, n0: vec3f, n1: vec3f, a0: vec3f, a1: vec3f, sc:
 // a GGX albedo table E(μ, α) for multiple-scattering compensation, computed once on the CPU
 export function ggxAlbedoTable(N = 16, S = 512) {
   const lam = (c, a) => { const c2 = c * c, t2 = (1 - c2) / Math.max(c2, 1e-9); return (-1 + Math.sqrt(1 + a * a * t2)) / 2; };
-  const out = [];
+  const out: any[] = [];
   for (let ia = 0; ia < N; ia++) {
     const a = Math.max(0.002, (ia / (N - 1)) ** 2);   // grid includes both ends: roughness 0 … 1
     for (let im = 0; im < N; im++) {

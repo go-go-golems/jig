@@ -57,9 +57,9 @@ export function irText(sceneB, compiled) {
 }
 // a DAG for the Graph view: identity of the underlying Comp objects makes sharing visible
 export function irGraph(sceneB) {
-  const sc = compOf(sceneB); if (!sc) return { nodes: [], edges: [] };
-  const nodes = [], edges = [], ids = new Map();
-  const add = (key, label, kind, sub) => { if (ids.has(key)) return ids.get(key); const id = nodes.length; nodes.push({ id, label, kind, sub }); ids.set(key, id); return id; };
+  const sc = compOf(sceneB); if (!sc) return { nodes: ([] as any[]), edges: ([] as any[]) };
+  const nodes: any[] = [], edges: any[] = [], ids = new Map();
+  const add = (key, label, kind, sub?) => { if (ids.has(key)) return ids.get(key); const id = nodes.length; nodes.push({ id, label, kind, sub }); ids.set(key, id); return id; };
   const root = add(sc, 'scene', 'scene');
   const surf = (c, from) => { if (!c) return; const id = add(c, c.kind.replace('bsdf.', ''), 'bsdf', c.props.ior && c.props.ior.name ? c.props.ior.name : ''); edges.push([from, id]); for (const k of ['a', 'b', 'top', 'bottom']) if (c.props[k]) surf(c.props[k], id); };
   const visit = (c, from) => {
@@ -74,7 +74,7 @@ export function irGraph(sceneB) {
 }
 export function explain(sceneB, compiled, vp) {
   const sc = compOf(sceneB); if (!sc) return '';
-  const lines = [];
+  const lines: any[] = [];
   const s = compiled ? compiled.stats : null;
   lines.push(`scene · ${sc.props.nodes.length} nodes · ${s ? s.params : 0} uniforms · units: SI, photometric`);
   const cam = sc.props.camera;

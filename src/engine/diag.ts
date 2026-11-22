@@ -2,7 +2,13 @@
 // Builder misuse throws at once (E1xx); problems that span nodes are collected while a scene is built and compiled.
 
 export class CandelaError extends Error {
-  constructor(code, message, o = {}) {
+  name: string;
+  code: any;
+  hint: any;
+  suggest: any;
+  loc: any;
+  severity: string;
+  constructor(code, message, o: Record<string, any> = {}) {
     super(message);
     this.name = 'CandelaError'; this.code = code; this.hint = o.hint || null; this.suggest = o.suggest || null;
     this.loc = o.loc || callSite(); this.severity = 'error';
@@ -15,7 +21,7 @@ export const lineOffset = { n: 2 };            // lines `new Function` adds befo
 export const sources = new Map();              // file → source text, to show a line and to sniff an operator
 
 const FRAME = /(?:at\s+(?:.*?\()?|@)(?:[^\s()]*\/)?([\w.\/-]+\.js):(\d+):(\d+)\)?\s*$/;
-export function callSite(stack) {
+export function callSite(stack?) {
   const s = stack || new Error().stack || '';
   for (const line of s.split('\n')) {
     const m = line.match(FRAME); if (!m) continue;
@@ -30,26 +36,26 @@ export const fmtLoc = l => l ? `${l.file}:${l.line}${l.col ? ':' + l.col : ''}` 
 export function lineText(loc) { if (!loc) return ''; const s = sources.get(loc.file); return s ? (s.split('\n')[loc.line - 1] || '') : ''; }
 
 // ---------- the collector ----------
-let sink = null;
+let sink: any = null;
 export function collecting(fn) {
-  const prev = sink, mine = []; sink = mine;
+  const prev = sink, mine: any[] = []; sink = mine;
   const done = r => { sink = prev; return r; };
   try { const r = fn(); if (r && typeof r.then === 'function') return r.then(v => done({ value: v, diags: mine }), e => { sink = prev; e.diags = mine; throw e; }); return done({ value: r, diags: mine }); }
   catch (e) { sink = prev; e.diags = mine; throw e; }
 }
 export async function collectingAsync(fn) {
-  const prev = sink, mine = []; sink = mine;
+  const prev = sink, mine: any[] = []; sink = mine;
   try { const v = await fn(); return { value: v, diags: mine }; } catch (e) { e.diags = mine; throw e; } finally { sink = prev; }
 }
 export function currentSink() { return sink; }
-export function report(severity, code, message, o = {}) {
+export function report(severity, code, message, o: Record<string, any> = {}) {
   const d = { severity, code, message, hint: o.hint || null, loc: o.loc === undefined ? callSite() : o.loc, suggest: o.suggest || null, node: o.node || null };
   if (o.unchecked && o.unchecked.has && (o.unchecked.has(code) || o.unchecked.has('*'))) return null;
   if (sink) { if (!sink.some(x => x.code === d.code && x.message === d.message)) sink.push(d); }
   return d;
 }
 export const warn = (code, message, o) => report('warning', code, message, o);
-export const info = (code, message, o) => report('info', code, message, o);
+export const info = (code, message, o?) => report('info', code, message, o);
 
 // ---------- did you mean ----------
 export function lev(a, b) {
@@ -72,7 +78,7 @@ export const BENIGN = new Set(['then', 'toJSON', 'constructor', '$$typeof', 'asy
 export function formatDiag(d) {
   const head = `${d.severity === 'error' ? '✖' : d.severity === 'warning' ? '⚠' : 'ⓘ'} ${d.code}  ${d.message}`;
   const where = d.loc ? `   ${fmtLoc(d.loc)}` : '';
-  const hint = d.hint ? '\n        ' + [].concat(d.hint).join('\n        ') : '';
+  const hint = d.hint ? '\n        ' + ([] as any[]).concat(d.hint).join('\n        ') : '';
   const sug = d.suggest && d.suggest.length ? `\n        Did you mean ${d.suggest.map(s => `'${s}'`).join(' or ')}?` : '';
   return head + where + sug + hint;
 }

@@ -22,13 +22,13 @@ export const LAYOUTS = [
   { id: 'reading', label: 'Reading the docs', make: () => split('row', [tile(['docs', 'notes', 'reference']), split('col', [tile(['viewport']), tile(['code', 'params', 'agent', 'console', 'scene', 'render', 'ir', 'graph', 'shader', 'lab'])], [0.6, 0.4])], [0.46, 0.54]) },
   { id: 'one', label: 'Everything in one tile', make: () => tile(KNOWN, 'viewport') },
 ];
-const NEAR = { viewport: [], code: ['notes', 'agent'], params: ['scene', 'lab'], notes: ['code', 'docs'], agent: ['code', 'notes'], console: ['ir', 'shader'], scene: ['params'], render: ['params', 'scene'], ir: ['graph', 'console'], graph: ['ir'], shader: ['console', 'ir'], lab: ['params'], docs: ['notes', 'reference'], reference: ['docs', 'notes'] };
+const NEAR = { viewport: ([] as any[]), code: ['notes', 'agent'], params: ['scene', 'lab'], notes: ['code', 'docs'], agent: ['code', 'notes'], console: ['ir', 'shader'], scene: ['params'], render: ['params', 'scene'], ir: ['graph', 'console'], graph: ['ir'], shader: ['console', 'ir'], lab: ['params'], docs: ['notes', 'reference'], reference: ['docs', 'notes'] };
 
 export function App({ host }) {
   useHost(host, 4);
   const [layout, setLayoutRaw] = useState(() => normalize(store.get('layout', null) || LAYOUTS[0].make(), KNOWN));
   const setLayout = l => { setLayoutRaw(l); store.set('layout', l); };
-  const [max, setMax] = useState(null);
+  const [max, setMax] = useState<any>(null);
   const [phone, setPhone] = useState(() => window.innerWidth < 700);
   const [phoneLayout, setPhoneLayout] = useState(() => tile(['viewport', 'params', 'notes', 'code', 'agent', 'console', 'scene', 'render', 'docs', 'ir', 'graph', 'shader', 'lab', 'reference'], 'viewport'));
   useEffect(() => { const h = () => setPhone(window.innerWidth < 700); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h); }, []);
@@ -102,7 +102,7 @@ function Header({ host, setLayout }) {
 }
 
 function PresetMenu({ host }) {
-  const p = host.preset; const [title, setTitle] = useState(''), [q, setQ] = useState(''); const fileRef = useRef(null);
+  const p = host.preset; const [title, setTitle] = useState(''), [q, setQ] = useState(''); const fileRef = useRef<any>(null);
   if (!p) return null;
   const all = host.allPresets().filter(x => !q || (x.id + ' ' + x.title + ' ' + x.about + ' ' + x.group).toLowerCase().includes(q.toLowerCase()));
   const doImport = async e => { const f = e.target.files && e.target.files[0]; if (!f) return; try { host.importProject(JSON.parse(await f.text())); host.toast('Imported ' + f.name); } catch (err) { host.toast('Import failed: ' + err.message, true); } e.target.value = ''; };

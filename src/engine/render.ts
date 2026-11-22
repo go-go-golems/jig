@@ -8,7 +8,7 @@ const TONEMAP_IX = { agx: 0, aces: 1, neutral: 2, reinhard: 3, filmic: 4, linear
 export { TONEMAP_IX };
 
 // the display function: HDR in, display-referred out
-export function displaySource(userPasses = []) {
+export function displaySource(userPasses: any[] = []) {
   const args = p => [0, 1, 2, 3].map(i => `D(${8 + p.slot * 4 + i})`).join(', ');
   const hdr = userPasses.filter(p => p.stage !== 'display').map(p => `  c = ${p.fn}(c, uv, alb, nrm, ${args(p)});`).join('\n');
   const dsp = userPasses.filter(p => p.stage === 'display').map(p => `  t = ${p.fn}(t, uv, alb, nrm, ${args(p)});`).join('\n');
@@ -75,6 +75,19 @@ ${dsp}
 
 // ---------------- WebGPU ----------------
 export class GPURenderer {
+  pipe: any;
+  source: any;
+  post: any;
+  sampler: any;
+  bind: any;
+  bufs: any;
+  w: any;
+  h: any;
+  outTex: any;
+  _sdGrow: boolean;
+  _sdHead: any;
+  sdBytes: any;
+  inflight: any;
   static async create(canvas) {
     if (!navigator.gpu) return null;
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
@@ -89,7 +102,7 @@ export class GPURenderer {
     device.lost.then(i => { r.lost = true; r.lostInfo = i && i.message; });
     return r;
   }
-  prelude(nU) {
+  prelude(nU?) {
     return `@group(0) @binding(0) var<storage, read> uni: array<vec4f>;
 @group(0) @binding(1) var<storage, read> objs: array<vec4f>;
 @group(0) @binding(2) var<storage, read> lits: array<vec4f>;
@@ -243,7 +256,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f, }
     const dev = this.device, B = this.bufs, P = this.post;
     const steps = denoise ? denoise.steps : 0;
     let src = B.accum;
-    const sets = [];
+    const sets: any[] = [];
     for (let k = 0; k < steps; k++) {
       const d = new Float32Array(D); d[1 * 4 + 3] = k === 0 ? 0 : 1; d[16] = 1 << k; d[17] = denoise.sigma / (1 << k);
       const ub = this.buf('dn' + k, d, GPUBufferUsage.STORAGE);
@@ -295,6 +308,20 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f, }
 const VS = `#version 300 es
 in vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
 export class GLRenderer {
+  pipe: any;
+  source: any;
+  post: any;
+  w: any;
+  h: any;
+  acc: any;
+  dn: any;
+  cur: any;
+  U: any;
+  _sdRows: number;
+  _sdHead: any;
+  sdBytes: any;
+  fence: any;
+  _saved: any;
   static create(canvas) {
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true, alpha: false, powerPreference: 'high-performance' });
     if (!gl) return null;
@@ -311,7 +338,7 @@ export class GLRenderer {
     const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(x) || 'compile failed'; const e = new Error(`GLSL (${label}): ` + log.split('\n').slice(0, 4).join(' ')); e.source = s; e.shaderErrors = log.split('\n').filter(Boolean).map(l => { const m = l.match(/0:(\d+):\s*(.*)/); return m ? { line: +m[1], message: m[2] } : { line: 0, message: l }; }); throw e; } return x; };
     const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`GLSL link (${label}): ` + gl.getProgramInfoLog(p));
-    const uniforms = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    const uniforms: Record<string, any> = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
     for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); uniforms[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); }
     return { p, u: uniforms };
   }
@@ -382,7 +409,7 @@ void main() { ivec2 res = ivec2(int(D(0).x), int(D(0).y)); ivec2 q = ivec2(gl_Fr
   target(w, h, n) {
     const gl = this.gl;
     const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-    const texs = [];
+    const texs: any[] = [];
     for (let i = 0; i < n; i++) {
       const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);

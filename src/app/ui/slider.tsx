@@ -8,12 +8,12 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const toT = (v, min, max, log) => log && min > 0 ? Math.log(v / min) / Math.log(max / min) : (v - min) / ((max - min) || 1);
 const fromT = (t, min, max, log) => log && min > 0 ? min * Math.pow(max / min, t) : min + t * (max - min);
 const nice = (v, step) => { if (step) { const k = Math.round(v / step) * step; return +k.toFixed(Math.max(0, -Math.floor(Math.log10(step)) + 1)); } const a = Math.abs(v); return +v.toPrecision(a >= 100 ? 5 : 4); };
-export const fmt = (v, d) => { if (!Number.isFinite(v)) return '—'; const a = Math.abs(v); if (d != null) return v.toFixed(d); return a >= 1000 ? Math.round(v).toLocaleString() : a >= 100 ? v.toFixed(1) : a >= 10 ? v.toFixed(2) : v.toFixed(3); };
+export const fmt = (v, d?) => { if (!Number.isFinite(v)) return '—'; const a = Math.abs(v); if (d != null) return v.toFixed(d); return a >= 1000 ? Math.round(v).toLocaleString() : a >= 100 ? v.toFixed(1) : a >= 10 ? v.toFixed(2) : v.toFixed(3); };
 
 export function Slider({ value, min = 0, max = 1, step, def, log, unit, onChange, onCommit, label, disabled, ticks = 4, compact, digits, title, origin }) {
-  const ref = useRef(null), [edit, setEdit] = useState(null), [active, setActive] = useState(false);
+  const ref = useRef<any>(null), [edit, setEdit] = useState<any>(null), [active, setActive] = useState(false);
   const t = clamp(toT(value, min, max, log), 0, 1), td = def != null ? clamp(toT(def, min, max, log), 0, 1) : null;
-  const setT = (tt, fine) => { const v = fromT(clamp(tt, 0, 1), min, max, log); onChange(nice(v, step)); };
+  const setT = (tt, fine?) => { const v = fromT(clamp(tt, 0, 1), min, max, log); onChange(nice(v, step)); };
   const down = e => {
     if (disabled || e.button !== 0) return;
     e.preventDefault(); ref.current.focus();

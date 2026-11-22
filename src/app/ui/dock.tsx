@@ -5,12 +5,12 @@ const { useState, useEffect, useRef, useCallback } = React;
 import { useOutside } from './common';
 
 const nid = p => p + Math.random().toString(36).slice(2, 8);
-export const tile = (views, active) => ({ t: 'tile', id: nid('t'), views: [...views], active: active ?? views[0] ?? null });
+export const tile = (views, active?) => ({ t: 'tile', id: nid('t'), views: [...views], active: active ?? views[0] ?? null });
 export const split = (dir, kids, sizes) => ({ t: 'split', id: nid('s'), dir, kids, sizes: sizes || kids.map(() => 1 / kids.length) });
 const clone = x => JSON.parse(JSON.stringify(x));
 function walk(n, fn, parent = null) { if (!n) return; fn(n, parent); if (n.t === 'split') for (const k of n.kids) walk(k, fn, n); }
-export function tilesOf(n) { const out = []; walk(n, x => { if (x.t === 'tile') out.push(x); }); return out; }
-const findNode = (n, id) => { let r = null; walk(n, x => { if (x.id === id) r = x; }); return r; };
+export function tilesOf(n) { const out: any[] = []; walk(n, x => { if (x.t === 'tile') out.push(x); }); return out; }
+const findNode = (n, id) => { let r: any = null; walk(n, x => { if (x.id === id) r = x; }); return r; };
 export const tileOf = (n, view) => tilesOf(n).find(t => t.views.includes(view)) || null;
 export const openViews = n => tilesOf(n).flatMap(t => t.views);
 
@@ -25,7 +25,7 @@ export function normalize(n, known) {
       return { t: 'tile', id: x.id || nid('t'), views, active: views.includes(x.active) ? x.active : views[0] ?? null };
     }
     if (x.t === 'split') {
-      const dir = x.dir === 'col' ? 'col' : 'row', kids = [], sizes = [];
+      const dir = x.dir === 'col' ? 'col' : 'row', kids: any[] = [], sizes: any[] = [];
       (x.kids || []).forEach((k, i) => {
         const f = fix(k); if (!f) return;
         const sz = Number(x.sizes && x.sizes[i]) > 0 ? Number(x.sizes[i]) : 1 / (x.kids.length || 1);
@@ -91,7 +91,7 @@ export function splitTile(layout, tileId, dir, known) {
 }
 export function closeView(layout, view, known) { const r = clone(layout); takeOut(r, view, null); return normalize(r, known); }
 export function activate(layout, tileId, view) { const r = clone(layout), t = findNode(r, tileId); if (t) t.active = view; return r; }
-export function addView(layout, view, known, nearViews = []) {
+export function addView(layout, view, known, nearViews: any[] = []) {
   const r = clone(layout), ts = tilesOf(r);
   if (!ts.length) return tile([view]);
   let t = ts.find(x => x.views.some(v => nearViews.includes(v))) || ts.reduce((a, b) => (b.views.length > a.views.length ? b : a), ts[0]);
@@ -100,14 +100,14 @@ export function addView(layout, view, known, nearViews = []) {
 
 // ---------- the component ----------
 export function Dock({ layout, setLayout, views, known, render, max, setMax }) {
-  const [drag, setDrag] = useState(null);        // { view | tile, x, y, target }
+  const [drag, setDrag] = useState<any>(null);        // { view | tile, x, y, target }
   const byId = Object.fromEntries(views.map(v => [v.id, v]));
   const tiles = tilesOf(layout);
   const maxed = max && tiles.some(t => t.id === max) ? max : null;
   const startDrag = (e, view, tileId, whole) => {
     if (e.button !== 0) return;
     const x0 = e.clientX, y0 = e.clientY; let moved = false;
-    const label = whole ? (tiles.find(t => t.id === tileId) || { views: [] }).views.map(v => (byId[v] || {}).title || v).join(' · ') : (byId[view] || {}).title || view;
+    const label = whole ? (tiles.find(t => t.id === tileId) || { views: ([] as any[]) }).views.map(v => (byId[v] || {}).title || v).join(' · ') : (byId[view] || {}).title || view;
     const move = ev => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
       if (!moved) { moved = true; document.body.classList.add('dragging-view'); }
@@ -137,7 +137,7 @@ function dropTarget(x, y, view, fromTile, whole) {
   const tileId = tileEl.getAttribute('data-tile');
   const tabs = el.closest('.dtabs') || (el.closest('.dstrip') ? tileEl.querySelector('.dtabs') : null);
   if (tabs) {
-    const items = [...tabs.querySelectorAll('.dtab')]; let index = items.length, rx = null;
+    const items = [...tabs.querySelectorAll('.dtab')]; let index = items.length, rx: any = null;
     for (let i = 0; i < items.length; i++) { const r = items[i].getBoundingClientRect(); if (x < r.left + r.width / 2) { index = i; rx = r.left; break; } }
     const tr = tabs.getBoundingClientRect(); if (rx == null) { const last = items[items.length - 1]; rx = last ? last.getBoundingClientRect().right : tr.left + 4; }
     if (whole && tileId === fromTile) return null;
@@ -158,7 +158,7 @@ function DNode(props) {
   return props.node.t === 'tile' ? <Tile key={props.node.id} t={props.node} {...props} /> : <Split key={props.node.id} {...props} />;
 }
 function Split({ node, layout, setLayout, byId, known, render, startDrag, maxed, setMax, single }) {
-  const ref = useRef(null);
+  const ref = useRef<any>(null);
   const onGutter = (e, i) => {
     e.preventDefault();
     const el = ref.current, box = el.getBoundingClientRect(), total = node.dir === 'row' ? box.width : box.height;
@@ -172,7 +172,7 @@ function Split({ node, layout, setLayout, byId, known, render, startDrag, maxed,
     const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); document.body.classList.remove('resizing-x', 'resizing-y'); };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
-  const out = [];
+  const out: any[] = [];
   node.kids.forEach((k, i) => {
     if (i) out.push(<div key={'g' + i} className={'gutter ' + node.dir} role="separator" tabIndex={0} onPointerDown={e => onGutter(e, i - 1)} />);
     out.push(<div key={k.id} className="dcell" style={{ flex: `${node.sizes[i]} 1 0` }}><DNode node={k} layout={layout} setLayout={setLayout} byId={byId} known={known} render={render} startDrag={startDrag} maxed={maxed} setMax={setMax} single={single} /></div>);
@@ -180,7 +180,7 @@ function Split({ node, layout, setLayout, byId, known, render, startDrag, maxed,
   return <div ref={ref} className={'dsplit ' + node.dir}>{out}</div>;
 }
 function Tile({ t, layout, setLayout, byId, known, render, startDrag, maxed, setMax, single }) {
-  const [pick, setPick] = useState(false), ref = useRef(null);
+  const [pick, setPick] = useState(false), ref = useRef<any>(null);
   useOutside(ref, () => setPick(false), pick);
   const closed = known.filter(v => !openViews(layout).includes(v));
   const isMax = maxed === t.id;

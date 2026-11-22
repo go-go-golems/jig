@@ -9,13 +9,13 @@ import { render } from '../markdown';
 import { highlight } from '../highlight';
 import { captureWorkbench } from './capture';
 
-const S = { threads: store.get('threads', null) || [{ id: 'a1', title: 'New thread', turns: [] }], active: store.get('thread', 'a1'), settings: Object.assign({ mode: 'auto', tier: 'default', effort: '' }, store.get('agentSettings', {})) };
+const S = { threads: store.get('threads', null) || [{ id: 'a1', title: 'New thread', turns: ([] as any[]) }], active: store.get('thread', 'a1'), settings: Object.assign({ mode: 'auto', tier: 'default', effort: '' }, store.get('agentSettings', {})) };
 if (!S.threads.find(t => t.id === S.active)) S.active = S.threads[0].id;
 const IMGS = new Map();   // image id → { url, blob } (kept for this page's life; threads store ids only)
 const persist = () => { store.set('threads', S.threads.slice(-12).map(t => ({ ...t, turns: t.turns.slice(-30).map(u => ({ ...u, pending: false, steps: (u.steps || []).map(s => ({ ...s, snapshot: undefined, resolve: undefined, result: s.result && s.result.length > 3000 ? s.result.slice(0, 3000) + '\n…' : s.result })) })) }))); store.set('thread', S.active); store.set('agentSettings', S.settings); };
-let sampleP = null;
+let sampleP: any = null;
 const getSample = () => sampleP || (sampleP = (async () => { try { return window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { return null; } })());
-let limitsP = null;
+let limitsP: any = null;
 const getLimits = () => limitsP || (limitsP = (async () => { const s = await getSample(); if (!s || !s.limits) return null; try { return await s.limits(); } catch (e) { return null; } })());
 const addImage = (blob) => { const id = 'img' + Math.random().toString(36).slice(2, 9); const url = URL.createObjectURL(blob); IMGS.set(id, { url, blob }); return id; };
 
@@ -42,16 +42,16 @@ function yaml(v, ind = '', depth = 0, seen = new Set()) {
     if (v.length > 60) items.push(`${ind}# … ${v.length - 60} more`);
     return '\n' + items.join('\n');
   }
-  let keys; try { keys = Object.keys(v); } catch (e) { return '{…}'; }
+  let keys: any; try { keys = Object.keys(v); } catch (e) { return '{…}'; }
   if (!keys.length) return '{}';
-  return '\n' + keys.slice(0, 80).map(k => { let x; try { x = v[k]; } catch (e) { x = '<' + e.message + '>'; } return `${ind}${k}: ${yaml(x, ind + '  ', depth + 1, seen)}`; }).join('\n');
+  return '\n' + keys.slice(0, 80).map(k => { let x: any; try { x = v[k]; } catch (e) { x = '<' + e.message + '>'; } return `${ind}${k}: ${yaml(x, ind + '  ', depth + 1, seen)}`; }).join('\n');
 }
 const jobDone = j => new Promise(res => { const k = setInterval(() => { if (j.status !== 'queued' && j.status !== 'running') { clearInterval(k); res({ id: j.id, status: j.status, error: j.error, ms: j.ms, files: (j.files || []).map(f => ({ name: f.name, bytes: f.data.length })) }); } }, 100); });
 function labScope(host) {
   const files = {
     list: () => Object.keys(host.files).sort().map(p => ({ path: p, lines: host.files[p].split('\n').length, edited: host.isDirty(p) })),
     read: (path, from, to) => { const s = host.files[path]; if (s == null) throw new Error('no file ' + path); if (from == null) return s; return s.split('\n').slice(from - 1, to || from + 40).map((l, i) => `${from + i}  ${l}`).join('\n'); },
-    grep: (pattern, path) => { const re = pattern instanceof RegExp ? pattern : new RegExp(pattern); const out = []; for (const [p, s] of Object.entries(host.files)) { if (path && p !== path) continue; s.split('\n').forEach((l, i) => { if (re.test(l)) out.push(`${p}:${i + 1}  ${l.trim().slice(0, 160)}`); }); } return out.slice(0, 80); },
+    grep: (pattern, path) => { const re = pattern instanceof RegExp ? pattern : new RegExp(pattern); const out: any[] = []; for (const [p, s] of Object.entries(host.files)) { if (path && p !== path) continue; s.split('\n').forEach((l, i) => { if (re.test(l)) out.push(`${p}:${i + 1}  ${l.trim().slice(0, 160)}`); }); } return out.slice(0, 80); },
     write: (path, src) => { if (typeof src !== 'string') throw new Error('write(path, src): src must be a string'); host.files[path] = src; host.saveEditsSoon(); host.notify(); return { path, lines: src.split('\n').length }; },
     edit: (path, find, replace) => {
       const s = host.files[path]; if (s == null) throw new Error('no file ' + path);
@@ -76,10 +76,10 @@ function labScope(host) {
     camera: (o) => { if (!o) { host.resetCamera(); return 'scene camera'; } host.freeCam = { at: o.at, target: o.target || o.lookAt || [0, 0.5, 0] }; host.vp.setView(host.freeCam); host.notify(); return host.freeCam; },
     // output: a job on the queue; resolves when it finishes, with the file names and sizes (the files are saved
     // through the page only if save: true)
-    still: async (o = {}) => jobDone(host.render(Object.assign({ kind: 'still', width: 1280, height: 720, spp: 128, format: 'png', autosave: !!o.save }, o))),
-    sequence: async (o = {}) => jobDone(host.render(Object.assign({ kind: 'sequence', width: 640, height: 360, spp: 32, fps: 24, start: 0, end: 1, format: 'png', autosave: !!o.save }, o))),
-    exr: async (o = {}) => jobDone(host.render(Object.assign({ kind: 'still', width: 1280, height: 720, spp: 128, format: 'exr', autosave: !!o.save }, o))),
-    video: async (o = {}) => jobDone(host.render(Object.assign({ kind: 'sequence', width: 1280, height: 720, spp: 32, fps: 24, start: 0, end: 2, format: 'mp4', quality: 'high', autosave: !!o.save }, o))),
+    still: async (o: Record<string, any> = {}) => jobDone(host.render(Object.assign({ kind: 'still', width: 1280, height: 720, spp: 128, format: 'png', autosave: !!o.save }, o))),
+    sequence: async (o: Record<string, any> = {}) => jobDone(host.render(Object.assign({ kind: 'sequence', width: 640, height: 360, spp: 32, fps: 24, start: 0, end: 1, format: 'png', autosave: !!o.save }, o))),
+    exr: async (o: Record<string, any> = {}) => jobDone(host.render(Object.assign({ kind: 'still', width: 1280, height: 720, spp: 128, format: 'exr', autosave: !!o.save }, o))),
+    video: async (o: Record<string, any> = {}) => jobDone(host.render(Object.assign({ kind: 'sequence', width: 1280, height: 720, spp: 32, fps: 24, start: 0, end: 2, format: 'mp4', quality: 'high', autosave: !!o.save }, o))),
     queue: () => host.queue.jobs.map(j => ({ id: j.id, kind: j.kind, status: j.status, progress: +j.progress.toFixed(2), error: j.error, files: j.files ? j.files.map(f => f.name) : null })),
     cancel: (id) => { host.queue.cancel(id); return 'cancelled ' + id; },
     // first-hit ids at a point: instance, face and distance (what the id pass writes into EXRs)
@@ -94,7 +94,7 @@ function labScope(host) {
     diagnostics: () => host.diags.map(formatDiag),
     logs: () => host.logs,
     explain: () => host.explain(), ir: () => host.irText(),
-    shader: (find) => { const c = host.result && host.result.compiled; if (!c) return null; const lines = c.shared.split('\n'); if (!find) return { lines: lines.length, materials: c.stats.materials }; const out = []; lines.forEach((l, i) => { if (l.includes(find)) out.push(`${i + 1}: ${l}`); }); return out.slice(0, 60); },
+    shader: (find) => { const c = host.result && host.result.compiled; if (!c) return null; const lines = c.shared.split('\n'); if (!find) return { lines: lines.length, materials: c.stats.materials }; const out: any[] = []; lines.forEach((l, i) => { if (l.includes(find)) out.push(`${i + 1}: ${l}`); }); return out.slice(0, 60); },
     params: (pattern = '') => host.params().filter(h => !pattern || h.id.includes(pattern)).map(h => ({ id: h.id, kind: h.kind, value: h.kind === 'angle' ? +(h.value * 180 / Math.PI).toFixed(3) + '°' : h.value, min: h.min, max: h.max, unit: h.unit, static: h.isStatic })),
     setParam: (id, v) => { const h = host.params().find(x => x.id === id); if (!h) throw new Error(`no param ${id} (have ${host.params().map(x => x.id).join(', ')})`); return h.set(v); },
     world: host.world(),
@@ -106,7 +106,7 @@ function labScope(host) {
 }
 const READONLY = new Set(['run', 'setParam', 'setNotes']);
 async function runEval(host, code, readOnly) {
-  const logs = [], lab = labScope(host);
+  const logs: any[] = [], lab = labScope(host);
   const scope = Object.assign({}, lab, {
     lab, files: readOnly ? Object.assign({}, lab.files, { write: () => { throw new Error('read-only mode: files.write is off'); }, edit: () => { throw new Error('read-only mode: files.edit is off'); } }) : lab.files,
     console: { log: (...a) => logs.push(a.map(x => typeof x === 'string' ? x : yaml(x).trim()).join(' ')), warn: (...a) => logs.push('warn: ' + a.join(' ')), error: (...a) => logs.push('error: ' + a.join(' ')) },
@@ -114,13 +114,13 @@ async function runEval(host, code, readOnly) {
   });
   if (readOnly) for (const k of READONLY) scope[k] = () => { throw new Error(`read-only mode: ${k}() is off`); };
   const names = Object.keys(scope).filter(k => /^[A-Za-z_$][\w$]*$/.test(k) && k !== 'default');
-  const t0 = performance.now(); let value, error = null;
+  const t0 = performance.now(); let value: any, error: any = null;
   try {
     const fn = new Function(...names, '"use strict";\nreturn (async () => {\n' + code + '\n})();\n//# sourceURL=agent-eval.js');
     value = await Promise.race([fn(...names.map(k => scope[k])), new Promise((_, rej) => setTimeout(() => rej(new Error('eval timed out after 30 s')), 30000))]);
   } catch (e) { error = e; }
   const ms = performance.now() - t0;
-  let out = error ? `Error${error.code ? ' ' + error.code : ''}: ${error.message}${error.suggest && error.suggest.length ? ` Did you mean ${error.suggest.map(x => `'${x}'`).join(' or ')}?` : ''}${error.hint ? '\n' + [].concat(error.hint).join('\n') : ''}` : yaml(value).replace(/^\n/, '');
+  let out = error ? `Error${error.code ? ' ' + error.code : ''}: ${error.message}${error.suggest && error.suggest.length ? ` Did you mean ${error.suggest.map(x => `'${x}'`).join(' or ')}?` : ''}${error.hint ? '\n' + ([] as any[]).concat(error.hint).join('\n') : ''}` : yaml(value).replace(/^\n/, '');
   if (logs.length) out = 'logs:\n' + logs.join('\n') + '\n---\n' + out;
   if (out.length > 9000) out = out.slice(0, 9000) + `\n… cut (${out.length} chars). Return less: pick fields, slice arrays.`;
   return { out, error: !!error, ms };
@@ -158,7 +158,7 @@ function context(host) {
   return '[context]\n' + lines.join('\n') + '\n[/context]';
 }
 function toTurns(host, thread, imagesOn) {
-  const out = [];
+  const out: any[] = [];
   thread.turns.forEach(t => {
     if (t.role === 'user') out.push({ role: 'user', content: (t.text || '') + (t.images && t.images.length ? `\n\n[${t.images.length} image${t.images.length > 1 ? 's' : ''} attached${t.auto ? ' (your screenshots)' : ''}${t.sent ? '' : ''}]` : '') });
     else { const steps = (t.steps || []).map(s => s.kind === 'screenshot' ? `[screenshot ${s.target}] ${s.result || ''}` : `[eval${s.reverted ? ', later reverted' : ''}] ${s.code.split('\n')[0].slice(0, 100)} → ${(s.result || '').replace(/\s+/g, ' ').slice(0, 160)}`).join('\n'); out.push({ role: 'assistant', content: ((steps ? steps + '\n\n' : '') + (t.text || '(no answer)')).trim() }); }
@@ -167,7 +167,7 @@ function toTurns(host, thread, imagesOn) {
   if (!out.length) return null;
   out[0] = { role: 'user', content: instructions(host, imagesOn) + '\n\n---\n\n' + out[0].content };
   out[out.length - 1] = { role: 'user', content: context(host) + '\n\n' + out[out.length - 1].content };
-  const merged = []; for (const t of out) { if (merged.length && merged[merged.length - 1].role === t.role) merged[merged.length - 1].content += '\n\n' + t.content; else merged.push(t); }
+  const merged: any[] = []; for (const t of out) { if (merged.length && merged[merged.length - 1].role === t.role) merged[merged.length - 1].content += '\n\n' + t.content; else merged.push(t); }
   // keep under the input cap: drop the oldest turns after the instructions
   while (JSON.stringify(merged).length > 220000 && merged.length > 3) merged.splice(1, 2);
   return merged;
@@ -178,8 +178,8 @@ const OFF = { not_granted: 'Claude is not allowed for this page. You can allow i
 export function AgentView({ host }) {
   useHost(host, 2);
   const [, force] = useState(0); const re = () => { force(x => x + 1); };
-  const [draft, setDraft] = useState(''), [busy, setBusy] = useState(false), [off, setOff] = useState(null), [avail, setAvail] = useState(undefined), [lim, setLim] = useState(null), [atts, setAtts] = useState([]), [dragOver, setDragOver] = useState(false);
-  const ctl = useRef(null), logRef = useRef(null), fileRef = useRef(null);
+  const [draft, setDraft] = useState(''), [busy, setBusy] = useState(false), [off, setOff] = useState<any>(null), [avail, setAvail] = useState(undefined), [lim, setLim] = useState<any>(null), [atts, setAtts] = useState([]), [dragOver, setDragOver] = useState(false);
+  const ctl = useRef<any>(null), logRef = useRef<any>(null), fileRef = useRef<any>(null);
   useEffect(() => { getSample().then(s => setAvail(!!s)); getLimits().then(setLim); }, []);
   useFocus(host, 'agent', r => { if (r.ask) { setDraft(r.ask); } });
   const th = S.threads.find(t => t.id === S.active);
@@ -196,18 +196,18 @@ export function AgentView({ host }) {
   };
   const onPaste = e => { const items = [...(e.clipboardData && e.clipboardData.items || [])].filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean); if (items.length) { e.preventDefault(); attach(items); } };
 
-  const send = async (text, o = {}) => {
+  const send = async (text?, o: Record<string, any> = {}) => {
     text = (text != null ? text : draft).trim();
     const imgs = o.images || atts;
     if ((!text && !imgs.length) || busy) return;
     const sample = await getSample(); if (!sample) { setOff('Claude is not available here, so the agent is off. Everything else in the workbench works.'); return; }
     th.turns.push({ role: 'user', text: text || '(image)', images: imgs, auto: !!o.auto });
     if (th.title === 'New thread') th.title = (text || 'image').slice(0, 32);
-    const turn = { role: 'agent', text: '', steps: [], pending: true }; th.turns.push(turn);
+    const turn = { role: 'agent', text: '', steps: ([] as any[]), pending: true }; th.turns.push(turn);
     if (!o.auto) { setDraft(''); setAtts([]); }
     setBusy(true); persist(); re();
     ctl.current = new AbortController();
-    const shots = [];   // screenshots taken in this round, sent back next round
+    const shots: any[] = [];   // screenshots taken in this round, sent back next round
     const evalTool = {
       name: 'eval',
       description: 'Run an async JavaScript function body in the workbench with the Candela API and the workbench helpers in scope (files, run, diagnostics, explain, ir, shader, params, setParam, world, render, test, presets). Returns the value as YAML plus console.log output. Use `return`.',
@@ -283,8 +283,8 @@ export function AgentView({ host }) {
     for (let j = i; j < turn.steps.length; j++) turn.steps[j].reverted = true;
     host.build({}); host.toast('Reverted the files to before that step and rebuilt'); re(); persist();
   };
-  const newThread = () => { const id = 'a' + Date.now().toString(36); S.threads.push({ id, title: 'New thread', turns: [] }); S.active = id; persist(); re(); };
-  const closeThread = id => { S.threads = S.threads.filter(t => t.id !== id); if (!S.threads.length) S.threads.push({ id: 'a1', title: 'New thread', turns: [] }); if (S.active === id) S.active = S.threads[S.threads.length - 1].id; persist(); re(); };
+  const newThread = () => { const id = 'a' + Date.now().toString(36); S.threads.push({ id, title: 'New thread', turns: ([] as any[]) }); S.active = id; persist(); re(); };
+  const closeThread = id => { S.threads = S.threads.filter(t => t.id !== id); if (!S.threads.length) S.threads.push({ id: 'a1', title: 'New thread', turns: ([] as any[]) }); if (S.active === id) S.active = S.threads[S.threads.length - 1].id; persist(); re(); };
   const tries = (host.preset && host.preset.tries || []).concat(['Take a screenshot and tell me what to improve physically', 'Explain every default this scene assumed']).slice(0, 6);
   const thumb = (id, k) => { const im = IMGS.get(id); return im ? <img key={k} className="thumb" src={im.url} alt="" /> : <span key={k} className="thumb gone" title="image from an earlier session">▢</span>; };
   return <div className={'tabbody col agent-panel' + (dragOver ? ' dragover' : '')} onDragOver={e => { if ([...(e.dataTransfer.types || [])].includes('Files')) { e.preventDefault(); setDragOver(true); } }} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }} onDrop={e => { e.preventDefault(); setDragOver(false); attach(e.dataTransfer.files); }}>

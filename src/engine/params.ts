@@ -6,11 +6,11 @@ import { Quantity, isQ, u, fmtNum } from './units';
 
 // values outlive builds: the scene file re-runs, the sliders keep their places
 export const store = {
-  values: new Map(), defs: new Map(), order: [], listeners: new Set(), version: 0,
+  values: new Map(), defs: new Map(), order: ([] as any[]), listeners: new Set(), version: 0,
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
   emit(p) { this.version++; for (const f of this.listeners) { try { f(p); } catch (e) { console.error(e); } } },
   beginBuild() { this.defs = new Map(); this.order = []; },
-  reset(name) { if (name) this.values.delete(name); else this.values.clear(); },
+  reset(name?) { if (name) this.values.delete(name); else this.values.clear(); },
 };
 
 const KINDS = {
@@ -39,7 +39,11 @@ function normValue(kind, v) {
 }
 
 class ParamDef {
-  constructor(kind, def, cfg = {}) {
+  kind: any;
+  k: any;
+  def: any;
+  cfg: any;
+  constructor(kind, def, cfg: Record<string, any> = {}) {
     this.kind = kind; this.k = KINDS[kind]; this.def = def; this.cfg = cfg;
   }
   with(k, v) { const d = new ParamDef(this.kind, this.def, Object.assign({}, this.cfg, { [k]: v })); if (this.options) d.options = this.options; return d; }
@@ -87,7 +91,7 @@ function handleOf(def, name) {
   return guard(H, `param ${id}`);
 }
 const typeOf = (a, b) => { const t = [a, b].map(x => typeof x === 'number' ? 'f' : Array.isArray(x) ? 'v' + x.length : typeof x === 'string' ? 'v3' : x && x.type ? x.type : 'f'); return t[0] === 'f' ? t[1] : t[0]; };
-let liftAny = null; export const setLift = f => { liftAny = f; };
+let liftAny: any = null; export const setLift = f => { liftAny = f; };
 
 let DN = 0;
 function derived(src, fn) {
@@ -130,7 +134,7 @@ export function registerParam(h) { if (h.derived) derivedRegistry.set(h.id, h); 
 
 // ---------- the public API ----------
 function mkParam(kind) {
-  return (def, o) => {
+  return (def, o?) => {
     if (kind === 'choice') {
       if (!Array.isArray(def) || !def.length) throw new CandelaError('E121', "param.choice(['a', 'b', …], default?) takes a list");
       const d = new ParamDef('choice', o != null ? String(o) : String(def[0]), { static: true }); d.options = def.map(String); return chain(d);
@@ -157,7 +161,7 @@ export const lift = param.lift;
 // params({ name: param.float(…), … }) → handles keyed by name
 export function params(spec) {
   if (!spec || typeof spec !== 'object') throw new CandelaError('E121', 'params({ name: param.float(0.5), … })');
-  const out = {};
+  const out: Record<string, any> = {};
   for (const [name, d] of Object.entries(spec)) {
     const def = d && d.__def; if (!def) throw new CandelaError('E121', `params: '${name}' is not a param definition (use param.float(…), param.color(…), …)`);
     const h = handleOf(def, name);

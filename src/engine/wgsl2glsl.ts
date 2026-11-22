@@ -7,10 +7,10 @@ const ty = t => { t = t.trim(); for (const [a, b] of TYPES) if (t === a) return 
 // find the index of the parenthesis matching the one at `i`
 function matchParen(s, i) { let d = 0; for (let k = i; k < s.length; k++) { if (s[k] === '(') d++; else if (s[k] === ')') { d--; if (!d) return k; } } return -1; }
 // split a call's argument list at top-level commas
-function splitArgs(s) { const out = []; let d = 0, a = 0; for (let k = 0; k < s.length; k++) { const c = s[k]; if (c === '(' || c === '[') d++; else if (c === ')' || c === ']') d--; else if (c === ',' && !d) { out.push(s.slice(a, k)); a = k + 1; } } out.push(s.slice(a)); return out.map(x => x.trim()); }
+function splitArgs(s) { const out: any[] = []; let d = 0, a = 0; for (let k = 0; k < s.length; k++) { const c = s[k]; if (c === '(' || c === '[') d++; else if (c === ')' || c === ']') d--; else if (c === ',' && !d) { out.push(s.slice(a, k)); a = k + 1; } } out.push(s.slice(a)); return out.map(x => x.trim()); }
 
 function selects(s) {
-  let i;
+  let i: any;
   while ((i = s.search(/\bselect\(/)) >= 0) {
     const open = s.indexOf('(', i), close = matchParen(s, open);
     if (close < 0) throw new Error('wgsl2glsl: unbalanced select');
@@ -23,9 +23,9 @@ function selects(s) {
 }
 
 export function wgslToGlsl(src) {
-  const lines = src.split('\n'), out = [];
+  const lines = src.split('\n'), out: any[] = [];
   let inStruct = false;
-  for (let raw of lines) {
+  for (let raw: any of lines) {
     let L = raw;
     if (inStruct) {
       const m = L.match(/^(\s*)(\w+)\s*:\s*([\w<>, ]+?),?\s*$/);

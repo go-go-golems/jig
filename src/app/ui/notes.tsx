@@ -23,7 +23,7 @@ export function Doc({ host, md, prefix = '', scrollRef }) {
 
 export function NotesView({ host }) {
   useHost(host, 2);
-  const [edit, setEdit] = useState(false), sc = useRef(null);
+  const [edit, setEdit] = useState(false), sc = useRef<any>(null);
   const p = host.preset;
   useEffect(() => { if (sc.current) sc.current.scrollTop = 0; }, [p && p.id]);
   if (!p) return null;
@@ -40,10 +40,10 @@ export function NotesView({ host }) {
   </div>;
 }
 
-let lastDoc = null;
+let lastDoc: any = null;
 export function DocsView({ host }) {
   useHost(host, 1);
-  const [id, setId] = useState(lastDoc || (host.docs[0] && host.docs[0].id)), [q, setQ] = useState(''), [nav, setNav] = useState(0), sc = useRef(null), pendingAnchor = useRef(null);
+  const [id, setId] = useState(lastDoc || (host.docs[0] && host.docs[0].id)), [q, setQ] = useState(''), [nav, setNav] = useState(0), sc = useRef<any>(null), pendingAnchor = useRef<any>(null);
   useFocus(host, 'docs', r => { if (r.doc) { setId(r.doc); lastDoc = r.doc; pendingAnchor.current = r.anchor || null; setNav(k => k + 1); } });
   useEffect(() => {
     if (!sc.current) return;
@@ -51,8 +51,8 @@ export function DocsView({ host }) {
     sc.current.scrollTop = 0;
   }, [id, nav]);
   const doc = host.docs.find(d => d.id === id) || host.docs[0];
-  const groups = []; for (const d of host.docs) { if (q && !(d.title + ' ' + d.about + ' ' + d.body).toLowerCase().includes(q.toLowerCase())) continue; let g = groups.find(x => x.name === d.group); if (!g) groups.push(g = { name: d.group, docs: [] }); g.docs.push(d); }
-  const uses = doc ? host.allPresets().filter(p => (p.docs || []).includes(doc.id)) : [];
+  const groups: any[] = []; for (const d of host.docs) { if (q && !(d.title + ' ' + d.about + ' ' + d.body).toLowerCase().includes(q.toLowerCase())) continue; let g = groups.find(x => x.name === d.group); if (!g) groups.push(g = { name: d.group, docs: ([] as any[]) }); g.docs.push(d); }
+  const uses = doc ? host.allPresets().filter(p => (p.docs || []).includes(doc.id)) : ([] as any[]);
   return <div className="tabbody docsview">
     <nav className="shelf">
       <input className="filter" placeholder="search the docs" value={q} onChange={e => setQ(e.target.value)} />
@@ -66,6 +66,6 @@ export function DocsView({ host }) {
 }
 
 export function ReferenceView({ host }) {
-  const sc = useRef(null);
+  const sc = useRef<any>(null);
   return <div className="tabbody col"><div className="scroll" ref={sc}><Doc host={host} md={host.reference} prefix="r-" scrollRef={sc} /></div></div>;
 }

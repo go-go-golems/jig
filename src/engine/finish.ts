@@ -45,7 +45,7 @@ function machined(o, what, d) {
   }
   return m;
 }
-const opt = o => (o == null ? {} : typeof o === 'string' || Array.isArray(o) ? { metal: o } : o);
+const opt = o => (o == null ? ({} as Record<string, any>) : typeof o === 'string' || Array.isArray(o) ? { metal: o } : o);
 
 export const finish = {
   // circumferential lathe grooves on a cylinder or cone, about `axis` through `center` (object space)
@@ -53,27 +53,27 @@ export const finish = {
   // concentric rings on a faced end
   faced: (o) => machined(opt(o), 'finish.faced', { r: 0.22, a: 0.7 }),
   // a face mill's sweep; with a direction, straight passes (peripheral milling)
-  milled: (o = {}) => { o = opt(o); return machined(o, 'finish.milled', { r: 0.32, a: 0.5, t: o.direction ? 'along' : 'around' }); },
+  milled: (o: Record<string, any> = {}) => { o = opt(o); return machined(o, 'finish.milled', { r: 0.32, a: 0.5, t: o.direction ? 'along' : 'around' }); },
   // straight, fine grain along `direction`
-  brushed: (o = {}) => machined(opt(o), 'finish.brushed', { r: 0.3, a: 0.8, t: 'along' }),
+  brushed: (o: Record<string, any> = {}) => machined(opt(o), 'finish.brushed', { r: 0.3, a: 0.8, t: 'along' }),
   // a grinding wheel: fine and bright; around the axis on a round part, along `direction` on a flat one
-  ground: (o = {}) => { o = opt(o); return machined(o, 'finish.ground', { r: 0.12, a: 0.45, t: o.direction ? 'along' : 'around' }); },
+  ground: (o: Record<string, any> = {}) => { o = opt(o); return machined(o, 'finish.ground', { r: 0.12, a: 0.45, t: o.direction ? 'along' : 'around' }); },
   // gear flanks: hob marks run along the tooth, parallel to the gear's axis
-  hobbed: (o = {}) => { o = opt(o); return machined(Object.assign({ direction: o.axis || [0, 1, 0] }, o), 'finish.hobbed', { r: 0.28, a: 0.5, t: 'along' }); },
+  hobbed: (o: Record<string, any> = {}) => { o = opt(o); return machined(Object.assign({ direction: o.axis || [0, 1, 0] }, o), 'finish.hobbed', { r: 0.28, a: 0.5, t: 'along' }); },
   polished: (o) => machined(opt(o), 'finish.polished', { r: 0.05, a: 0 }),
   // sand-cast or forged skin: rough, a little mottled
-  asCast: (o = {}) => { o = opt(o); const M = metalArg(o.metal ?? 'cast-iron', 'finish.asCast'); return pbr().baseColor(o.color ?? M.f0.map(v => v * 0.8)).metallic(1).roughness(o.roughness ?? 0.62).normal(fx.bump(p => fx.noise.fbm(p.local.mul(o.scale ?? 900), { octaves: 3 }).mul(o.depth ?? 4e-5), 1)); },
+  asCast: (o: Record<string, any> = {}) => { o = opt(o); const M = metalArg(o.metal ?? 'cast-iron', 'finish.asCast'); return pbr().baseColor(o.color ?? M.f0.map(v => v * 0.8)).metallic(1).roughness(o.roughness ?? 0.62).normal(fx.bump(p => fx.noise.fbm(p.local.mul(o.scale ?? 900), { octaves: 3 }).mul(o.depth ?? 4e-5), 1)); },
   // conversion coatings are thin: the process's grooves show through, so pass the process (default turned)
-  blackOxide: (o = {}) => { o = opt(o); const base = finish[procName(o.process) || 'turned'](Object.assign({}, o, { color: [0.045, 0.045, 0.05] })); return base.roughness(o.roughness ?? 0.32); },
-  zinc: (o = {}) => { o = opt(o); const tint = o.color ?? (o.yellow ? [0.78, 0.7, 0.45] : [0.68, 0.7, 0.74]); return finish[procName(o.process) || 'turned'](Object.assign({}, o, { metal: 'zinc', color: tint })).roughness(o.roughness ?? 0.3); },
+  blackOxide: (o: Record<string, any> = {}) => { o = opt(o); const base = finish[procName(o.process) || 'turned'](Object.assign({}, o, { color: [0.045, 0.045, 0.05] })); return base.roughness(o.roughness ?? 0.32); },
+  zinc: (o: Record<string, any> = {}) => { o = opt(o); const tint = o.color ?? (o.yellow ? [0.78, 0.7, 0.45] : [0.68, 0.7, 0.74]); return finish[procName(o.process) || 'turned'](Object.assign({}, o, { metal: 'zinc', color: tint })).roughness(o.roughness ?? 0.3); },
   // anodized aluminium: a dyed oxide over the metal — a coat over a tinted conductor
-  anodized: (color = '#2b4c7e', o = {}) => { o = opt(o); return finish[procName(o.process) || 'milled'](Object.assign({}, o, { metal: 'aluminium', color })).roughness(o.roughness ?? 0.35).coat(0.6).coatRoughness(0.25); },
+  anodized: (color = '#2b4c7e', o: Record<string, any> = {}) => { o = opt(o); return finish[procName(o.process) || 'milled'](Object.assign({}, o, { metal: 'aluminium', color })).roughness(o.roughness ?? 0.35).coat(0.6).coatRoughness(0.25); },
   // paint and powder coat hide the substrate
-  paint: (color = '#c8102e', o = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.35).coat(o.gloss ?? 0.8).coatRoughness(o.coatRoughness ?? 0.06),
-  powderCoat: (color = '#2a2a2a', o = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.55).coat(0.3).coatRoughness(0.3),
-  plastic: (color = '#b3b0aa', o = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.4),
-  rubber: (color = '#333333', o = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.85),
-  glass: (o = {}) => material.glass(o),
+  paint: (color = '#c8102e', o: Record<string, any> = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.35).coat(o.gloss ?? 0.8).coatRoughness(o.coatRoughness ?? 0.06),
+  powderCoat: (color = '#2a2a2a', o: Record<string, any> = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.55).coat(0.3).coatRoughness(0.3),
+  plastic: (color = '#b3b0aa', o: Record<string, any> = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.4),
+  rubber: (color = '#333333', o: Record<string, any> = {}) => pbr().baseColor(color).roughness(o.roughness ?? 0.85),
+  glass: (o: Record<string, any> = {}) => material.glass(o),
   fromMetadata,
 };
 const PROC = { turned: 'turned', turning: 'turned', lathe: 'turned', faced: 'faced', facing: 'faced', milled: 'milled', milling: 'milled', machined: 'milled', 'cnc': 'milled', ground: 'ground', grinding: 'ground', honed: 'ground', lapped: 'polished', brushed: 'brushed', polished: 'polished', hobbed: 'hobbed', shaped: 'hobbed', cast: 'asCast', 'as-cast': 'asCast', forged: 'asCast', 'sand-cast': 'asCast' };
@@ -83,7 +83,7 @@ const procName = p => (p ? PROC[key(p)] : null);
 // process (turned, faced, milled, ground, brushed, hobbed, polished, cast), finish (black-oxide, zinc,
 // anodized, paint, powder-coat, polished, chrome …), color, axis, center, direction, roughness. Returns null
 // when nothing is recognised, so the shape's own material (or the default) applies.
-export function fromMetadata(meta = {}) {
+export function fromMetadata(meta: Record<string, any> = {}) {
   const mat = meta.material != null ? key(meta.material) : null;
   const fin = meta.finish != null ? key(meta.finish) : null;
   const proc = procName(meta.process);

@@ -11,7 +11,7 @@ const TMS = [['', 'scene'], ['agx', 'AgX'], ['aces', 'ACES'], ['neutral', 'PBR N
 
 export function ViewportView({ host }) {
   useHost(host, 6);
-  const wrap = useRef(null), [meter, setMeter] = useState(null), [pickInfo, setPickInfo] = useState(null), [dropOn, setDropOn] = useState(false);
+  const wrap = useRef<any>(null), [meter, setMeter] = useState<any>(null), [pickInfo, setPickInfo] = useState<any>(null), [dropOn, setDropOn] = useState(false);
   useEffect(() => {
     if (!host.canvas) { host.canvas = document.createElement('canvas'); host.canvas.className = 'vp-canvas'; }
     wrap.current.prepend(host.canvas);
@@ -46,12 +46,12 @@ export function ViewportView({ host }) {
   };
   useEffect(() => {
     const el = wrap.current;
-    let tm = null;
+    let tm: any = null;
     const wheel = e => { e.preventDefault(); host.interacting = true; host.orbit(0, e.deltaY, 'zoom'); clearTimeout(tm); tm = setTimeout(() => { host.interacting = false; }, 160); };
     el.addEventListener('wheel', wheel, { passive: false }); return () => el.removeEventListener('wheel', wheel);
   }, [host]);
   // the id pass as an overlay: a colour per (instance, face), redrawn when the view or the scene changes
-  const idCanvas = useRef(null);
+  const idCanvas = useRef<any>(null);
   useEffect(() => {
     if (host.view.aov !== 'ids') return;
     let last = '', busy = false, alive = true;

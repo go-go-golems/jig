@@ -14,13 +14,13 @@ export function CodeView({ host }) {
   useHost(host, 4);
   const [, force] = useState(0); const rerender = () => force(x => x + 1);
   const [text, setText] = useState(host.files[ui.active] ?? '');
-  const ta = useRef(null), pre = useRef(null), gut = useRef(null), sent = useRef(text), pendingLine = useRef(null);
+  const ta = useRef<any>(null), pre = useRef<any>(null), gut = useRef<any>(null), sent = useRef(text), pendingLine = useRef<any>(null);
   const [cursor, setCursor] = useState({ ln: 1, col: 1 });
   const path = ui.active;
   if (host.files[path] == null) { ui.active = 'scene.js'; if (!ui.open.includes('scene.js')) ui.open.unshift('scene.js'); }
   // pick up changes made elsewhere (the agent, a revert, a preset)
   if (host.files[ui.active] !== sent.current && host.files[ui.active] != null) { sent.current = host.files[ui.active]; if (text !== sent.current) setTimeout(() => setText(sent.current), 0); }
-  const open = (p, line, find) => {
+  const open = (p, line?, find?) => {
     if (host.files[p] == null) return;
     if (!ui.open.includes(p)) ui.open.push(p);
     ui.active = p; sent.current = host.files[p]; setText(host.files[p]); pendingLine.current = { line, find }; rerender();

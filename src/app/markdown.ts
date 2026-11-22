@@ -15,7 +15,7 @@ export function tex(src, display) {
 
 // inline: code, math, links, bold, italics. Code and math are cut out first so their contents stay literal.
 export function inline(s) {
-  const keep = [];
+  const keep: any[] = [];
   const stash = html => `\u0000${keep.push(html) - 1}\u0000`;
   s = s.replace(/`([^`]+)`/g, (_, c) => stash(`<code>${esc(c)}</code>`));
   s = s.replace(/\$\$([^$]+)\$\$/g, (_, m) => stash(tex(m, true)));
@@ -35,18 +35,18 @@ export function inline(s) {
 
 const CALLOUTS = [[/^(try it|try|play)\b/i, 'try'], [/^(exercise|exercises|challenge)\b/i, 'exercise'], [/^(caveat|careful|warning|watch out|note)\b/i, 'caveat']];
 
-export function render(md, o = {}) {
+export function render(md, o: Record<string, any> = {}) {
   const lines = String(md || '').replace(/\r/g, '').split('\n');
-  const out = [], toc = [];
+  const out: any[] = [], toc: any[] = [];
   let i = 0;
-  const para = [];
+  const para: any[] = [];
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para.length = 0; } };
   while (i < lines.length) {
     const L = lines[i];
     // fenced code / math
     let m = L.match(/^```\s*([\w-]*)\s*$/);
     if (m) {
-      flushPara(); const lang = m[1].toLowerCase(), body = []; i++;
+      flushPara(); const lang = m[1].toLowerCase(), body: any[] = []; i++;
       while (i < lines.length && !/^```\s*$/.test(lines[i])) body.push(lines[i++]);
       i++;
       if (lang === 'math' || lang === 'tex' || lang === 'latex') out.push(`<div class="mathblock">${tex(body.join('\n'), true)}</div>`);
@@ -55,7 +55,7 @@ export function render(md, o = {}) {
         // a figure: the SVG, then (optionally) a caption paragraph that starts with "Figure N.k"
         let j = i; while (j < lines.length && /^\s*$/.test(lines[j])) j++;
         let cap = '';
-        if (j < lines.length && /^\s*\*{0,2}_?Figure\s+[\w.]+/.test(lines[j])) { const c = []; while (j < lines.length && !/^\s*$/.test(lines[j])) c.push(lines[j++].trim()); cap = c.join(' '); i = j; }
+        if (j < lines.length && /^\s*\*{0,2}_?Figure\s+[\w.]+/.test(lines[j])) { const c: any[] = []; while (j < lines.length && !/^\s*$/.test(lines[j])) c.push(lines[j++].trim()); cap = c.join(' '); i = j; }
         out.push(figure(body.join('\n'), cap, o));
       }
       else out.push(`<pre class="src${lang ? ' lang-' + lang : ''}">${o.highlight && (lang === 'js' || lang === 'javascript' || lang === '') ? o.highlight(body.join('\n')) : esc(body.join('\n'))}</pre>`);
@@ -83,7 +83,7 @@ export function render(md, o = {}) {
       flushPara();
       const row = s => s.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(c => c.trim().replace(/\\\|/g, '|'));
       const head = row(L), aligns = row(lines[i + 1]).map(c => /:$/.test(c) ? (/^:/.test(c) ? 'center' : 'right') : 'left');
-      i += 2; const rows = [];
+      i += 2; const rows: any[] = [];
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(row(lines[i++]));
       const al = k => aligns[k] && aligns[k] !== 'left' ? ` style="text-align:${aligns[k]}"` : '';
       out.push(`<div class="tablewrap-x"><table class="rt doc-t"><thead><tr>${head.map((c, k) => `<th${al(k)}>${inline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, k) => `<td${al(k)}>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
@@ -91,7 +91,7 @@ export function render(md, o = {}) {
     }
     // block quotes → callouts
     if (/^>\s?/.test(L)) {
-      flushPara(); const body = [];
+      flushPara(); const body: any[] = [];
       while (i < lines.length && /^>\s?/.test(lines[i])) body.push(lines[i++].replace(/^>\s?/, ''));
       const first = body.join(' ').replace(/^\*\*([^*]+)\*\*.*/, '$1').trim();
       let cls = '';
@@ -102,7 +102,7 @@ export function render(md, o = {}) {
     // lists (nested by indentation)
     if (/^\s*([-*+]|\d+[.)])\s+/.test(L)) {
       flushPara();
-      const items = [];
+      const items: any[] = [];
       while (i < lines.length && (/^\s*([-*+]|\d+[.)])\s+/.test(lines[i]) || (/^\s{2,}\S/.test(lines[i]) && items.length))) {
         const mm = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
         if (mm) items.push({ ind: mm[1].length, ord: /\d/.test(mm[2]), text: mm[3] });
@@ -121,7 +121,7 @@ export function render(md, o = {}) {
   return { html, toc };
 }
 function listHtml(items, start, ind) {
-  const ord = items[start] && items[start].ord, parts = []; let i = start;
+  const ord = items[start] && items[start].ord, parts: any[] = []; let i = start;
   while (i < items.length && items[i].ind >= ind) {
     if (items[i].ind > ind) { const sub = listHtml(items, i, items[i].ind); parts[parts.length - 1] = parts[parts.length - 1].replace(/<\/li>$/, sub.html + '</li>'); i = sub.next; continue; }
     parts.push(`<li>${inline(items[i].text)}</li>`); i++;

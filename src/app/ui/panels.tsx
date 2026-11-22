@@ -23,7 +23,7 @@ export function ConsoleView({ host }) {
     <div className="scroll">
       {tab === 'diags' && (d.length ? <div className="diaglist">{d.map((x, i) => <button key={i} className={'dg ' + x.severity} onClick={() => x.loc && host.files[x.loc.file] != null && host.focus({ view: 'code', file: x.loc.file, line: x.loc.line })}>
         <span className="sev">{x.severity === 'error' ? '✖' : x.severity === 'warning' ? '⚠' : 'ⓘ'}</span><code className="code">{x.code}</code>
-        <span className="msg">{x.message}{x.suggest && x.suggest.length ? <em> Did you mean {x.suggest.map(s => `'${s}'`).join(' or ')}?</em> : null}{x.hint ? <pre className="hint">{[].concat(x.hint).join('\n')}</pre> : null}</span>
+        <span className="msg">{x.message}{x.suggest && x.suggest.length ? <em> Did you mean {x.suggest.map(s => `'${s}'`).join(' or ')}?</em> : null}{x.hint ? <pre className="hint">{([] as any[]).concat(x.hint).join('\n')}</pre> : null}</span>
         <span className="loc">{x.loc ? `${x.loc.file}:${x.loc.line}` : ''}</span>
       </button>)}</div> : <p className="empty padded">No diagnostics. Builders check units, ranges and energy as you write; stage errors (JS arithmetic on a field) are caught while tracing.</p>)}
       {tab === 'logs' && (logs.length ? <pre className="logs big">{logs.join('\n')}</pre> : <p className="empty padded">console.log from the scene files shows here.</p>)}
@@ -48,12 +48,12 @@ const KIND_ORDER = ['scene', 'group', 'shape', 'light', 'camera', 'material', 'b
 export function GraphView({ host }) {
   useHost(host, 1);
   const g = useMemo(() => host.irGraph(), [host.result]);
-  const [hov, setHov] = useState(null);
+  const [hov, setHov] = useState<any>(null);
   if (!g.nodes.length) return <div className="tabbody col"><p className="empty padded">No scene.</p></div>;
   // layers by longest path from the root
   const depth = new Array(g.nodes.length).fill(0);
   for (let it = 0; it < g.nodes.length; it++) for (const [a, b] of g.edges) depth[b] = Math.max(depth[b], depth[a] + 1);
-  const layers = []; g.nodes.forEach(n => { (layers[depth[n.id]] = layers[depth[n.id]] || []).push(n); });
+  const layers: any[] = []; g.nodes.forEach(n => { (layers[depth[n.id]] = layers[depth[n.id]] || []).push(n); });
   const W = 150, H = 26, GX = 60, GY = 10;
   const pos = new Map();
   layers.forEach((L, i) => L.forEach((n, j) => pos.set(n.id, { x: 20 + i * (W + GX), y: 20 + j * (H + GY) })));
@@ -144,7 +144,7 @@ export function SceneView({ host }) {
 // ---------- lab: physical tests and readings ----------
 export function LabView({ host }) {
   useHost(host, 2);
-  const [rows, setRows] = useState(null), [busy, setBusy] = useState(false), [ms, setMs] = useState(true);
+  const [rows, setRows] = useState<any>(null), [busy, setBusy] = useState(false), [ms, setMs] = useState(true);
   const run = () => { setBusy(true); setTimeout(() => { const r = test.sweep(x => API.bsdf.conductor.schlick({ f0: 1, roughness: x, multiscatter: ms }), { roughness: [0.25, 0.5, 0.75, 1], angles: [0, 45, 75, 85], spp: 1 << 15, multiscatter: ms }); setRows(r); setBusy(false); }, 30); };
   const vp = host.vp, c = host.result && host.result.compiled;
   return <div className="tabbody col labview">

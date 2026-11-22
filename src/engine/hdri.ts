@@ -51,8 +51,8 @@ const MEMO = new Map();
 const memo = (kind, o, make) => { const k = kind + JSON.stringify(o); let v = MEMO.get(k); if (!v) { v = make(o); MEMO.set(k, v); if (MEMO.size > 16) MEMO.delete(MEMO.keys().next().value); } return v; };
 export const hdri = {
   // a photo studio, in nits: dark walls, a floor, rectangular softboxes [{ az, el, w, h, L }] (degrees, nits)
-  studio(o = {}) { return memo('studio', o, studioImg); },
-  outdoor(o = {}) { return memo('outdoor', o, outdoorImg); },
+  studio(o: Record<string, any> = {}) { return memo('studio', o, studioImg); },
+  outdoor(o: Record<string, any> = {}) { return memo('outdoor', o, outdoorImg); },
   parse: parseHDR,
 };
 function studioImg(o) {
@@ -118,7 +118,7 @@ export function envTables(img, maxW = 1024) {
   let sum = 0, avgL = 0, solid = 0;
   for (let y = 0; y < H; y++) { const s = Math.sin((y + 0.5) / H * Math.PI); for (let x = 0; x < W; x++) { const i = y * W + x, o = i * 3; const L = 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2]; w[i] = Math.max(L, 1e-9) * s; sum += w[i]; avgL += L * s; solid += s; } }
   // alias table (Vose)
-  const prob = new Float64Array(N), alias = new Int32Array(N), small = [], large = [], q = new Float64Array(N);
+  const prob = new Float64Array(N), alias = new Int32Array(N), small: any[] = [], large: any[] = [], q = new Float64Array(N);
   for (let i = 0; i < N; i++) { q[i] = w[i] / sum * N; (q[i] < 1 ? small : large).push(i); }
   while (small.length && large.length) { const s = small.pop(), l = large.pop(); prob[s] = q[s]; alias[s] = l; q[l] = q[l] + q[s] - 1; (q[l] < 1 ? small : large).push(l); }
   for (const i of large) { prob[i] = 1; alias[i] = i; } for (const i of small) { prob[i] = 1; alias[i] = i; }

@@ -57,7 +57,7 @@ function moves(v) {
   if (isParam(v)) return v.isStatic ? null : 'param';
   const n = isExpr(v) ? nodeOf(v) : v && v.op ? v : null;
   if (n) { const d = depsOf(n); return d.has('time') ? 'time' : d.has('param') ? 'param' : null; }
-  if (Array.isArray(v)) { let r = null; for (const x of v) { const m = moves(x); if (m === 'time') return 'time'; if (m) r = m; } return r; }
+  if (Array.isArray(v)) { let r: any = null; for (const x of v) { const m = moves(x); if (m === 'time') return 'time'; if (m) r = m; } return r; }
   return null;
 }
 function isBlackSurface(b) {
@@ -92,7 +92,7 @@ function localBox(ty, pr) {
     default: return null;
   }
 }
-function worldBox(M, box, bound) {
+function worldBox(M, box, bound?) {
   if (!box) { const b = bound; box = [[-b, -b, -b], [b, b, b]]; }
   const mn = [1e30, 1e30, 1e30], mx = [-1e30, -1e30, -1e30];
   for (let k = 0; k < 8; k++) { const p = xfPoint(M, [box[k & 1][0], box[(k >> 1) & 1][1], box[(k >> 2) & 1][2]]); for (let i = 0; i < 3; i++) { mn[i] = Math.min(mn[i], p[i]); mx[i] = Math.max(mx[i], p[i]); } }
@@ -102,7 +102,7 @@ function worldBox(M, box, bound) {
 // ---------- BVH ----------
 function buildBVH(items) {
   // items: [{box:[mn,mx], idx}] → nodes [{mn, mx, left|first, count}] and an order of items
-  const nodes = [], order = [];
+  const nodes: any[] = [], order: any[] = [];
   if (!items.length) return { nodes, order };
   const cen = it => [0, 1, 2].map(i => (it.box[0][i] + it.box[1][i]) / 2);
   const build = (list) => {
@@ -162,17 +162,17 @@ function preetham(T, thetaS) {
 }
 
 // ---------- the compiler ----------
-export function compile(sceneB, engineB, opts = {}) {
+export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
   const sc = compOf(sceneB);
   if (!sc || sc.kind !== 'scene') throw new CandelaError('E121', 'compile(scene, engine): the first argument must be a scene()');
   const eng = engineB && engineB.cfg ? engineB.cfg : engine.realtime().cfg;
   const spectralOn = !!eng.spectral;
   const S = {
-    objs: [], lights: [], mats: [], matByKey: new Map(), matByComp: new Map(), media: [], sdfs: [], heights: [], dens: [], helpers: [],
-    slots: new Map(), slotList: [], sun: null, sky: null, env: null, fog: null, cam: sc.props.camera, behaviors: [], moving: { time: false, param: false },
-    ids: new Map(), spectralUse: false, matCode: [], warnedKeys: new Set(), shapeCount: new Map(), autoMats: new Map(), triangles: 0, nodeIds: new Set(),
+    objs: ([] as any[]), lights: ([] as any[]), mats: ([] as any[]), matByKey: new Map(), matByComp: new Map(), media: ([] as any[]), sdfs: ([] as any[]), heights: ([] as any[]), dens: ([] as any[]), helpers: ([] as any[]),
+    slots: new Map(), slotList: ([] as any[]), sun: null, sky: null, env: null, fog: null, cam: sc.props.camera, behaviors: ([] as any[]), moving: { time: false, param: false },
+    ids: new Map(), spectralUse: false, matCode: ([] as any[]), warnedKeys: new Set(), shapeCount: new Map(), autoMats: new Map(), triangles: 0, nodeIds: new Set(),
   };
-  const uniform = (id, type, n) => {
+  const uniform = (id, type, n?) => {
     let s = S.slots.get(id);
     if (s == null) { s = U_BASE + S.slotList.length; S.slots.set(id, s); S.slotList.push({ id, slot: s, type, derived: !!(n && n.x && n.x.derived) }); }
     return type === 'f' ? `U(${s}).x` : type === 'b' ? `(U(${s}).x > 0.5)` : type === 'v2' ? `U(${s}).xy` : type === 'v3' ? `U(${s}).xyz` : `U(${s})`;
@@ -199,8 +199,8 @@ export function compile(sceneB, engineB, opts = {}) {
     }
     throw new CandelaError('E121', `scene: cannot place a ${c.kind}`);
   };
-  const recipeMoves = r => { let m = null; for (let x = r; x; x = x.parent) { if (x.mv === 'time') return 'time'; if (x.mv) m = x.mv; } return m; };
-  const evalRecipe = (r, env) => { const chain = []; for (let x = r; x; x = x.parent) chain.unshift(x.c); let M = I34(); for (const c of chain) M = mul34(M, nodeXf(c, env)); return M; };
+  const recipeMoves = r => { let m: any = null; for (let x = r; x; x = x.parent) { if (x.mv === 'time') return 'time'; if (x.mv) m = x.mv; } return m; };
+  const evalRecipe = (r, env) => { const chain: any[] = []; for (let x = r; x; x = x.parent) chain.unshift(x.c); let M = I34(); for (const c of chain) M = mul34(M, nodeXf(c, env)); return M; };
 
   // ---- shapes ----
   function addShape(c, recipe, matComp) {
@@ -225,7 +225,7 @@ export function compile(sceneB, engineB, opts = {}) {
     }
     S.shapeCount.set(c.kind, (S.shapeCount.get(c.kind) || 0) + 1);
     // area emitters
-    let lightIdx = -1, mat;
+    let lightIdx = -1, mat: any;
     if (p.emit) {
       lightIdx = S.lights.length;
       S.lights.push({ kind: 'emit', comp: p.emit, shape: c, ty, pr, recipe, objIndex: S.objs.length });
@@ -233,7 +233,7 @@ export function compile(sceneB, engineB, opts = {}) {
     } else if (ty === 13 && p.autoFinish && !matComp) mat = -1;
     else mat = lowerMaterial(matComp, c);
     // a mesh's faces: materials from metadata (autoFinish) and explicit .face(selector, material) bindings
-    let faceMats = null;
+    let faceMats: any = null;
     if (ty === 13) {
       const def = p.def, fm = new Array(def.faces.length).fill(-1); let any = false;
       if (p.autoFinish) def.faces.forEach((f, k) => {
@@ -292,7 +292,7 @@ export function compile(sceneB, engineB, opts = {}) {
     S.mats.push({ id, code, label: 'emitter', key }); S.lights[li].emitSlot = '__emit' + li;
     return id;
   }
-  function lowerMaterial(mc, shapeComp, o = {}) {
+  function lowerMaterial(mc, shapeComp, o: Record<string, any> = {}) {
     if (o.emissionOf != null) {
       const id = S.mats.length, slot = uniform('__emit' + o.emissionOf, 'v3');
       S.mats.push({ id, code: `fn mat_${id}(h: Hit, wo: vec3f, uIn: f32) -> Lobe {\n  var L: Lobe = lobeNone();\n  L.kind = 1; L.c0 = vec3f(0.0, 0.0, 0.0); L.N = h.N;\n  L.Le = ${slot};\n  return L;\n}\n`, label: 'bulb' });
@@ -306,8 +306,8 @@ export function compile(sceneB, engineB, opts = {}) {
     if (S.matByComp.has(mc)) return S.matByComp.get(mc);
     const gen = new Gen({ uniform, prefix: 'm', label: 'a material', ctx: { P: 'h.P', N: 'h.N', Ng: 'h.Ng', uv: 'h.uv', wo: 'wo', time: 'gTime', lambda: 'gLam', local: 'h.lp', irand: 'h.irand', iid: 'h.iid', curvature: '0.0' } });
     gen.onBump = (n, g) => bumpCall(n, g);
-    const body = [];
-    let surface, attrs = null;
+    const body: any[] = [];
+    let surface: any, attrs: any = null;
     const unchecked = new Set(mc.meta.unchecked || []);
     const loc = mc.meta.loc;
     const def = definedMaterial(mc.kind);
@@ -318,7 +318,7 @@ export function compile(sceneB, engineB, opts = {}) {
       for (const f of frags) {
         const F = fragInternals(f);
         for (const r of F.req) if (!(r in attrs)) throw new CandelaError('E130', `fragment '${F.name}' needs attribute '${r}', which ${mc.kind} does not expose`, { loc, hint: 'apply it to a material.pbr() (or a material.define with that attribute)' });
-        const fv = {}; for (const [k, d] of Object.entries(F.ps)) { const v = mc.props['frag:' + F.name + ':' + k]; fv[k] = E(v != null ? (isParam(v) ? lift(v) : v) : (d.kind === 'color' ? constNode(d.def) : constNode(+d.def || 0))); }
+        const fv: Record<string, any> = {}; for (const [k, d] of Object.entries(F.ps)) { const v = mc.props['frag:' + F.name + ':' + k]; fv[k] = E(v != null ? (isParam(v) ? lift(v) : v) : (d.kind === 'color' ? constNode(d.def) : constNode(+d.def || 0))); }
         for (const vf of F.vals) vf(mc, fv, { warn: (code, msg) => report('warning', code, msg, { loc }), info: (code, msg) => report('info', code, msg, { loc }) });
         for (const lf of F.lowers) {
           const view = mkView(attrs);
@@ -375,7 +375,7 @@ export function compile(sceneB, engineB, opts = {}) {
         return `${ind}L.kind = 1; L.c0 = ${R(n)}; L.N = ${nrm};`;
       }
       case 'bsdf.conductor': {
-        const p = c.props; let s;
+        const p = c.props; let s: any;
         if (p.ior) {
           if (spectralOn) S.spectralUse = true;
           const eta = `vec3f(${p.ior.eta.map(fl).join(', ')})`, k = `vec3f(${p.ior.k.map(fl).join(', ')})`;
@@ -384,7 +384,7 @@ export function compile(sceneB, engineB, opts = {}) {
         return s + ` ${alpha(p.roughness)} L.N = ${nrm};${p.ms !== false ? ' L.flags = L.flags | 8;' : ''}${film()}${tang(c)}`;
       }
       case 'bsdf.dielectric': {
-        const p = c.props; let iorC;
+        const p = c.props; let iorC: any;
         if (p.f0) { const f = R(p.f0); iorC = `((1.0 + sqrt(clamp(${f}, 0.0, 0.99))) / (1.0 - sqrt(clamp(${f}, 0.0, 0.99))))`; }
         else iorC = iorCode(p.ior, gen);
         if (p.ior && p.ior.op === 'const' && p.ior.x < 1 && !o.unchecked.has('W340')) report('warning', 'W340', `ior ${p.ior.x} < 1 describes a relative index (e.g. glass→water): declare the outside medium with .exterior(…)`, { loc: c.meta.loc || o.loc });
@@ -408,7 +408,7 @@ export function compile(sceneB, engineB, opts = {}) {
       case 'bsdf.layer': {
         const top = c.props.top, d = Object.assign({}, o, { depth: o.depth + 1 });
         const v = `f${o.depth}_${++S._k}`;
-        let pick, topCode;
+        let pick: any, topCode: any;
         if (top.kind === 'bsdf.sheen') { pick = `clamp(lum(${R(top.props.color)}) * 0.25, 0.0, 1.0)`; topCode = genSurface(top, gen, nrm, d); }
         else {
           const iorC = top.props.f0 ? `((1.0 + sqrt(clamp(${R(top.props.f0)}, 0.0, 0.99))) / (1.0 - sqrt(clamp(${R(top.props.f0)}, 0.0, 0.99))))` : iorCode(top.props.ior, gen);
@@ -471,7 +471,7 @@ export function compile(sceneB, engineB, opts = {}) {
       }
       m.majorant = maj;
       // an invisible box that switches the path into the medium
-      const o = { comp: b, ty: 4, pr: [half[0], half[1], half[2], 0], bound: 1, recipe: { parent: null, c: b, mv: null }, mat: null, lightIdx: -1, irand: 0, id: null, tags: [], flags: 1, mediumBox: true };
+      const o = { comp: b, ty: 4, pr: [half[0], half[1], half[2], 0], bound: 1, recipe: { parent: null, c: b, mv: null }, mat: null, lightIdx: -1, irand: 0, id: null, tags: ([] as any[]), flags: 1, mediumBox: true };
       const mid = S.mats.length;
       S.mats.push({ id: mid, code: `fn mat_${mid}(h: Hit, wo: vec3f, uIn: f32) -> Lobe {\n  var L: Lobe = lobeNone();\n  L.kind = 6; L.N = h.N; L.med = ${id};\n  return L;\n}\n`, label: 'medium bounds' });
       o.mat = mid; S.objs.push(o);
@@ -491,7 +491,7 @@ export function compile(sceneB, engineB, opts = {}) {
 
   // ---- the scene data's static head: mesh BVHs and triangles (once per definition), face tables, the HDRI ----
   {
-    const parts = []; let len = 0;
+    const parts: any[] = []; let len = 0;
     const push = f => { parts.push(f); const at = len; len += f.length / 4; return at; };
     const meshAt = new Map(), tableAt = new Map();
     for (const o of S.objs) if (o.ty === 13) {
@@ -546,17 +546,17 @@ export function compile(sceneB, engineB, opts = {}) {
     stats: { objects: S.objs.length, lights: S.lights.length, materials: S.mats.length, media: S.media.length, sdfs: S.sdfs.length, params: S.slotList.length, lines: 0, triangles: S.triangles, meshes: S.meshDefs, sceneData: S.sdHead.byteLength },
     motionBlur: S.cam && S.cam.props && S.cam.props.motion ? S.cam.props.motion : null, hdri: S.env6, poseIds: S.nodeIds,
     sun: S.sun, sky: S.sky, env: S.env, fog: S.fog,
-    pack: (env = {}) => pack(S, env, nU),
+    pack: (env: Record<string, any> = {}) => pack(S, env, nU),
   };
   compiled.stats.lines = shared.split('\n').length;
   return compiled;
 }
 
-function material_plainLambert() { return { [Symbol.for('candela.comp')]: new Comp('material.plain', { surface: new Comp('bsdf.lambert', { rho: constNode([0.5, 0.5, 0.5]) }, { frags: [], loc: null, unchecked: [] }) }, { frags: [], loc: null, unchecked: [] }) }; }
+function material_plainLambert() { return { [Symbol.for('candela.comp')]: new Comp('material.plain', { surface: new Comp('bsdf.lambert', { rho: constNode([0.5, 0.5, 0.5]) }, { frags: ([] as any[]), loc: null, unchecked: ([] as any[]) }) }, { frags: ([] as any[]), loc: null, unchecked: ([] as any[]) }) }; }
 
 // ---------- custom integrators: a traced kernel over a small transport API ----------
 function genCustomKernel(integ, uniform) {
-  const n = (op, type, args = [], x = null) => node(op, type, args, x);
+  const n = (op, type, args: any[] = [], x = null) => node(op, type, args, x);
   const ray = { o: E(n('ctx', 'v3', [], 'ro')), d: E(n('ctx', 'v3', [], 'rd')) };
   let tag = 0;
   const hitOf = (r) => {
@@ -584,7 +584,7 @@ function genCustomKernel(integ, uniform) {
       uniformSphere: () => E(n('uSphere', 'v3', [], { tag: ++tag })),
     },
   };
-  const P = {}; for (const [k, d] of Object.entries(integ.params || {})) P[k] = d && d.__def ? d.__def.def : d;
+  const P: Record<string, any> = {}; for (const [k, d] of Object.entries(integ.params || {})) P[k] = d && d.__def ? d.__def.def : d;
   const root = lift(integ.kernel(api, P));
   if (root.type !== 'v3' && root.type !== 'f') throw new CandelaError('E122', 'an integrator kernel returns a colour (Vec3)');
   const gen = new Gen({ uniform, prefix: 'k', label: 'an integrator', ctx: { ro: 'ro', rd: 'rd', time: 'gTime' } });
@@ -644,7 +644,7 @@ function pack(S, env, nU) {
       if (!still) rig.set(i, R.map(rigidOf));
     });
   }
-  const items = [], unb = [];
+  const items: any[] = [], unb: any[] = [];
   objs.forEach((o, i) => { if (o.hidden) return; const lb = o.box || localBox(o.ty, o.pr); const unbounded = o.ty === 1 && !(o.pr[0] > 0); if (unbounded) unb.push(i); else items.push({ idx: i, box: rig.has(i) ? sweptBox(rig.get(i), mats[i], lb, o.bound) : worldBox(mats[i], lb, o.bound) }); });
   const bvh = buildBVH(items);
   const order = bvh.order.concat(unb);
@@ -670,7 +670,7 @@ function pack(S, env, nU) {
   const BV = new Float32Array(Math.max(1, bvh.nodes.length) * 8);
   bvh.nodes.forEach((n, k) => { BV.set([n.mn[0], n.mn[1], n.mn[2], n.a, n.mx[0], n.mx[1], n.mx[2], n.cnt], k * 8); });
   // lights
-  const lightRecs = [], uniOver = new Map();
+  const lightRecs: any[] = [], uniOver = new Map();
   for (const [li, L] of S.lights.entries()) {
     const r = new Float32Array(24);
     const p = L.comp.props;
@@ -687,7 +687,7 @@ function pack(S, env, nU) {
         uniOver.set('__emit' + li, col.rgb.map(v => v * lum));
       } else {
         const c = xfPoint(M, [0, 0, 0]);
-        let ex, ey, area;
+        let ex: any, ey: any, area: any;
         if (L.ty === 2) { ex = xfDir(M, [L.pr[0], 0, 0]); ey = xfDir(M, [0, 0, L.pr[1]]); area = 4 * V.len(ex) * V.len(ey); }
         else { ex = xfDir(M, [L.pr[0], 0, 0]); ey = xfDir(M, [0, 0, L.pr[0]]); area = Math.PI * V.len(ex) * V.len(ey); }
         // make (ex × ey) point along the local +y the shape faces
@@ -728,7 +728,7 @@ function pack(S, env, nU) {
   // sun, sky, environment
   let sunOn = 0, sunDir = [0, 1, 0], sunCos = 1, sunRad = [0, 0, 0], sunElev = Math.PI / 4, sunAz = 0;
   if (S.sun || S.sky) {
-    const sp = S.sun ? S.sun.props : {};
+    const sp = S.sun ? S.sun.props : ({} as Record<string, any>);
     sunElev = S.sun ? valueOf(sp.elevation, E0) : (S.sky.props.elevation != null ? valueOf(S.sky.props.elevation, E0) : Math.PI / 4);
     sunAz = S.sun ? valueOf(sp.azimuth, E0) : (S.sky.props.azimuth != null ? valueOf(S.sky.props.azimuth, E0) : Math.PI * 0.75);
     if (S.sky && S.sky.props.elevation != null && !S.sky.props.fromSun) { sunElev = valueOf(S.sky.props.elevation, E0); sunAz = S.sky.props.azimuth != null ? valueOf(S.sky.props.azimuth, E0) : sunAz; }
@@ -778,7 +778,7 @@ function pack(S, env, nU) {
   set(21, [1, 1, 1, 0]);
   // params and derived values
   for (const s of S.slotList) {
-    let v;
+    let v: any;
     if (uniOver.has(s.id)) v = uniOver.get(s.id);
     else v = paramValue(s.id);
     if (typeof v === 'boolean') v = v ? 1 : 0;
@@ -799,7 +799,7 @@ function lightIntensityAt(c, env) {
 // deepest posed node on the chain replaces everything above it: M = Pose · (the chain below it)
 // A local pose ({ …, local: true }) replaces only that node's own transform, under whatever is above it.
 function evalRecipeOf(r, env) {
-  const chain = []; for (let x = r; x; x = x.parent) chain.unshift(x.c);
+  const chain: any[] = []; for (let x = r; x; x = x.parent) chain.unshift(x.c);
   let start = 0, M = I34();
   const P = env && env.poses && env.poses.size ? env.poses : null;
   const poseOf = c => (P && c.props.id != null ? P.get(String(c.props.id)) : null);
@@ -821,7 +821,7 @@ export function poseMatrix(p, id = '?') {
   const m = p.length === 16 ? p : p.matrix;
   if (m) { if (m.length !== 16) throw bad(); return [m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14]]; }
   const t = p.position || p.translation || [0, 0, 0];
-  let R;
+  let R: any;
   if (p.quaternion || p.q) { let [x, y, z, w] = p.quaternion || p.q; const l = Math.hypot(x, y, z, w) || 1; x /= l; y /= l; z /= l; w /= l; R = [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w), 2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w), 2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]; }
   else if (p.rotation) { const [a, b, c] = p.rotation, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cc = Math.cos(c), sc = Math.sin(c); R = [cb * cc, -cb * sc, sb, ca * sc + sa * sb * cc, ca * cc - sa * sb * sc, -sa * cb, sa * sc - ca * sb * cc, sa * cc + ca * sb * sc, ca * cb]; }
   else if (p.position || p.translation || p.scale != null) R = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -842,7 +842,7 @@ function rigidOf(A) {
   const s = Math.cbrt(det) || 1;
   const m = [A[0] / s, A[1] / s, A[2] / s, A[4] / s, A[5] / s, A[6] / s, A[8] / s, A[9] / s, A[10] / s];
   // quaternion from a (nearly) orthonormal matrix (Shepperd)
-  const tr = m[0] + m[4] + m[8]; let q;
+  const tr = m[0] + m[4] + m[8]; let q: any;
   if (tr > 0) { const k = Math.sqrt(tr + 1) * 2; q = [(m[7] - m[5]) / k, (m[2] - m[6]) / k, (m[3] - m[1]) / k, k / 4]; }
   else if (m[0] > m[4] && m[0] > m[8]) { const k = Math.sqrt(1 + m[0] - m[4] - m[8]) * 2; q = [k / 4, (m[1] + m[3]) / k, (m[2] + m[6]) / k, (m[7] - m[5]) / k]; }
   else if (m[4] > m[8]) { const k = Math.sqrt(1 + m[4] - m[0] - m[8]) * 2; q = [(m[1] + m[3]) / k, k / 4, (m[5] + m[7]) / k, (m[2] - m[6]) / k]; }
@@ -891,7 +891,7 @@ export function cameraUniforms(camComp, o) {
   if (p.focusOn && o.focusPoint) focus = Math.max(0.05, V.dot(V.sub(o.focusPoint, at), f));
   if (o.view && o.view.focus) focus = o.view.focus;
   const physical = Math.log2(N * N / p.shutter) - Math.log2(p.iso / 100);
-  let ev = null, mode = 'auto';
+  let ev: any = null, mode = 'auto';
   if (typeof p.exposure === 'number') { ev = p.exposure; mode = 'fixed'; }
   else if (isParam(p.exposure)) { ev = valueOf(p.exposure, env); mode = 'param'; }
   else if (p.exposure === 'physical') { ev = physical; mode = 'physical'; }

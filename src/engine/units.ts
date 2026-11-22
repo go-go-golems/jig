@@ -10,7 +10,11 @@ export const fmtNum = x => {
 };
 
 export class Quantity {
-  constructor(v, dim, unit, shown) { this.v = v; this.dim = dim; this.unit = unit; this.shown = shown == null ? v : shown; Object.freeze(this); }
+  v: any;
+  dim: any;
+  unit: any;
+  shown: any;
+  constructor(v, dim, unit, shown?) { this.v = v; this.dim = dim; this.unit = unit; this.shown = shown == null ? v : shown; Object.freeze(this); }
   get value() { return this.v; }
   get deg() { return this.dim === 'angle' ? this.v * 180 / Math.PI : undefined; }
   get rad() { return this.dim === 'angle' ? this.v : undefined; }
@@ -54,7 +58,7 @@ export function parseQuantity(s) {
 }
 
 // a value for a slot that wants dimension `dim`. Bare numbers mean the slot's canonical unit.
-export function expectDim(x, dim, what, o = {}) {
+export function expectDim(x, dim, what, o: Record<string, any> = {}) {
   x = parseQuantity(x);
   if (typeof x === 'number') return o.scale ? x * o.scale : x;
   if (isQ(x)) {

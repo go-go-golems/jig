@@ -8,7 +8,7 @@ export async function captureWorkbench(host, maxW = 1400) {
   // canvases: the viewport through the renderer's readback, others through toDataURL
   const src = [...root.querySelectorAll('canvas')], dst = [...clone.querySelectorAll('canvas')];
   for (let i = 0; i < src.length; i++) {
-    let url = null;
+    let url: any = null;
     try { url = src[i] === host.canvas && host.vp ? (await host.screenshotViewport(2000)).toDataURL('image/jpeg', 0.9) : src[i].toDataURL(); } catch (e) { url = null; }
     const r = src[i].getBoundingClientRect();
     const img = document.createElement('img');
