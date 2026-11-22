@@ -13,6 +13,7 @@
 //   encodeCadPackage(pkg)                               → JSON text, arrays as base64 (export('candela'))
 import * as K from './kernel.js';
 import { meshBody, faceMeta } from './mesh.js';
+import { selectInPart } from './compile.js';
 
 export const CAD_PACKAGE_FORMAT = 'jig-cad-package';
 export const CAD_PACKAGE_VERSION = 1;
@@ -46,14 +47,55 @@ const APPEARANCE = {
   PP: { material: 'pp', finish: 'plastic', roughness: 0.5 }, 'TPU-95A': { material: 'tpu', finish: 'rubber' },
   'PA-CF': { material: 'pa', color: '#2b2b2e', roughness: 0.6 }, 'resin-standard': { material: 'resin', finish: 'plastic', roughness: 0.3 },
 };
-export function appearanceOf(mat, color) {
+export function appearanceOf(mat) {
   const name = mat?.name ?? (typeof mat === 'string' ? mat : null);
-  if (!name) return color ? { color } : {};
-  const a = APPEARANCE[name] ?? { material: String(name).toLowerCase() };
-  const { metal, ...meta } = a;
-  // a metal's look comes from the metal; jig's display colour is the drawing's, not the part's
-  if (!metal && color) meta.color = color;
+  if (!name) return { meta: {}, metal: false };
+  const { metal, ...meta } = APPEARANCE[name] ?? { material: String(name).toLowerCase() };
   return { meta, metal: !!metal };
+}
+// coats whose colour is the part's colour: on a metal part only these take jig's display colour
+const COATS = /^(paint|powder-coat|anodized)/;
+/** a face's final colour: an explicit .finish({ color }) always; jig's display colour (.color()) for plastics,
+ *  and for a metal only under a coat (paint, powder coat, anodizing): otherwise a metal looks like its metal */
+function settleColor(meta, display, metal) {
+  if (meta.color != null || display == null) return meta;
+  if (!metal || COATS.test(meta.finish ?? '')) meta.color = display;
+  return meta;
+}
+
+// .finish(sel, meta) and .color(sel, c) of a part, resolved to face names of the part's bodies (later entries win).
+// A string is a persistent name or a * glob; anything else goes through the part's selector engine, as joint ends
+// picked on geometry do. Selections are made per part, once, before the bodies are walked.
+const globRe = (g) => new RegExp('^' + g.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+function select(part, sel) {
+  const bodies = part.res.state.bodies;
+  if (sel == null || sel === '*') return bodies.flatMap((b) => b.names.map((n) => [b, n]));
+  if (typeof sel === 'string') {
+    const re = globRe(sel), hits = bodies.flatMap((b) => b.names.filter((n) => n === sel || n.replace(/#[a-z0-9]+$/, '') === sel || (sel.includes('*') && re.test(n))).map((n) => [b, n]));
+    if (!hits.length) {
+      const head = sel.split('/')[0], names = bodies.flatMap((b) => b.names), near = names.filter((n) => n.split('/')[0] === head);
+      throw new Error(`no face named '${sel}'; names like ${(near.length ? near : names).slice(0, 4).map((n) => `'${n}'`).join(', ')}`);
+    }
+    return hits;
+  }
+  const r = selectInPart(part.res, sel);
+  if (!r.items?.length) throw new Error(`${String(sel)} selects no face`);
+  return r.items.filter((c) => bodies.includes(c.body)).map((c) => [c.body, c.name]);
+}
+function partOverrides(part, diagnostics) {
+  const meta = part.part?.meta ?? {}, finishes = new Map(), colors = new Map();
+  const key = (b, n) => `${b.id}\u0000${n}`;
+  const each = (list, kind, fn) => {
+    for (const e of list ?? []) {
+      let hits;
+      try { hits = select(part, e.sel); }
+      catch (err) { diagnostics.push({ level: 'warning', kind, at: part.name, line: e.line ?? null, message: `${kind === 'finish.unresolved' ? '.finish' : '.color'}(${e.sel == null ? '' : String(e.sel)}): ${err.message}` }); continue; }
+      for (const [b, n] of hits) fn(key(b, n), e);
+    }
+  };
+  each(meta.finishes, 'finish.unresolved', (k, e) => finishes.set(k, Object.assign(finishes.get(k) ?? {}, e.meta)));
+  each(meta.colors, 'color.unresolved', (k, e) => colors.set(k, e.color));
+  return { finishes: (b, n) => finishes.get(key(b, n)), colors: (b, n) => colors.get(key(b, n)) };
 }
 
 // the feature that made a face: its id is the persistent name's first segment ('body/side[s.big]' → 'body')
@@ -106,7 +148,8 @@ const featureTypes = (graph) => {
 };
 
 /** the body's faces as package face records: ids, meta (kind, axis, feature, process …) in Candela's frame */
-function faceRecords(body, m, partName, appearance, types, multi) {
+function faceRecords(body, m, part, appearance, types, multi, ov) {
+  const partName = part.name, display = part.part?.meta?.color ?? null;
   const faces = faceMeta(body);
   const byName = new Map(faces.map((f) => [f.name, f]));
   return faces.map((f) => {
@@ -124,6 +167,8 @@ function faceRecords(body, m, partName, appearance, types, multi) {
       if (p.center) meta.center = pt(p.center);
       if (p.direction) meta.direction = R(p.direction);
     }
+    Object.assign(meta, ov.finishes(body, f.name) ?? {});
+    settleColor(meta, ov.colors(body, f.name) ?? display, appearance.metal);
     return { id: f.name, meta };
   });
 }
@@ -140,11 +185,11 @@ export function cadPackage(prog, { quality = 'render' } = {}) {
   if (!P?.parts) throw new Error('candela export: nothing compiled');
   const types = featureTypes(data.graph), multi = P.parts.length > 1;
   const placement = new Map((P.bodiesData ?? []).map((b) => [b.id, b.transform]));
-  const components = new Map(), bodies = [];
+  const components = new Map(), bodies = [], diagnostics = [];
   const W = [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]];
   for (const p of P.parts) {
     const meta = p.part?.meta ?? {};
-    const look = appearanceOf(meta.material, meta.color ?? null);
+    const look = appearanceOf(meta.material), ov = partOverrides(p, diagnostics);
     for (const b of p.res.state.bodies) {
       const id = `${p.name}/${b.id}`;
       const T = placement.get(id) ?? K.IDENTITY;
@@ -162,7 +207,7 @@ export function cadPackage(prog, { quality = 'render' } = {}) {
       const bb = b.bbox();
       if (bb) for (const c of boxCorners(bb)) grow(W, pt(K.matApply(T, c)));
       bodies.push({ id, component: p.name, transform: toCandelaMatrix(T), positions: pos, normals: nrm,
-        indices: Uint32Array.from(m.indices), triFace: Uint32Array.from(m.triFace), faces: faceRecords(b, m, p.name, look, types, multi) });
+        indices: Uint32Array.from(m.indices), triFace: Uint32Array.from(m.triFace), faces: faceRecords(b, m, p, look, types, multi, ov) });
     }
   }
   return {
@@ -170,7 +215,7 @@ export function cadPackage(prog, { quality = 'render' } = {}) {
     source: { name: data.name, kind: data.kind, hash: data.hash },
     frame: { units: 'm', up: '+y', fromJig: 'p = 0.001 * (x, z, -y)' },
     bounds: Number.isFinite(W[0][0]) ? W : null,
-    components: [...components.values()], bodies, studies: {},
+    components: [...components.values()], bodies, studies: {}, diagnostics,
     views: { axo: { yaw: 38, pitch: 27 }, front: { yaw: 0, pitch: 0 }, side: { yaw: -90, pitch: 0 }, plan: { yaw: 0, pitch: 90 } },
   };
 }

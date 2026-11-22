@@ -180,7 +180,8 @@ Refs: `'l1'`, `'l1.start'`, `'l1.end'`, `'l1.mid'`, `'c1.center'`, `'origin'`, `
 
 - `j.part(name)` ✓: an empty part. Example: `j.part('box')`.
 - `.material(m) .color(c)` ✓: material for mass; display colour. Example: `.material(j.material('PETG'))`.
-- `.color(sel, c)` ◐ (recorded only): per-face colour. Example: `.color(j.feat('body').endFace(), 'red')`.
+- `.color(sel, c)` ◐ (the stage ignores it; the Render view uses it): per-face colour. On a metal part a colour shows only under a coat (`finish: 'paint'`, `'powder-coat'`, `'anodized'`); otherwise the metal shows. Example: `.color(j.feat('body').endFace(), 'red')`.
+- `.finish(meta)` `.finish(faces, meta)` ✓: how the part is made and coated, for rendering. `meta` takes `finish` (black-oxide, zinc, zinc-yellow, galvanized, anodized, anodized-black, anodized-clear, paint, powder-coat, chrome, nickel, plastic, rubber, glass), `process` (turned, faced, milled, ground, brushed, hobbed, polished, cast, forged), `color` and `roughness` (0–1). Faces are a selector, a persistent name or a `*` glob; later calls win. Without it, metal parts get a process from the feature that made each face: revolved faces turned (ends faced), holes and bores ground, everything else milled. It is not geometry: changing it re-runs no feature. Example: `.finish({ finish: 'black-oxide' }).finish(j.feat('bore').faces(), { process: 'ground' })`.
 - `.port(name, frame)` ✓: a named frame for joints. Example: `.port('hinge', j.frame({ … }))`.
 - `.fit(profile)` ✓: the fit profile for every fit-aware slot. Example: `.fit(j.fit.profile('mk4-petg', { … }))`.
 - `.set(k, v) .use(...fns) .with(fn)` ✓: raw settings, presets and rule sets, a builder function. Example: `.use(j.rules.fdm)`.
@@ -277,7 +278,7 @@ Default classes, per side: press 0.05, snug 0.10, slide 0.20, free 0.30, printIn
 
 ## Inspect and materials
 
-- `j.material(name)` ✓: PLA, PETG, ABS, ASA, PP, TPU-95A, PA-CF, resin-standard, and for machined and bought parts steel, stainless, aluminium. Each has `density` (g/cm³), `cost` (usd/kg), `modulus` (Young's, GPa), `nu` (Poisson's ratio) and `strength` (MPa: what a stress study holds the part to; a printed plastic's weak-direction tensile strength, a metal's yield). Typical handbook values, not a datasheet. Example: `j.material('PETG')` (1.27 g/cm³).
+- `j.material(name)` ✓: PLA, PETG, ABS, ASA, PP, TPU-95A, PA-CF, resin-standard, and for machined and bought parts steel, stainless, aluminium, brass, bronze, copper. Each has `density` (g/cm³), `cost` (usd/kg), `modulus` (Young's, GPa), `nu` (Poisson's ratio) and `strength` (MPa: what a stress study holds the part to; a printed plastic's weak-direction tensile strength, a metal's yield). Typical handbook values, not a datasheet. Example: `j.material('PETG')` (1.27 g/cm³).
 - `m.with({ … })` ✓: change properties; quantities go in the table's units. Example: `j.material('PLA').with({ strength: MPa(42), modulus: GPa(3.2) })`.
 - `j.inspect.materials()` ✓: the material names. Example: `j.inspect.materials()`.
 - `j.inspect.mass(t, { walls, infill })` ✓: solid, or as printed with a walls and infill model. Example: `j.inspect.mass(part, { walls: 3, infill: 0.15 })`.

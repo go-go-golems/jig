@@ -2,10 +2,26 @@
 // Nothing is computed here; compile.js / features.js evaluate the timeline.
 
 // Where in script.js was this builder call made? (shared with core's sketch builder: src/engine/callsite.js)
-import { callerLine } from './callsite.js';
+import { callerLine, stampLine } from './callsite.js';
 export { callerLine };
 
-const META0 = Object.freeze({ params: [], configs: null, config: null, overrides: [], exposed: null, material: null, color: null, colors: [], ports: [], fit: null, rules: [], sets: {}, presets: [] });
+const META0 = Object.freeze({ params: [], configs: null, config: null, overrides: [], exposed: null, material: null, color: null, colors: [], finishes: [], ports: [], fit: null, rules: [], sets: {}, presets: [] });
+
+// .finish() metadata: the vocabulary Candela's finish.fromMetadata reads (design doc §6.4)
+export const FINISH_KEYS = { finish: 'string', process: 'string', color: 'string', roughness: 'number' };
+export const PROCESSES = ['turned', 'faced', 'milled', 'ground', 'brushed', 'hobbed', 'polished', 'cast', 'forged'];
+export const FINISHES = ['black-oxide', 'zinc', 'zinc-yellow', 'galvanized', 'anodized', 'anodized-black', 'anodized-clear', 'paint', 'powder-coat', 'chrome', 'nickel', 'plastic', 'rubber', 'glass', ...PROCESSES];
+function finishMeta(m) {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) throw new TypeError(`.finish(): give { finish, process, color, roughness }, e.g. .finish({ finish: 'black-oxide' }) or .finish(faces, { process: 'ground' })`);
+  for (const [k, v] of Object.entries(m)) {
+    if (!(k in FINISH_KEYS)) throw new TypeError(`.finish(): unknown key '${k}' (keys: ${Object.keys(FINISH_KEYS).join(', ')})`);
+    if (typeof v !== FINISH_KEYS[k]) throw new TypeError(`.finish(): ${k} is a ${FINISH_KEYS[k]}, got ${JSON.stringify(v)}`);
+  }
+  if (m.process != null && !PROCESSES.includes(m.process)) throw new TypeError(`.finish(): process '${m.process}' is not one of ${PROCESSES.join(', ')}`);
+  if (m.finish != null && !FINISHES.includes(m.finish)) throw new TypeError(`.finish(): finish '${m.finish}' is not one of ${FINISHES.join(', ')}`);
+  if (m.roughness != null && !(m.roughness >= 0 && m.roughness <= 1)) throw new TypeError(`.finish(): roughness is in [0, 1], got ${m.roughness}`);
+  return Object.freeze({ ...m });
+}
 
 export class Part {
   constructor(name, items = [], meta = META0, flags = {}) {
@@ -37,6 +53,14 @@ export class Part {
   expose(names, opts = {}) { return this._meta({ exposed: { names, ...opts } }); }
   material(m) { return this._meta({ material: m }); }
   color(a, b) { return b === undefined ? this._meta({ color: a }) : this._meta({ colors: [...this.meta.colors, { sel: a, color: b }] }); }
+  // how the part is made and coated, for rendering (JIG-016): .finish({ finish: 'black-oxide' }) for the whole part,
+  // .finish(faces, { process: 'ground' }) for some faces; later calls win. Not geometry: it never re-runs a feature.
+  finish(a, b) {
+    const [sel, meta] = b === undefined ? [null, a] : [a, b];
+    const rec = { sel, meta: finishMeta(meta) };
+    stampLine(rec);   // the line, for messages; not enumerable, so it is no part of any cache key
+    return this._meta({ finishes: [...this.meta.finishes, Object.freeze(rec)] });
+  }
   port(name, frame) { return this._meta({ ports: [...this.meta.ports, { name, frame }] }); }
   fit(profile) { return this._meta({ fit: profile }); }
   set(key, v) { return this._meta({ sets: { ...this.meta.sets, [key]: v } }); }
