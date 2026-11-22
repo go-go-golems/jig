@@ -83,7 +83,8 @@ class Live {
   Live(int argc, char** argv, Queue& q) : argc_(argc), argv_(argv), q_(q) {
     maxSpp_ = std::stoi(arg(argc, argv, "--max-spp", "2048"));
     maxW_ = std::stoi(arg(argc, argv, "--max-width", "1920"));
-    denoise_ = arg(argc, argv, "--denoise", "ai");   // ai | scene | off (the live view defaults to the AI denoiser)
+    denoise_ = arg(argc, argv, "--denoise", "ai");
+    ser_ = serOption(argc, argv);   // ai | scene | off (the live view defaults to the AI denoiser)
   }
 
   void run() {
@@ -193,7 +194,7 @@ class Live {
     if (files_.IsEmpty()) return;
     sendText("{\"type\":\"status\",\"state\":\"building\"}");
     const auto t0 = Clock::now();
-    auto opts = rt().fromJSON("{\"width\":" + std::to_string(w_) + ",\"height\":" + std::to_string(h_) + ",\"time\":" + std::to_string(t_) + ",\"seed\":" + std::to_string(seed_) + ",\"target\":\"auto\"}");
+    auto opts = rt().fromJSON("{\"width\":" + std::to_string(w_) + ",\"height\":" + std::to_string(h_) + ",\"time\":" + std::to_string(t_) + ",\"seed\":" + std::to_string(seed_) + ",\"target\":\"auto\"" + ser_ + "}");
     opts.As<v8::Object>()->Set(rt().context(), rt().str("params"), params_.IsEmpty() ? v8::Object::New(rt().isolate()).As<v8::Value>() : params_.Get(rt().isolate()).As<v8::Value>()).Check();
     auto hr = rt().call("Candela", "openRender", {files_.Get(rt().isolate()), opts});
     if (!rt().get(hr, "ok")->IsTrue()) {
@@ -341,6 +342,7 @@ class Live {
   std::unique_ptr<crt::JpegEncoder> jpeg_;
   std::unique_ptr<crt::AiDenoiser> ai_;
   std::string denoise_ = "ai";
+  std::string ser_;
   std::vector<char> postCubin_;
   std::string target_, programKey_;
   int w_ = 960, h_ = 540, seed_ = 1, maxSpp_ = 2048, maxW_ = 1920, batch_ = 1, metered_ = 0, epoch_ = 0;

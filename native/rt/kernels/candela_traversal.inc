@@ -18,6 +18,20 @@ __device__ TraceR traceAll(vec3f ro, vec3f rd, f32 tmax, bool shadow) {
   if (nB == 0 || (shadow && r.obj >= 0)) return r;   // occluded() only asks whether anything was hit
   unsigned p0 = __float_as_uint(r.t), p1 = ~0u, p2 = ~0u, p3 = 0u, p4 = 0u;
   unsigned p5 = __float_as_uint(gTau), p6 = __float_as_uint(gTime), p7 = shadow ? 1u : 0u;
+#ifdef CANDELA_SER
+  // shader execution reordering (CANDELA-002 phase 6): find the hit without running a program, regroup the threads
+  // by what they hit, then run the hit program; the shading that follows in this raygen program then runs in warps
+  // that agree more often. Shadow rays only ask "blocked or not" and skip the reorder. Measured (960x540, 256 spp):
+  // X-02 -21 %, M-07 -12 %, but K-09 +24 %, K-01 +39 % (moving the raygen's live state costs more than mesh scenes
+  // gain; a material coherence hint changed nothing), so the engine defines CANDELA_SER only for scenes without
+  // meshes (src/engine/headless.ts).
+  if (!shadow) {
+    optixTraverse(params.ias, make_float3(ro.x, ro.y, ro.z), make_float3(rd.x, rd.y, rd.z), EPS, r.t, fminf(fmaxf(gTau, 0.0f), 1.0f),
+                  CANDELA_MASK_CAMERA | CANDELA_MASK_SHADOW, OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, p4, p5, p6, p7);
+    optixReorder();
+    optixInvoke(p0, p1, p2, p3, p4, p5, p6, p7);
+  } else
+#endif
   optixTrace(params.ias, make_float3(ro.x, ro.y, ro.z), make_float3(rd.x, rd.y, rd.z),
              EPS, r.t,                                         // tmin = EPS: hitMesh ignores hits closer than EPS
              fminf(fmaxf(gTau, 0.0f), 1.0f),                   // ray time = shutter τ (moving meshes' SRT keys span [0, 1])

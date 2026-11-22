@@ -20,6 +20,9 @@ export interface HeadlessOptions {
   target?: CudaTargetChoice | null;
   /** false: render without motion blur (parity checks) */
   motionBlur?: boolean;
+  /** shader execution reordering on the OptiX target: 'auto' (default) = only for scenes without meshes, where it
+   *  measured faster (X-02 −21 %, M-07 −12 %; mesh scenes +24–39 %, CANDELA-002 diary step 22) */
+  ser?: boolean | 'auto';
   /** param values by id, set before the build (numbers, booleans, strings for choices, [r,g,b] for colours) */
   params?: Record<string, any>;
 }
@@ -109,7 +112,7 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     ok: true, width: o.width, height: o.height, time: o.time || 0, seed: seed0,
     wgsl: WGSL_PRELUDE + s.compiled.shared + WGSL_MAIN,
     target,
-    cuda: target === null ? null : cudaProgram(s.compiled, target),
+    cuda: target === null ? null : cudaProgram(s.compiled, target, { ser: o.ser === true || ((o.ser === undefined || o.ser === 'auto') && !!optix && optix.meshes.length === 0) }),
     post: target === null ? null : cudaPostProgram(displaySource(ps.userPasses)),
     optix,
     O: nonEmpty(optix ? optix.O : P.O), LI: nonEmpty(P.LI), BV: nonEmpty(P.BV), SD,

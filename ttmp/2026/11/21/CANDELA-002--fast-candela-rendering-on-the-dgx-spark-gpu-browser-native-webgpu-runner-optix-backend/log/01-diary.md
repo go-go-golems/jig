@@ -1367,3 +1367,52 @@ detailed diary as you work (using the diary format from the skill)"
 
 ### Technical details
 - Code commit `b7c151b`; evidence `various/21-*`, script `scripts/21-image-error.py`.
+
+## Step 22: Phase 6 — shader execution reordering, kept only where it measured faster
+
+SER regroups threads by what their ray hit before the shading code runs. In Candela the whole path tracer lives in
+the raygen program, so a reorder moves all of a thread's live state. That pays on scenes of many analytic objects
+(up to 21 % faster) and costs on mesh scenes (24–39 % slower). `--ser auto`, the default, enables it on OptiX only
+for scenes without meshes; the images do not change.
+
+### Prompt Context
+**User prompt (verbatim):** "ok continue" (after PR #1 was updated to the stable state; see Step 21 for the phase)
+**Assistant interpretation:** Finish the SER measurement and keep it where it helps; leave PR #1 at the stable commit.
+
+### What I did
+- `candela_traversal.inc`: under `CANDELA_SER`, non-shadow rays use `optixTraverse` (no program runs), `optixReorder()`,
+  then `optixInvoke`; shadow rays keep `optixTrace` with terminate-on-first-hit (they shade nothing afterwards).
+- `cudaProgram(compiled, target, { ser })` prepends `#define CANDELA_SER 1` (OptiX only). `openRender({ ser })`:
+  `'auto'` (default) = OptiX scene with no meshes; `true`/`false` force it. `candela-rt render|serve --ser auto|on|off`;
+  the render summary prints `optix +ser`.
+
+### Why
+- Hardware reordering helps when divergence after the hit dominates; with the full path tracer in raygen, the cost of
+  moving a thread's state is fixed per ray, so only scenes where traversal is cheap relative to divergent shading gain.
+
+### What worked
+- `various/22-ser.txt`: X-02 −21 %, G-05 −21 %, F-08 −12 %, G-04 −3 % with `--ser auto`; images identical (0.00 %).
+
+### What didn't work
+- SER on mesh scenes: K-09 911 → 1130–1148 ms, K-01 1174 → 1617–1643 ms.
+- A material coherence hint (`optixReorder(hint, 4)`, hint = material index of the hit object): no measurable change
+  on any of the four presets; removed.
+
+### What I learned
+- The register-heavy raygen design (Step 16: 255 registers) makes SER expensive; a split into a lighter raygen plus
+  callable shading programs would change the trade-off, but that is a different renderer structure.
+
+### What warrants a second pair of eyes
+- The `auto` rule is "no meshes", decided from four presets plus M-07; scenes mixing a few meshes with many analytic
+  objects are untested.
+
+### What should be done in the future
+- Built-in sphere primitives for X-02-like scenes (next phase-6 item); temporal denoising for sequences.
+
+### Code review instructions
+- `native/rt/kernels/candela_traversal.inc` (`#ifdef CANDELA_SER`), `src/engine/targets/cuda.ts` (`cudaProgram`),
+  `src/engine/headless.ts` (`ser`), `serOption` in `native/rt/src/common.h`.
+- Validate: `./build/rt/candela-rt render X-02 --size 960x540 --spp 256 --ser off` vs `--ser auto`.
+
+### Technical details
+- Gates: typecheck, golden 105/105, session, unit tests pass. Branch `candela-rt-ser` (PR #1 stays at `562fb3e`).

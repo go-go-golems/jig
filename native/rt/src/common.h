@@ -12,6 +12,11 @@
 std::string readFile(const std::filesystem::path& p);
 std::string arg(int argc, char** argv, const char* name, const char* def);
 bool hasFlag(int argc, char** argv, const char* name);
+/** --ser auto|on|off → the JSON fragment for openRender's options ("" for auto, the engine's default) */
+inline std::string serOption(int argc, char** argv) {
+  const std::string v = arg(argc, argv, "--ser", "auto");
+  return v == "on" ? ",\"ser\":true" : v == "off" ? ",\"ser\":false" : "";
+}
 /** content/ as a JS object { 'presets/B-01-hello-sphere.js': '…', … } */
 v8::Local<v8::Object> readContent(crt::JsRuntime& rt, const std::filesystem::path& dir, size_t* files, size_t* bytes);
 std::string kernelsDir(int argc, char** argv);
