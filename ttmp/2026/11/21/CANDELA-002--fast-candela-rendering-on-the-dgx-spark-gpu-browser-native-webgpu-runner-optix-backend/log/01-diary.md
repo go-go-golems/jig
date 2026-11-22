@@ -291,3 +291,30 @@ file inspected before); the instruction to install covers accepting the licence.
 ### Technical details
 - Interactive SDK samples need `libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev` (and Wayland/xkbcommon
   dev packages) for a windowed GLFW; not needed for `--file` output or for Candela's backend.
+
+## Step 6: OptiX SDK 9.0.0 runs on the GB10 (step 3, phase 1 done)
+
+Installed the 9.0.0 SDK the user downloaded, rebuilt `optixTriangle` for `sm_121`, and ran it: the first OptiX
+program on this machine works.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, 9.0.0 in ~/Downloads"
+**Assistant interpretation:** Install SDK 9.0.0 (licence acceptance covered by the earlier install instruction) and verify.
+**Inferred user intent:** Unblock step 3.
+
+### Evidence and commits
+- `NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64.sh`, sha256 `2ef1ca95…69fa4b`; header identical to 9.1.0's apart from the
+  version; `OPTIX_ABI_VERSION 105` (≤ the driver runtime's 110).
+- Install → `~/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64` (`OPTIX_VERSION 90000`); build dir `~/opt/optix-9.0.0-build`.
+- `ninja optixTriangle` → `[44/44] Linking CXX executable bin/optixTriangle`; `./optixTriangle --file out.png` → exit 0,
+  1024×768 PNG with the expected gradient triangle (`various/09-optixTriangle-9.0.0.png`).
+- Full commands/outputs: `various/08-optix-sdk-install.txt`.
+
+### Noteworthy decisions or failures
+- My first parse of the installer's payload offset failed (`tail: invalid number of lines: '+'`) because the 9.0.0 header
+  formats the line slightly differently; my fallback diff then dumped binary payload (49 MB output, saved by the
+  harness). Read the line directly (`tail … +216`) instead; no effect on the install.
+- Standardise on SDK 9.0.0 for the backend; keep 9.1.0 installed for a future driver.
+
+### Remaining requirements and next action
+- Step 3 phase 2: the scene package writer (TS) and reader (C++); phases 3–7 per guide §6.8. Steps 1 and 2 are also open.

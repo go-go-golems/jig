@@ -10,3 +10,10 @@ run: ./optixTriangle --file out.png
 driver runtime (strings /usr/lib/aarch64-linux-gnu/libnvoptix.so.1):
   OptiX Version:[9.0002.0.0.0.0] Branch:[r582_73] Build Number:[38463315] ABI Version:[110] CUDA Version:[13.0.0.0,]
 conclusion: driver 580.178.04 runs OptiX ABI <= 110 (OptiX 9.0.x); SDK 9.1.0 needs ABI 118 -> use SDK 9.0.x, or a newer driver.
+
+# SDK 9.0.0 (matches the driver)
+installer: ~/Downloads/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64.sh (sha256 2ef1ca9552938fae5a1ea561233b2c4e7d383359d9ef04b4c40093af0d69fa4b)
+  CPack header identical to 9.1.0 apart from the version; OPTIX_ABI_VERSION 105
+  -> ~/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64 (OPTIX_VERSION 90000)
+build: same cmake flags, build dir ~/opt/optix-9.0.0-build; ninja optixTriangle -> [44/44] Linking CXX executable bin/optixTriangle
+run: ./optixTriangle --file out.png -> rc 0, PNG 1024x768 (various/09-optixTriangle-9.0.0.png: the expected gradient triangle)

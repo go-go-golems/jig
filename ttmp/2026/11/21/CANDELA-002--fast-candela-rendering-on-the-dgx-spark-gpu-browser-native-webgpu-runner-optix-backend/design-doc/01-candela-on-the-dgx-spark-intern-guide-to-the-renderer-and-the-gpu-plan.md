@@ -814,8 +814,10 @@ code. Status: proposed.
 ## 9. Open questions
 
 - ~~Does GB10's NVENC support AV1 and 10-bit HEVC?~~ Answered: yes, both, with Ubuntu's `ffmpeg` (section 3.5).
-- Which OptiX SDK version to standardise on: 9.0.x matches the installed driver (ABI 110); 9.1 needs a driver
-  update. The SDK is an NVIDIA developer download, so it cannot be an npm dependency. Blocks step 3 phase 1.
+- ~~Which OptiX SDK version?~~ Answered: **9.0.0** (ABI 105) runs on the installed driver; it is installed at
+  `~/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64` and `optixTriangle` renders (`various/09-optixTriangle-9.0.0.png`).
+  9.1 needs a driver whose OptiX runtime reports ABI ≥ 118. The SDK is an NVIDIA developer download, so builds must
+  find it through a path (e.g. `OptiX_INSTALL_DIR`), not npm.
 - Is it acceptable that the OptiX backend shades in ray generation (simpler, identical path loop) rather than in
   closest-hit programs (more idiomatic, potentially faster with SER)? Decide after phase 4 measurements.
 - The lockstitch thread geometry: where does a curve description come from (the kine rig, or a new jig export)?
