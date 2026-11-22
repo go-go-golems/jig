@@ -84,6 +84,7 @@ async function main() {
   for (const f of others) {
     const diffs = compareDigests(res, JSON.parse(fs.readFileSync(f, 'utf8')));
     console.log(`compare with ${f}: ${res.length - diffs.length}/${res.length} identical${diffs.length ? '; differ: ' + diffs.map(d => `${d.id} (${d.field})`).join(', ') : ''}`);
+    if (diffs.length) process.exitCode = 1;   // a CI step fails on a difference
   }
 }
 

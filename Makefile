@@ -2,8 +2,9 @@
 #
 #   make web           build import/jigcad/dist (esbuild bundle, jig-compute wasm, OpenCascade wasm, Candela)
 #   make build         go build ./... (the server reads dist/ from disk: jigcad serve --dist)
+#   make candela-rt    the native NVIDIA renderer from import/candela/native/rt (CUDA 13, OptiX SDK, libnode-dev)
 #   make build-bin     ./dist/jigcad with the workbench embedded (-tags embed; runs `make web` first)
-#   make test          Go tests and the JavaScript suites that need no network
+#   make test          Go tests, the JavaScript suites that need no network, and Candela's engine tests
 #   make lint          golangci-lint (pinned in .golangci-lint-version) and gofmt
 #   make goreleaser    a local snapshot release for this platform (no publishing)
 #
@@ -11,7 +12,7 @@
 # import/candela has its own package.json for Candela's development tools),
 # Rust with the wasm32-unknown-unknown target (optional: without it dist/ runs the JS implementations).
 
-.PHONY: all web esbuild occt build build-bin test test-go test-js lint lint-fix golangci-lint-install gofmt \
+.PHONY: all web esbuild occt build build-bin candela-rt test test-go test-js test-candela lint lint-fix golangci-lint-install gofmt \
 	goreleaser goreleaser-check serve agent-eval-oracle clean
 
 all: lint test build
@@ -20,6 +21,11 @@ BINARY ?= jigcad
 MODULE ?= github.com/go-go-golems/jig
 CMD_DIR ?= ./cmd/$(BINARY)
 WEB ?= import/jigcad
+CANDELA ?= import/candela
+# candela-rt builds where Candela's own scripts look for it (import/candela/build/rt/candela-rt)
+RT_BUILD ?= $(CANDELA)/build/rt
+OPTIX_DIR ?=
+RENDER ?= auto
 GO_PACKAGES ?= ./cmd/... ./pkg/... ./import/...
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -61,11 +67,19 @@ build-bin: web
 	GOWORK=off CGO_ENABLED=0 go build -tags embed -ldflags "-s -w -X main.version=$(VERSION)" -o ./dist/$(BINARY) $(CMD_DIR)
 
 serve: web
-	GOWORK=off go run $(CMD_DIR) serve --dist $(WEB)/dist
+	GOWORK=off go run $(CMD_DIR) serve --dist $(WEB)/dist --render $(RENDER)
+
+# candela-rt (JIG-017): Candela's native renderer, a separate process jigcad serve starts and proxies at /rt. Only
+# on an NVIDIA machine: CUDA 13 (NVRTC, nvJPEG), the OptiX SDK 9.0 headers (OPTIX_DIR=…, else CMake's default under
+# ~/opt), libnode-dev (V8), zlib, cmake, ninja; ffmpeg with NVENC at run time for MP4. Run jig with it:
+#   make serve RENDER=$(RT_BUILD)/candela-rt
+candela-rt:
+	cmake -S $(CANDELA)/native/rt -B $(RT_BUILD) -G Ninja $(if $(OPTIX_DIR),-DOptiX_INSTALL_DIR=$(OPTIX_DIR))
+	ninja -C $(RT_BUILD)
 
 # ── tests ────────────────────────────────────────────────────────────────────
 
-test: test-go test-js
+test: test-go test-js test-candela
 
 test-go:
 	GOWORK=off go test $(GO_PACKAGES) -count=1
@@ -79,6 +93,11 @@ test-js: web
 	cd $(WEB) && node --test test/agent-eval/harness.test.mjs test/agent-eval/fea.test.mjs
 	cd $(WEB) && node test/engine-core/run.mjs
 	cd $(WEB) && node test/engine/run.mjs
+
+# Candela's engine tests (tests/session.test.ts, and tests/golden-pack.test.ts: every preset, ~7 min) in plain Node
+# through jig's esbuild; CI runs them in their own job
+test-candela: web
+	cd $(CANDELA) && ESBUILD=$(ESBUILD) node scripts/node-tests.mjs
 
 agent-eval-oracle: web
 	cd $(WEB) && node tools/agent-eval.mjs --oracle
@@ -109,4 +128,4 @@ goreleaser:
 	GOWORK=off goreleaser release $(GORELEASER_ARGS) $(GORELEASER_TARGET)
 
 clean:
-	rm -rf ./dist ./.bin/esbuild
+	rm -rf ./dist ./.bin/esbuild $(CANDELA)/dist-core $(CANDELA)/build/node-tests

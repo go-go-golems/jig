@@ -1,0 +1,80 @@
+name: candela-rt
+
+# Candela's native renderer (import/candela/native/rt) builds and runs only on an NVIDIA machine. These jobs run on a
+# self-hosted runner with the labels `self-hosted`, `linux` and `nvidia` (the DGX Spark: linux arm64, CUDA 13, the
+# OptiX SDK 9.0 headers, libnode-dev, zlib, cmake, ninja, ffmpeg with NVENC, Node 24, Go).
+# They run only when the repository variable NVIDIA_RUNNER is 'true', so a fork, or this repository before the
+# runner is registered, does not queue jobs that never start. OPTIX_DIR (a repository variable) points at the SDK
+# when it is not under the runner user's ~/opt.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'import/candela/**'
+      - 'import/jigcad/build.mjs'
+      - 'pkg/render/**'
+      - 'Makefile'
+      - '.github/workflows/candela-rt.yml'
+  pull_request:
+    paths:
+      - 'import/candela/**'
+      - 'import/jigcad/build.mjs'
+      - 'pkg/render/**'
+      - 'Makefile'
+      - '.github/workflows/candela-rt.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: candela-rt on the GPU
+    if: vars.NVIDIA_RUNNER == 'true'
+    runs-on: [self-hosted, linux, nvidia]
+    timeout-minutes: 45
+    env:
+      IDS: B-01,D-02,K-09
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build the workbench (and Candela's core bundle in import/candela/dist-core)
+        run: make web
+
+      - name: Build candela-rt
+        run: make candela-rt OPTIX_DIR="${{ vars.OPTIX_DIR }}"
+
+      - name: The same engine in Node and in candela-rt's V8 (digests of every preset at three times)
+        working-directory: import/candela
+        run: |
+          set -euo pipefail
+          ./build/rt/candela-rt digest --json build/rt-digest.json
+          ESBUILD="$GITHUB_WORKSPACE/.bin/esbuild/node_modules/esbuild/lib/main.js" \
+            node scripts/node-tests.mjs --run scripts/core-digest.ts -- --compare build/rt-digest.json
+
+      - name: Kernels compile for this GPU (CUDA and OptiX)
+        working-directory: import/candela
+        run: |
+          set -euo pipefail
+          ./build/rt/candela-rt cuda-sweep --ids "$IDS" --backend cuda
+          ./build/rt/candela-rt cuda-sweep --ids "$IDS" --backend optix
+
+      - name: A still on the GPU
+        working-directory: import/candela
+        run: ./build/rt/candela-rt render B-01 --size 320x180 --spp 16 --format png --out build/ci-render
+
+      - name: jigcad starts and proxies candela-rt
+        run: |
+          set -euo pipefail
+          GOWORK=off go build -o build/jigcad ./cmd/jigcad
+          ./build/jigcad serve --no-models --dist import/jigcad/dist --render import/candela/build/rt/candela-rt \
+            --listen 127.0.0.1:8799 &
+          trap 'kill %1' EXIT
+          for _ in $(seq 1 120); do
+            state=$(curl -fsS http://127.0.0.1:8799/api/render/capabilities | sed -n 's/.*"state":"\([a-z]*\)".*/\1/p' || true)
+            [ "$state" = up ] && break
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:8799/api/render/capabilities
+          [ "$state" = up ]

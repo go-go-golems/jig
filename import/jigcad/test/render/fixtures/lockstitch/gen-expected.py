@@ -3,10 +3,10 @@
 test/render/lockstitch.test.mjs: per part and face, the process the converter gave (turned / faced / polished)
 with its axis and centre, and, for every cylinder and cone, the converter's own per-face axis fit (cyl_axis).
 
-Rerun (from any directory except the extracted project; it reads its inputs, it runs nothing from them):
+Rerun from import/jigcad (it reads its inputs, it runs nothing from the extracted project):
 
     python3 -I test/render/fixtures/lockstitch/gen-expected.py \\
-        <pbr-spark>/tools/lockstitch/convert.py <project>/animation/web/meshes.json \\
+        ../candela/tools/lockstitch/convert.py <project>/animation/web/meshes.json \\
         <project>/animation/web/rigdata.json test/render/fixtures/lockstitch/expected.json [<scratch dir>]
 
 How:

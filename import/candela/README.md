@@ -1,4 +1,5 @@
-# Candela (TypeScript, standalone)
+# Candela
+
 
 A physically based rendering workbench: a fluent, unit-aware JavaScript API for scenes and engines, compiled to a
 progressive path tracer that runs on **WebGPU** (compute) or **WebGL2** (fragment), in a tiling React workbench
@@ -7,8 +8,39 @@ and a chat agent that drives the API.
 
 This is the standalone TypeScript port of the Candela workspace that originally shipped as a single claude.ai
 artifact page. The import, the porting decisions and a step-by-step diary are in the docmgr ticket
-[`CANDELA-001`](ttmp/2026/11/21/CANDELA-001--standalone-typescript-port-of-the-candela-pbr-workspace/index.md);
+[`CANDELA-001`](../../ttmp/2026/11/21/CANDELA-001--standalone-typescript-port-of-the-candela-pbr-workspace/index.md);
 the original sources are under that ticket's `sources/candela/`.
+
+## Candela inside jig
+
+Candela lives in jig at `import/candela` (it was the repository `wesen/2026-11-21--pbr-spark`, merged with its
+history by `git subtree` in JIG-017). jig renders its CAD models with this engine: the workbench's Render view, the
+CAD-package bridge `import/jigcad/src/render/jig-candela.js`, and `jigcad serve`, which starts `candela-rt` and
+proxies it at `/rt`. The intern guide to all of it is JIG-017's design doc
+(`../../ttmp/2026/11/22/JIG-017-CANDELA--…/design-doc/01-…`).
+
+What jig builds and runs from this directory, with no npm install (jig's own esbuild, from the repository root):
+
+| from jig's root | what it does |
+| --- | --- |
+| `make web` | jig's `dist/`, including `dist/candela.js` (engine + browser layer) and the core, written to `import/candela/dist-core/candela-core.js` and copied to jig's `dist/` |
+| `make test-candela` | `tests/session.test.ts` and `tests/golden-pack.test.ts` through `scripts/node-tests.mjs` |
+| `make candela-rt [OPTIX_DIR=…]` | `import/candela/build/rt/candela-rt` (NVIDIA machine; prerequisites below) |
+| `make serve RENDER=import/candela/build/rt/candela-rt` | jig with the native renderer behind `/rt` |
+
+`scripts/node-tests.mjs --run <script.ts> -- <args>` runs any Node-only script the same way, e.g.
+`node scripts/node-tests.mjs --run scripts/core-digest.ts -- --ids B-01 --compare rt.json` (set `ESBUILD` to jig's
+`.bin/esbuild/node_modules/esbuild/lib/main.js`, as `make test-candela` does).
+
+The golden baseline is per CPU architecture: `tests/golden/pack-digests.json` was recorded on the DGX Spark
+(arm64) and `tests/golden/pack-digests.x64.json` on x86-64; 10 of the 105 presets differ in the last bits of a few
+floats between the two.
+
+Everything below — the React workbench, `npm run …`, the screenshot and parity tools — is Candela's own development
+setup, and still works as before after `npm install` in this directory. jig does not build or ship the workbench.
+Tickets are in jig's `ttmp/` (CANDELA-001 and CANDELA-002 under `2026/11/21/`); this directory is no longer a
+docmgr root. Some defaults still carry the old repository name: render and package outputs go to
+`~/data/pbr-spark/…` (cubins are cached in `~/data/candela/cubin-cache`).
 
 ## Quick start
 
@@ -48,7 +80,7 @@ Open a preset directly with its id in the hash: `http://localhost:5173/#K-01`.
 | `spec/` | the API design spec |
 | `native/rt/` | `candela-rt`, the native render runtime (C++): embedded V8, CUDA/OptiX renderers, render jobs, live server — see below |
 | `native/optix/` | the standalone OptiX ambient-occlusion spike |
-| `ttmp/2026/11/21/CANDELA-00{1,2}--…/` | tickets: design docs, the implementation diaries, measurement evidence |
+| `../../ttmp/2026/11/21/CANDELA-00{1,2}--…/` | tickets (in jig's `ttmp/`): design docs, the implementation diaries, measurement evidence |
 
 ## candela-rt: rendering on an NVIDIA GPU (DGX Spark)
 
@@ -56,7 +88,7 @@ Open a preset directly with its id in the hash: `http://localhost:5173/#K-01`.
 (`src/engine/wgsl2cuda.ts`), compiles it with NVRTC at run time, and renders it either as plain CUDA or on the RT
 cores through OptiX (`--backend auto` picks per scene). It renders stills and sequences (PNG, EXR, PFM, MP4 through
 NVENC), denoises with the OptiX AI denoiser (`--denoise ai`), and serves the workbench's **OptiX** viewport mode
-(`serve`). Design: `ttmp/…/CANDELA-002…/design-doc/02-…`; history and measurements: that ticket's `log/01-diary.md`.
+(`serve`). Design: `../../ttmp/2026/11/21/CANDELA-002…/design-doc/02-…`; history and measurements: that ticket's `log/01-diary.md`.
 
 Prerequisites (tested on a DGX Spark: GB10 `sm_121`, Ubuntu arm64, CUDA 13.0, driver 580):
 
@@ -69,9 +101,8 @@ Prerequisites (tested on a DGX Spark: GB10 `sm_121`, Ubuntu arm64, CUDA 13.0, dr
 - IXWebSocket is fetched by CMake (FetchContent).
 
 ```sh
-npm install
-npm run bundle:core                                   # dist-core/candela-core.js, the engine for embedded V8
-cmake -S native/rt -B build/rt -G Ninja && ninja -C build/rt
+make -C ../.. web candela-rt                          # from jig: dist-core/candela-core.js and build/rt/candela-rt
+# or, standalone: npm install && npm run bundle:core && cmake -S native/rt -B build/rt -G Ninja && ninja -C build/rt
 
 ./build/rt/candela-rt render K-09 --size 960x540 --spp 256            # still → PFM; add --format png,exr
 ./build/rt/candela-rt render K-09 --param "scene=S-07 Whole head" --sequence --start 0 --end 1.9583 \
@@ -86,7 +117,7 @@ The workbench finds the server at `ws://<page host>:8790`, or at `?rt=ws://host:
 HTTP from another machine the browser has no WebGPU (not a secure context) and falls back to WebGL2 for its local
 view; the OptiX view is unaffected.
 
-Checks for this part: `npm run test:golden`, `npm run test:session`, `npx tsx scripts/parity-sweep.ts --size 320x180
+Checks for this part: `make test-candela` from jig (or `npm run test:golden`, `npm run test:session`), `npx tsx scripts/parity-sweep.ts --size 320x180
 --spp 1` (WGSL on Dawn vs CUDA), `./build/rt/candela-rt cuda-sweep`.
 
 ## The agent

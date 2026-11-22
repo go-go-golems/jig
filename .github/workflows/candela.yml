@@ -1,0 +1,40 @@
+name: candela
+
+# Candela's engine tests (import/candela/tests) in plain Node through jig's esbuild: the session test, and the golden
+# test, which compiles and packs every preset at three times and compares the digests with the baseline for this
+# architecture (tests/golden/pack-digests.x64.json here; pack-digests.json is the arm64 baseline from the DGX Spark).
+# The golden test takes about 7 minutes, so this workflow runs only when Candela or the build changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'import/candela/**'
+      - 'import/jigcad/build.mjs'
+      - 'Makefile'
+      - '.github/workflows/candela.yml'
+  pull_request:
+    paths:
+      - 'import/candela/**'
+      - 'import/jigcad/build.mjs'
+      - 'Makefile'
+      - '.github/workflows/candela.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Candela engine tests (session, golden pack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Build the core bundle and run the tests
+        env:
+          JIG_SKIP_CARGO: '1'   # the engine tests need Candela's core, not jig's Rust compute module
+        run: make test-candela
