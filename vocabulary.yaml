@@ -13,6 +13,10 @@ topics:
       description: WebGPU/WebGL GPU rendering
     - slug: port
       description: Porting existing code
+    - slug: gpu
+      description: GPU compute, drivers and performance
+    - slug: optix
+      description: NVIDIA OptiX ray tracing
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes

@@ -1,0 +1,5 @@
+config	preset	size	spp	ms	spp/s	Msamples/s	backend
+swiftshader-webgl2	B-01	640x360	4	1073	3.7	0.9	WebGL2 ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)
+swiftshader-webgl2	K-01	640x360	4	2212	1.8	0.4	WebGL2 ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)
+gpu-webgpu	K-09	640x360	16	243	65.7	15.1	WebGPU nvidia
+gpu-webgpu	K-09	1920x1080	16	1291	12.4	25.7	WebGPU nvidia

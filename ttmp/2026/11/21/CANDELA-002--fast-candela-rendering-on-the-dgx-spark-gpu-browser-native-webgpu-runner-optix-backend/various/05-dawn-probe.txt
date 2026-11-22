@@ -1,0 +1,43 @@
+# webgpu@0.6.2 on aarch64
+Warning: maxDynamicUniformBuffersPerPipelineLayout artificially reduced from 500000 to 16 to fit dynamic offset allocation limit.
+Warning: maxDynamicStorageBuffersPerPipelineLayout artificially reduced from 500000 to 16 to fit dynamic offset allocation limit.
+{
+ "info": {
+  "vendor": "nvidia",
+  "architecture": "",
+  "device": "nvidia-gb10",
+  "description": "NVIDIA: 580.178.04 580.178.4.0"
+ },
+ "limits": {
+  "maxStorageBuffersPerShaderStage": 16,
+  "maxStorageBufferBindingSize": 2147483644,
+  "maxBufferSize": 1099511627776,
+  "maxComputeWorkgroupsPerDimension": 65535
+ },
+ "features": [
+  "atomic-vec2u-min-max",
+  "texture-compression-unaligned",
+  "subgroup-size-control",
+  "texture-component-swizzle",
+  "primitive-index",
+  "texture-formats-tier2",
+  "texture-formats-tier1",
+  "subgroups",
+  "dual-source-blending",
+  "clip-distances",
+  "float32-blendable",
+  "core-features-and-limits",
+  "float32-filterable",
+  "depth-clip-control",
+  "depth32float-stencil8",
+  "texture-compression-bc",
+  "texture-compression-bc-sliced-3d",
+  "texture-compression-etc2",
+  "texture-compression-astc",
+  "texture-compression-astc-sliced-3d",
+  "timestamp-query",
+  "indirect-first-instance",
+  "rg11b10ufloat-renderable",
+  "bgra8unorm-storage"
+ ]
+}
