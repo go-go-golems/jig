@@ -185,10 +185,10 @@ FAMILY.bsdf = {
   normal: (c, n) => c.with('normal', field(n, '.normal', { type: 'v3' })),
   scale: (c, k) => new Comp('bsdf.scale', { a: c, k: field(k, 'scale(k)', { type: 'f', range: [0, 1] }) }, c.meta),
   thinFilm: (c, o: Record<string, any> = {}) => c.with('film', { thickness: field(o.thickness != null ? parseQuantity(o.thickness) : u.nm(400), 'thinFilm thickness', { type: 'f' }), ior: field(o.ior || 1.33, 'thinFilm ior', { type: 'f' }) }),
-  multiscatter: (c, how = 'kulla-conty') => c.with('ms', how !== false && how !== 'none'),
+  multiscatter: (c, how: any = 'kulla-conty') => c.with('ms', how !== false && how !== 'none'),
   over: (c, bottom) => compOf(bsdf.layer(wrap(c), bottom)),
 };
-export const bsdf = {
+export const bsdf: Record<string, any> = {
   lambert: (rho = 0.8) => mkB('lambert', { rho: field(rho, 'bsdf.lambert(ρ)', { type: 'v3' }) }),
   diffuse: (rho = 0.8) => bsdf.lambert(rho),
   dielectric: (o: Record<string, any> = {}) => {
@@ -249,7 +249,7 @@ const GLASSES = {
 const sellmeierAt = (B, C, nm) => { const l2 = (nm / 1000) ** 2; return Math.sqrt(1 + B.reduce((s, b, i) => s + b * l2 / (l2 - C[i]), 0)); };
 export const ior = {
   metal: (name) => { const m = METALS[name] || Object.entries(METALS).find(([, v]) => v.name === name)?.[1]; if (!m) throw new CandelaError('E121', `ior.metal('${name}'): no data`, { suggest: didYouMean(String(name), Object.keys(METALS)), hint: 'metals: ' + Object.keys(METALS).join(', ') }); return { __ior: 'metal', name, eta: m.eta, k: m.k, f0: m.eta.map((e, i) => ((e - 1) ** 2 + m.k[i] ** 2) / ((e + 1) ** 2 + m.k[i] ** 2)) }; },
-  sellmeier: ({ B, C }) => { if (!B || !C || B.length !== 3 || C.length !== 3) throw new CandelaError('E121', 'ior.sellmeier({ B: [b1, b2, b3], C: [c1, c2, c3] })  (λ in µm)'); const o = { __ior: 'sellmeier', B, C, at: q => sellmeierAt(B, C, isQ(q) ? q.v * 1e9 : q), abbe: () => { const nd = sellmeierAt(B, C, 587.56), nF = sellmeierAt(B, C, 486.13), nC = sellmeierAt(B, C, 656.27); return +((nd - 1) / (nF - nC)).toFixed(2); } }; o.nd = sellmeierAt(B, C, 587.56); return o; },
+  sellmeier: ({ B, C }) => { if (!B || !C || B.length !== 3 || C.length !== 3) throw new CandelaError('E121', 'ior.sellmeier({ B: [b1, b2, b3], C: [c1, c2, c3] })  (λ in µm)'); const o: any = { __ior: 'sellmeier', B, C, at: q => sellmeierAt(B, C, isQ(q) ? q.v * 1e9 : q), abbe: () => { const nd = sellmeierAt(B, C, 587.56), nF = sellmeierAt(B, C, 486.13), nC = sellmeierAt(B, C, 656.27); return +((nd - 1) / (nF - nC)).toFixed(2); } }; o.nd = sellmeierAt(B, C, 587.56); return o; },
   glass: (name = 'N-BK7') => { const g = GLASSES[name]; if (!g) throw new CandelaError('E121', `ior.glass('${name}')`, { suggest: didYouMean(name, Object.keys(GLASSES)) }); return ior.sellmeier(g); },
   cauchy: (A = 1.5, Bc = 0.004) => ({ __ior: 'cauchy', A, B: Bc, at: q => A + Bc / ((isQ(q) ? q.v * 1e9 : q) / 1000) ** 2, nd: A + Bc / 0.5876 ** 2 }),
   water: 1.333, ice: 1.31, diamond: 2.42, sapphire: 1.77, acrylic: 1.49, quartz: 1.544,
@@ -304,16 +304,16 @@ FAMILY.material = {
 const MAT_GET = { surface: c => wrap(lowerSurfaceOnly(c)) };
 spec('material.plain', 'material', {}, MAT_GET);
 
-export function material(b) {
+const materialOf = function material(b) {
   if (!isComp(b, 'bsdf')) throw new CandelaError('E121', `material(bsdf) takes a BSDF — bsdf.lambert(0.5), bsdf.layer(…) — or use material.pbr()`);
   return wrap(new Comp('material.plain', { surface: compOf(b) }, { frags: ([] as any[]), loc: callSite(), unchecked: ([] as any[]) }));
-}
+};
 // a material kind defined by params and a body over them: its params become fluent methods, sliders and attributes
 const DEFINED = new Map();
-material.define = (name, specp, body) => {
+materialOf.define = (name, specp, body) => {
   if (typeof body !== 'function') throw new CandelaError('E121', 'material.define(name, { attr: param.float(…) }, m => surface)');
   const attrs: Record<string, any> = {};
-  for (const [k, d] of Object.entries(specp)) { const def = d && d.__def; if (!def) throw new CandelaError('E121', `material.define: attribute '${k}' needs a param definition`); attrs[k] = { kind: def.kind, def: def.def, range: def.cfg.range, type: def.kind === 'color' ? 'v3' : 'f' }; }
+  for (const [k, d] of Object.entries<any>(specp)) { const def = d && d.__def; if (!def) throw new CandelaError('E121', `material.define: attribute '${k}' needs a param definition`); attrs[k] = { kind: def.kind, def: def.def, range: def.cfg.range, type: def.kind === 'color' ? 'v3' : 'f' }; }
   const kind = 'material.' + name;
   const methods: Record<string, any> = {};
   for (const [k, a] of Object.entries(attrs)) methods[k] = (c, v) => c.with(k, field(v, `${name}.${k}`, { type: a.type, range: a.range && a.kind !== 'color' ? a.range : null }));
@@ -323,6 +323,8 @@ material.define = (name, specp, body) => {
   make.attrs = attrs; make.kind = kind;
   return make;
 };
+/** `material(bsdf)`, `material.define(…)` and the kinds stdlib registers on it (pbr, glass, metal, …) */
+export const material: typeof materialOf & Record<string, any> = materialOf;
 export const definedMaterial = kind => DEFINED.get(kind);
 
 // ---------- lights ----------
@@ -403,7 +405,7 @@ const CAM = {
   blades: (c, n) => c.with('blades', n), bladeRotation: (c, a) => c.with('bladeRot', ang(a, 'bladeRotation')),
   // motion blur: the scene is sampled at `steps` instants across `shutter` seconds of scene time (or a shutter
   // angle at a frame rate); each path sees the scene at its own instant. Independent of the exposure's shutter.
-  motionBlur: (c, o: Record<string, any> = {}) => {
+  motionBlur: (c, o: any = {}) => {
     if (o === false) return c.with('motion', null);
     let iv = o.shutter != null ? +parseQuantity(o.shutter) : null;
     if (iv == null && o.angle != null) iv = (ang(o.angle, 'motionBlur angle') / (Math.PI * 2)) / (o.fps || 24);
@@ -516,12 +518,12 @@ export function allIds(sc) { const out: any[] = []; const v = c => { if (c.props
 // ---------- fragments ----------
 export function fragment(name, o: Record<string, any> = {}) {
   if (typeof name !== 'string') throw new CandelaError('E121', "fragment('name')");
-  const F = { __fragment: true, name, kinds: ([] as any[]), req: ([] as any[]), ps: ({} as Record<string, any>), ms: ({} as Record<string, any>), ar: ({} as Record<string, any>), lowers: ([] as any[]), vals: ([] as any[]), override: !!o.override, renames: ({} as Record<string, any>) };
+  const F: any = { __fragment: true, name, kinds: ([] as any[]), req: ([] as any[]), ps: ({} as Record<string, any>), ms: ({} as Record<string, any>), ar: ({} as Record<string, any>), lowers: ([] as any[]), vals: ([] as any[]), override: !!o.override, renames: ({} as Record<string, any>) };
   F.targetsKind = k => F.kinds.length === 0 || F.kinds.some(t => k === t || k.startsWith(t + '.') || (t === 'material' && k.startsWith('material')));
   F.methodTable = () => {
     const t: Record<string, any> = {};
-    for (const [k, d] of Object.entries(F.ps)) { const nm = F.renames[k] || k; t[nm] = (c, v) => c.with('frag:' + name + ':' + k, isParam(v) ? v : field(v, `${name}.${k}`, { type: d.type })); }
-    for (const [k, f] of Object.entries(F.ms)) { const nm = F.renames[k] || k; t[nm] = (c, ...a) => compOrValue(f(wrap(c), ...a)); }
+    for (const [k, d] of Object.entries<any>(F.ps)) { const nm = F.renames[k] || k; t[nm] = (c, v) => c.with('frag:' + name + ':' + k, isParam(v) ? v : field(v, `${name}.${k}`, { type: d.type })); }
+    for (const [k, f] of Object.entries<any>(F.ms)) { const nm = F.renames[k] || k; t[nm] = (c, ...a) => compOrValue(f(wrap(c), ...a)); }
     return t;
   };
   F.aroundsFor = m => F.ar[m] || [];
@@ -530,7 +532,7 @@ export function fragment(name, o: Record<string, any> = {}) {
     targetsKind: F.targetsKind, methodTable: F.methodTable, aroundsFor: F.aroundsFor,
     targets: (...k) => { F.kinds.push(...k.flat()); return api; },
     requires: (...a) => { F.req.push(...a.flat()); return api; },
-    params: (ps) => { for (const [k, d] of Object.entries(ps)) { const def = d.__def; F.ps[k] = { def: def.def, kind: def.kind, type: def.kind === 'color' ? 'v3' : 'f', range: def.cfg.range }; } return api; },
+    params: (ps) => { for (const [k, d] of Object.entries<any>(ps)) { const def = d.__def; F.ps[k] = { def: def.def, kind: def.kind, type: def.kind === 'color' ? 'v3' : 'f', range: def.cfg.range }; } return api; },
     methods: (ms) => { Object.assign(F.ms, ms); return api; },
     around: (m, fn) => { (F.ar[m] = F.ar[m] || []).push(fn); return api; },
     lower: fn => { F.lowers.push(fn); return api; },
@@ -567,7 +569,7 @@ function engineBuilder(cfg) {
   const B = {
     __engine: true, cfg,
     integrator: i => { if (!i || !i.__integrator) throw new CandelaError('E121', '.integrator(integrator.path({…}))'); return engineBuilder(Object.assign({}, cfg, { integrator: i })); },
-    spectral: (o: Record<string, any> = {}) => engineBuilder(Object.assign({}, cfg, { spectral: o === false ? false : { mode: o.mode || 'hero' } })),
+    spectral: (o: any = {}) => engineBuilder(Object.assign({}, cfg, { spectral: o === false ? false : { mode: o.mode || 'hero' } })),
     post: (...p) => { for (const x of p) if (!x || !x.__pass) throw new CandelaError('E121', '.post(pass.tonemap(\'agx\'), …) takes passes'); return engineBuilder(Object.assign({}, cfg, { post: p })); },
     backend: b => { if (!['auto', 'webgpu', 'webgl2'].includes(b)) throw new CandelaError('E121', ".backend('auto' | 'webgpu' | 'webgl2')"); return engineBuilder(Object.assign({}, cfg, { backend: b })); },
     spp: n => engineBuilder(Object.assign({}, cfg, { spp: n })), sppPerFrame: n => engineBuilder(Object.assign({}, cfg, { sppPerFrame: n })),
@@ -591,7 +593,7 @@ export const isEngine = x => !!(x && x.__engine);
 function lowerSurfaceOnly(c) { if (c.kind === 'material.plain') return c.props.surface; const d = DEFINED.get(c.kind); if (!d) return null; return compOf(d.body(attrsOf(c, d))); }
 export function attrsOf(c, d) {
   const m: Record<string, any> = {};
-  for (const [k, a] of Object.entries(d.attrs)) { const v = c.props[k]; m[k] = E(v != null ? v : (a.kind === 'color' ? constNode(a.def) : typeof a.def === 'boolean' ? constNode(a.def ? 1 : 0) : constNode(a.def))); }
+  for (const [k, a] of Object.entries<any>(d.attrs)) { const v = c.props[k]; m[k] = E(v != null ? v : (a.kind === 'color' ? constNode(a.def) : typeof a.def === 'boolean' ? constNode(a.def ? 1 : 0) : constNode(a.def))); }
   return m;
 }
 export { Comp, label as compLabel };

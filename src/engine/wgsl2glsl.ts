@@ -25,7 +25,7 @@ function selects(s) {
 export function wgslToGlsl(src) {
   const lines = src.split('\n'), out: any[] = [];
   let inStruct = false;
-  for (let raw: any of lines) {
+  for (let raw of lines) {
     let L = raw;
     if (inStruct) {
       const m = L.match(/^(\s*)(\w+)\s*:\s*([\w<>, ]+?),?\s*$/);

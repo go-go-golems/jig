@@ -21,7 +21,7 @@ const show = v => {
 function surfaceTree(c, ind, out) {
   if (!c) return;
   const p = c.props, k = c.kind.replace('bsdf.', '');
-  const attrs = Object.entries(p).filter(([key, v]) => v != null && !['a', 'b', 'top', 'bottom', 'loc'].includes(key)).map(([key, v]) => `${key}=${key === 'film' ? `film(${show(v.thickness)} m)` : show(v)}`).join('  ');
+  const attrs = Object.entries<any>(p).filter(([key, v]) => v != null && !['a', 'b', 'top', 'bottom', 'loc'].includes(key)).map(([key, v]) => `${key}=${key === 'film' ? `film(${show(v.thickness)} m)` : show(v)}`).join('  ');
   out.push(`${ind}${k}  ${attrs}`);
   for (const key of ['a', 'b', 'top', 'bottom']) if (p[key]) surfaceTree(p[key], ind + '  ', out);
 }

@@ -51,7 +51,7 @@ function labScope(host) {
   const files = {
     list: () => Object.keys(host.files).sort().map(p => ({ path: p, lines: host.files[p].split('\n').length, edited: host.isDirty(p) })),
     read: (path, from, to) => { const s = host.files[path]; if (s == null) throw new Error('no file ' + path); if (from == null) return s; return s.split('\n').slice(from - 1, to || from + 40).map((l, i) => `${from + i}  ${l}`).join('\n'); },
-    grep: (pattern, path) => { const re = pattern instanceof RegExp ? pattern : new RegExp(pattern); const out: any[] = []; for (const [p, s] of Object.entries(host.files)) { if (path && p !== path) continue; s.split('\n').forEach((l, i) => { if (re.test(l)) out.push(`${p}:${i + 1}  ${l.trim().slice(0, 160)}`); }); } return out.slice(0, 80); },
+    grep: (pattern, path) => { const re = pattern instanceof RegExp ? pattern : new RegExp(pattern); const out: any[] = []; for (const [p, s] of Object.entries<any>(host.files)) { if (path && p !== path) continue; s.split('\n').forEach((l, i) => { if (re.test(l)) out.push(`${p}:${i + 1}  ${l.trim().slice(0, 160)}`); }); } return out.slice(0, 80); },
     write: (path, src) => { if (typeof src !== 'string') throw new Error('write(path, src): src must be a string'); host.files[path] = src; host.saveEditsSoon(); host.notify(); return { path, lines: src.split('\n').length }; },
     edit: (path, find, replace) => {
       const s = host.files[path]; if (s == null) throw new Error('no file ' + path);

@@ -156,7 +156,7 @@ export async function runRender(o, ctx) {
       // exposure: metered on the first frame and then held, so a sequence does not flicker
       if (lockedEV != null) { vp.lockEV = true; vp.ev = lockedEV; } else vp.lockEV = false;
       await accumulate(vp, spp, signal, x => prog((f + x * 0.95) / frames, `frame ${f + 1}/${frames}`));
-      if (lockedEV == null) { if (vp.metering) await new Promise(r => { const k = setInterval(() => { if (!vp.metering) { clearInterval(k); r(); } }, 10); }); lockedEV = vp.ev; vp.lockEV = true; }
+      if (lockedEV == null) { if (vp.metering) await new Promise<void>(r => { const k = setInterval(() => { if (!vp.metering) { clearInterval(k); r(); } }, 10); }); lockedEV = vp.ev; vp.lockEV = true; }
       vp.show(); await vp.backend.idle();
       const stem = o.kind === 'sequence' ? `${base}.${pad(f + (o.firstFrame ?? 1))}` : base;
       if (writer) await writer.add(await vp.backend.readRGBA8());

@@ -83,7 +83,7 @@ export async function runFiles(files, main = 'scene.js', extraScope: Record<stri
   };
   const pending = order.slice(); let guard = 0;
   while (pending.length && guard++ < 50) {
-    const p = pending.shift();
+    const p = pending.shift()!;
     try { await evalModule(p); } catch (e) { if (e && e.code === 'E152') { pending.push(p); continue; } throw e; }
   }
   const ex = await evalModule(main);

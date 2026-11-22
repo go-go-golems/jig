@@ -5,16 +5,21 @@ import { isQ, Quantity } from './units';
 
 // ---------- nodes ----------
 let NID = 0;
-const TABLE = new Map();
+/** field value types: f32, bool, vec2f, vec3f, vec4f */
+export type FType = 'f' | 'b' | 'v2' | 'v3' | 'v4';
+const TABLE = new Map<string, Node>();
+/** a hash-consed expression node: equal (op, type, x, args) share one Node and one id */
 export class Node {
-  op: any;
-  type: any;
-  args: any;
+  op: string;
+  type: string;
+  args: Node[];
+  /** op payload: a constant, a context name, a param id, … */
   x: any;
   id: number;
-  constructor(op, type, args, x) { this.op = op; this.type = type; this.args = args; this.x = x; this.id = 0; }
+  key: string;
+  constructor(op: string, type: string, args: Node[], x: any) { this.op = op; this.type = type; this.args = args; this.x = x; this.id = 0; }
 }
-export function node(op, type, args: any[] = [], x = null) {
+export function node(op: string, type: string, args: Node[] = [], x: any = null): Node {
   const key = op + '|' + type + '|' + (x == null ? '' : JSON.stringify(x)) + '|' + args.map(a => a.id).join(',');
   let n = TABLE.get(key);
   if (n) return n;
@@ -67,7 +72,9 @@ const handler = {
   getOwnPropertyDescriptor() { return undefined; },
   set(t, k) { throw new CandelaError('E105', `fields are immutable values: cannot set '${String(k)}'`, { hint: 'make a new field: const b = a.mul(2)' }); },
 };
-export function E(n) { const t: Record<string, any> = {}; t[EXPR] = n; return new Proxy(t, handler); }
+/** a field: the symbolic proxy around a node. Dynamic by design (methods, swizzles), so typed as `any`. */
+export type Field = any;
+export function E(n: Node): Field { const t: any = {}; t[EXPR] = n; return new Proxy(t, handler); }
 
 // ---------- lifting JS values to nodes ----------
 const NAMED = { white: [1, 1, 1], black: [0, 0, 0], grey: [0.18, 0.18, 0.18], gray: [0.18, 0.18, 0.18], red: [0.8, 0.04, 0.04], green: [0.05, 0.6, 0.08], blue: [0.03, 0.08, 0.75] };
@@ -281,7 +288,7 @@ export const cmf = l => [
   0.821 * g(l, 568.8, 46.9, 40.5) + 0.286 * g(l, 530.9, 16.3, 31.1),
   1.217 * g(l, 437.0, 11.8, 36.0) + 0.681 * g(l, 459.0, 26.0, 13.8),
 ];
-export const xyzToLinearSRGB = ([X, Y, Z]) => [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z];
+export const xyzToLinearSRGB = ([X, Y, Z]: number[]): number[] => [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z];
 export const planck = (lnm, T) => { const l = lnm * 1e-9, h = 6.62607015e-34, c = 2.99792458e8, k = 1.380649e-23; return 2 * h * c * c / (l ** 5 * (Math.exp(h * c / (l * k * T)) - 1)); };
 const bbCache = new Map();
 export function blackbodyRGB(T) {

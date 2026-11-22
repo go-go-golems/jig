@@ -167,7 +167,8 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
   if (!sc || sc.kind !== 'scene') throw new CandelaError('E121', 'compile(scene, engine): the first argument must be a scene()');
   const eng = engineB && engineB.cfg ? engineB.cfg : engine.realtime().cfg;
   const spectralOn = !!eng.spectral;
-  const S = {
+  // the compile state: grows as the scene is walked (objects, lights, materials, media, env, mesh defs, …)
+  const S: any = {
     objs: ([] as any[]), lights: ([] as any[]), mats: ([] as any[]), matByKey: new Map(), matByComp: new Map(), media: ([] as any[]), sdfs: ([] as any[]), heights: ([] as any[]), dens: ([] as any[]), helpers: ([] as any[]),
     slots: new Map(), slotList: ([] as any[]), sun: null, sky: null, env: null, fog: null, cam: sc.props.camera, behaviors: ([] as any[]), moving: { time: false, param: false },
     ids: new Map(), spectralUse: false, matCode: ([] as any[]), warnedKeys: new Set(), shapeCount: new Map(), autoMats: new Map(), triangles: 0, nodeIds: new Set(),
@@ -318,7 +319,7 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
       for (const f of frags) {
         const F = fragInternals(f);
         for (const r of F.req) if (!(r in attrs)) throw new CandelaError('E130', `fragment '${F.name}' needs attribute '${r}', which ${mc.kind} does not expose`, { loc, hint: 'apply it to a material.pbr() (or a material.define with that attribute)' });
-        const fv: Record<string, any> = {}; for (const [k, d] of Object.entries(F.ps)) { const v = mc.props['frag:' + F.name + ':' + k]; fv[k] = E(v != null ? (isParam(v) ? lift(v) : v) : (d.kind === 'color' ? constNode(d.def) : constNode(+d.def || 0))); }
+        const fv: Record<string, any> = {}; for (const [k, d] of Object.entries<any>(F.ps)) { const v = mc.props['frag:' + F.name + ':' + k]; fv[k] = E(v != null ? (isParam(v) ? lift(v) : v) : (d.kind === 'color' ? constNode(d.def) : constNode(+d.def || 0))); }
         for (const vf of F.vals) vf(mc, fv, { warn: (code, msg) => report('warning', code, msg, { loc }), info: (code, msg) => report('info', code, msg, { loc }) });
         for (const lf of F.lowers) {
           const view = mkView(attrs);
@@ -456,7 +457,7 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
     const ix = S.media.findIndex(m => m.comp === mcomp); if (ix >= 0) return ix;
     const p = mcomp.props, id = S.media.length;
     const alb = p.albedo.op === 'const' ? p.albedo.x : (warn('W350', 'a medium albedo must be a constant colour here; using its value at the origin', { loc: mcomp.meta.loc }), evalNode(p.albedo, {}));
-    const m = { comp: mcomp, id, sigmaT: p.sigmaT, albedo: Array.isArray(alb) ? alb : [alb, alb, alb], g: p.g, hetero: mcomp.kind === 'medium.heterogeneous' };
+    const m: any = { comp: mcomp, id, sigmaT: p.sigmaT, albedo: Array.isArray(alb) ? alb : [alb, alb, alb], g: p.g, hetero: mcomp.kind === 'medium.heterogeneous' };
     if (m.hetero) {
       const k = S.dens.length; S.dens.push({ node: p.density, med: id });
       const b = p.bounds; const M = nodeXf(b, env0); const half = b.props.size ? b.props.size.map(v => valueOf(v, env0) / 2) : [1, 1, 1];
@@ -471,7 +472,7 @@ export function compile(sceneB, engineB, opts: Record<string, any> = {}) {
       }
       m.majorant = maj;
       // an invisible box that switches the path into the medium
-      const o = { comp: b, ty: 4, pr: [half[0], half[1], half[2], 0], bound: 1, recipe: { parent: null, c: b, mv: null }, mat: null, lightIdx: -1, irand: 0, id: null, tags: ([] as any[]), flags: 1, mediumBox: true };
+      const o: any = { comp: b, ty: 4, pr: [half[0], half[1], half[2], 0], bound: 1, recipe: { parent: null, c: b, mv: null }, mat: null, lightIdx: -1, irand: 0, id: null, tags: ([] as any[]), flags: 1, mediumBox: true };
       const mid = S.mats.length;
       S.mats.push({ id: mid, code: `fn mat_${mid}(h: Hit, wo: vec3f, uIn: f32) -> Lobe {\n  var L: Lobe = lobeNone();\n  L.kind = 6; L.N = h.N; L.med = ${id};\n  return L;\n}\n`, label: 'medium bounds' });
       o.mat = mid; S.objs.push(o);
@@ -556,7 +557,7 @@ function material_plainLambert() { return { [Symbol.for('candela.comp')]: new Co
 
 // ---------- custom integrators: a traced kernel over a small transport API ----------
 function genCustomKernel(integ, uniform) {
-  const n = (op, type, args: any[] = [], x = null) => node(op, type, args, x);
+  const n = (op: string, type: string, args: any[] = [], x: any = null) => node(op, type, args, x);
   const ray = { o: E(n('ctx', 'v3', [], 'ro')), d: E(n('ctx', 'v3', [], 'rd')) };
   let tag = 0;
   const hitOf = (r) => {
@@ -584,7 +585,7 @@ function genCustomKernel(integ, uniform) {
       uniformSphere: () => E(n('uSphere', 'v3', [], { tag: ++tag })),
     },
   };
-  const P: Record<string, any> = {}; for (const [k, d] of Object.entries(integ.params || {})) P[k] = d && d.__def ? d.__def.def : d;
+  const P: Record<string, any> = {}; for (const [k, d] of Object.entries<any>(integ.params || {})) P[k] = d && d.__def ? d.__def.def : d;
   const root = lift(integ.kernel(api, P));
   if (root.type !== 'v3' && root.type !== 'f') throw new CandelaError('E122', 'an integrator kernel returns a colour (Vec3)');
   const gen = new Gen({ uniform, prefix: 'k', label: 'an integrator', ctx: { ro: 'ro', rd: 'rd', time: 'gTime' } });
@@ -831,8 +832,8 @@ export function poseMatrix(p, id = '?') {
 }
 export function normPoses(P) {
   if (!P) return null;
-  if (P instanceof Map && P._norm) return P;
-  const out = new Map(); out._norm = true;
+  if (P instanceof Map && (P as any)._norm) return P;
+  const out: any = new Map(); out._norm = true;
   for (const [k, v] of P instanceof Map ? P : Object.entries(P)) if (v != null) out.set(String(k), { M: poseMatrix(v, k), local: !!(v && v.local) });
   return out;
 }

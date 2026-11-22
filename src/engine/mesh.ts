@@ -12,6 +12,11 @@ const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / 
 
 // ---------- the part definition ----------
 export class MeshDef {
+  /** the bottom-level BVH, built once and shared by copies with other metadata */
+  _blas: any;
+  /** set by mesh.gear: the pitch radius and tooth count, for meshing gears together */
+  pitchRadius: number | undefined;
+  teeth: number | undefined;
   name: any;
   tris: any;
   triFace: any;
@@ -252,7 +257,7 @@ export const mesh = {
   bearing(o: Record<string, any> = {}) {
     const D = o.outer || 0.035, d = o.inner || 0.015, B = o.width || 0.011, n = o.balls || 9;
     const rm = (D + d) / 4, rb = Math.min((D - d) / 4 * 0.55, B * 0.38);
-    const parts = [
+    const parts: any[] = [
       { mesh: mesh.tube(D / 2, rm + rb * 0.55, B, { faces: ['outer-side', 'outer-race-od', 'outer-side-2', 'outer-raceway'], segments: 48 }), at: [0, 0, 0] },
       { mesh: mesh.tube(rm - rb * 0.55, d / 2, B, { faces: ['inner-side', 'inner-raceway', 'inner-side-2', 'bore'], segments: 48 }), at: [0, 0, 0] },
     ];
@@ -338,16 +343,16 @@ export function blasOf(def) {
   const bounds = (lo, hi) => { const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity], cm = [Infinity, Infinity, Infinity], cx = [-Infinity, -Infinity, -Infinity]; for (let k = lo; k < hi; k++) { const t = order[k]; for (let i = 0; i < 3; i++) { if (bmn[t * 3 + i] < mn[i]) mn[i] = bmn[t * 3 + i]; if (bmx[t * 3 + i] > mx[i]) mx[i] = bmx[t * 3 + i]; const c = cen[t * 3 + i]; if (c < cm[i]) cm[i] = c; if (c > cx[i]) cx[i] = c; } } return { mn, mx, cm, cx }; };
   const mk = () => { nodes.push(new Float64Array(8)); return nodes.length - 1; };
   const root = mk();
-  const stack = [[root, 0, n]];
+  const stack: [any, number, number][] = [[root, 0, n]];
   while (stack.length) {
-    const [ni, lo, hi] = stack.pop();
+    const [ni, lo, hi] = stack.pop()!;
     const b = bounds(lo, hi), N = nodes[ni];
     N[0] = b.mn[0]; N[1] = b.mn[1]; N[2] = b.mn[2]; N[4] = b.mx[0]; N[5] = b.mx[1]; N[6] = b.mx[2];
     const cnt = hi - lo;
     const leaf = () => { N[3] = lo; N[7] = cnt; };
     if (cnt <= LEAF) { leaf(); continue; }
     // best SAH split over the three axes
-    let best = { cost: Infinity, axis: -1, split: 0 };
+    let best: any = { cost: Infinity, axis: -1, split: 0 };
     for (let ax = 0; ax < 3; ax++) {
       const lo_ = b.cm[ax], ext = b.cx[ax] - lo_;
       if (ext < 1e-12) continue;
@@ -388,9 +393,9 @@ export function rayMesh(def, o, d, tmax = Infinity) {
   const B = blasOf(def), N = B.nodes, T = B.tris;
   const inv = [1 / (d[0] || 1e-12), 1 / (d[1] || 1e-12), 1 / (d[2] || 1e-12)];
   let best = tmax, hit: any = null;
-  const st = [0];
+  const st: number[] = [0];
   while (st.length) {
-    const ni = st.pop(), b = ni * 8;
+    const ni = st.pop()!, b = ni * 8;
     let t0 = -Infinity, t1 = best;
     for (let i = 0; i < 3; i++) { const a = (N[b + i] - o[i]) * inv[i], c = (N[b + 4 + i] - o[i]) * inv[i]; t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c)); }
     if (t0 > t1 || t1 < 0) continue;

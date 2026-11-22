@@ -1,16 +1,27 @@
 // viewport.js — drives a backend: compiles a scene's shaders, packs and uploads its data, accumulates samples,
 // meters the exposure, and answers screenshots and light-meter readings.
-import { GPURenderer, GLRenderer, displaySource, TONEMAP_IX } from './render';
+import { GPURenderer, GLRenderer, displaySource, TONEMAP_IX, type Backend } from './render';
 import { cameraUniforms, U_BASE, vec3 as V } from './compile';
 import { cmf, xyzToLinearSRGB, Gen, genFunction, lift, E, node, withTracer, nodeOf, constNode, parseColor } from './fx';
 import { CandelaError } from './diag';
 
 // white balance for the spectral engine: the flat spectrum renders as (1, 1, 1)
-const WB = (() => { const s = [0, 0, 0]; for (let l = 380; l < 780; l += 1) { const c = xyzToLinearSRGB(cmf(l + 0.5)); for (let i = 0; i < 3; i++) s[i] += c[i]; } return s.map(v => 106.857 / v); })();
+const WB = (() => { const s: [number, number, number] = [0, 0, 0]; for (let l = 380; l < 780; l += 1) { const c = xyzToLinearSRGB(cmf(l + 0.5)); for (let i = 0; i < 3; i++) s[i] += c[i]; } return s.map(v => 106.857 / v); })();
 
 export class Viewport {
-  canvas: any;
-  backend: any;
+  canvas: HTMLCanvasElement & { __gpuUsed?: boolean };
+  backend: Backend | null | any;
+  // set by the host (view settings) and the render queue (fixed-size, locked-exposure output renders)
+  /** transform overrides for animation/behaviours, by node id */
+  overrides: any;
+  motionOverride: any;
+  fixedSize: [number, number] | null | undefined;
+  focusPoint: any;
+  lockEV: boolean | undefined;
+  aov: string | undefined;
+  tonemapOverride: string | null | undefined;
+  falseColorOverride: boolean | null | undefined;
+  denoiseOverride: boolean | null | undefined;
   spp: number;
   frameN: number;
   ev: number;
@@ -46,7 +57,7 @@ export class Viewport {
     if (prefer !== 'webgl2') { try { b = await GPURenderer.create(this.canvas); } catch (e) { this.notes.push('WebGPU: ' + e.message); b = null; } if (!b && prefer === 'webgpu') this.notes.push('WebGPU is not available in this browser; using WebGL2'); }
     if (!b) {
       // a canvas that was given to WebGPU cannot become WebGL2: swap in a fresh one
-      if (this.canvas.__gpuUsed) { const c2 = this.canvas.cloneNode(); this.canvas.replaceWith(c2); this.canvas = c2; }
+      if (this.canvas.__gpuUsed) { const c2 = this.canvas.cloneNode() as HTMLCanvasElement; this.canvas.replaceWith(c2); this.canvas = c2; }
       b = GLRenderer.create(this.canvas);
     } else this.canvas.__gpuUsed = true;
     if (!b) throw new CandelaError('E710', 'this browser has neither WebGPU nor WebGL2 with float render targets');
@@ -85,7 +96,7 @@ export class Viewport {
   repack(time = 0, overrides = null) {
     if (!this.compiled) return;
     this.time = time;
-    const env = { time, overrides: overrides || this.overrides || null, poses: this.posesFor(time), seed: this.seed || 0 };
+    const env: any = { time, overrides: overrides || this.overrides || null, poses: this.posesFor(time), seed: this.seed || 0 };
     // motion blur: the scene at `steps` instants across the shutter, centred on now
     const mb = this.motionOverride !== undefined ? this.motionOverride : this.compiled.motionBlur;
     if (mb && mb.interval > 0 && mb.steps >= 2) {
@@ -243,10 +254,10 @@ export class Viewport {
   async snapshot(type = 'image/png') {
     await this.backend.idle();
     const img = await this.backend.readRGBA8();
-    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0);
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d')!.putImageData(img, 0, 0);
     return await new Promise(res => c.toBlob(b => res(b), type, 0.92));
   }
-  async snapshotCanvas() { await this.backend.idle(); const img = await this.backend.readRGBA8(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').putImageData(img, 0, 0); return c; }
+  async snapshotCanvas() { await this.backend.idle(); const img = await this.backend.readRGBA8(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d')!.putImageData(img, 0, 0); return c; }
 }
 
 // a user pass: pass.define(name, { params, kernel: ({ color, uv, albedo, normal }, params) => colour }) → WGSL

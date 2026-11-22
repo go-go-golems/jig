@@ -13,7 +13,7 @@ export const weathering = fragment('weathering')
   .methods({
     aged(self, years) {
       const y = liftParam(years);
-      return self.wear(y.map(v => Math.min(1, (typeof v === 'number' ? v : +v) / 25))).dust(y.map(v => Math.min(1, (typeof v === 'number' ? v : +v) / 8)));
+      return self.wear((y as any).map(v => Math.min(1, (typeof v === 'number' ? v : +v) / 25))).dust((y as any).map(v => Math.min(1, (typeof v === 'number' ? v : +v) / 8)));
     },
   })
   .lower((m, f) => {

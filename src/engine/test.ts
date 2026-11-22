@@ -64,7 +64,7 @@ const mkRng = (s = 1) => () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s <<
 const surfaceOf = b => { const c = compOf(b); if (!c) throw new CandelaError('E121', 'test: pass a BSDF (bsdf.…) or a material'); if (c.kind.startsWith('material')) return compOf(b.surface); return c; };
 const deg = a => typeof a === 'number' ? a : a && a.dim === 'angle' ? a.v * 180 / Math.PI : +a;
 
-export const test = {
+export const test: Record<string, any> = {
   // directional albedo E(θo) = ∫ f cos dωi: 1 for a lossless surface, < 1 when energy is lost
   furnace(b, o: Record<string, any> = {}) {
     const c = surfaceOf(b), angles = (o.angles || [0, 45, 75, 85]).map(deg), n = o.spp || 1 << 16, rng = mkRng(o.seed || 7);
@@ -81,6 +81,6 @@ export const test = {
   },
   // f(ωi, ωo) = f(ωo, ωi): for the leaf BSDFs here this holds by construction; report the stochastic estimate
   reciprocity(b, o: Record<string, any> = {}) { const c = surfaceOf(b); return { pairs: o.pairs || 1000, maxRelError: 0, note: `${c.kind}: GGX + Smith (height-correlated) and Lambert are symmetric in ωi and ωo` }; },
-  energy(b) { const r = test.furnace(b, { spp: 1 << 14 }); return { maxAlbedo: Math.max(...Object.values(r.albedo)), conserving: !r.gain }; },
+  energy(b) { const r = test.furnace(b, { spp: 1 << 14 }); return { maxAlbedo: Math.max(...Object.values<number>(r.albedo)), conserving: !r.gain }; },
 };
 test.furnace.sweep = (fn, o) => test.sweep(fn, o);

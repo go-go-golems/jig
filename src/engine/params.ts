@@ -6,7 +6,7 @@ import { Quantity, isQ, u, fmtNum } from './units';
 
 // values outlive builds: the scene file re-runs, the sliders keep their places
 export const store = {
-  values: new Map(), defs: new Map(), order: ([] as any[]), listeners: new Set(), version: 0,
+  values: new Map<string, any>(), defs: new Map<string, any>(), order: ([] as any[]), listeners: new Set<(p: any) => void>(), version: 0,
   onChange(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
   emit(p) { this.version++; for (const f of this.listeners) { try { f(p); } catch (e) { console.error(e); } } },
   beginBuild() { this.defs = new Map(); this.order = []; },
@@ -39,6 +39,8 @@ function normValue(kind, v) {
 }
 
 class ParamDef {
+  /** choice params: the allowed values */
+  options: string[] | undefined;
   kind: any;
   k: any;
   def: any;
@@ -112,7 +114,7 @@ function guard(H, what) {
     get(t, k, recv) {
       if (k in t) return t[k];
       if (typeof k === 'string' && FIELD_METHODS.has(k)) { if (t.derived) registerParam(recv); const f = E(resolveParam(recv)); return typeof f[k] === 'function' ? (...a) => f[k](...a) : f[k]; }
-      if (k === Symbol.toPrimitive) return () => { throw new CandelaError('E203', `${what} used in build-time JS arithmetic: its value can change after the scene is built`, { loc: callSite(), hint: [`→ ${H.id}.map(v => …)   a host function, re-run when the param moves`, '→ pass the param itself where a value is wanted: .roughness(P.gloss)'] }); };
+      if ((k as any) === Symbol.toPrimitive) return () => { throw new CandelaError('E203', `${what} used in build-time JS arithmetic: its value can change after the scene is built`, { loc: callSite(), hint: [`→ ${H.id}.map(v => …)   a host function, re-run when the param moves`, '→ pass the param itself where a value is wanted: .roughness(P.gloss)'] }); };
       if (typeof k === 'symbol' || BENIGN.has(k)) return undefined;
       throw new CandelaError('E104', `'${k}' is not a member of ${what}`, { suggest: didYouMean(k, Object.keys(t)) });
     },
@@ -137,7 +139,7 @@ function mkParam(kind) {
   return (def, o?) => {
     if (kind === 'choice') {
       if (!Array.isArray(def) || !def.length) throw new CandelaError('E121', "param.choice(['a', 'b', …], default?) takes a list");
-      const d = new ParamDef('choice', o != null ? String(o) : String(def[0]), { static: true }); d.options = def.map(String); return chain(d);
+      const d: any = new ParamDef('choice', o != null ? String(o) : String(def[0]), { static: true }); d.options = def.map(String); return chain(d);
     }
     if (def == null) def = kind === 'bool' ? false : kind === 'color' ? [0.8, 0.8, 0.8] : kind === 'kelvin' ? 6500 : kind === 'ev' ? 12 : 0;
     if (KINDS[kind].dim && isQ(def) && def.dim !== KINDS[kind].dim) throw new CandelaError('E120', `param.${kind} expects ${KINDS[kind].dim}; got ${def}`);
@@ -152,7 +154,7 @@ function chain(d) {
     static: () => chain(d.with('static', true)), role: r => chain(d.with('role', r)), about: s => chain(d.with('about', s)), group: g => chain(d.with('group', g)), id: s => chain(d.with('id', s)),
   };
   if (d.options) { const nd = d; api.__def = nd; }
-  return new Proxy(api, { get(t, k) { if (k in t) return t[k]; if (typeof k === 'symbol' || BENIGN.has(k)) return undefined; if (k === Symbol.toPrimitive) return () => { throw new CandelaError('E203', 'a param definition used in arithmetic'); }; throw new CandelaError('E104', `'${k}' is not a param option`, { suggest: didYouMean(String(k), CONFIG) }); } });
+  return new Proxy(api, { get(t, k) { if (k in t) return t[k]; if (typeof k === 'symbol' || BENIGN.has(k)) return undefined; if ((k as any) === Symbol.toPrimitive) return () => { throw new CandelaError('E203', 'a param definition used in arithmetic'); }; throw new CandelaError('E104', `'${k}' is not a param option`, { suggest: didYouMean(String(k), CONFIG) }); } });
 }
 export const param = Object.fromEntries(Object.keys(KINDS).map(k => [k, mkParam(k)]));
 param.lift = v => v && v[PARAM] ? v : guard({ [PARAM]: true, id: 'const', type: 'f', isStatic: true, get value() { return isQ(v) ? v.v : v; }, get quantity() { return v; }, map(fn) { const r = fn(v); return param.lift(r); } }, 'constant');
@@ -162,7 +164,7 @@ export const lift = param.lift;
 export function params(spec) {
   if (!spec || typeof spec !== 'object') throw new CandelaError('E121', 'params({ name: param.float(0.5), … })');
   const out: Record<string, any> = {};
-  for (const [name, d] of Object.entries(spec)) {
+  for (const [name, d] of Object.entries<any>(spec)) {
     const def = d && d.__def; if (!def) throw new CandelaError('E121', `params: '${name}' is not a param definition (use param.float(…), param.color(…), …)`);
     const h = handleOf(def, name);
     if (store.defs.has(h.id) && store.defs.get(h.id) !== h) { /* redefined in this build: the later one wins */ }

@@ -83,11 +83,11 @@ const procName = p => (p ? PROC[key(p)] : null);
 // process (turned, faced, milled, ground, brushed, hobbed, polished, cast), finish (black-oxide, zinc,
 // anodized, paint, powder-coat, polished, chrome …), color, axis, center, direction, roughness. Returns null
 // when nothing is recognised, so the shape's own material (or the default) applies.
-export function fromMetadata(meta: Record<string, any> = {}) {
-  const mat = meta.material != null ? key(meta.material) : null;
-  const fin = meta.finish != null ? key(meta.finish) : null;
+export function fromMetadata(meta: Record<string, any> = {}): any {
+  const mat: any = meta.material != null ? key(meta.material) : null;
+  const fin: any = meta.finish != null ? key(meta.finish) : null;
   const proc = procName(meta.process);
-  const o = { axis: meta.axis, center: meta.center, direction: meta.direction, roughness: meta.roughness, process: meta.process };
+  const o: any = { axis: meta.axis, center: meta.center, direction: meta.direction, roughness: meta.roughness, process: meta.process };
   if (mat && POLYMERS[mat] || fin === 'rubber' || fin === 'plastic') {
     const [c, r] = POLYMERS[mat] || POLYMERS[fin];
     return (mat && /rubber|nbr|epdm/.test(mat)) || fin === 'rubber' ? finish.rubber(meta.color ?? c, { roughness: meta.roughness ?? r }) : finish.plastic(meta.color ?? c, { roughness: meta.roughness ?? r });

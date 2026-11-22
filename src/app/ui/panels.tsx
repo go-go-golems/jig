@@ -127,7 +127,7 @@ export function SceneView({ host }) {
       {c.sun && <div className="block"><header><h2>Sun</h2></header><dl className="kv"><dt>elevation</dt><dd>{typeof c.sun.props.elevation === 'number' ? (c.sun.props.elevation * 180 / Math.PI).toFixed(1) + '°' : 'param'}</dd><dt>illuminance</dt><dd>{c.sun.props.illuminance != null ? (typeof c.sun.props.illuminance === 'number' ? Math.round(c.sun.props.illuminance).toLocaleString() + ' lx' : 'param') : 'from air mass'}</dd></dl></div>}
       {c.stats.triangles > 0 && <div className="block"><header><h2>Meshes</h2><span className="sub">{c.stats.meshes} definition{c.stats.meshes === 1 ? '' : 's'} · {c.stats.triangles.toLocaleString()} triangles across instances · {(c.stats.sceneData / 1048576).toFixed(1)} MB scene data</span></header>
         <table className="rt"><thead><tr><th>definition</th><th>triangles</th><th>faces</th><th>instances</th></tr></thead><tbody>
-          {[...new Set(c.objects.filter(o => o.def).map(o => o.def))].map((d, i) => <tr key={i}><td><b>{d.name}</b>{d.meta && d.meta.material ? <span className="dim"> · {d.meta.material}{d.meta.finish ? ' · ' + d.meta.finish : ''}</span> : null}</td><td>{d.count.toLocaleString()}</td><td title={d.faces.map(f => f.id).join(', ')}>{d.faces.length}</td><td>{c.objects.filter(o => o.def === d).length}</td></tr>)}
+          {[...new Set<any>(c.objects.filter(o => o.def).map(o => o.def))].map((d, i) => <tr key={i}><td><b>{d.name}</b>{d.meta && d.meta.material ? <span className="dim"> · {d.meta.material}{d.meta.finish ? ' · ' + d.meta.finish : ''}</span> : null}</td><td>{d.count.toLocaleString()}</td><td title={d.faces.map(f => f.id).join(', ')}>{d.faces.length}</td><td>{c.objects.filter(o => o.def === d).length}</td></tr>)}
         </tbody></table>
         <p className="note">Click a part in the viewport to see its definition, instance and face, with the face's metadata.</p>
       </div>}
@@ -151,7 +151,7 @@ export function LabView({ host }) {
     <div className="scroll">
       <div className="block"><header><h2>White furnace</h2><span className="sub">GGX conductor, F0 = 1, height-correlated Smith: directional albedo E(θo) by Monte Carlo on the CPU</span></header>
         <div className="row"><Tog on={ms} onClick={() => setMs(!ms)}>Multiple-scattering compensation</Tog><button className="btn sm primary" onClick={run} disabled={busy}>{busy ? 'running…' : 'Run'}</button></div>
-        {rows && <table className="rt"><thead><tr><th>roughness</th>{Object.keys(rows[0]).filter(k => k !== 'roughness').map(k => <th key={k}>θo = {k}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}><td>{r.roughness}</td>{Object.entries(r).filter(([k]) => k !== 'roughness').map(([k, v]) => <td key={k} className={v < 0.95 ? 'badcell' : ''}>{v.toFixed(3)}</td>)}</tr>)}</tbody></table>}
+        {rows && <table className="rt"><thead><tr><th>roughness</th>{Object.keys(rows[0]).filter(k => k !== 'roughness').map(k => <th key={k}>θo = {k}</th>)}</tr></thead><tbody>{rows.map((r, i) => <tr key={i}><td>{r.roughness}</td>{Object.entries<any>(r).filter(([k]) => k !== 'roughness').map(([k, v]) => <td key={k} className={v < 0.95 ? 'badcell' : ''}>{v.toFixed(3)}</td>)}</tr>)}</tbody></table>}
         <p className="note">Without compensation a rough metal loses up to 69 % of its energy: at α = 1 and normal incidence it keeps exactly 1 − ln 2 ≈ 0.307. With it on, single scattering is multiplied by 1 + F0 (1/E − 1), as the kernel does.</p>
       </div>
       <div className="block"><header><h2>Readings</h2></header>

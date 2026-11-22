@@ -75,6 +75,16 @@ ${dsp}
 
 // ---------------- WebGPU ----------------
 export class GPURenderer {
+  device: GPUDevice;
+  canvas: HTMLCanvasElement;
+  name: 'WebGPU';
+  info: string;
+  ctx: GPUCanvasContext;
+  format: GPUTextureFormat;
+  /** compiled pipelines by shader source */
+  cache: Map<string, any>;
+  lost: boolean;
+  lostInfo: string | undefined;
   pipe: any;
   source: any;
   post: any;
@@ -88,7 +98,7 @@ export class GPURenderer {
   _sdHead: any;
   sdBytes: any;
   inflight: any;
-  static async create(canvas) {
+  static async create(canvas: HTMLCanvasElement): Promise<GPURenderer | null> {
     if (!navigator.gpu) return null;
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }).catch(() => null);
     if (!adapter) return null;
@@ -96,7 +106,7 @@ export class GPURenderer {
     if (!device) return null;
     const r = new GPURenderer(); r.device = device; r.canvas = canvas; r.name = 'WebGPU';
     r.info = adapter.info ? `${adapter.info.vendor || ''} ${adapter.info.architecture || ''}`.trim() : '';
-    r.ctx = canvas.getContext('webgpu'); r.format = navigator.gpu.getPreferredCanvasFormat();
+    r.ctx = canvas.getContext('webgpu')!; r.format = navigator.gpu.getPreferredCanvasFormat();
     r.ctx.configure({ device, format: r.format, alphaMode: 'opaque' });
     r.cache = new Map(); r.lost = false;
     device.lost.then(i => { r.lost = true; r.lostInfo = i && i.message; });
@@ -137,13 +147,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       const mod = dev.createShaderModule({ code });
       const info = await mod.getCompilationInfo();
       const errs = info.messages.filter(m => m.type === 'error');
-      if (errs.length) { const e = new Error('WGSL: ' + errs.slice(0, 3).map(m => `line ${m.lineNum - this.prelude().split('\n').length + 1}: ${m.message}`).join('; ')); e.shaderErrors = errs.map(m => ({ line: m.lineNum, message: m.message })); e.source = code; throw e; }
+      if (errs.length) { const e: any = new Error('WGSL: ' + errs.slice(0, 3).map(m => `line ${m.lineNum - this.prelude().split('\n').length + 1}: ${m.message}`).join('; ')); e.shaderErrors = errs.map(m => ({ line: m.lineNum, message: m.message })); e.source = code; throw e; }
       dev.pushErrorScope('validation');
       const p = await dev.createComputePipelineAsync({ layout: 'auto', compute: { module: mod, entryPoint: 'main' } });
       const ve = await dev.popErrorScope(); if (ve) throw new Error('WebGPU pipeline: ' + ve.message);
       pipe = { trace: p, code };
       this.cache.set(key, pipe);
-      if (this.cache.size > 24) this.cache.delete(this.cache.keys().next().value);
+      if (this.cache.size > 24) this.cache.delete(this.cache.keys().next().value!);
     }
     this.pipe = pipe; this.source = pipe.code;
     // post
@@ -241,7 +251,7 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f, }
     if (!this.bind) {
       const L = this.pipe.trace.getBindGroupLayout(0);
       const ent = [['uni', 0], ['objs', 1], ['lits', 2], ['bvh', 3], ['sd', 4], ['accum', 5], ['aovA', 6], ['aovN', 7]];
-      this.bind = dev.createBindGroup({ layout: L, entries: ent.map(([n, b]) => ({ binding: b, resource: { buffer: B[n] } })) });
+      this.bind = dev.createBindGroup({ layout: L, entries: ent.map(([n, b]) => ({ binding: b as number, resource: { buffer: B[n] } })) });
     }
     const enc = dev.createCommandEncoder();
     const pass = enc.beginComputePass(); pass.setPipeline(this.pipe.trace); pass.setBindGroup(0, this.bind);
@@ -301,13 +311,22 @@ struct VO { @builtin(position) pos: vec4f, @location(0) uv: vec2f, }
   saveAccum() { const enc = this.device.createCommandEncoder(); enc.copyBufferToBuffer(this.bufs.accum, 0, this.bufs.tB, 0, this.w * this.h * 16); this.device.queue.submit([enc.finish()]); }
   restoreAccum() { const enc = this.device.createCommandEncoder(); enc.copyBufferToBuffer(this.bufs.tB, 0, this.bufs.accum, 0, this.w * this.h * 16); this.device.queue.submit([enc.finish()]); }
   async idle() { await this.device.queue.onSubmittedWorkDone(); }
-  dispose() { try { for (const b of Object.values(this.bufs || {})) b.destroy(); this.device.destroy(); } catch (e) { /* gone */ } }
+  dispose() { try { for (const b of Object.values<any>(this.bufs || {})) b.destroy(); this.device.destroy(); } catch (e) { /* gone */ } }
 }
 
 // ---------------- WebGL2 ----------------
 const VS = `#version 300 es
 in vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
 export class GLRenderer {
+  gl: WebGL2RenderingContext;
+  canvas: HTMLCanvasElement;
+  name: 'WebGL2';
+  info: string;
+  /** linked programs by shader source */
+  cache: Map<string, any>;
+  vb: WebGLBuffer;
+  tex: Record<string, any>;
+  lost: boolean;
   pipe: any;
   source: any;
   post: any;
@@ -322,7 +341,7 @@ export class GLRenderer {
   sdBytes: any;
   fence: any;
   _saved: any;
-  static create(canvas) {
+  static create(canvas: HTMLCanvasElement): GLRenderer | null {
     const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true, alpha: false, powerPreference: 'high-performance' });
     if (!gl) return null;
     if (!gl.getExtension('EXT_color_buffer_float')) return null;
@@ -335,11 +354,11 @@ export class GLRenderer {
   }
   program(fs, label) {
     const gl = this.gl;
-    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(x) || 'compile failed'; const e = new Error(`GLSL (${label}): ` + log.split('\n').slice(0, 4).join(' ')); e.source = s; e.shaderErrors = log.split('\n').filter(Boolean).map(l => { const m = l.match(/0:(\d+):\s*(.*)/); return m ? { line: +m[1], message: m[2] } : { line: 0, message: l }; }); throw e; } return x; };
-    const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
+    const sh = (t, s) => { const x = gl.createShader(t)!; gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(x) || 'compile failed'; const e: any = new Error(`GLSL (${label}): ` + log.split('\n').slice(0, 4).join(' ')); e.source = s; e.shaderErrors = log.split('\n').filter(Boolean).map(l => { const m = l.match(/0:(\d+):\s*(.*)/); return m ? { line: +m[1], message: m[2] } : { line: 0, message: l }; }); throw e; } return x; };
+    const p = gl.createProgram()!; gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
     if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`GLSL link (${label}): ` + gl.getProgramInfoLog(p));
     const uniforms: Record<string, any> = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
-    for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); uniforms[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); }
+    for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i)!; uniforms[a.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, a.name); }
     return { p, u: uniforms };
   }
   prelude(nU) {
@@ -373,7 +392,7 @@ void main() {
 }`;
       pipe = Object.assign(this.program(fs, 'path tracer'), { code: fs, nU: compiled.nU });
       this.cache.set(key, pipe);
-      if (this.cache.size > 16) { const k = this.cache.keys().next().value; gl.deleteProgram(this.cache.get(k).p); this.cache.delete(k); }
+      if (this.cache.size > 16) { const k = this.cache.keys().next().value!; gl.deleteProgram(this.cache.get(k).p); this.cache.delete(k); }
     }
     this.pipe = pipe; this.source = pipe.code;
     if (!this.post || this.post.key !== dispSrc) {
@@ -511,3 +530,6 @@ void main() { ivec2 res = ivec2(int(D(0).x), int(D(0).y)); ivec2 q = ivec2(gl_Fr
   }
   dispose() { const e = this.gl.getExtension('WEBGL_lose_context'); if (e) e.loseContext(); }
 }
+
+/** a GPU backend: WebGPU compute or WebGL2 fragment */
+export type Backend = GPURenderer | GLRenderer;

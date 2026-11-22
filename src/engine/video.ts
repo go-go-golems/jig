@@ -15,7 +15,7 @@ const hasWebCodecs = () => typeof VideoEncoder !== 'undefined' && typeof VideoFr
 
 // what this browser can write: { mp4: codec | null, webm: codec | null }
 export async function videoSupport(w = 1280, h = 720, fps = 24) {
-  const out = { mp4: null, webm: null };
+  const out: { mp4: string | null; webm: string | null } = { mp4: null, webm: null };
   if (!hasWebCodecs()) return out;
   for (const c of ['mp4', 'webm']) for (const codec of candidates(c, w, h, fps)) {
     try { const s = await VideoEncoder.isConfigSupported(encCfg(codec, w, h, fps, 4e6)); if (s.supported) { out[c] = codec; break; } } catch (e) { /* try the next */ }
@@ -23,7 +23,7 @@ export async function videoSupport(w = 1280, h = 720, fps = 24) {
   return out;
 }
 function encCfg(codec, width, height, fps, bitrate) {
-  const c = { codec, width, height, bitrate: Math.round(bitrate), framerate: fps, latencyMode: 'quality', bitrateMode: 'variable' };
+  const c: VideoEncoderConfig = { codec, width, height, bitrate: Math.round(bitrate), framerate: fps, latencyMode: 'quality', bitrateMode: 'variable' };
   if (codec.startsWith('avc1')) c.avc = { format: 'avc' };
   return c;
 }
@@ -32,12 +32,22 @@ export const VIDEO_QUALITY = { draft: 0.06, standard: 0.12, high: 0.22, max: 0.4
 export const videoBitrate = (w, h, fps, quality = 'high') => w * h * fps * (VIDEO_QUALITY[quality] || VIDEO_QUALITY.high);
 
 // ---------- the writer ----------
+/** an encoded chunk as the muxers take it */
+export interface VideoChunk { data: Uint8Array; key: boolean; ts: number }
 export class VideoWriter {
+  container: 'mp4' | 'webm';
+  codec: string;
+  width: number;
+  height: number;
+  fps: number;
+  bitrate: number;
+  chunks: VideoChunk[];
+  n: number;
   keyEvery: number;
   enc: VideoEncoder;
-  desc: any;
-  colorSpace: VideoColorSpaceInit;
-  error: DOMException;
+  desc: Uint8Array | null;
+  colorSpace: VideoColorSpaceInit | null;
+  error: DOMException | null;
   canvas: any;
   ctx: any;
   // o: { container: 'mp4' | 'webm', width, height, fps, bitrate (bits/s) | quality, keyframeInterval (s) }
@@ -60,7 +70,7 @@ export class VideoWriter {
         const data = new Uint8Array(chunk.byteLength); chunk.copyTo(data);
         this.chunks.push({ data, key: chunk.type === 'key', ts: chunk.timestamp });
         const dc = meta && meta.decoderConfig;
-        if (dc) { if (dc.description) this.desc = new Uint8Array(dc.description instanceof ArrayBuffer ? dc.description.slice(0) : dc.description.buffer.slice(dc.description.byteOffset, dc.description.byteOffset + dc.description.byteLength)); if (dc.colorSpace) this.colorSpace = dc.colorSpace; }
+        if (dc) { if (dc.description) this.desc = new Uint8Array(dc.description instanceof ArrayBuffer ? dc.description.slice(0) : (dc.description as ArrayBufferView).buffer.slice((dc.description as ArrayBufferView).byteOffset, (dc.description as ArrayBufferView).byteOffset + dc.description.byteLength)); if (dc.colorSpace) this.colorSpace = dc.colorSpace; }
       },
       error: e => { this.error = e; },
     });
@@ -74,7 +84,7 @@ export class VideoWriter {
     let source = src;
     if (typeof ImageData !== 'undefined' && src instanceof ImageData) {
       if (src.width === this.width && src.height === this.height) this.ctx.putImageData(src, 0, 0);
-      else { const t = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(src.width, src.height) : Object.assign(document.createElement('canvas'), { width: src.width, height: src.height }); t.getContext('2d').putImageData(src, 0, 0); this.ctx.drawImage(t, 0, 0, this.width, this.height); }
+      else { const t = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(src.width, src.height) : Object.assign(document.createElement('canvas'), { width: src.width, height: src.height }); (t.getContext('2d') as any).putImageData(src, 0, 0); this.ctx.drawImage(t, 0, 0, this.width, this.height); }
       source = this.canvas;
     }
     const k = this.n++;
@@ -106,7 +116,7 @@ const colourCodes = cs => (cs && cs.primaries && cs.transfer && cs.matrix && PRI
 const cat = parts => { let n = 0; for (const p of parts) n += p.length; const o = new Uint8Array(n); let k = 0; for (const p of parts) { o.set(p, k); k += p.length; } return o; };
 const u8 = (...v) => Uint8Array.from(v);
 const be = (v, n) => { const o = new Uint8Array(n); for (let i = n - 1; i >= 0; i--) { o[i] = v % 256; v = Math.floor(v / 256); } return o; };
-const ascii = s => Uint8Array.from(s, c => c.charCodeAt(0));
+const ascii = (s: string) => Uint8Array.from(s, c => c.charCodeAt(0));
 
 // ---------- MP4 (ISO BMFF) ----------
 const box = (type, ...parts) => { const body = cat(parts.flat()); return cat([be(body.length + 8, 4), ascii(type), body]); };
