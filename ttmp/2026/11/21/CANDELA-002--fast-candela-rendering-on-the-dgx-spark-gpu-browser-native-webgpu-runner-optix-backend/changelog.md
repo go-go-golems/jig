@@ -23,3 +23,7 @@ Step 1 implemented: scripts/render-preset.ts, tools/lockstitch/render.ts; 1080p 
 ## 2026-11-21
 
 OptiX traversal spike: K-09 AO at 1080p 1721 spp/s on RT cores vs 105 on WebGPU, images match
+
+## 2026-11-21
+
+Design: compile the JS API to OptiX (wgsl2cuda + traceAll shim) and a live OptiX workbench (server + RemoteOptixBackend); vault report 940ccdb1

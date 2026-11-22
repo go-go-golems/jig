@@ -8,3 +8,6 @@
 - [ ] Step 3: OptiX backend (SDK install, scene package, WGSL->CUDA, GAS/IAS, programs, motion, SER, denoiser) <!-- t:uaob -->
 - [x] Step 3 phase 1: OptiX SDK 9.0.0 installed, optixTriangle runs on GB10 (sm_121) <!-- t:uj5d -->
 - [x] Step 3 spike: scene package v0 + candela-optix-ao (AO on RT cores, ~16x WebGPU on K-09) <!-- t:qj0x -->
+- [ ] OptiX phase: wgsl2cuda.ts + header; nvcc-compile every preset's translated kernel <!-- t:6kif -->
+- [ ] OptiX phase: scene package v1 + renderPixel raygen; image parity vs WebGPU; measure path-tracing speed-up and NVRTC time <!-- t:6c5q -->
+- [ ] Live workbench: candela-server + RemoteOptixBackend (host-owned progressive loop, JPEG frames) <!-- t:x4t9 -->

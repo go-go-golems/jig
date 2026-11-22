@@ -480,3 +480,69 @@ missing dependencies (or give the sudo command) instead of working around them.
   (stride RAY_TYPES = 2), instance sbtOffset 0. Pipeline: single-level instancing, maxTraceDepth 1, stack sizes from
   `optixUtilComputeStackSizes`, max traversable depth 2.
 - Build flags: GAS `PREFER_FAST_TRACE | ALLOW_RANDOM_VERTEX_ACCESS | ALLOW_COMPACTION`; geometry `DISABLE_ANYHIT`.
+
+## Step 9: Design for compiling the JS API to OptiX and a live OptiX workbench; vault deep-dive report
+
+The user asked how the JavaScript scene API can be compiled down to run on OptiX, with a live workbench that shows
+OptiX renders, and then asked for the answer as a pedagogical deep-dive project report in the Obsidian vault
+(textbook style, no analogies), committed and pushed. I read the seams the design depends on, then wrote the report.
+No code changed in this step.
+
+### Prompt Context
+**User prompts (verbatim):** "Ok, now how can we take our JS API, and target / compile it down so it can be run with
+optix, and we can have a live workbench that renders and displays GPU optix renders"; "yeah in fact use the knowledge
+you gather to then  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post
+using a textbook writing style (no analogies, see skill). Commit and push the bsidian vault when done (go-go-parc
+vault)."; "make the report pedagogical and introduce everything to someone who is new to the subject and new to the
+codebase and new to the technologies"
+**Assistant interpretation:** Design (not implement) the compile path and the live workbench, grounded in the code,
+and publish it as a vault PROJECT REPORT.
+**Inferred user intent:** A shareable explanation and plan before committing to the OptiX backend.
+
+### What I did
+- Read: `wgsl2glsl.ts` (59 lines, relies on the kernel's strict WGSL subset); the backend interface shared by the
+  WebGPU and WebGL2 classes in `render.ts` (`compile/resize/upload/uploadSD/setUniforms/trace/busy/display/readAccum/
+  readBuf/idle/saveAccum/restoreAccum/dispose`); `kernel.ts` `traceAll` (the single traversal function; `traceScene`
+  and `occluded` call it), `hitObj`, `hitMesh` (sets `gTri`/`gBary`), `finishHit`, `xfP`/`xfD` (motion poses),
+  the six `var<private>` globals and the `ETAB` private table; `viewport.ts` (`repack`, `posesFor`, metering via
+  `readRGBA8`); `host.ts` engine-mode override.
+- Wrote `go-go-parc/Projects/2026/11/21/PROJECT REPORT - Candela on the DGX Spark - From a JavaScript Scene API to
+  OptiX Ray Tracing - A Technical Deep Dive.md` (559 lines) with five figures in `_assets/candela-spark-*`.
+- Vault commit `940ccdb1` (after `git pull --rebase`; the first push was rejected as non-fast-forward), pushed.
+
+### Why
+- The design keeps `build`/`compile`/`pack` and adds a CUDA target because traversal is concentrated in `traceAll`,
+  the kernel is already machine-translated for WebGL2, and the viewport only depends on the backend interface.
+
+### What worked
+- `git push` after rebase: `## main...origin/main` (in sync).
+
+### What didn't work
+- First vault push: rejected (`hint: 'git pull' before pushing again`); fixed with `git pull --rebase`.
+
+### What I learned
+- `blasOf` reorders a mesh's triangles; `finishHit` indexes the reordered records with `gTri`, so an OptiX GAS must
+  be built in kernel order (the AO spike's original order is fine for AO but not for shading).
+- Intersection programs cannot see raygen's per-thread state; `gTime` must travel in a payload register.
+- `var<private>` globals must become members of a per-thread `Kernel` struct (CUDA `__device__` globals are shared).
+
+### What was tricky to build
+- Keeping the report honest about what is measured (AO 16×), what is implemented (step 1, spike) and what is design
+  (translator, shim, server, remote backend); each is labelled in the report.
+
+### What warrants a second pair of eyes
+- The proposed `RemoteOptixBackend` changes who counts samples (host-owned progressive loop); the viewport's
+  assumptions about `trace()` per frame need checking when implementing.
+- NVRTC compile time and the path-tracing speed-up are unmeasured and decide the order of steps 2 and 3.
+
+### What should be done in the future
+- Phase 1 of the design: `src/engine/wgsl2cuda.ts` + header; compile every preset's translated kernel with nvcc.
+
+### Code review instructions
+- Read the report's Parts 5–6 against `kernel.ts` `traceAll`/`hitObj`/`finishHit` and `render.ts`'s backend methods.
+
+### Technical details
+- Report sections: foundations (path tracing, GPU programs, RT cores/OptiX concepts, the machine), Candela's
+  pipeline and buffers, measurements, the spike, the compile design (translation rules, `Kernel` struct, traversal
+  shim, run-time compilation), the live workbench (architecture, method mapping, frames, denoiser, final renders),
+  phases with image-comparison exit checks, failure modes, open questions.
