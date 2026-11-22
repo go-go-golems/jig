@@ -114,6 +114,14 @@ function partOverrides(part, diagnostics, asm = []) {
 
 // the feature that made a face: its id is the persistent name's first segment ('body/side[s.big]' → 'body')
 const featureOf = (name) => String(name).replace(/#[a-z0-9]+$/, '').split('/')[0];
+// a pattern or mirror copy is named <pattern>[k]/<the source's face name> (features.js), copies of copies alike:
+// its feature is the source's, and its own faces carry the copy's prefix ('spokes[1]/' for 'spokes[1]/spoke/end')
+function sourceOf(name) {
+  const parts = String(name).replace(/#[a-z0-9]+$/, '').split('/');
+  let i = 0;
+  while (i < parts.length - 1 && /\[\d+\]$/.test(parts[i])) i++;
+  return { fid: parts[i], prefix: parts.slice(0, i).join('/') + (i ? '/' : ''), copy: i ? parts.slice(0, i).join('/') : null };
+}
 
 /** cylinder or cone face i of a mesh: does its surface face its axis (a bore) rather than away (a boss)? */
 function concave(m, i, axis) {
@@ -148,6 +156,13 @@ export function inferProcess(featureType, f, ctx) {
         return along ? { process: 'milled', axis: f.normal, center: f.center } : { process: 'milled', direction: ctx.direction };
       }
       return { process: 'milled' };
+    case 'add':
+      // a primitive unioned or cut in (.add(j.cyl(…)), j.cone, j.box …): round faces as on a lathe about their own
+      // axis (a bore ground), flat faces across a round face of the same primitive faced, other flats face-milled
+      if (round && ax) return ctx.concave ? { process: 'ground', axis: ax.dir, center: ax.origin } : { process: 'turned', axis: ax.dir, center: ax.origin };
+      if (plane && f.normal && ctx.lathe) return { process: 'faced', axis: ctx.lathe.dir, center: ctx.lathe.origin };
+      if (plane && f.normal) return { process: 'milled', axis: f.normal, center: f.center };
+      return { process: 'milled' };
     case 'fillet': case 'chamfer': case 'draft': case 'shell': case 'sweep': case 'loft':
       return { process: 'milled' };
     default:
@@ -166,15 +181,27 @@ function faceRecords(body, m, part, appearance, types, multi, ov) {
   const partName = part.name, display = part.part?.meta?.color ?? null;
   const faces = faceMeta(body);
   const byName = new Map(faces.map((f) => [f.name, f]));
+  const typeOf = (id) => types.get(multi ? `${partName}:${id}` : id) ?? types.get(id) ?? null;
+  // the round faces of each feature (copy by copy): a flat face across one of their axes is faced about it
+  const rounds = new Map();
+  for (const f of faces) {
+    if (!f.axis || !['cylinder', 'cone'].includes(f.kind)) continue;
+    const src = sourceOf(f.name), k = src.prefix + src.fid;
+    if (!rounds.has(k)) rounds.set(k, []);
+    rounds.get(k).push(f.axis);
+  }
+  const across = (k, n) => (rounds.get(k) ?? []).find((a) => Math.abs(a.dir[0] * n[0] + a.dir[1] * n[1] + a.dir[2] * n[2]) > 0.99) ?? null;
   return faces.map((f) => {
-    const fid = featureOf(f.name), featureType = types.get(multi ? `${partName}:${fid}` : fid) ?? types.get(fid) ?? null;
+    const src = sourceOf(f.name), fid = src.fid, featureType = typeOf(fid);
     const meta = { kind: f.kind, feature: fid, featureType };
+    if (src.copy) meta.copy = src.copy;
     if (f.normal) meta.normal = R(f.normal);
     if (f.center) meta.center = pt(f.center);
     if (f.axis) { meta.axis = R(f.axis.dir); meta.axisOrigin = pt(f.axis.origin); meta.radius = f.axis.radius * S; }
     if (appearance.metal) {
-      const end = byName.get(`${fid}/end`) ?? byName.get(`${fid}/start`);
-      const ctx = { concave: f.axis && (f.kind === 'cylinder' || f.kind === 'cone') ? concave(m, f.index, f.axis) : false, direction: end?.normal ?? null };
+      const end = byName.get(`${src.prefix}${fid}/end`) ?? byName.get(`${src.prefix}${fid}/start`);
+      const ctx = { concave: f.axis && (f.kind === 'cylinder' || f.kind === 'cone') ? concave(m, f.index, f.axis) : false, direction: end?.normal ?? null,
+        lathe: f.kind === 'plane' && f.normal ? across(src.prefix + fid, f.normal) : null };
       const p = inferProcess(featureType, f, ctx);
       if (p.process) meta.process = p.process;
       if (p.axis) meta.axis = R(p.axis);

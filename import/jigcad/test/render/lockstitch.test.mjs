@@ -12,7 +12,7 @@
 //   2. jig's exact axes against the converter's per-face fits, and against the lathe axis it gave turned and faced faces;
 //   3. processes, with every disagreement in a named class with its reason;
 //   4. a summary (t.diagnostic).
-// Two jig gaps found here are `todo` tests at the end.
+// Two jig gaps it found (no process for .add(), none for pattern copies) are fixed; their tests are at the end.
 //
 // Fixtures in test/render/fixtures/lockstitch/:
 //   - scripts.json: each part's jig script, from the lockstitch project's animation/cad;
@@ -262,39 +262,34 @@ test('2b. axes: the lathe axis convert.py gave its turned and faced faces is jig
 //              material's default).
 // Anything else is a disagreement, and each falls in one class below (the first that matches), with its reason.
 const AGREE = { turned: ['turned', 'ground'], faced: ['faced'], polished: ['none'] };
-const isCopy = (m) => /\[\d+\]$/.test(m.feature);
 const CLASSES = [
-  { id: 'add-no-rule', count: 123, example: 'crank hub/side',
-    reason: 'inferProcess has no rule for .add() (a primitive unioned or cut in: j.cyl, j.cone, j.box). Such a face is a ' +
-      'cylinder or plane whose exact axis jig knows, but it gets no process. convert.py turned it, or faced it, as coaxial ' +
-      'with the part\'s lathe axis (todo test below).',
-    match: (e, jp) => jp === 'none' && e.j.meta.featureType === 'add' && (e.x.p === 'turned' || e.x.p === 'faced') },
-  { id: 'pattern-copy', count: 4, example: 'handwheel spokes[1]/spoke/end',
-    reason: 'a pattern copy\'s faces are named "spokes[1]/spoke/…", and the package takes "spokes[1]" as their feature. The ' +
-      'graph has no such feature, so featureType is null and nothing is inferred, while the original spoke\'s faces are ' +
-      'milled. convert.py faced the ends across the lathe axis (todo test below).',
-    match: (e, jp) => jp === 'none' && isCopy(e.j.meta) && e.x.p === 'faced' },
   { id: 'extrude-side-milled', count: 3, example: 'crank web/side[circle]#1',
     reason: 'an extrude\'s outer round side is milled in jig (peripheral milling, about its axis). convert.py turned it, ' +
       'being coaxial with the part\'s lathe axis.',
     match: (e, jp) => e.x.p === 'turned' && jp === 'milled' && e.j.meta.featureType === 'extrude' },
-  { id: 'extrude-end-milled', count: 65, example: 'handwheel rim/start',
+  { id: 'extrude-end-milled', count: 69, example: 'handwheel rim/start',
     reason: 'an extrude\'s end, or a flat side across the axis, is milled in jig (a face mill about its normal). ' +
       'convert.py faced it, because it is across the lathe axis of a FACED part.',
     match: (e, jp) => e.x.p === 'faced' && jp === 'milled' && e.j.meta.featureType === 'extrude' },
-  { id: 'not-a-lathe-part', count: 85, example: 'nbLink link/side[rect.left]',
-    reason: 'jig infers a process for every metal part from its features (extrude faces milled, an inner loop ground). ' +
+  { id: 'add-box-milled', count: 3, example: 'bobbinCase spring/top',
+    reason: 'a box added to a turned part (.add(j.box(…))) is milled flat in jig, a face mill about its normal; only a flat ' +
+      'across a round face of the same primitive is faced. convert.py faced every flat across the lathe axis of a FACED part.',
+    match: (e, jp) => e.x.p === 'faced' && jp === 'milled' && e.j.meta.featureType === 'add' && e.j.meta.kind === 'plane' },
+  { id: 'not-a-lathe-part', count: 231, example: 'nbLink link/side[rect.left]',
+    reason: 'jig infers a process for every metal part from its features (extrude faces milled, an inner loop ground, ' +
+      'an added pin turned about its own axis and its ends faced). ' +
       'convert.py grooved only the parts in its LATHE list, and gave links, levers and castings an isotropic finish.',
-    match: (e, jp) => !e.P.lathe && e.x.p === 'polished' && (jp === 'milled' || jp === 'ground') },
+    match: (e, jp) => !e.P.lathe && e.x.p === 'polished' && jp !== 'none' },
   { id: 'gear-flank', count: 312, example: 'hookGear gear/face#1',
     reason: 'a twisted extrude\'s tooth flanks are B-splines, and jig mills them by the extrude rule (§6.4\'s "hobbed" is ' +
       'for j.lib.gear, not a script\'s own gear). convert.py fits only cylinders and cones, so it left them polished.',
     match: (e, jp) => e.P.lathe && e.x.p === 'polished' && jp === 'milled' && e.j.meta.kind === 'bspline' },
-  { id: 'off-the-lathe-axis', count: 246, example: 'crank web/start',
+  { id: 'off-the-lathe-axis', count: 373, example: 'crank web/start',
     reason: 'on a lathe part, convert.py grooved only faces round its one lathe axis, and ends across it on FACED parts; ' +
-      'it polished the rest. jig mills an extrude\'s or chamfer\'s faces wherever they are: the crank\'s web, an off-axis ' +
+      'it polished the rest. jig mills an extrude\'s or chamfer\'s faces wherever they are, and turns an added pin about ' +
+      'its own axis: the crank\'s web, its crank pin, an off-axis ' +
       'pin bore, the ends of a part not in FACED, a chamfer cone the fit got 90° wrong.',
-    match: (e, jp) => e.P.lathe && e.x.p === 'polished' && (jp === 'milled' || jp === 'ground') },
+    match: (e, jp) => e.P.lathe && e.x.p === 'polished' && jp !== 'none' },
 ];
 
 test('3. processes: where jig and convert.py agree, and every disagreement in a class with its reason', (t) => {
@@ -317,7 +312,7 @@ test('3. processes: where jig and convert.py agree, and every disagreement in a 
     assert.equal(byClass[c.id].length, c.count, `${c.id}: ${c.reason}`);
     assert.ok(byClass[c.id].includes(c.example), `${c.id}: the example ${c.example} is in the class`);
   }
-  assert.deepEqual([tally.agreeProcess, tally.agreeNeither], [3, 283]);
+  assert.deepEqual([tally.agreeProcess, tally.agreeNeither], [123, 10]);
 });
 
 test('4. summary', (t) => {
@@ -330,8 +325,8 @@ test('4. summary', (t) => {
   assert.ok(compileMs < 60_000, `compiling took ${compileMs} ms`);
 });
 
-// ---- jig gaps the comparison shows: the tests say what jig should do, and are todo until it does ----
-test('a cylinder or cone that .add() brings into a metal part gets a process about its axis', { todo: 'inferProcess (cadpkg.js) has no case for featureType "add": j.cyl and j.cone sides added to a metal part get no process' }, () => {
+// ---- jig gaps the comparison showed (fixed in cadpkg.js: inferProcess's 'add' rule, sourceOf for copies) ----
+test('a cylinder or cone that .add() brings into a metal part gets a process about its axis', () => {
   const none = [];
   for (const [part, { bodies }] of Object.entries(J)) {
     if (EXPECTED[part].material.material === 'rubber') continue;
@@ -342,7 +337,7 @@ test('a cylinder or cone that .add() brings into a metal part gets a process abo
   assert.equal(none.length, 0, `${none.length} round faces from .add() have no process, e.g. ${none.slice(0, 4).join(', ')}`);
 });
 
-test('a pattern copy\'s faces carry the patterned feature\'s type and process', { todo: 'cadpkg.js featureOf takes "spokes[1]" from "spokes[1]/spoke/end" (features.js names copies `${id}[${k}]/${name}`), which is no feature in the graph' }, () => {
+test('a pattern copy\'s faces carry the patterned feature\'s type and process', () => {
   const hw = [...J.handwheel.bodies.values()].flatMap((b) => b.faces), byId = new Map(hw.map((f) => [f.id, f.meta]));
   const features = new Set(J.handwheel.graph.nodes.map((n) => n.id));
   const copies = hw.filter((f) => /^spokes\[\d+\]\//.test(f.id));

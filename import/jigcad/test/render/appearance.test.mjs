@@ -133,3 +133,35 @@ export default scene().add(jigScene(program)).add(light.env.hdri(hdri.studio()))
   assert.ok(three.every((m) => m >= 0), JSON.stringify(three));
   assert.equal(new Set(three).size, 3, `turned, faced, black-oxide: ${JSON.stringify(three)}`);
 });
+
+// a primitive added to a metal part is machined as on a lathe about its own axis; pattern copies carry their source
+test('.add(j.cyl) on a metal part: its side turned, its ends faced about its axis; a bore cut in ground', async () => {
+  const f = faces((await pkgOf(`return j.part('shaft').material(j.material('steel'))
+  .add(j.cyl(5, 40), { id: 'body' })
+  .add(j.box(20, 20, 4), { id: 'flange' })
+  .add(j.cyl(2, 50).moved(j.tx.move(0, 0, -5)), { id: 'bore', op: 'cut' })`)).pkg);
+  const side = Object.entries(f).find(([k, m]) => k.startsWith('body/') && m.kind === 'cylinder')[1];
+  assert.equal(side.process, 'turned');
+  assert.deepEqual(side.axis.map(Math.abs), [0, 1, 0], 'about jig Z, Candela Y');
+  const end = Object.entries(f).find(([k, m]) => k.startsWith('body/') && m.kind === 'plane')?.[1];
+  if (end) assert.equal(end.process, 'faced');
+  const bore = Object.entries(f).find(([k, m]) => k.startsWith('bore/') && m.kind === 'cylinder')[1];
+  assert.equal(bore.process, 'ground');
+  const flats = Object.entries(f).filter(([k, m]) => k.startsWith('flange/') && m.kind === 'plane').map(([, m]) => m.process);
+  assert.ok(flats.length && flats.every((p) => p === 'milled' || p === 'faced'), JSON.stringify(flats));
+});
+
+test('a pattern copy\'s faces name the copied feature, its type and process, and the copy', async () => {
+  const f = faces((await pkgOf(`return j.part('wheel').material(j.material('steel'))
+  .extrude(j.sketch('s', { on: j.plane.XY }).circle('c', 30).profiles(), mm(4), { id: 'disc' })
+  .extrude(j.sketch('t', { on: j.plane.offset(j.plane.XY, 4) }).circle('k', 3, { at: [20, 0] }).profiles(), mm(6), { id: 'knob' })
+  .pattern(j.feat('knob'), j.pattern.circular(j.axis.Z, { count: 3 }), { id: 'knobs' })`)).pkg);
+  const copies = Object.entries(f).filter(([k]) => /^knobs\[\d+\]\//.test(k));
+  assert.ok(copies.length > 0, Object.keys(f).join(', '));
+  for (const [k, m] of copies) {
+    const orig = f[k.replace(/^knobs\[\d+\]\//, '')];
+    assert.ok(orig, k);
+    assert.equal(m.feature, 'knob'); assert.equal(m.featureType, 'extrude'); assert.match(m.copy, /^knobs\[\d+\]$/);
+    assert.equal(m.process, orig.process, k);
+  }
+});
