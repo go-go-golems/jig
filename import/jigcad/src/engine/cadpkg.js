@@ -17,6 +17,7 @@
 import * as K from './kernel.js';
 import { meshBody, faceMeta } from './mesh.js';
 import { selectInPart } from './compile.js';
+import { finishTargets } from './assembly.js';
 
 export const CAD_PACKAGE_FORMAT = 'jig-cad-package';
 export const CAD_PACKAGE_VERSION = 1;
@@ -85,19 +86,24 @@ function select(part, sel) {
   if (!r.items?.length) throw new Error(`${String(sel)} selects no face`);
   return r.items.filter((c) => bodies.includes(c.body)).map((c) => [c.body, c.name]);
 }
-function partOverrides(part, diagnostics) {
+// asm: the assembly's .finish() calls that name this component ({ comp, faces, meta }, every level's, prefixed:
+// assembly.js), applied after the part's own, so the assembly's word wins; faces are selected in this part.
+function partOverrides(part, diagnostics, asm = []) {
   const meta = part.part?.meta ?? {}, finishes = new Map(), colors = new Map();
   const key = (b, n) => `${b.id}\u0000${n}`;
-  const each = (list, kind, fn) => {
+  const each = (list, kind, sel, call, fn) => {
     for (const e of list ?? []) {
       let hits;
-      try { hits = select(part, e.sel); }
-      catch (err) { diagnostics.push({ level: 'warning', kind, at: part.name, line: e.line ?? null, message: `${kind === 'finish.unresolved' ? '.finish' : '.color'}(${e.sel == null ? '' : String(e.sel)}): ${err.message}` }); continue; }
+      try { hits = select(part, sel(e)); }
+      catch (err) { diagnostics.push({ level: 'warning', kind, at: part.name, line: e.line ?? null, message: `${call(e)}: ${err.message}` }); continue; }
       for (const [b, n] of hits) fn(key(b, n), e);
     }
   };
-  each(meta.finishes, 'finish.unresolved', (k, e) => finishes.set(k, Object.assign(finishes.get(k) ?? {}, e.meta)));
-  each(meta.colors, 'color.unresolved', (k, e) => colors.set(k, e.color));
+  const merge = (k, e) => finishes.set(k, Object.assign(finishes.get(k) ?? {}, e.meta));
+  const shown = (s) => (s == null ? '' : typeof s === 'string' ? `'${s}'` : String(s));
+  each(meta.finishes, 'finish.unresolved', (e) => e.sel, (e) => `.finish(${shown(e.sel)})`, merge);
+  each(asm, 'finish.unresolved', (e) => e.faces, (e) => `assembly .finish('${e.comp}'${e.faces == null ? '' : `, ${shown(e.faces)}`})`, merge);
+  each(meta.colors, 'color.unresolved', (e) => e.sel, (e) => `.color(${shown(e.sel)})`, (k, e) => colors.set(k, e.color));
   return { finishes: (b, n) => finishes.get(key(b, n)), colors: (b, n) => colors.get(key(b, n)) };
 }
 
@@ -216,9 +222,10 @@ export function cadPackage(prog, { quality = 'render', studies = true } = {}) {
   const placement = new Map((P.bodiesData ?? []).map((b) => [b.id, b.transform]));
   const components = new Map(), jigPlace = new Map(), bodies = [], diagnostics = [];
   const W = [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]];
+  const asmFinishes = P.finishes ?? [];   // an assembly's .finish() calls, every level's (assembly.js)
   for (const p of P.parts) {
     const meta = p.part?.meta ?? {};
-    const look = appearanceOf(meta.material), ov = partOverrides(p, diagnostics);
+    const look = appearanceOf(meta.material), ov = partOverrides(p, diagnostics, asmFinishes.filter((f) => finishTargets(f.comp, [p.name]).length));
     for (const b of p.res.state.bodies) {
       const id = `${p.name}/${b.id}`;
       const T = placement.get(id) ?? K.IDENTITY;
