@@ -8,6 +8,8 @@
 //   rh.applyMeta('rod#body/side[s.big]', { material: 'brass' })   → a line in look.js, then a rebuild
 import LIB from '../generated/candela-lib.json';
 
+import { toCandelaMatrix } from './frame.js';
+
 export const LOOK_FILE = 'look.js';
 // project files the look may import (baked poses, shared materials): sent to Candela's build under their own names,
 // e.g. import poses from './shutter-poses.look.js'. jig's compile never runs them (only script.js runs).
@@ -104,6 +106,7 @@ export class RenderHost {
     this.freeCam = null; this.picked = null; this.backend = null;
     this._seq = 0; this._pkgKey = null; this._lookKey = null; this._raf = 0;
     this.time = 0; this.playing = false; this.rendering = false; this.progress = null;
+    this.motion = 'look';   // motion blur: 'look' (as the look says), 'off', or '180' (a 180° shutter at 24 fps)
   }
   on(fn) { this.ls.add(fn); return () => this.ls.delete(fn); }
   emit() { for (const f of this.ls) try { f(this); } catch (e) { console.error(e); } }
@@ -139,7 +142,9 @@ export class RenderHost {
       await this.vp.init(this.prefer);
       this.backend = this.vp.backendName;   // the viewport may swap the canvas for WebGL2: listen on its parent
       this.vp.target = 1024;          // stop accumulating at 1024 samples per pixel
-      this.offs = [this.host.on('program', () => this.refresh()), this.host.on('files', () => this.refresh())];
+      this.offs = [this.host.on('program', () => this.refresh()), this.host.on('files', () => this.refresh()),
+        this.host.on('pose', (p) => this.livePose(p)), this.host.on('overrides', (ov) => this.followDrive(ov))];
+      this.setMotion(this.motion, true);
       this.loop();
       await this.refresh(true);
     } catch (e) {
@@ -176,7 +181,10 @@ export class RenderHost {
     if (!prog) { this.status = 'idle'; this.message = 'Nothing compiled yet.'; this.emit(); return; }
     const seq = ++this._seq;
     const model = JSON.stringify([...this.host.files].filter(([k]) => !isLookFile(k))) + JSON.stringify(this.host.overrides ?? {}) + prog.hash;
-    if (!force && model === this._pkgKey && this.lookKey() === this._lookKey) return;
+    if (!force && model === this._pkgKey && this.lookKey() === this._lookKey) {
+      if (this._dropPoses) { this._dropPoses = false; this.vp?.setPoses(null); }   // a drag that changed nothing
+      return;
+    }
     this.status = 'building'; this.emit();
     try {
       if (model !== this._pkgKey || !this.pkg) {
@@ -203,13 +211,14 @@ export class RenderHost {
     this.loading = true; this.status = 'compiling'; this.emit();
     const t0 = performance.now();
     const anim = r.compiled.animation;
-    if (!anim) { this.playing = false; this.time = 0; this._timeFor = null; }
-    else if (anim.study && this._timeFor !== anim.study) {
-      // a study's timeline opens where the stage stands: the drive's current value as a time
-      this._timeFor = anim.study;
-      const t = this.timeOfDrive(anim);
-      if (t != null) this.time = t;
+    if (!anim) { this.playing = false; this.time = 0; this._sync = null; }
+    else if (anim.study) {
+      // a study's timeline stands where the stage stands: the drive's current value as a time, whenever that value
+      // changed (a joint slider, a click on a study, a drag on the stage), unless the timeline is playing
+      const v = this.driveNow(anim), key = `${anim.study}\0${v}`;
+      if (this._sync !== key) { this._sync = key; const t = this.timeAt(anim, v); if (t != null && !this.playing) this.time = t; }
     }
+    if (this._dropPoses) { this._dropPoses = false; this.vp.externalPoses = null; }   // the drag's pose is now the model's
     try { await this.vp.load(r.compiled, { time: this.time }); }
     catch (e) { this.status = 'error'; this.message = `shader compile failed: ${e.message}`; this.emit(); return; }
     finally { this.loading = false; }
@@ -221,13 +230,54 @@ export class RenderHost {
 
   // ---------- the timeline: the look's export const animation (asm.animate) ----------
   duration() { const a = this.result?.compiled?.animation; return a ? (a.duration > 0 ? a.duration : 4) : 0; }
-  /** the time at which an asm.animate() timeline shows the assembly's current drive value (null if unknown) */
-  timeOfDrive(anim) {
+  /** the study's drive value in the compiled assembly (null if unknown) */
+  driveNow(anim) {
     const s = this.pkg?.studies?.[anim.study], prog = this.host.program?.ok !== false ? this.host.program : this.host.lastGood;
     const j = s && prog?.assembly?.joints?.find((x) => x.id === s.drive);
-    const x = s?.x, from = s?.from ?? x?.[0], to = s?.to ?? x?.[x.length - 1];
-    if (!j || !Number.isFinite(j.value) || !(anim.duration > 0) || !Number.isFinite(from) || !Number.isFinite(to) || to === from) return null;
-    return Math.min(anim.duration, Math.max(0, ((j.value - from) / (to - from)) * anim.duration));
+    return j && Number.isFinite(j.value) ? j.value : null;
+  }
+  /** the time at which an asm.animate() timeline shows the drive at v (its own from/to, else the study's range);
+   *  a study of whole turns wraps, any other clamps */
+  timeAt(anim, v) {
+    const s = this.pkg?.studies?.[anim.study], x = s?.x;
+    const from = anim.from ?? s?.from ?? x?.[0], to = anim.to ?? s?.to ?? x?.[x.length - 1];
+    if (v == null || !Number.isFinite(v) || !(anim.duration > 0) || !Number.isFinite(from) || !Number.isFinite(to) || to === from) return null;
+    let f = (v - from) / (to - from);
+    const turns = Math.abs(to - from) / 360;
+    if (s?.unit === 'deg' && turns >= 1 - 1e-9 && Math.abs(turns - Math.round(turns)) < 1e-6) f = ((f % 1) + 1) % 1;   // whole turns wrap
+    return Math.min(anim.duration, Math.max(0, f * anim.duration));
+  }
+  /** a drive override was set (the Mechanism view's slider or study, the stage's drag commit): show it at once from
+   *  the study's poses; the compile it starts brings the model, and the timeline stays there */
+  followDrive(ov) {
+    const anim = this.result?.compiled?.animation, s = anim?.study && this.pkg?.studies?.[anim.study];
+    const text = s && ov?.[s.drive];
+    if (text == null) return;
+    const m = /^\s*(-?[\d.]+(?:e-?\d+)?)\s*(deg|°|mm)?\s*$/i.exec(String(text));
+    if (!m || (m[2] && (m[2] === 'mm') !== (s.unit === 'mm'))) return;   // another unit: the compile will tell
+    const t = this.timeAt(anim, +m[1]);
+    if (t != null) { this.playing = false; this.setTime(t); }
+  }
+  /** the stage's drag-to-pose, live: its world transforms (jig's frame) as Candela poses until the drag commits */
+  livePose(p) {
+    if (!this.vp?.compiled || !p) return;
+    if (p.transforms) {
+      const map = {};
+      for (const [id, T] of Object.entries(p.transforms)) if (T && T.length === 16) map[id] = toCandelaMatrix(T);
+      this.playing = false;
+      this.vp.setPoses(map);
+      this.emit();
+    }
+    if (p.done) { if (p.changed) this._dropPoses = true; else this.vp.setPoses(null); }
+  }
+  /** motion blur in the view and in render jobs: 'look' (the look's camera decides), 'off', or '180' (a 180° shutter
+   *  at 24 fps: 1/48 s of the timeline, 8 instants) */
+  setMotion(m, quiet = false) {
+    this.motion = m;
+    if (!this.vp) return;
+    this.vp.motionOverride = m === 'off' ? null : m === '180' ? { interval: 1 / 48, steps: 8 } : undefined;
+    if (this.vp.compiled && this.vp.packed) this.vp.repack(this.time);
+    if (!quiet) this.emit();
   }
   setTime(t, quiet = false) {
     const d = this.duration();

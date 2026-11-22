@@ -68,6 +68,47 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
       return { duration: jigRender.duration(), study: jigRender.result.compiled.animation?.study, moved: a && b && a.some((v, i) => Math.abs(v - b[i]) > 1e-6), ui: !!document.querySelector('.renderview .rendertime input[type=range]') };
     });
     check('the timeline plays the study cycle and moves the rod', tl.duration === 4 && tl.study === 'cycle' && tl.moved && tl.ui, JSON.stringify(tl));
+    // the Mechanism view sets a drive override (its slider, a click on a study): the timeline goes there at once,
+    // and the compile it starts (a new CAD package) keeps it there
+    const now = await page.evaluate(() => { jigHost.setOverride('main', '90 deg'); return jigRender.time; });
+    await page.waitForFunction(() => !jigHost.compiling && jigRender.status === 'ready' && Math.abs(jigRender.driveNow(jigRender.result.compiled.animation) - 90) < 1e-6, null, { timeout: 60000 });
+    const after = await page.evaluate(() => jigRender.time);
+    check('a drive override from the Mechanism view moves the timeline at once and after the compile', Math.abs(now - 1) < 1e-9 && Math.abs(after - 1) < 1e-6, `at once t = ${now}, after the compile t = ${after}`);
+    await page.evaluate(() => jigHost.setOverride('main', null));
+    await page.waitForFunction(() => !jigHost.compiling && jigRender.status === 'ready' && Math.abs(jigRender.driveNow(jigRender.result.compiled.animation) - 30) < 1e-6, null, { timeout: 60000 });
+    // the stage's drag-to-pose: each solve's transforms show live in the Render view; a drag that pins nothing lets go
+    const live = await page.evaluate(async () => {
+      const vp = jigRender.vp, A = jigHost.program.assembly, fixed = new Set(A.fixed || []);
+      const rodW = () => { const O = vp.packed.O; for (let k = 0; k < vp.packed.nObjs; k++) { const b = k * 24, o = vp.compiled.objects[O[b + 21] | 0]; if (o.def?.name === 'rod/body1') return Array.from(O.subarray(b + 4, b + 16)); } return null; };
+      // W (world→object, 3×4 row-major) · M (a component's world matrix, column-major): the body within its component
+      const rel = (W, M) => { const out = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) { let x = 0; for (let k = 0; k < 4; k++) x += W[r * 4 + k] * M[c * 4 + k]; out.push(x); } return out; };
+      // the crank's port farthest from its pivot (dragging the pivot itself moves nothing)
+      const port = (A.ports || []).filter((q) => String(q.ref).startsWith('crank:') && !fixed.has('crank')).sort((a, b) => Math.hypot(...b.o) - Math.hypot(...a.o))[0];
+      if (!port) return { error: 'no crank port' };
+      const r = await jigHost.call('dragPose', { ref: port.ref, to: [port.o[0] + 4, port.o[1] + 6, port.o[2]], reset: true });
+      if (!r?.ok) return { error: 'dragPose failed', r };
+      const W0 = rodW(), M0 = jigRender.pkg.components.find((c) => c.id === 'rod').transform;
+      jigHost.emit('pose', { source: 'drag', transforms: r.transforms });
+      const W1 = rodW(), M1 = jigRender.vp.externalPoses?.rod;
+      const a = rel(W0, M0), b = M1 && rel(W1, M1);
+      jigHost.emit('pose', { source: 'drag', done: true, changed: false });
+      const W2 = rodW();
+      return { port: port.ref, moved: W0.some((v, i) => Math.abs(v - W1[i]) > 1e-5), placed: !!b && a.every((v, i) => Math.abs(v - b[i]) < 1e-4), released: !jigRender.vp.externalPoses && W0.every((v, i) => Math.abs(v - W2[i]) < 1e-6) };
+    });
+    check('a drag on the stage poses the Render view live, as jig solved it, and lets go', live.moved && live.placed && live.released, JSON.stringify(live));
+    // motion blur: a 180° shutter at 24 fps in the view and in renders, chosen in the timeline row
+    const blur = await page.evaluate(async () => {
+      const ui = !!document.querySelector('.renderview .rendertime select[aria-label="motion blur"]');
+      jigRender.setTime(1.5);
+      const png = async () => new Uint8Array((await jigRender.renderJob({ kind: 'still', width: 96, height: 64, spp: 8, format: 'png', seed: 7 }))[0].data);
+      const sharp = await png();
+      jigRender.setMotion('180');
+      const interval = jigRender.vp.motionOverride?.interval, steps = jigRender.vp.motionOverride?.steps;
+      const blurred = await png();
+      jigRender.setMotion('look');
+      return { ui, interval, steps, differs: sharp.length !== blurred.length || sharp.some((v, i) => v !== blurred[i]), back: jigRender.vp.motionOverride === undefined };
+    });
+    check('motion blur: 180° at 24 fps changes the still, and goes back to the look', blur.ui && Math.abs(blur.interval - 1 / 48) < 1e-12 && blur.steps === 8 && blur.differs && blur.back, JSON.stringify(blur));
     const still = await page.evaluate(async () => { const f = await jigRender.renderJob({ kind: 'still', width: 96, height: 64, spp: 4, format: 'png' }); const d = new Uint8Array(f[0].data); return { name: f[0].name, png: d[0] === 0x89 && d[1] === 0x50 && d[2] === 0x4e && d[3] === 0x47, bytes: d.length }; });
     check('a still renders to PNG', still.png && /\.png$/.test(still.name), JSON.stringify(still));
     const seq = await page.evaluate(async () => {

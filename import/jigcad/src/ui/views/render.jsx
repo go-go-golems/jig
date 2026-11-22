@@ -93,6 +93,13 @@ export function RenderView({ host }) {
           <button class="btn sm" onClick={() => rh.play()} aria-label={rh.playing ? 'Pause' : 'Play'}>{rh.playing ? '❚❚' : '▶'}</button>
           <input type="range" min="0" max={dur} step="0.01" value={rh.time} onInput={(e) => { rh.play(false); rh.setTime(+e.currentTarget.value); }} aria-label="time" />
           <span class="small">{rh.time.toFixed(2)} / {dur} s · {rh.result?.compiled?.animation?.study ?? ''}</span>
+          <label class="small" title="motion blur in the view and in renders: as the look's camera says, none, or a 180° shutter at 24 fps">blur{' '}
+            <select value={rh.motion} onChange={(e) => rh.setMotion(e.currentTarget.value)} aria-label="motion blur">
+              <option value="look">as the look</option>
+              <option value="off">off</option>
+              <option value="180">180° at 24 fps</option>
+            </select>
+          </label>
         </div>
       )}
       <div class="renderbody">

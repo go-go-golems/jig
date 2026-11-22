@@ -302,7 +302,7 @@ function jig(st) {
       const a = driveValue(s, o.from ?? s.from ?? s.x[0]), b = driveValue(s, o.to ?? s.to ?? s.x[s.x.length - 1]);
       if (!Number.isFinite(a) || !Number.isFinite(b)) throw new Error(`jigScene().animate('${name}', { from, to }): values of the drive ${s.drive}, in ${s.unit}`);
       const fn = (t) => api.posesAt(name, a + (b - a) * (t / duration));
-      fn.duration = duration; fn.study = name;   // the timeline's length, for a host's clock (the Render view)
+      fn.duration = duration; fn.study = name; fn.from = a; fn.to = b;   // the timeline, for a host's clock (the Render view)
       return fn;
     },
     bounds() { return st.pkg.bounds; },

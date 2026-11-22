@@ -123,7 +123,7 @@ export function createStage(element, host = {}, options = {}) {
     try {
       const r = await host.call('dragPose', { ref: d.ref, to, reset: !d.started });
       d.started = true;
-      if (r && r.ok && !dead && pdrag === d) { posed = { pose: r.transforms, ports: r.ports, joints: r.joints, overrides: r.overrides, limits: r.limits || [], contacts: r.contacts || [] }; poseHandle = { ref: d.ref, at: proj(last.cam, r.at) }; d.result = r; invalidate(); }
+      if (r && r.ok && !dead && pdrag === d) { posed = { pose: r.transforms, ports: r.ports, joints: r.joints, overrides: r.overrides, limits: r.limits || [], contacts: r.contacts || [] }; poseHandle = { ref: d.ref, at: proj(last.cam, r.at) }; d.result = r; invalidate(); if (host.emit) host.emit('pose', { source: 'drag', transforms: r.transforms }); }
     } catch (e) { if (host.toast) host.toast(`Drag: ${e.message || e}`, 'error'); }
     d.busy = false;
     if (d.pending && pdrag === d) requestAnimationFrame(poseStep);
@@ -134,6 +134,8 @@ export function createStage(element, host = {}, options = {}) {
     if (pdrag === d) pdrag = null;
     const ov = d.result && d.result.overrides;
     if (heldFit) heldFit.keep = 1;
+    // other views that showed the live pose (the Render view) keep it until the compile this commit asks for lands
+    if (d.result && host.emit) host.emit('pose', { source: 'drag', done: true, changed: !!(ov && Object.keys(ov).length) });
     if (ov && host.setOverride) for (const [id, v] of Object.entries(ov)) host.setOverride(id, v);
     canvas.style.cursor = 'default'; invalidate();
   }
