@@ -11,9 +11,9 @@ DocType: log
 Intent: long-term
 Owners: []
 RelatedFiles:
-    - Path: repo://src/app/claude.ts
+    - Path: repo://import/candela/src/app/claude.ts
       Note: Agent sampling loop
-    - Path: repo://tests/agent-loop.test.ts
+    - Path: repo://import/candela/tests/agent-loop.test.ts
       Note: Offline agent loop test
     - Path: repo://ttmp/2026/11/21/CANDELA-001--standalone-typescript-port-of-the-candela-pbr-workspace/scripts/03-optional-params-and-nullable-lets.ts
       Note: Typing codemod

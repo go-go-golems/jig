@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { parseArgs } from './render-preset';
+import { parseArgs } from './args';
 
 type Digest = { id: string; ok: boolean; error?: string; shared?: string; lines?: number; nU?: number; frames?: { t: number; d: Record<string, string> }[]; buildMs?: number; frameMs?: number };
 

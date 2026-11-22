@@ -11,17 +11,17 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
-    - Path: repo://native/optix/src/main.cpp
+    - Path: repo://import/candela/native/optix/src/main.cpp
       Note: spike patterns reused by candela-rt
-    - Path: repo://src/app/host.ts
+    - Path: repo://import/candela/src/app/host.ts
       Note: clock and behaviours move into SceneSession
-    - Path: repo://src/engine/candela.ts
+    - Path: repo://import/candela/src/engine/candela.ts
       Note: build sandbox (new Function, async modules, seeded Math)
-    - Path: repo://src/engine/compile.ts
+    - Path: repo://import/candela/src/engine/compile.ts
       Note: compile/pack to split into lower + targets
-    - Path: repo://src/engine/fx.ts
+    - Path: repo://import/candela/src/engine/fx.ts
       Note: Gen gains WGSL/CUDA dialects
-    - Path: repo://src/engine/kernel.ts
+    - Path: repo://import/candela/src/engine/kernel.ts
       Note: 'WGSL kernel: traceAll replaced, rest translated to CUDA'
 ExternalSources: []
 Summary: 'Design and implementation guide for candela-rt: a native process that embeds V8 to run Candela scene files (with their animation, behaviour and param callbacks) and renders them with OptiX, offline and for a live workbench. Splits the engine into a target-neutral front end and two targets (WebGPU, OptiX).'

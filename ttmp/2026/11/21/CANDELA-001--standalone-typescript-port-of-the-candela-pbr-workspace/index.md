@@ -11,13 +11,13 @@ DocType: index
 Intent: long-term
 Owners: []
 RelatedFiles:
-    - Path: repo://scripts/validate.ts
+    - Path: repo://import/candela/scripts/validate.ts
       Note: Preset build validation gate
-    - Path: repo://src/app/main.tsx
+    - Path: repo://import/candela/src/app/main.tsx
       Note: Workbench entry point
-    - Path: repo://src/content/catalog.ts
+    - Path: repo://import/candela/src/content/catalog.ts
       Note: Content catalog (port of build/build.js preset/doc loading)
-    - Path: repo://vite.config.ts
+    - Path: repo://import/candela/vite.config.ts
       Note: Build configuration (multi-file and single-file)
 ExternalSources:
     - local:candela-workspace.zip

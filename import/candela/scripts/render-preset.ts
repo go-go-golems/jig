@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { serve } from './shot';
+import { parseArgs } from './args';
 
 /** headless-shell flags that reach the NVIDIA GPU on the DGX Spark (CANDELA-002 various/01-gpu-probe.txt) */
 export const GPU_ARGS = ['--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
@@ -176,18 +177,7 @@ export async function renderPreset(o: RenderPresetOptions): Promise<RenderPreset
 }
 
 // ---------- command line ----------
-export function parseArgs(argv: string[]) {
-  const flags: Record<string, string | boolean> = {}, params: Record<string, string> = {}, rest: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a.startsWith('--')) { rest.push(a); continue; }
-    const k = a.slice(2), next = argv[i + 1];
-    const v = next != null && !next.startsWith('--') ? (i++, next) : true;
-    if (k === 'param') { const s = String(v), eq = s.indexOf('='); if (eq < 1) throw new Error(`--param id=value, got '${s}'`); params[s.slice(0, eq)] = s.slice(eq + 1); }
-    else flags[k] = v;
-  }
-  return { flags, params, rest };
-}
+export { parseArgs } from './args';
 
 async function main() {
   const { flags, params, rest } = parseArgs(process.argv.slice(2));

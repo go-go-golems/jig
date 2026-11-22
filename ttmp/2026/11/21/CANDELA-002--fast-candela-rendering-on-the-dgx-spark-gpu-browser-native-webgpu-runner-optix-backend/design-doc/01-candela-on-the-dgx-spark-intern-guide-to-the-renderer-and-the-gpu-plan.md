@@ -11,23 +11,23 @@ DocType: design-doc
 Intent: long-term
 Owners: []
 RelatedFiles:
-    - Path: repo://native/optix/src/ao.cu
+    - Path: repo://import/candela/native/optix/src/ao.cu
       Note: 'Step 3 spike: AO device programs'
-    - Path: repo://native/optix/src/main.cpp
+    - Path: repo://import/candela/native/optix/src/main.cpp
       Note: 'Step 3 spike: OptiX host (GAS/IAS, pipeline, timing)'
-    - Path: repo://scripts/render-preset.ts
+    - Path: repo://import/candela/scripts/render-preset.ts
       Note: 'Step 1: render any preset headless on the GPU'
-    - Path: repo://scripts/scene-package.ts
+    - Path: repo://import/candela/scripts/scene-package.ts
       Note: 'Step 3: scene package writer (v0: geometry, instances, camera)'
-    - Path: repo://src/engine/compile.ts
+    - Path: repo://import/candela/src/engine/compile.ts
       Note: 'compile and pack: objects, generated WGSL, GPU buffers'
-    - Path: repo://src/engine/kernel.ts
+    - Path: repo://import/candela/src/engine/kernel.ts
       Note: The WGSL path tracer (renderPixel, tracePath, traceAll, hitMesh)
-    - Path: repo://src/engine/output.ts
+    - Path: repo://import/candela/src/engine/output.ts
       Note: runRender and per-sample accumulate loop
-    - Path: repo://src/engine/render.ts
+    - Path: repo://import/candela/src/engine/render.ts
       Note: WebGPU/WebGL2 backends; limits caps
-    - Path: repo://tools/lockstitch/render.ts
+    - Path: repo://import/candela/tools/lockstitch/render.ts
       Note: 'Step 1: lockstitch scenes on the GPU (replaces render.js)'
     - Path: repo://ttmp/2026/11/21/CANDELA-002--fast-candela-rendering-on-the-dgx-spark-gpu-browser-native-webgpu-runner-optix-backend/scripts/02-throughput.ts
       Note: Throughput measurement on the GB10
