@@ -10,6 +10,14 @@ DocType: diary
 Intent: long-term
 Owners: []
 RelatedFiles:
+    - Path: repo://import/jigcad/src/ui/views/render.jsx
+      Note: the Render view
+    - Path: repo://import/jigcad/test/render/bridge.test.mjs
+      Note: bridge tests on F-06 and synthetic packages
+    - Path: repo://import/jigcad/test/ui/render.cjs
+      Note: browser check of the Render view on the GPU
+    - Path: repo://pkg/render/render.go
+      Note: the candela-rt sidecar (supervision, /rt proxy)
     - Path: repo://ttmp/2026/11/22/JIG-016-RENDER--keyshot-style-rendering-for-jig-candela-as-jig-s-renderer-a-scene-package-from-jig-and-candela-rt-as-an-nvidia-sidecar/scripts/01-f06-face-records.mjs
       Note: 'evidence script: F-06 body and face records from the worker in Node'
 ExternalSources: []
@@ -202,3 +210,204 @@ Two design points changed from the guide while building, both for the better:
 - **Arrays:** `positions` and `normals` are Float32, `indices` and `triFace` are Uint32, base64 in JSON.
 - **C** (column-major) is `[S,0,0,0, 0,0,-S,0, 0,S,0,0, 0,0,0,1]` with S = 0.001; T′ = C·T·C⁻¹.
 - **Euler extraction** for `Rz·Ry·Rx`: y = asin(−r20), x = atan2(r21, r22), z = atan2(r10, r00).
+
+## Step 5: Phase 2 (appearance in jig) and the candela-rt sidecar merged
+
+This step gave jig's own scripts a say over appearance: a part can be finished where it is defined (`.finish()`), display colours follow a rule, and brass, bronze and copper exist as engineering materials. The Go sidecar built by the first subagent was reviewed and merged.
+
+The phases 0–1 code is commit `65d237d`. This step's commits are `54b4014` (Phase 2) and `619caaf` (the sidecar merge).
+
+### Prompt Context
+**User prompt (verbatim):** see Step 4.
+**Assistant interpretation:** continue the phases; keep commits and the diary going.
+**Inferred user intent:** working rendering, built incrementally.
+**Commit (code):** `54b4014` "JIG-016 phase 2: appearance in jig (.finish, display colours, one vocabulary)"; `619caaf` "Merge the candela-rt sidecar (pkg/render, --render, /rt) into jig-016-render".
+
+### What I did
+**`Part.finish(meta)` and `.finish(faces, meta)`** (`src/engine/part.js`).
+- The keys are `finish`, `process`, `color` and `roughness`. Unknown keys, processes or finishes throw at the call, so the compile fails with `(script.js:3:NN)`.
+- Each record carries its line through `stampLine`, as a non-enumerable property, so it never enters a cache key.
+
+**Resolution in the CAD package** (`src/engine/cadpkg.js`, `partOverrides` and `select`).
+- `.finish()` and `.color()` selectors are resolved once per part: a persistent name, a `*` glob, or else `selectInPart` (the part's selector engine, as joint ends picked on geometry use).
+- A selector that names nothing becomes a `finish.unresolved` warning in `pkg.diagnostics`, with the line and the closest real names. It does not crash the export.
+
+**Colour rule** (`settleColor`).
+- jig's display colour dresses plastics.
+- On a metal it shows only under a coat: paint, powder coat or anodizing.
+- `.finish({ color })` always wins.
+
+**Materials.**
+- `MATERIALS` gains brass (C360), bronze (C932) and copper (C110), with density, cost, modulus and strength (`inspect.js`).
+- `reference.md` documents `.finish()` and the colour rule.
+
+**Tests.** `test/render/appearance.test.mjs`, 8 tests.
+
+**Sidecar merge.** Reviewed the subagent's diff of `server.go` and `main.go`, then merged `worktree-agent-a6d3627942f15b582` (`0a21626`, `5001158`).
+- `GOWORK=off go test ./cmd/... ./pkg/...`: ok for render, gepp and server.
+- `gofmt -l`: clean.
+- Removed the worktree and the branch afterwards.
+
+### Why
+- **Finishes are metadata, not materials.** Candela's `autoFinish` needs the axis jig found to run lathe grooves around it. A Candela material written in jig would lose it.
+- **Selectors resolve per part, in the worker.** That is where OpenCascade topology is. The page and candela-rt only see names (decision D9 in the guide).
+- **A bad selector is a warning, not a failure.** A typo in a finish should not stop an export or a render.
+
+### What worked
+- `node --test test/render/*.test.mjs`: 20 passed.
+- Agent and UI: `node --test test/agent/*.test.mjs test/ui/*.test.mjs`, 90 passed.
+- Engine core: `node test/engine-core/run.mjs`, 69 passed.
+- The "changing a finish re-runs no feature" test passes: the graph shows `rev` with `cached: true`.
+
+### What didn't work
+- **A string fell through to the selector engine.** `.finish('rev/end', …)` on a full revolve, which has no `rev/end` face, crashed the export with `expected a selector, got rev/end` (from `compile.js:187`, via `selectInPart`).
+  - Fix: a string is a name or glob only, and a miss is a diagnostic.
+- **Validation errors were looked for in the wrong place.** The first validation test looked for them in `program.diagnostics`, but a builder throw fails the compile reply itself. The test now asserts `r.ok === false` and the message's `(script.js:3:N)`.
+- **The test's `line` check failed** because `callerLine()` returns `{ line, column }`. Switched to `stampLine` and `e.line`.
+- **A first fixture made no faces.** It used a hole at the centre of a revolved tube, which is empty space there. Removed it; the revolve's own faces suffice.
+
+### What I learned
+- **Display colours on metal parts are the drawing's, not the part's.** The Compur's brass housing is `'#3a3b3f'` in jig. The rule above keeps it brass unless a coat is declared.
+- **Candela labels every material `pbr`.** The materials' anisotropy can't be inspected from outside, so the test checks that the faces get distinct materials. The look of each material is Candela's tested `fromMetadata`.
+
+### What was tricky to build
+- **Overrides key on `(body, name)`, not the name alone.** One part can have several bodies with equal face names (patterns or splits), so the key is `body.id + NUL + name`.
+
+### What warrants a second pair of eyes
+- **The new materials' numbers** (`inspect.js`): C360 yield 310 MPa, C932 125 MPa, C110 70 MPa (annealed). They are typical values; check them before using them for stress results.
+- **The sidecar's Origin check on `/rt`.** It rejects a cross-origin `Origin`, as gorilla/websocket does by default. A TLS front end that rewrites `Host` would need to preserve it (see the subagent's report, quoted in Step 6).
+
+### What should be done in the future
+- `.finish(component, meta)` on assemblies needs a rule in the subassembly expansion (the FLEXIBLE table) and is deferred.
+- Candela's `POLYMERS` could gain petg, asa, pp, tpu and resin upstream. jig maps them to `finish: 'plastic'` meanwhile.
+
+### Code review instructions
+- `part.js` `finishMeta` and `finish`; `cadpkg.js` `select`, `partOverrides` and `settleColor`; `pkg/render/render.go` and `proxy.go`.
+- Run `node --test test/render/appearance.test.mjs` and `GOWORK=off go test ./pkg/render/ ./pkg/server/`.
+
+### Technical details
+- Sidecar API (from the subagent's report and verified by the merged tests):
+  - `render.Find(mode)`, `render.New(Config{Mode, DistDir, Dist})`, `(*Sidecar).Run(ctx)`, `Status()`, `ServeRT` and `ServeCapabilities`.
+  - Routes: `GET /rt` and `GET /api/render/capabilities` → `{ rt, state, reason, restarts }`. Flag: `jigcad serve --render auto|off|PATH`.
+  - The child runs as `candela-rt serve --bind 127.0.0.1 --port <free> --token <random> --bundle <dist>/candela-core.js`, and the proxy adds `token=`.
+  - After 5 failed starts in a row it stays down.
+
+## Step 6: Phase 3, the Render view (checked on the GPU); Phase 4 study poses merged; timeline and render jobs
+
+This step built the visible feature. jig's workbench has a Render tab that path-traces the open model with Candela on the page. A click names a face as jig does, and a material from the library becomes one `.meta()` line in `look.js`. A study plays on a timeline, and stills and video render to files. The view was verified in Chromium on this laptop's Intel Iris Xe: 10/10 checks on WebGPU, and the earlier 6/6 suite also on WebGL2.
+
+The headless investigation took most of the effort: software WebGPU loses its device. The second subagent's Phase 4 work (study poses) was merged.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 4.
+**Assistant interpretation:** build the Render view and the motion pieces; verify in a browser.
+**Inferred user intent:** a KeyShot-like experience inside jig.
+**Commit (code):**
+- `2bc5b73` "JIG-016 phase 3 (first cut): the Render view; .meta() in the bridge"
+- `c218987` "Merge study poses (phase 4) into jig-016-render"
+- `a1c04de` "JIG-016 phase 3: the Render view, checked in Chromium on a GPU"
+- `89ad6fc` "JIG-016: the Render view plays studies and renders stills and video"
+
+### What I did
+**`src/render/host.js` (`RenderHost`), the view's controller.**
+- Loads `dist/candela.js` on first use (`import(new URL('./candela.js', import.meta.url))`).
+- Gets the CAD package with `host.export('candela', { quality: 'render' })`. It does not export while `host.dirty` or `host.compiling`; the compile's `program` event brings it back.
+- Builds `{ 'jig-candela.js', 'jig-program.js', 'scene.js': look }` with `scope: { __jigPackage }`.
+- Drives a Viewport with a rAF loop that draws no frames while shaders compile, while a job renders, or after the device is lost.
+- Camera: orbit, pan and zoom, Y up, ported from Candela's host. Picking uses `rayMesh`, now exported from `dist/candela.js`, against packed meshes, and `faceAt()` maps a hit to `{ component, body, face, address }`.
+- `applyMeta(address, patch)` inserts `.meta(…)` before the `;` that ends the chain under the marker line.
+- Timeline: `duration()`, `setTime()`, `play()`, and `timeOfDrive()`, which opens at the stage's pose.
+- Render jobs: `renderJob(o)` and `cancelJob()` wrap Candela's `runRender`.
+- `restart(prefer)` handles a lost device; the backend choice is stored in localStorage `jig.render.backend`.
+
+**The default look.** autoFinish, a studio HDRI, a floor plane at the model's lowest Y, the stage's view as a 100 mm camera (`asm.view()`), and the first study animated over 4 s.
+
+**`src/ui/views/render.jsx`, the view.**
+- Toolbar: status, backend and spp; Reset camera; Edit or Make `look.js`; Render PNG and Render video; progress with Cancel.
+- Timeline row: play/pause and a time slider.
+- Side panel: the picked face (component, persistent name, feature and current look), a "whole component" toggle, the material library (metadata patches) and diagnostics.
+
+**Registration.** `app.jsx` and `layouts.js` (every built-in layout gets `tile(['stage', 'render'], 'stage')`), plus CSS in `jig.css`.
+
+**Bridge.**
+- `.meta(sel, patch)`: per face, the last word in call order between an explicit material and a metadata patch decides.
+- `animate()` returns a function carrying `duration` and `study`.
+
+**`test/ui/render.cjs`, the Playwright check.**
+- Needs `NODE_PATH` set to a playwright install, plus `CHROMIUM` (the scratchpad install of 1.65.1 and the cached `chromium-1254`).
+- Uses Vulkan flags so ANGLE and WebGPU use the real GPU; `RENDER_BACKEND=webgl2` forces WebGL2.
+
+**Phase 4 merge.** Merged `worktree-agent-a30d950823c2ddea3`:
+- `5827366`: every study keeps its poses on the worker side;
+- `a406387`: the package carries them;
+- `553bffd`: `asm.studies()`, `posesAt()` and `animate()`;
+- `a03b0b3`: tests and docs.
+
+The one conflict was the import line of `jig-candela.js`: their header was kept, plus my `finish` import.
+
+### Why
+- **Materials as metadata patches.** A finish keeps the axis jig found; a hard-coded `finish.turned()` would not.
+- **The timeline uses Candela's `export const animation`.** It reuses the engine's repack path (no rebuild) and the bridge's interpolation, so the host has no second copy of the pose math.
+- **Opening at the drive's value.** Without it the view showed F-06 at the study's 0° while the stage shows 30°.
+
+### What worked
+- **`test/ui/render.cjs` on WebGPU:** 10 passed, 0 failed. The adapter is `intel gen-12lp`.
+  - Shader compile: 38.8 s cold, then 400–500 ms thanks to Mesa's disk cache.
+  - Steps passed: F-06 at 16 spp, timeline opening at t = 0.3333, pick `rod#body/side[s.big]` and stage selection, the Brass line, the rod moving with the clock, a PNG still (12,853 bytes), MP4 (1,655 B) and WebM (4,280 B) sequences, and no console errors.
+- **With `RENDER_BACKEND=webgl2`:** the earlier 6/6 suite passed before the timeline checks were added.
+- **Screenshots** `test/ui/out/render-f06.png` and `render-f06-brass.png` show the frame plate grey diffuse, the steel parts with studio reflections and floor contact shadows, and the crank-pin bore turning brass after the click.
+- **Node render tests:** 36 passed (21 bridge and appearance, 15 poses).
+- **Engine suite on the merged tree:** 62 passed, 0 failed (124.3 s).
+
+### What didn't work
+- **Waiting for samples timed out headless.** The first headless run (SwiftShader flags) hit `page.waitForFunction: Timeout 120000ms exceeded`. The diagnosis showed `status: building` for 40 s and page errors `TypeError: Cannot read properties of undefined (reading 'U')`.
+  - Cause: my loop called `vp.frame()` while `Viewport.loadNow` had set `compiled` but not yet `packed` (`viewport.ts:80-92`).
+  - Fix: no frames while `this.loading` or `!vp.packed`.
+- **The software adapter lost its device.** On software WebGPU, the shader compile took 33.8 s (`compileMs: 33750`), then accumulation stopped at `spp: 2` with `busy: false`, `metered: 0`.
+  - At quarter resolution (102 × 78) it still stopped at 2. `vp.snapshot()` then threw `OperationError: A valid external Instance reference no longer exists.`: the device was lost.
+  - Response: detect `backend.lost`, show an error with Restart and Use WebGL2, and test on the real GPU instead. Candela's own `render-preset.ts` refuses a software rasteriser without `--allow-software`.
+- **The screenshot at 2 spp was plain white.** That was the lost device; it is not a sign of a broken scene.
+- **Your Chrome didn't respond.** I tried to verify there through the Chrome extension, and `tabs_context_mcp` timed out twice; I stopped and used Vulkan instead.
+- **No usable Playwright at first.** No playwright package was found, and pbr-spark has no `node_modules`. After `npm install playwright@1` (1.65.1) into the scratchpad, it asked for an uncached browser, so the test takes `CHROMIUM` (the cached chromium-1254).
+- **Device probe on `about:blank`.** With the Vulkan flags it said `"no adapter"` because the page was not a secure context. The real page on 127.0.0.1 got `intel gen-12lp`.
+- **The "no console errors" check failed** on `Failed to load resource: … 404`. It was the browser's own `/favicon.ico` request, which never shows as a page response. The test now records `m.location().url` and ignores only the favicon, like `shoot.cjs:461`.
+
+### What I learned
+- **Viewport needs a loading guard.** `Viewport.load` is chained and async, and `compiled` is set before `packed`. Candela's own host avoids the gap with its `compiling` flag.
+- **This laptop's GPU works headless.** It is an Intel Iris Xe (TigerLake GT2), usable with `--enable-features=Vulkan --use-angle=vulkan --use-vulkan --ignore-gpu-blocklist --enable-unsafe-webgpu`.
+- **Mesa caches the compiled kernel on disk.** A cold compile of Candela's kernel takes ~39 s on the Iris Xe; warm loads take ~0.4 s.
+- **WebCodecs here encodes both H.264 (MP4) and VP8/VP9 (WebM).**
+
+### What was tricky to build
+- **Scheduling the package refresh.** Edits emit `files` before the compile runs. Exporting then would export the previous program, so the export is skipped while `dirty` or `compiling`, and look-only edits rebuild at once.
+- **Restart.** A canvas that once held a WebGPU context cannot become WebGL2, which is why Candela itself swaps canvases. `restart()` replaces the canvas node before re-attaching, and pointer events live on the wrapper, not the canvas.
+- **Writing into a hand-editable file.** Material lines go to the end of the marked chain, so later lines win. If the user removes the marker, `applyMeta` throws with the exact line to paste.
+
+### What warrants a second pair of eyes
+- **Exporting after every compile.** `refresh()` re-exports the package after every compile that changes the model: a render-quality re-mesh in the worker plus new mesh definitions (BVHs) on the page. That is fine for F-06 (60 ms export); large assemblies need a cache keyed by body content.
+- **World poses.** The timeline's poses are world matrices in the package frame. Moving the whole `jigScene` group in a look would not move the posed components (the subagent documented this in the bridge header).
+- **The clock re-packs every frame while playing.** That resets accumulation, which is expected; motion blur is opt-in in the look.
+
+### What should be done in the future
+- The Mechanism view could forward drags and study scrubs to the Render view (`vp.setPoses`). The Compur adapter is an example of poses from an outside engine.
+- Cache mesh definitions by body content across compiles.
+- Push pbr-spark's `jig-016-path-ids` (`38fc068`) and open a PR there, with the user's go-ahead.
+- Phase 6 (the subtree merge) waits for the OptiX work, as planned. The sidecar has been tested only against a fake candela-rt, because there is no NVIDIA GPU here.
+
+### Code review instructions
+- Start with `src/render/host.js` (`refresh`, `build`, `loop`, `pick`, `applyMeta`, `renderJob`), `src/ui/views/render.jsx`, and the bridge's `meta()` and `realize()` in `src/render/jig-candela.js`.
+- Validate:
+
+  ```sh
+  make web
+  node --test test/render/*.test.mjs
+  NODE_PATH=<playwright> CHROMIUM=<chrome> node test/ui/render.cjs
+  node test/engine/run.mjs
+  ```
+
+### Technical details
+- **Look-file contract:**
+  - `import { jigScene } from 'jig-candela'` and `import { program } from 'jig-program'`, both resolved as files by Candela's `runFiles`;
+  - the marker line `// materials: the Render view adds lines here`, with the chain ending in a line that is just `;`;
+  - an optional `export const animation = asm.animate(study, { duration })`.
+- **Library patches** include `finish: null` for bare metals, so a jig `.finish()` coat can be removed from the Render view.

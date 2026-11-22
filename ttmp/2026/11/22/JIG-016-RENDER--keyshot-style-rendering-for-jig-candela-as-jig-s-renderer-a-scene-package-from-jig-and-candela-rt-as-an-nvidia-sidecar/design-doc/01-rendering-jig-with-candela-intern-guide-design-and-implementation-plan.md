@@ -33,6 +33,26 @@ WhenToUse: Before touching the jig↔Candela bridge, the Render view, the sideca
 
 # Rendering jig with Candela: intern guide, design and implementation plan
 
+## 0. Status (2026-11-22, branch `jig-016-render`)
+
+Phases 0–5 are implemented. Phase 6 (the repository merge) waits for the OptiX work, as planned. Where the sections below and the code differ, the code and this list win:
+- **Built**, with the commit for each part:
+  - Candela's engine vendored (`65d237d`);
+  - the CAD package export and the bridge, plus `.meta()` (`65d237d`, `2bc5b73`);
+  - `.finish()` and the shared material names (`54b4014`);
+  - the candela-rt sidecar (`619caaf`);
+  - study poses (`c218987`);
+  - the Render view with picking, the material library, the timeline and PNG/MP4 jobs (`a1c04de`, `89ad6fc`).
+- **Tests:** `test/render/*.test.mjs` (36), `test/ui/render.cjs` (10 checks in Chromium on the GPU) and the Go tests in `pkg/render`.
+- **Changed from the design while building:**
+  - **The bridge is a Candela library module** (`src/render/jig-candela.js`). Its source is sent to Candela's build as the scene file `jig-candela.js`, next to `jig-program.js` and the look. It is not part of `candela-core.js`, so Candela's core needed only one change: path ids, made upstream as a local, unpushed pbr-spark commit `38fc068` and vendored from there.
+  - **The bridge is immutable,** like every Candela builder: `.face()`, `.material()` and `.meta()` return a new group, written as one chain.
+  - **`.meta(sel, patch)` was added.** It patches the metadata autoFinish reads, so a face keeps the axis jig found. The Render view's material library writes these lines.
+  - **Selectors** are addresses, globs, lists of addresses, or predicates over face metadata. A glob matches by name: `body/side[s.*]` also matches the outline's sides `body/side[s.r.*]`.
+  - **Cameras aim with `.lookAt()`,** not `.target()`.
+  - **Studies always keep their poses on the worker side** (`prog.studyPoses()`), with no `poses: true` option. The package carries them, and `asm.studies()`, `asm.posesAt(name, x)` and `asm.animate(name, { duration })` play them back.
+  - **The sidecar needs no new candela-rt command and has no `/renders/` proxy.** Readiness is the localhost port accepting connections, and the browser gets the GPU from candela-rt's `hello` reply. `/rt` checks the `Origin` header, and capabilities are at `GET /api/render/capabilities`.
+
 ## 1. What this document is for
 
 jig is a parametric CAD workbench.
@@ -217,7 +237,7 @@ const rod = mesh.fromArrays({ positions, normals, indices, faceIds,
 export default scene()
   .add(shape.mesh(rod).id('rod').autoFinish())
   .add(light.env.hdri(hdri.studio()))
-  .camera(camera.thinLens().at([0.3, 0.2, 0.4]).target([0, 0, 0]));
+  .camera(camera.thinLens().at([0.3, 0.2, 0.4]).lookAt([0, 0, 0]));
 ```
 
 A scene goes through four stages. It helps to keep them apart, because each one is cached separately and the integration hooks into different ones:
@@ -425,15 +445,15 @@ import { scene, light, camera, hdri, finish } from 'candela';
 import { jigScene } from 'jig-candela';
 import { program } from 'jig:program';             // the open program's ProgramData, provided by the workbench host
 
-const asm = jigScene(program, { autoFinish: true, quality: 'render' });
-asm.face('rod#body/side[s.*]', finish.ground({ metal: 'bearing-steel' }));   // both pin bores
-asm.find('crank').material(finish.blackOxide({ process: 'milled' }));        // the whole crank
-
+const asm = jigScene(program, { autoFinish: true })                              // immutable: one chain
+  .face(['rod#body/side[s.big]', 'rod#body/side[s.small]'], finish.ground({ metal: 'bearing-steel' }))   // both pin bores
+  .material('crank', finish.blackOxide({ process: 'milled' }))                   // the whole crank
+  .meta('slider', { material: 'brass' });                                        // metadata: keeps jig's axes
+const v = asm.view('axo');
 export default scene()
   .add(asm)
-  .ground({ color: 0.18 })
   .add(light.env.hdri(hdri.studio(), { rotate: 30 }))
-  .camera(camera.thinLens().at(asm.view('axo').at).target(asm.center()).fstop(5.6));
+  .camera(camera.thinLens().at(v.at).lookAt(v.target).focal(v.focal).fstop(5.6));
 ```
 
 What `jigScene` does, in order:
@@ -627,7 +647,7 @@ The agent can then dress and render a model the way it already edits and inspect
 Candela accepts poses by node id, and the bridge makes node ids equal to jig component ids. Three sources feed the same channel.
 
 1. **Studies.**
-   - `.study(name, { …, poses: true })`, or the CAD-package exporter, asks the study to keep `S.transforms()` for every row. `runStudy`'s `onRow` hook already supports this (`assembly.js:307`).
+   - Every study keeps `S.transforms()` for every row it reaches, on the worker side only, through `runStudy`'s `onRow` hook (`assembly.js:307`). `prog.studyPoses(name)` returns them; there is no `poses: true` option (see §0).
    - Memory is small: 361 rows × 30 components × 16 floats is about 0.7 MB in float32.
    - The package carries them as `studies.<name>.poses` (§6.3).
    - `posesAt(study, x)` interpolates between rows: positions linearly, quaternions linearly with the shorter-arc sign, as K-09's `frameAt` does (`K-09-lockstitch.js:36-41`).
@@ -652,8 +672,8 @@ On a machine with an NVIDIA GPU, final renders and a faster live view should go 
 
 **Discovery and launch.** `jigcad serve` gets a flag `--render auto|off|<path>`. In `auto` mode:
 1. It looks for a `candela-rt` binary: the flag's path, then `PATH`, then the repository's build directory.
-2. It asks the binary what it can do. No probe command exists today, so this design adds `candela-rt info`. It prints JSON with the CUDA devices, OptiX availability and the bundle hash, and exits non-zero when there is no usable device.
-3. If a device is present, it starts the sidecar as a child process:
+2. (Built differently: see §0.) There is no probe command. A machine without a usable device makes `candela-rt serve` exit during start-up, and after five failed starts in a row the sidecar stays "down" with the exit status and stderr tail as the reason.
+3. It starts the sidecar as a child process:
 
 ```go
 // pkg/render (proposed): start the sidecar and proxy it (sketch)
@@ -663,7 +683,7 @@ cmd := exec.CommandContext(ctx, bin, "serve", "--bind", "127.0.0.1", "--port", s
 cmd.Stdout, cmd.Stderr = logWriter("candela-rt"), logWriter("candela-rt")
 // restarted with backoff if it exits; stopped with the server
 mux.Handle("/rt", wsProxy("ws://127.0.0.1:"+strconv.Itoa(port), token))     // the proxy adds the token
-mux.Handle("/renders/", reverseProxy("http://127.0.0.1:"+strconv.Itoa(port)))  // job outputs
+// (no /renders/ proxy as built: candela-rt serve has no job or file endpoint yet; see §0)
 mux.HandleFunc("GET /api/capabilities", caps)   // { rt: true, backends: ['optix', 'cuda'], denoise: 'ai', device: 'GB10' }
 ```
 
@@ -681,7 +701,7 @@ ws /rt  ────────────────────────
 files { look.js, drive.jigcad.json } ───────────────────────────────────▶ build + compile in V8 → built { irHash }
                                                                          (the browser compares with its own irHash)
 view, poses, clock ─────────────────────────────────────────────────────▶ OptiX accumulate → frame (JPEG) …
-render { size, spp, sequence, format: 'mp4', denoise: 'ai' } ──────────▶  job → files under /renders/…
+(render jobs over the live protocol are future work: candela-rt serve speaks hello, files, param, view, clock)
 ```
 
 The `files` message today carries Candela scene files. A CAD package is one more file, so the bridge module must be inside `candela-core.js`, or sent with the files, for the sidecar to build it (§8.2).
@@ -720,7 +740,7 @@ jig/
 - `dist/candela-core.js`, the same IIFE as today. The page loads it, and the sidecar gets the same file with `--bundle`. Browser and sidecar then run byte-identical engine code from one commit, so an `irHash` mismatch means a real bug rather than version drift.
 - `dist/candela-view.js`, ESM that takes the core from `globalThis.Candela`, so the core is loaded exactly once.
 
-**Where the bridge lives.** It is needed by both hosts: the page builds `look.js`, and so does the sidecar. It therefore belongs in the core bundle. The bridge reads only plain records (ProgramData bodies or a CAD package), not jig's engine, so it adds no OpenCascade dependency to Candela.
+**Where the bridge lives.** It is needed by both hosts: the page builds `look.js`, and so does the sidecar. As built (§0), it is a Candela library module whose source is sent with the scene files, so both hosts run the same bytes without any change to `candela-core.js`. The bridge reads only plain records (a CAD package), not jig's engine, so it adds no OpenCascade dependency to Candela.
 
 **Where things run.** jig's worker, which holds OpenCascade, produces ProgramData or the package. The page's main thread runs the Candela build, the bridge and the `Viewport`, because WebGPU draws into the page's canvas.
 
@@ -782,7 +802,7 @@ Each phase ends with something a user can see and a test that would fail without
   - a scripted drop on the rod's bore writes `asm.face('rod#body/side[s.big]', …)` to `look.js` and triggers a rebuild.
 
 **Phase 4: motion.**
-- `.study(…, { poses: true })` keeps transforms; `posesAt`.
+- Every study keeps its transforms (built: `prog.studyPoses()`, no option); `posesAt`, `animate`.
 - The Mechanism view forwards drags, and the Render view renders sequences with motion blur.
 - The Compur adapter, as an example in `content/`.
 - Tests:
@@ -790,8 +810,8 @@ Each phase ends with something a user can see and a test that would fail without
   - a 4-frame sequence encodes to MP4.
 
 **Phase 5: the sidecar.**
-- In Candela: `candela-rt info`; `render` also accepting a scene directory; the bridge in the core bundle.
-- In jig: `pkg/render`, with detection, the child process, restart, the `/rt` and `/renders/` proxies and `/api/capabilities`. The Render view's OptiX mode uses `RemoteRender`, moved into `view.ts`.
+- In Candela (still open): `render` also accepting a scene directory, so a CAD package renders offline on candela-rt.
+- In jig (built): `pkg/render`, with detection, the child process, restart, the `/rt` proxy and `/api/render/capabilities`. The Render view's OptiX mode uses `RemoteRender`, moved into `view.ts`.
 - Tests:
   - Go tests with a fake sidecar (a WebSocket echo server) for proxying, the token and restart;
   - on the `nvidia` runner, one 1080p still of F-06 through `/rt`, with `irHash` equal to the browser's.

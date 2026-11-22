@@ -23,7 +23,7 @@ WhenToUse: ""
 
 ## Overview
 
-Photographic, KeyShot-style rendering for jig using Candela, the team's path tracer, which has a CAD path and an OptiX runtime called `candela-rt`. The work is design only so far; nothing is implemented.
+Photographic, KeyShot-style rendering for jig using Candela, the team's path tracer, which has a CAD path and an OptiX runtime called `candela-rt`. Phases 0–5 are implemented on branch `jig-016-render`. Phase 6, the repository merge, waits for the OptiX work. The guide's §0 lists what was built and what changed from the design; the diary (steps 4–6) has the evidence.
 
 - **Design and intern guide:** [design-doc/01](design-doc/01-rendering-jig-with-candela-intern-guide-design-and-implementation-plan.md). It covers:
   - jig and Candela background;
