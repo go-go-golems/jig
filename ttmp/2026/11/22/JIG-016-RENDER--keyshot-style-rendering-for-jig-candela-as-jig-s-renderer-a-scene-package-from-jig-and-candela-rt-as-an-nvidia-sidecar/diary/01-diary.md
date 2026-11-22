@@ -411,3 +411,85 @@ The one conflict was the import line of `jig-candela.js`: their header was kept,
   - the marker line `// materials: the Render view adds lines here`, with the chain ending in a line that is just `;`;
   - an optional `export const animation = asm.animate(study, { duration })`.
 - **Library patches** include `finish: null` for bare metals, so a jig `.finish()` coat can be removed from the Render view.
+
+## Step 7: the Render view follows the mechanism; motion blur; three agents on the remaining items
+
+The user asked whether the remaining items could be done or whether they needed the repository merge. They don't: they are all jig-side and the vendored engine has everything they use. So the work was split. Three worktree agents took the items with no UI:
+- `.finish()` on assemblies and caching render meshes between compiles;
+- the lockstitch comparison test;
+- the Compur preset with poses baked from its simulation.
+
+I did the two UI items. The Render view now follows the mechanism: drive overrides, live drags on the stage, and a motion-blur control. All 13 browser checks pass on the GPU.
+
+### Prompt Context
+**User prompt (verbatim):** "ok can we do any of these?" followed by a paste of my list:
+- the Mechanism view driving the Render view's pose;
+- the Compur example;
+- a motion-blur control;
+- the lockstitch comparison test;
+- `.finish()` on assemblies;
+- caching meshes between compiles, which matters for large models (F-06's export takes 60 ms).
+
+Then: "or do we need th emerge?"
+
+**Assistant interpretation:** do the items now if the merge isn't required. It isn't, so do them, in parallel where the files don't overlap.
+
+**Inferred user intent:** finish the feature set before any repository surgery.
+
+**Commit (code):**
+- `3462813` "Render view: project files named *.look.js go to Candela's build with look.js": the contract the Compur agent needs.
+- `260d98f` "Render view follows the mechanism: drive overrides, live drags, motion blur".
+
+### What I did
+**Contract for baked data.** Project files named `*.look.js` are sent to Candela's build with `look.js`, so a look can `import poses from './x.look.js'`. jig's compile never runs them, and they are not part of the package key. This went in before the Compur agent started.
+
+**Agents.** Three worktree agents with disjoint files:
+- **engine:** `assembly.js`, `cadpkg.js`, `part.js`, and the bridge's DEFS cache;
+- **lockstitch:** test and fixtures only;
+- **Compur:** a new preset directory, `tools/compur-poses.mjs`, and its test.
+
+**Following the drive** (`src/render/host.js`).
+- `followDrive(overrides)` listens to the host's `overrides` event. When the study's drive changes (e.g. "90 deg"), it moves the timeline to that drive value at once, using the study's poses.
+- After the compile, `build()` re-syncs the timeline whenever the drive's value changed. The key is `study\0value`. The re-sync is skipped while playing.
+- `timeAt()` uses `asm.animate()`'s own from/to (now carried on the function) and wraps studies of whole turns.
+
+**Live drag.**
+- `stage.js` emits `pose { source: 'drag', transforms }` after each `dragPose` solve, and `{ done, changed }` on commit.
+- `livePose()` converts jig transforms to Candela's frame (`src/render/frame.js`, the same C·T·C⁻¹ as `cadpkg.js`) and calls `vp.setPoses(map)`. External poses win over the animation.
+- A commit that pinned overrides keeps the pose until the compile's build lands (`_dropPoses`). A drag that pinned nothing lets go at once.
+
+**Motion blur.** `setMotion('look' | 'off' | '180')` sets `vp.motionOverride` (`{ interval: 1/48, steps: 8 }` for 180° at 24 fps). The control is a select in the timeline row, and `attach()` re-applies it after a restart.
+
+### Why
+- **Overrides are what the Mechanism view already emits.** Both its slider and a click on a study call `host.setOverride`, so the Render view needs no new channel from it. The instant jump uses poses the package already has, so the user doesn't wait for the re-export.
+- **Re-syncing on every value change.** Syncing only when the study changed left the Render view at the old pose after a drag or slider move: the package's rest pose moved, but the animation, which wins, still showed the old time.
+
+### What worked
+`test/ui/render.cjs`: 13 passed, 0 failed on the Intel GPU (WebGPU).
+- An override of `main` to "90 deg" moves the timeline to t = 1 at once, and t = 0.9999999999998 after the compile.
+- A real `dragPose` on `crank:pin` moves the rod in the packed scene. The body-in-component relation W·M stays as at rest within 1e-4, so the pose is placed as jig solved it. A done event with `changed: false` releases it.
+- 180° blur sets interval 1/48 and 8 steps, and the still differs from the sharp one with the same seed.
+
+Node tests: `node --test test/render/*.test.mjs` 36 passed, and agent/UI 90 passed.
+
+### What didn't work
+- **The first live-drag check failed** with `{"moved":false,"placed":true,"released":true}`. The test dragged the first crank port, `crank:pivot`, which sits on the fixed axis, so the drag moves nothing. It now takes the crank's port farthest from the origin, `crank:pin`.
+
+### What I learned
+- **Stage and Render share one tile in every built-in layout.** The live drag pose is visible only after moving the Render tab to another tile. The Mechanism view sits in its own tile, so the override path is the one users see by default.
+- **Candela's poses from `setPoses` win over the scene's animation** (`viewport.ts:104-107`), which is what makes a live drag override a playing study.
+
+### What was tricky to build
+- **Not flashing back to the old pose on release.** The drag's commit sets overrides, then a compile runs, then the package is exported and the view rebuilt. Clearing the external poses on release would show the old pose for that whole time, so they are cleared just before `vp.load` of the new build. If nothing changed, they are cleared in `refresh()`'s unchanged-key branch.
+
+### What warrants a second pair of eyes
+- **The unit match in `followDrive`.** It parses `"<number> deg|°|mm"` and skips other units, leaving them to the compile. A drive given in turns or radians would therefore not jump at once.
+- **The frame code is duplicated.** `src/render/frame.js` repeats `cadpkg.js`'s matrices. `cadpkg.js` could import it once the engine agent's changes are merged.
+
+### What should be done in the future
+- Point `cadpkg.js` at `src/render/frame.js`.
+- A real pointer drag on the stage with Render in a second tile, in the browser test.
+
+### Code review instructions
+- Read `host.js` `followDrive`, `livePose`, `setMotion`, `timeAt` and `build()`; `stage.js` `poseStep` and `commitPose`; and the timeline row in `render.jsx`.
+- Validate: `make web`, then `NODE_PATH=<playwright> CHROMIUM=<chrome> node test/ui/render.cjs`.
