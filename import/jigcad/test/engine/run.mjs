@@ -944,6 +944,200 @@ await test('51 mechanism: a closure with a port turned half a turn is a conflict
   return `${c.message.slice(0, 60)}…; study rows ${rows.map(r => r.ok).join('/')}`;
 });
 
+await test('52 mechanism: a pin-slot joint (a Scotch yoke: the yoke moves r·cos θ, the pin slides r·sin θ in its slot)', async () => {
+  const p = await compile('52-pin-slot.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const A = p.assembly, pin = A.joints.find(j => j.id === 'pin'), guide = A.joints.find(j => j.id === 'guide');
+  assert(pin.kind === 'pinSlot' && pin.equations === 4 && A.mobility.dof === 1 && A.mobility.left === 0, `pin ${pin.kind} ${pin.equations}, mobility ${JSON.stringify(A.mobility)}`);
+  assert(near(guide.value, 12 * Math.cos(Math.PI / 6), 1e-9, 1e-9) && near(pin.slide, 6, 1e-9, 1e-9) && near(pin.value, -60, 1e-9, 1e-7), `guide ${guide.value}, slide ${pin.slide}, angle ${pin.value}`);
+  const worst = Math.max(...A.studies.turn.rows.map(r => Math.abs(r.yokeX - 12 * Math.cos(r.q))));
+  assert(near(A.reports[0].value, 24, 1e-9, 1e-9) && worst < 1e-8, `stroke ${A.reports[0].value}, worst ${worst}`);
+  const k = await call('kine', {});
+  assert(/'jig\.table'/.test(k.source), `kine: ${k.notes}`);
+  // a measure named like a study column is refused
+  const q = await compile(script('52-pin-slot.js').replace("measure('yokeX'", "measure('x'"));
+  assert(q.diagnostics.some(d => d.kind === 'asm.measure' && /cannot be called 'x'/.test(d.message)), 'reserved measure name');
+  // a pin free in its slot: a drag along the slot commits the slide too ('h.slide'), so the recompile keeps the pose
+  const BOX = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const axle = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+`;
+  const PS = BOX + `return j.assembly('slot').add('yoke', box('yoke').port('slot', axle), { ground: true }).add('pin', box('pin').port('pin', axle))
+  .joint('h', j.joint.pinSlot({ slideLimits: [mm(-15), mm(15)] }), 'yoke:slot', 'pin:pin')`;
+  await compile(PS);
+  const dr = await call('dragPose', { ref: 'pin:pin', to: [10, 0, 0], reset: true });
+  assert(dr.ok && dr.pinned && dr.overrides['h.slide'] === '10 mm' && Math.abs(dr.at[0] - 10) < 1e-6, `drag: ${JSON.stringify(dr.overrides)} pinned ${dr.pinned}`);
+  const again = await compile(PS, { options: { override: dr.overrides } });
+  assert(near(again.assembly.joints[0].slide, 10, 1e-9, 1e-9), `recompiled with the drag's overrides: slide ${again.assembly.joints[0].slide}`);
+  // a slide is a coordinate like a value: .drive('h.slide', …) drives it, held at its slide limits
+  const dv = await compile(PS + ".drive('h.slide', mm(20))");
+  const held = dv.diagnostics.find(d => d.kind === 'asm.limit' && d.at === 'h.slide');
+  assert(held && /h\.slide is driven to 20 mm, past its limit 15 mm/.test(held.message) && near(dv.assembly.joints[0].slide, 15, 1e-9, 1e-9), `slide drive: ${held?.message} ${dv.assembly.joints[0].slide}`);
+  // a joint with no coordinates (planar) cannot carry a dragged pose: the drag says so rather than snapping back later
+  await compile(BOX + `return j.assembly('table').add('top', box('top').port('face', axle), { ground: true }).add('puck', box('puck').port('base', axle))
+  .joint('p', j.joint.planar(), 'top:face', 'puck:base')`);
+  const pl = await call('dragPose', { ref: 'puck:base', to: [5, 3, 0], reset: true });
+  assert(pl.ok && pl.pinned === false, `planar drag pinned: ${pl.pinned}`);
+  return `stroke ${A.reports[0].value.toFixed(6)} mm, slide ${pin.slide.toFixed(3)} mm at 30°, closed form within ${worst.toExponential(1)}; a dragged slide recompiles`;
+});
+
+await test('53 mechanism: joint limits hold drives, studies and drags; a contact set stops a drag', async () => {
+  const p = await compile('53-limits.js');
+  const held = p.diagnostics.find(d => d.kind === 'asm.limit' && d.at === 'h');
+  assert(held && /driven to 140°, past its limit 110°/.test(held.message) && near(p.assembly.joints[0].value, 110, 1e-9, 1e-9), `held: ${held?.message} ${p.assembly.joints[0].value}`);
+  const st = p.assembly.studies.open, lim = st.rows.filter(r => r.limit === 'h');
+  assert(lim.length === 7 && Math.round(lim[0].x) === 120 && st.rows.filter(r => r.ok).length === 12 && !st.gaps.length, `limited rows ${lim.map(r => r.x)}`);
+  assert(p.diagnostics.some(d => d.kind === 'asm.limit' && d.at === 'open' && /7 of 19 drive values put h past its limit/.test(d.message)), 'study diagnostic');
+  const a = await call('dragPose', { ref: 'lid:front', to: [0, 60, -10], reset: true });
+  assert(a.ok && a.overrides.h === '110 deg' && a.limits.includes('h.value'), `drag to the limit: ${JSON.stringify(a.overrides)} ${a.limits}`);
+  const b = await call('dragPose', { ref: 'lid:front', to: [0, -20, 0] });
+  assert(b.ok && b.overrides.h === '0 deg', `back to the lower limit: ${JSON.stringify(b.overrides)}`);
+  // a stop block in the lid's way, in a contact set with the lid: the drag stops before the limit
+  await compile(`const plate = (name, w, d) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', w, d, { center: true }).profiles(), mm(3), { id: 'body' })
+const box = plate('box', 60, 40).port('hinge', j.frame({ origin: j.pt(0, 20, 3), x: j.dir('+Y'), z: j.dir('-X') }))
+const lid = plate('lid', 60, 40).port('hinge', j.frame({ origin: j.pt(0, 20, 0), x: j.dir('+Y'), z: j.dir('-X') }))
+  .port('front', j.frame({ origin: j.pt(0, -20, 3), x: j.dir('+X'), z: j.dir('+Z') }))
+const stop = j.part('stop').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 10, 6, { center: true }).profiles(), mm(10), { id: 'body' })
+return j.assembly('box')
+  .add('box', box, { ground: true }).add('lid', lid).add('stop', stop, { at: j.tx.move(0, 30, 30) })
+  .joint('h', j.joint.revolute({ limits: [deg(0), deg(110)] }), 'box:hinge', 'lid:hinge')
+  .drive('h', deg(30))
+  .contact(['lid', 'stop'])
+`);
+  const c = await call('dragPose', { ref: 'lid:front', to: [0, 60, -10], reset: true });
+  const deg = parseFloat(c.overrides.h);
+  assert(c.ok && deg > 90 && deg < 100 && c.contacts.join() === 'lid–stop' && !c.limits.length, `contact: ${JSON.stringify(c.overrides)} ${c.contacts}`);
+  // a target past the stop: the drag walks the step within the clearance, so it stops at the stop rather than
+  // jumping through it (a 2 mm slider block, a 2 mm stop at z = 10: contact at z = 8)
+  const SLIDE = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const line = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const slide = j.assembly('slide')
+  .add('rail', box('rail').port('line', line), { ground: true }).add('slider', box('slider').port('line', line))
+  .add('stop', box('stop'), { at: j.tx.move(0, 0, 10) })
+  .joint('s', j.joint.slider(), 'rail:line', 'slider:line')
+  .contact(['slider', 'stop'])
+`;
+  await compile(SLIDE + 'return slide');
+  const z = async (ref, to) => { const r = await call('dragPose', { ref, to, reset: true }); return { z: r.at[2], contacts: r.contacts.join() }; };
+  const near8 = (r, pair) => r.z > 7.99 && r.z <= 8 && r.contacts === pair;
+  const d10 = await z('slider:line', [0, 0, 10]), d20 = await z('slider:line', [0, 0, 20]), d100 = await z('slider:line', [0, 0, 100]);
+  assert(near8(d10, 'slider–stop') && near8(d20, 'slider–stop') && near8(d100, 'slider–stop'), `past the stop: ${JSON.stringify([d10, d20, d100])}`);
+  const back = await call('dragPose', { ref: 'slider:line', to: [0, 0, 4] });   // from the contact: the pair may part
+  assert(back.ok && Math.abs(back.at[2] - 4) < 1e-6 && !back.contacts.length, `back from the stop: ${back.at} ${back.contacts}`);
+  // the same slide as a flexible subassembly: its contact set comes prefixed into the parent's drag
+  await compile(SLIDE + `return j.assembly('top').add('base', box('base'), { ground: true, at: j.tx.move(50, 0, 0) }).add('sub', slide, { flexible: true })`);
+  const fx = await z('sub/slider:line', [0, 0, 20]);
+  assert(near8(fx, 'sub/slider–sub/stop'), `flexible: ${JSON.stringify(fx)}`);
+  return `held at 110°, ${lim.length} study rows past it, drag stops at ${a.overrides.h}; contact at ${c.overrides.h}; a drag to z = 100 stops at ${d100.z.toFixed(4)}`;
+});
+
+await test('54 assembly: joint ends picked on geometry (a bore’s axis, a planar face) and as-built joints', async () => {
+  const p = await compile('54-geometry-joints.js');
+  assert(errs(p).length === 0, JSON.stringify(errs(p)));
+  const M = p.assembly.measures;
+  assert(Math.hypot(M.bore[0] - 20, M.bore[1], M.bore[2] - 5) < 1e-9 && Math.hypot(M.tip[0] - 20, M.tip[1] - 40, M.tip[2] - 9) < 1e-9, `bores ${M.bore}, tip ${M.tip}`);
+  const d = p.decisions.filter(x => x.kind === 'port').map(x => x.reason);
+  assert(/plate: its axis, at the end of its length \(5 mm\)/.test(d[0]) && /arm: its axis, at the start of its length \(4 mm\)/.test(d[1]), d.join(' / '));
+  assert(p.assembly.joints[0].a.startsWith("j.frame.on(j.on('plate'"), `shown as ${p.assembly.joints[0].a}`);
+  // two planar faces meet face to face: the lid on the box, centred
+  const m = await compile(`const box = j.part('box').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 60, 40, { center: true }).profiles(), mm(20), { id: 'body' })
+const lid = j.part('lid').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 50, 30, { center: true }).profiles(), mm(3), { id: 'body' })
+return j.assembly('mate')
+  .add('box', box, { ground: true }).add('lid', lid)
+  .joint('seat', j.joint.rigid(), j.on('box', j.sel.faces('>Z')), j.on('lid', j.sel.faces('<Z')))
+  .measure('lidTop', m => m.point('lid', [0, 0, 3]))
+`);
+  assert(errs(m).length === 0 && Math.hypot(...m.assembly.measures.lidTop.map((v, i) => v - [0, 0, 23][i])) < 1e-9, `lid top ${m.assembly.measures.lidTop}`);
+  // as built: the arm stays where its \`at\` put it, the joint frame is the plate's bore; a value turns it about that axis
+  const asBuilt = `const plate = j.part('plate').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 60, 30, { center: true }).circle('h', 3, { at: [20, 0] }).profiles(), mm(5), { id: 'body' })
+const arm = j.part('arm').extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 50, 10, { center: true }).circle('h', 3, { at: [-20, 0] }).profiles(), mm(4), { id: 'body' })
+  .port('tip', j.frame({ origin: j.pt(20, 0, 4), x: j.dir('+X'), z: j.dir('+Z') }))
+return j.assembly('as built')
+  .add('plate', plate, { ground: true }).add('arm', arm, { at: j.tx.move(40, 0, 5) })
+  .joint('hinge', j.joint.revolute({ asBuilt: j.on('plate', j.sel.faces('%cylinder')) }), 'plate', 'arm')
+  .measure('tip', m => m.point('arm:tip'))
+`;
+  const a = await compile(asBuilt);
+  assert(errs(a).length === 0 && near(a.assembly.joints[0].value, 0, 1e-9, 1e-9) && Math.hypot(...a.assembly.measures.tip.map((v, i) => v - [60, 0, 9][i])) < 1e-9, `as built: ${a.assembly.joints[0].value}, tip ${a.assembly.measures.tip}`);
+  const b = await compile(asBuilt, { options: { override: { hinge: '90 deg' } } });
+  assert(Math.hypot(...b.assembly.measures.tip.map((v, i) => v - [20, 40, 9][i])) < 1e-9, `turned: tip ${b.assembly.measures.tip}`);
+  // ends that cannot be joints
+  const bare = await compile(asBuilt.replace('j.joint.revolute({ asBuilt: j.on(\'plate\', j.sel.faces(\'%cylinder\')) })', 'j.joint.revolute()'));
+  assert(bare.diagnostics.some(x => x.kind === 'joint.unsolved' && /names a component without a port/.test(x.message)), 'a bare component needs as-built');
+  const none = await compile(script('54-geometry-joints.js').replace("j.on('arm', j.sel.faces('%cylinder'))", "j.on('arm', j.sel.faces('%cone'))"));
+  assert(none.diagnostics.some(x => x.kind === 'joint.unsolved' && /picks nothing on arm/.test(x.message)), 'a selector that picks nothing');
+  return `bores at ${M.bore.map(v => +v.toFixed(3))}; lid top z ${m.assembly.measures.lidTop[2]}; as built tip ${a.assembly.measures.tip}`;
+});
+
+await test('55 assembly: subassemblies (flexible and rigid), a nested bill of materials, STEP with its product structure', async () => {
+  const p = await compile('55-subassemblies.js');
+  assert(errs(p).length === 0 && !p.diagnostics.some(d => d.level === 'warning'), JSON.stringify(p.diagnostics.filter(d => d.level !== 'info')));
+  const A = p.assembly, J = id => A.joints.find(j => j.id === id)?.value;
+  assert(A.components.map(c => c.id).join() === 'frame,arm,drive/base,drive/wheel,bracket/p1,bracket/p2' && A.components.find(c => c.id === 'drive/wheel').sub === 'drive', 'components under their subassembly');
+  // flexible: its joint is the parent's, coupled 2:1 to the parent's arm; its root stays where its `at` puts it
+  assert(near(J('drive/spin'), 60, 1e-9, 1e-7) && A.subassemblies.find(s => s.id === 'drive').fixed && !A.joints.some(j => /rigid/.test(j.id)), `spin ${J('drive/spin')}`);
+  const mk = A.measures.mark;
+  assert(Math.hypot(mk[0] - (40 + 10 * Math.cos(Math.PI / 3)), mk[1] - 10 * Math.sin(Math.PI / 3), mk[2] - 6) < 1e-9 && near(A.reports.find(r => r.name === 'drive/markNow').value, 10 * Math.sin(Math.PI / 3)), `mark ${mk}`);
+  // rigid: solved on its own (tilt 20°), its study and report under its id, moved as one body by the parent's swing
+  assert(near(A.reports.find(r => r.name === 'bracket/drop').value, 20, 1e-6) && A.studies['bracket/fold']?.rows.length === 10, 'the bracket study');
+  const q = await compile('55-subassemblies.js', { options: { override: { swing: '90 deg', 'bracket/tilt': '45 deg' } } });
+  const p2 = q.assembly.measures.p2, s = Math.SQRT1_2 * 10;
+  assert(Math.hypot(p2[0], p2[1] - (20 + 10 + s), p2[2] - (2 + 3 - s)) < 1e-9, `p2 after a swing of 90° and a tilt of 45°: ${p2}`);
+  // without the parent's swing joint, the rigid bracket stays where it is placed
+  const free = await compile(script('55-subassemblies.js').replace("  .joint('swing', j.joint.revolute(), 'frame:pivot', 'bracket/p1:pivot')\n", '').replace(".drive('swing', deg(0))", ''));
+  assert(errs(free).length === 0 && free.assembly.subassemblies.find(x => x.id === 'bracket').fixed, 'a rigid subassembly no joint holds is fixed');
+  // the bill of materials nests; flat lists the six parts
+  await compile('55-subassemblies.js');
+  const flat = await call('bom', { group: 'flat' });
+  assert(flat.length === 6 && flat.every(r => r.kind === 'printed') && flat[5].id === 'bracket/p2', `flat bom ${flat.map(r => r.id)}`);
+  assert(A.bom.length === 4 && A.bom[2].kind === 'assembly' && A.bom[2].children.length === 2 && A.bom[3].flexible === false, 'nested bom');
+  // STEP: an assembly tree (one product per part and per subassembly, components placed), the same solids
+  await compile('55-subassemblies.js', { options: { override: { swing: '90 deg' } } });
+  const ex = await exp('step', {});
+  const prods = (ex.data.match(/PRODUCT\('([^']*)'/g) || []).map(x => x.slice(9, -1));
+  const nauo = (ex.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length;
+  assert(['machine', 'wheel drive', 'bracket', 'frame', 'p2'].every(n => prods.includes(n)) && prods.length === 9 && nauo === 8 && !/DOCUMENT/.test(ex.data), `products ${prods}, ${nauo} usages`);
+  assert(/product structure: 8 components, 2 subassemblies/.test(ex.report.kept.join()), ex.report.kept.join('; '));
+  // a rigid subassembly nested in a rigid one: the tree carries the inner one whole, placed as the parent moves it
+  const nest = await compile(`const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const pivot = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const inner = j.assembly('inner').add('p', box('p'), { ground: true }).add('r', box('r'), { at: j.tx.move(0, 3, 0) })
+const outer = j.assembly('outer').add('k', box('k').port('pivot', pivot), { ground: true }).add('inner', inner, { at: j.tx.move(5, 0, 0) })
+return j.assembly('top').add('base', box('base').port('pivot', pivot), { ground: true }).add('outer', outer, { at: j.tx.move(0, 20, 0) })
+  .joint('swing', j.joint.revolute(), 'base:pivot', 'outer/k:pivot').drive('swing', deg(90))`);
+  assert(errs(nest).length === 0 && nest.assembly.subassemblies.map(x => x.id).join() === 'outer,outer/inner' && nest.assembly.components.find(c => c.id === 'outer/inner/r').sub === 'outer/inner', `nested: ${JSON.stringify(nest.assembly.subassemblies)}`);
+  const st = W.currentProgram().structure(), oi = st.children[1].children[1];
+  const at = n => [n.T[12], n.T[13], n.T[14]];
+  assert(oi.id === 'outer/inner' && Math.hypot(...at(oi).map((x, k) => x - [0, 5, 0][k])) < 1e-9 && Math.hypot(...at(oi.children[1]).map((x, k) => x - [-3, 5, 0][k])) < 1e-9, `outer/inner at ${at(oi)}, its r at ${at(oi.children[1])}`);
+  const nx = await exp('step', {});
+  assert(/exact B-rep \(4 parts\); product structure: 6 components, 2 subassemblies/.test(nx.report.kept.join("; ")) && (nx.data.match(/NEXT_ASSEMBLY_USAGE_OCCURRENCE/g) || []).length === 6, nx.report.kept.join('; '));
+  // a flexible subassembly whose root is a subassembly (its only component), inside a rigid one: roots are components
+  const roots = await compile(`const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const inner = j.assembly('inner').add('p', box('p'), { ground: true })
+const outer = j.assembly('outer').add('inner', inner)
+const mid = j.assembly('mid').add('outer', outer, { flexible: true })
+return j.assembly('top').add('base', box('base'), { ground: true, at: j.tx.move(20, 0, 0) }).add('mid', mid)`);
+  assert(errs(roots).length === 0 && roots.assembly.subassemblies.every(x => x.root === 'mid/outer/inner/p'), `roots: ${JSON.stringify(roots.assembly.subassemblies)} ${JSON.stringify(errs(roots))}`);
+  // a value a child gives its own joint drives it when the child is flexible too; the parent's, by the prefixed id,
+  // wins; and a flexible level's value for its rigid child's joint reaches that child's solve
+  const ARM = `const box = (name) => j.part(name).extrude(j.sketch('s', { on: j.plane.XY }).rect('r', 2, 2, { center: true }).profiles(), mm(2), { id: 'body' })
+const axle = j.frame({ origin: j.pt(0, 0, 0), x: j.dir('+X'), z: j.dir('+Z') })
+const arm = j.assembly('arm').add('base', box('base').port('axle', axle), { ground: true }).add('link', box('link').port('axle', axle))
+  .joint('h', j.joint.revolute(), 'base:axle', 'link:axle').override({ h: '45 deg' })
+`;
+  const top = (sub, flex) => `return j.assembly('top').add('frame', box('frame'), { ground: true, at: j.tx.move(20, 0, 0) }).add('sub', ${sub}, { flexible: ${flex} })`;
+  const hOf = (q, id) => q.assembly.joints.find(x => x.id === id)?.value ?? q.assembly.measures?.[id];
+  const fx = await compile(ARM + top('arm', true)), fo = await compile(ARM + top('arm', true), { options: { override: { 'sub/h': '60 deg' } } });
+  assert(near(hOf(fx, 'sub/h'), 45, 1e-9, 1e-9) && near(hOf(fo, 'sub/h'), 60, 1e-9, 1e-9), `flexible child's own override ${hOf(fx, 'sub/h')}, the parent's ${hOf(fo, 'sub/h')}`);
+  const nested = await compile(ARM + `const holder = j.assembly('holder').add('arm', arm).override({ 'arm/h': '30 deg' }).measure('tip', m => m.point('arm/link', [1, 0, 0]))
+return j.assembly('top').add('frame', box('frame'), { ground: true, at: j.tx.move(20, 0, 0) }).add('sub', holder, { flexible: true })`);
+  const tip = nested.assembly.measures['sub/tip'];
+  assert(Math.hypot(tip[0] - Math.cos(Math.PI / 6), tip[1] - Math.sin(Math.PI / 6)) < 1e-9, `the flexible level's override of its rigid child: tip ${tip}`);
+  // a flexible child's declaration that has no meaning in its parent is said, not dropped
+  const ifr = await compile(ARM + top("arm.interference(['base', 'link'])", true));
+  assert(ifr.diagnostics.some(d => d.kind === 'asm.flexible' && d.level === 'warning' && /sub is flexible: its \.interference\(\) is not carried/.test(d.message)), JSON.stringify(ifr.diagnostics.map(d => d.kind)));
+  return `spin ${J('drive/spin').toFixed(1)}°, bracket drop ${A.reports.find(r => r.name === 'bracket/drop').value.toFixed(3)} mm; STEP ${prods.length} products, ${nauo} usages`;
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

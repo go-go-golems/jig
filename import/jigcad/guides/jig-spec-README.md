@@ -360,8 +360,14 @@ j.lib.bearing('608') .catalog(rows, { key }) .nearest(std, { d: mm(3), l: x => x
 ### 4.10 `assembly`
 ```js
 j.assembly(name?)
-  .add(id, partOrAssembly, { at: tx | frame, ground, config, params, qty, color })
+  .add(id, partOrAssembly, { at: tx | frame, ground, config, params, qty, color, flexible })
                                                     // params binds child params to parent expressions: { params: { w: 'w', length: 'w - 4 mm' } }
+                                                    // an assembly is a subassembly: its components are '<id>/<comp>' here
+                                                    // ('hook/shaft:axis'). Rigid (default): solved on its own (the parent's
+                                                    // '<id>/<joint>' values are its overrides), moved as one body; its
+                                                    // studies and reports come along as '<id>/<name>'. flexible: true: its
+                                                    // joints, drives, couplings, readings and studies join this solve.
+                                                    // Its root stays where `at` puts it unless a joint here holds it.
   .ground(id) .joint(id, kind, a, b, opts) .rigidGroup(ids)
   .pattern(compId, pattern) .mirror(compId, plane) .replace(id, part | (current) => part)
   .printInPlace(ids, { clearance: 'printInPlace', pose: { [jointId]: value } })   // one print, fit-class gaps, printed in a chosen pose
@@ -389,10 +395,23 @@ j.assembly(name?)
                                                     // sampled pose (a 'gap a–b' column, plotted), where they overlap the
                                                     // shared volume V(a ∩ b) = V(a) + V(b) − V(a ∪ b) and the worst pose;
                                                     // studies.x.clearance(a, b) → { min, overlaps, worst }
-// a, b: 'lid:hinge' (component:port) | j.on('lid', sel) | j.frame.on(j.on('lid', sel))
-j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical() .planar() .ball() .snap()   // .fixed = .rigid, .prismatic = .slider
-       // each is a subgroup of SE(3) with DOF 0, 1, 1, 2, 3, 3, 0 (snap is rigid once engaged)
-prog.occurrence('lid') prog.dof() prog.joint(id) prog.bom({ group: 'part' | 'flat' }) prog.sweep(jointId)
+// a, b: 'lid:hinge' (component:port) | j.on('lid', sel) | j.frame.on(j.on('lid', sel), { flip, at: 'start' | 'end', offset })
+//   a picked bore, pin or cone gives its axis (mid-way, or at an end); a circular edge its centre and axis; a straight
+//   edge its middle and direction; a planar face its centre and normal (outward on a, inward on b: faces meet); a
+//   vertex its point. Axes point along +Z, else +Y, else +X; flip turns the frame half a turn about x.
+//   As built: j.joint.revolute({ asBuilt: true | end }) reads one joint frame where the components sit (their `at`),
+//   from end a's geometry or the end given, so the joint holds at 0 without moving them; a bare 'comp' is an end.
+//   The Mechanism view's "Joint from the sheet" writes such a .joint( line from two faces or edges picked on the sheet.
+j.joint.rigid() .revolute({ axis?, limits?: [a, b] }) .slider({ dir?, limits? }) .cylindrical({ slideLimits? }) .pinSlot({ limits?, slideLimits? })
+       .planar() .ball() .snap()                    // .fixed = .rigid, .prismatic = .slider
+       // each is a subgroup of SE(3) with DOF 0, 1, 1, 2, 2, 3, 3, 0 (snap is rigid once engaged); pinSlot turns
+       // about z and slides along x (Fusion's Pin-Slot). Limits hold: a drive past one is held at it (asm.limit), a
+       // study pose past one is a gap marked with the joint, a drag stops there. Numbers: degrees for an angle, mm
+       // for a slide.
+  .contact(ids?)                                    // contact set: a drag stops where two of these would touch
+prog.occurrence('lid') prog.dof() prog.joint(id) prog.bom({ group: 'flat' }) prog.sweep(jointId)   // bom nests by subassembly
+j.export.step(asmProg)                              // an assembly writes its product structure (XCAF): a product per part
+                                                    // and per subassembly, components placed and named; { flat: true }: one compound
 prog.kine(o)                                        // the solved mechanism as a kine program (export format 'kine')
 prog.dragPose({ ref: 'comp:port', to: [x, y, z] })  // drag to pose: the nearest pose the joints allow (drives released,
                                                     // couplings kept), its transforms, and the overrides that pin it;

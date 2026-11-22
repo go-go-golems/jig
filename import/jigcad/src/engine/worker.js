@@ -181,6 +181,7 @@ function answer(P, method, a) {
     case 'genealogy': return P.genealogy(a[0]);
     case 'body': return P.body(a[0]);
     case 'kine': if (!P.kine) throw new Error('kine: only an assembly compiles to a kine program'); return P.kine(a[0] ?? {});
+    case 'bom': if (!P.bom) throw new Error('bom: only an assembly has a bill of materials'); return P.bom(a[0] ?? {});
     case 'dragPose': if (!P.dragPose) throw new Error('drag: only an assembly has a pose to drag'); return P.dragPose(a[0] ?? {});
   }
   throw new Error(`unknown call method '${method}'`);

@@ -329,7 +329,7 @@ export function asPrinted(volume, area, bboxHeight, footprint, { walls = 3, infi
 // ── mechanisms and snap-fits ─────────────────────────────────────────────────
 export function mobility(asm) {
   const n = asm.components.length; const joints = asm.joints;
-  const dofOf = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, planar: 3, ball: 3, snap: 0 };
+  const dofOf = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, pinSlot: 2, planar: 3, ball: 3, snap: 0 };
   const sumF = joints.reduce((s, j) => s + (dofOf[j.kind] ?? 0), 0);
   const M = 6 * (n - 1 - joints.length) + sumF;
   // solver DOF: joints between the same pair along the same axis are redundant

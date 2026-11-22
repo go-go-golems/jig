@@ -2,14 +2,16 @@
 // each joint with its solved value (a slider sets it as an override, which drives it), the conflicting set when the
 // joints cannot hold, the free motions, the reports, and one plot per study measure with its extremes, its events and
 // a cursor at the drive's current value. A click on a plot moves the drive there.
+import { useState } from 'preact/hooks';
 import { useHost } from '../common.jsx';
 import { num } from '../format.js';
+import { endFromSelection, jointCode, insertJoint, nextJointId, JOINT_KINDS } from '../joint-insert.js';
 
 const fmt = (v, d = 3) => (v == null || !Number.isFinite(v) ? '—' : +v.toFixed(d) + '');
 const unitText = (u) => (u === '°' ? 'deg' : u || '');
 
 export function MechanismView({ host }) {
-  useHost(host, ['program', 'overrides']);
+  useHost(host, ['program', 'overrides', 'selection']);
   // a compile that fails on the joints (a conflict) still carries its assembly, and the conflict is what to show;
   // the last good program only stands in when the compile failed before an assembly was solved
   const program = host.program?.ok !== false || host.program?.assembly ? host.program : host.lastGood ?? host.program;
@@ -45,6 +47,15 @@ export function MechanismView({ host }) {
             {asmDiags.map((d, i) => <p key={i} class={d.level === 'error' ? 'fail' : 'dim'}><b>{d.kind}</b> {d.message}{d.fix ? <> · <i>{d.fix}</i></> : null}</p>)}
           </div>
         )}
+        {(A.subassemblies || []).length > 0 && (
+          <div class="block">
+            <header><h2>Subassemblies</h2><span class="sub">a rigid one is solved on its own and moves as one body; a flexible one's joints move in this solve</span></header>
+            <table class="rt"><tbody>{A.subassemblies.map((sa) => (
+              <tr key={sa.id}><td class="code-cell">{sa.id}</td><td>{sa.flexible ? 'flexible' : 'rigid'}</td>
+                <td class="dim">{(A.components || []).filter((c) => c.sub === sa.id).length} components · root {sa.root}{sa.fixed ? ' (fixed: no joint here holds it)' : ''}</td></tr>
+            ))}</tbody></table>
+          </div>
+        )}
         <div class="block">
           <header><h2>Joints</h2><span class="sub">{(A.joints || []).length} joints; a value set here drives its joint (an override named by the joint's id)</span></header>
           <table class="rt">
@@ -59,7 +70,7 @@ export function MechanismView({ host }) {
                   <td>{j.kind}</td>
                   <td class="dim">{j.a} → {j.b}</td>
                   <td class="num">{j.equations}</td>
-                  <td class="num">{has ? `${fmt(j.value, angular ? 2 : 3)} ${j.unit}` : '—'}{j.driven ? <span class="dim"> driven</span> : null}</td>
+                  <td class="num">{has ? `${fmt(j.value, angular ? 2 : 3)} ${j.unit}` : '—'}{j.slide != null ? <span class="dim">{` · slide ${fmt(j.slide, 3)} mm`}</span> : null}{j.driven ? <span class="dim"> driven</span> : null}{j.limits ? <span class="dim" title="limits">{` [${j.limits.map((x) => fmt(angular ? x * 180 / Math.PI : x, 1)).join(', ')}]`}</span> : null}</td>
                   <td>{has ? <input type="range" min={lo} max={hi} step={angular ? 1 : 0.5} value={j.value} aria-label={`Value of ${j.id}`} onInput={(e) => setJoint(j, +e.currentTarget.value)} /> : null}</td>
                   <td><button class="tabact" disabled={!over} title="back to the code's value" aria-label={`Reset ${j.id}`} onClick={() => setJoint(j, null)}>{over ? '↺' : ''}</button></td>
                 </tr>
@@ -67,6 +78,7 @@ export function MechanismView({ host }) {
             })}</tbody>
           </table>
         </div>
+        <PickJoint host={host} program={program} />
         {(A.couples || []).length > 0 && (
           <div class="block">
             <header><h2>Couplings</h2><span class="sub">one equation each: value(b) = ratio · value(a) + offset; for gears the ratio comes from the teeth and its sign from the axes</span></header>
@@ -119,7 +131,7 @@ function StudyBlock({ st, A, host }) {
   };
   return (
     <div class="block">
-      <header><h2>Study {st.name}</h2><span class="sub">{st.drive} from {fmt(st.from, 1)} to {fmt(st.to, 1)}{st.unit}, {st.rows.length} poses{st.gaps?.length ? `, ${st.gaps.length} unreachable` : ''}{st.events?.length ? `, ${st.events.length} event(s)` : ''}</span></header>
+      <header><h2>Study {st.name}</h2><span class="sub">{st.drive} from {fmt(st.from, 1)} to {fmt(st.to, 1)}{st.unit}, {st.rows.length} poses{st.gaps?.length ? `, ${st.gaps.length} unreachable` : ''}{st.limited?.length ? `, ${st.limited.length} past a limit` : ''}{st.events?.length ? `, ${st.events.length} event(s)` : ''}</span></header>
       {keys.map((k) => {
         const ok = st.rows.filter((r) => r.ok && typeof r[k] === 'number');
         let lo = Math.min(...ok.map((r) => r[k])), hi = Math.max(...ok.map((r) => r[k]));
@@ -139,6 +151,7 @@ function StudyBlock({ st, A, host }) {
           <svg key={k} class="studyplot" viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${k} against ${st.drive}`} onClick={go}>
             <rect x={x0} y={12} width={x1 - x0} height={H - 28} fill="none" stroke="var(--rule, #ccc)" />
             {(st.gaps || []).map((g, i) => <rect key={i} x={X(g) - (x1 - x0) / st.rows.length / 2} y={12} width={(x1 - x0) / st.rows.length} height={H - 28} fill="var(--accent)" opacity="0.12" />)}
+            {(st.limited || []).map((l, i) => <rect key={`l${i}`} x={X(l.at) - (x1 - x0) / st.rows.length / 2} y={12} width={(x1 - x0) / st.rows.length} height={H - 28} fill="var(--ink-2, #666)" opacity="0.10"><title>{`${l.ids} past its limit at ${fmt(l.at, 1)}${st.unit}`}</title></rect>)}
             {(pair?.overlaps || []).map(([a, b], i) => <rect key={`o${i}`} x={Math.max(x0, X(a) - step / 2)} y={12} width={Math.min(x1, X(b) + step / 2) - Math.max(x0, X(a) - step / 2)} height={H - 28} fill="var(--accent)" opacity="0.16"><title>{`${pair.a} and ${pair.b} overlap from ${fmt(a, 1)} to ${fmt(b, 1)}${st.unit}`}</title></rect>)}
             {(st.events || []).map((ev, i) => <line key={i} x1={X(ev.at)} x2={X(ev.at)} y1={12} y2={H - 16} stroke="var(--accent)" stroke-width="1"><title>{`${ev.name} ${ev.rising ? '↑' : '↓'} at ${fmt(ev.at, 3)}${st.unit}`}</title></line>)}
             <path d={path} fill="none" stroke="var(--ink)" stroke-width="1.4" />
@@ -167,6 +180,46 @@ function StudyBlock({ st, A, host }) {
           ))}</tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+// a joint from two picks on the sheet: select a face or an edge, set it as an end, pick the kind, insert the line
+function PickJoint({ host, program }) {
+  const [ends, setEnds] = useState({ a: null, b: null });
+  const [kind, setKind] = useState('revolute');
+  const [asBuilt, setAsBuilt] = useState(false);
+  const [note, setNote] = useState('');
+  const cur = endFromSelection(host.selection, program);
+  const id = nextJointId(program);
+  const line = ends.a && ends.b ? jointCode({ id, kind, a: ends.a, b: ends.b, asBuilt }) : null;
+  const use = (side) => { setEnds({ ...ends, [side]: cur }); setNote(''); };
+  const insert = () => {
+    const src = host.files.get('script.js') ?? '';
+    const out = insertJoint(src, line);
+    if (out == null) { setNote('no .joint( or .add( call in script.js to put it after: copy the line instead'); return; }
+    host.setFile('script.js', out); setEnds({ a: null, b: null }); setNote(`inserted ${id}; compiling`);
+    if (host.scheduleCompile) host.scheduleCompile(0); else host.compile?.();     // as Run would
+  };
+  const copy = () => { try { navigator.clipboard.writeText(line); setNote('copied'); } catch { setNote('the clipboard is not available here'); } };
+  const endRow = (side, label) => (
+    <tr key={side}><td>{label}</td><td class="code-cell">{ends[side] ? `${ends[side].comp} · ${ends[side].name}` : <span class="dim">—</span>}</td>
+      <td><button class="tabact" disabled={!cur} title={cur ? `use ${cur.comp} · ${cur.name}` : 'select a face or an edge of a component on the sheet first'} onClick={() => use(side)}>use selection</button></td></tr>
+  );
+  return (
+    <div class="block">
+      <header><h2>Joint from the sheet</h2><span class="sub">select a face or an edge on the sheet (a bore or a pin gives its axis, a circular edge its centre, a planar face its centre and normal) and set it as an end</span></header>
+      <table class="rt"><tbody>{endRow('a', 'end a')}{endRow('b', 'end b')}</tbody></table>
+      <p class="mechpills">
+        <label>kind <select value={kind} onChange={(e) => setKind(e.currentTarget.value)}>{JOINT_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></label>
+        <label title="keep both components where their `at` puts them: the joint frame is read from end a"><input type="checkbox" checked={asBuilt} onChange={(e) => setAsBuilt(e.currentTarget.checked)} /> as built</label>
+      </p>
+      {line && <pre class="code-cell pickline">{line}</pre>}
+      <p class="mechpills">
+        <button class="tabact" disabled={!line} onClick={insert}>insert into script.js</button>
+        <button class="tabact" disabled={!line} onClick={copy}>copy</button>
+        {note && <span class="dim">{note}</span>}
+      </p>
     </div>
   );
 }

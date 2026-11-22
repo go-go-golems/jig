@@ -227,3 +227,4 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .mechview .studyplot { display: block; max-width: 760px; cursor: ew-resize; margin: 4px 0; }
 .mechview tr.failrow td { color: var(--accent); }
 .mechview input[type=range] { width: 160px; }
+.mechview pre.pickline { white-space: pre-wrap; word-break: break-all; margin: 6px 0; }

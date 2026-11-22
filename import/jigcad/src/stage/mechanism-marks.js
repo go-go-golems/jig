@@ -1,5 +1,6 @@
 // The Joints overlay (assembly spec v0.1, workbench views): for an assembly, the frames of the ports its joints use
-// (x in st-rec, z in st-blue), a glyph per joint (a ring about a revolute's axis, a double arrow along a slider, a
+// (x in st-rec, z in st-blue), a glyph per joint (a ring about a revolute's axis, a double arrow along a slider, both
+// for a pin in a slot (the arrow along the slot), a
 // square for a rigid joint, a disc for a ball, a square in the plane of a planar joint) with its id and solved value,
 // the free motions the joints leave (an arc about the axis of a rotation that passes through the component, else
 // the velocities the twist gives the component's ports and centre), and the paths of point measures over a study.
@@ -42,7 +43,8 @@ export function drawMechanism(ctx, C, state, program) {
     const c = j.kind === 'slider' && j.atB ? j.atB : j.at, n = V.norm(j.axis), u = perp(n), v = V.cross(n, u), q = P(c);
     ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.5;
     const ring = (rad) => { ctx.beginPath(); for (let i = 0; i <= 40; i++) { const t = i / 40 * Math.PI * 2, p = P(V.add(c, V.add(V.mul(u, rad * Math.cos(t)), V.mul(v, rad * Math.sin(t))))); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); } ctx.stroke(); };
-    if (j.kind === 'revolute' || j.kind === 'cylindrical') ring(L(10));
+    if (j.kind === 'revolute' || j.kind === 'cylindrical' || j.kind === 'pinSlot') ring(L(10));
+    if (j.kind === 'pinSlot' && j.slideAxis) { const sx = V.norm(j.slideAxis); arrow(ctx, q, P(V.sub(c, V.mul(sx, L(24)))), col, 1.5); arrow(ctx, q, P(V.add(c, V.mul(sx, L(24)))), col, 1.5); }
     if (j.kind === 'slider' || j.kind === 'cylindrical') { arrow(ctx, q, P(V.sub(c, V.mul(n, L(24)))), col, 1.5); arrow(ctx, q, P(V.add(c, V.mul(n, L(24)))), col, 1.5); }
     if (j.kind === 'rigid' || j.kind === 'snap') ctx.strokeRect(q[0] - 4.5, q[1] - 4.5, 9, 9);
     if (j.kind === 'ball') { ctx.beginPath(); ctx.arc(q[0], q[1], 8, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(q[0], q[1], 2.5, 0, 7); ctx.fill(); }
