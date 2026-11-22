@@ -1,0 +1,12 @@
+B-01  Hello, sphere
+  objects 2  lights 0  materials 2  meshes 0  triangles 0  params 0  WGSL lines 1468
+  buffers: U 0.6 KiB  objs 0.2 KiB  lits 0.1 KiB  bvh 0.0 KiB  sd head 0.0 KiB  sd tail 0.0 KiB
+M-07  Car paint
+  objects 12  lights 0  materials 5  meshes 0  triangles 0  params 3  WGSL lines 1518
+  buffers: U 0.7 KiB  objs 1.1 KiB  lits 0.1 KiB  bvh 0.2 KiB  sd head 0.0 KiB  sd tail 0.0 KiB
+K-01  A gear train in motion
+  objects 15  lights 0  materials 18  meshes 7  triangles 12024  params 0  WGSL lines 1811
+  buffers: U 0.6 KiB  objs 1.4 KiB  lits 0.1 KiB  bvh 0.4 KiB  sd head 17575.3 KiB  sd tail 0.0 KiB
+K-09  Lockstitch head (jig CAD, kine rig)
+  objects 36  lights 0  materials 30  meshes 34  triangles 23701  params 1  WGSL lines 2078
+  buffers: U 0.6 KiB  objs 3.4 KiB  lits 0.1 KiB  bvh 1.0 KiB  sd head 19456.3 KiB  sd tail 0.0 KiB

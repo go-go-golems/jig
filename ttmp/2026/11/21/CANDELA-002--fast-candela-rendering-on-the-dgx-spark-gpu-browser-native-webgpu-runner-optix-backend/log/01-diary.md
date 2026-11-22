@@ -111,3 +111,72 @@ implementation of the three steps.
 
 ### Technical details
 - Headless shell launch: `chromium.launch({ args: ['--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] })`.
+
+## Step 2: Reading the renderer and writing the intern guide
+
+Read the parts of the engine the GPU work touches (kernel call tree, backends, buffer packing, viewport, output
+loop, mesh BVH, lockstitch tooling), measured scene sizes, and wrote the guide
+`design-doc/01-candela-on-the-dgx-spark-intern-guide-to-the-renderer-and-the-gpu-plan.md`. Then reviewed the draft
+against the source and the intern reader before revising.
+
+Outcome: an ~870-line guide covering a path-tracing primer, the five stages from scene file to pixels with buffer
+layouts and kernel pseudocode, the Spark measurements, designs for the three steps (APIs, pseudocode, diagrams),
+testing, decision records, open questions, and file/API appendices.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Intern-level analysis/design/implementation guide, evidence-backed, stored in the ticket.
+**Inferred user intent:** Onboard someone to do the GPU work without this conversation.
+**Commit (code):** see the commit after this entry ("CANDELA-002: intern guide …")
+
+### What I did
+- Read `src/engine/kernel.ts` (`renderPixel`, `tracePath`, `traceAll`, `hitMesh`, `cameraRay`), `render.ts`
+  (`GPURenderer.create/compile/resize/upload/uploadSD/trace/display/readRGBA8`), `compile.ts` (`compile`, `pack`,
+  `SHAPE_TYPE`, object record layout), `viewport.ts` (`frame`, `show`, `meter`), `output.ts` (`runRender`,
+  `accumulate`), `mesh.ts` (`blasOf`), `test.ts` (`furnace`), `tools/lockstitch/{README.md,render.js}`.
+- `scripts/05-scene-stats.ts` → `various/06-scene-stats.txt` (objects, triangles, buffer sizes per preset).
+- Wrote the guide; second pass with review notes before revising (below).
+
+### Why
+- The guide had to correct the earlier plan where the code says otherwise; that needed source reading, not just
+  the plan's text.
+
+### What worked
+- `docmgr doctor --ticket CANDELA-002 --stale-after 30` → all checks passed.
+
+### What didn't work
+- No tool failures. Review found draft errors (next section).
+
+### What I learned
+- The engine already supports several samples per dispatch (`renderPixel` loops `U(0).w`, `engine.sppPerFrame`);
+  the per-sample wait is in `accumulate` (output.ts), not the kernel.
+- `GPURenderer.create` caps requested limits at 10 storage buffers and 1 GiB per binding/buffer: the real limit for
+  big CAD scenes is the single 1 GiB `sd` binding, not the 8-buffer default the plan named.
+- Quantised meshes are a file format only; the GPU gets 112-byte fp32 triangles (`blasOf`).
+- `tools/lockstitch/render.js` uses `channel: 'chromium'`, which has no GPU here, and the unported harness.
+- The large `sd` heads of K-01/K-09 (17–19 MiB) are mostly the 1024×512 HDRI tables (16 MiB).
+
+### What was tricky to build
+- Keeping measured, read and proposed statements separate; the guide labels each.
+
+### What warrants a second pair of eyes
+- OptiX API names (OptiX 8/9: `optixModuleCreate`, `optixTraverse`/`optixReorder`/`optixInvoke`, denoiser model
+  kinds) are from knowledge, not from installed headers (none installed); the guide says to check them.
+- The NVENC capability of GB10 (AV1, 10-bit HEVC) is unverified and marked as an open question.
+
+### What should be done in the future
+- Steps 1–3 as tasks 3–5 in `tasks.md`.
+
+### Code review instructions
+- Read the guide top to bottom; spot-check §2.6 buffer table against `pack` and §2.8 limits against
+  `GPURenderer.create`.
+
+### Technical details
+- Second-pass review notes (recorded before revising):
+  - Comprehension: BVH, SAH, NEE, MIS, Russian roulette, AOV, EV100, à-trous used before explanation → added
+    §2.1 "Path tracing in one page".
+  - Fact: B-01 roughness is 0.4 (draft said 0.35).
+  - Fact: limits are capped in code (10 buffers, 1 GiB) → rewrote §2.8, added refactor 5.2.3 (lift the cap, split `sd`).
+  - Fact: `render.js` default stitch is 2 s → step-1 estimate is ~4 min per stitch at 1080p/64 spp, not 8.
+  - Clarity: `vp.seek` in the step-2 sketch is proposed API → labelled; K-09 param ids (`scene`, `stitch`,
+    `orbit`) named in step 1; "the earlier plan" defined in §1; section numbers and cross-references renumbered.
