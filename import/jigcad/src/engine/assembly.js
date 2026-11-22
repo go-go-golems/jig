@@ -13,6 +13,7 @@ import { gearSpecOf, meshReport } from './gears.js';
 import { massProps, kinematics, reactions as jointReactions, magnitude } from './dynamics.js';
 import { material as materialOf } from './inspect.js';
 import { isQuantity } from './units.js';
+import { G0, acceleration, force, moment } from './vectors.js';
 
 const V = K.V;
 const DOF = { rigid: 0, revolute: 1, slider: 1, cylindrical: 2, planar: 3, ball: 3, snap: 0 };
@@ -508,15 +509,12 @@ function pairOverlap(A, B, TA, TB) {
 }
 
 // ── forces (spec v0.2, layer 5) ─────────────────────────────────────────────────────────────────────────────────
-const G0 = 9806.65;   // mm/s²
 const r6 = (x) => +x.toPrecision(6);
-const AX = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
+// gravity reads as a stress study's does (vectors.js): '-Z' is 1 g, [x, y, z] a vector in g; false leaves it out
 function gDir(v) {
   if (v === false || v === null) return null;
   if (v === undefined) return [0, 0, -G0];
-  if (typeof v === 'string') { const m = /^([+-]?)([XYZ])$/i.exec(v); if (!m) throw new Error(`gravity: '+X', '-Z', … or [x, y, z] in g, not '${v}'`); return AX[m[2].toUpperCase()].map((x) => (m[1] === '-' ? -x : x) * G0); }
-  if (Array.isArray(v)) return v.map((x) => (isQuantity(x) ? x.value : Number(x) * G0));
-  throw new Error('gravity: a direction or a vector in g');
+  return acceleration(v, { what: 'gravity' });
 }
 // masses from the parts (each component's bodies, in its own frame) and their materials; the drive rates; wrenches
 function forceSetup(S, comp, o, diagnostics, decisions) {
@@ -545,7 +543,8 @@ function forceSetup(S, comp, o, diagnostics, decisions) {
   }).filter(Boolean);
   return { masses, table, g, rate, wrenches, redundantNote: true };
 }
-const N3 = (v) => (Array.isArray(v) ? v.map((x) => (isQuantity(x) ? x.in('N') : Number(x))) : null);
+const N3 = (v) => (v == null ? null : force(v, { what: 'wrench force' }));
+const NMM3 = (v) => (v == null ? [0, 0, 0] : moment(v, { what: 'wrench moment' }));
 // one sampled pose: wrench lambdas read the row, then kinematics (when the drive has a speed) and the reactions
 function forceRow(S, F, drive, row) {
   const rate = F.rate(drive);
@@ -554,8 +553,8 @@ function forceRow(S, F, drive, row) {
   for (const w of F.wrenches) {
     let v; try { v = typeof w.fn === 'function' ? w.fn(row) : w.fn; } catch (e) { v = null; }
     if (v == null || v === false) continue;
-    const force = Array.isArray(v) ? N3(v) : N3(v.force) ?? [0, 0, 0], moment = Array.isArray(v) ? (w.moment ? w.moment.map(Number) : [0, 0, 0]) : (v.moment ? v.moment.map(Number) : [0, 0, 0]);
-    wr.push({ bi: w.bi, comp: w.comp, port: w.port, label: w.label, point: w.point, force, moment });
+    const arr = Array.isArray(v), F3 = arr ? N3(v) : N3(v.force) ?? [0, 0, 0], M3 = NMM3(arr ? w.moment : v.moment);
+    wr.push({ bi: w.bi, comp: w.comp, port: w.port, label: w.label, point: w.point, force: F3, moment: M3 });
   }
   const r = jointReactions(S, { masses: F.masses, kin, gravity: F.g, wrenches: wr });
   const readings = {};

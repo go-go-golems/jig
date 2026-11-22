@@ -86,19 +86,23 @@ export function solveStatic({ mesh, material, fixed = [], rollers = [], forces }
   const prec = (src, dst) => { for (let i = 0; i < nn; i++) { const m = 9 * i, a = src[3 * i], b = src[3 * i + 1], c = src[3 * i + 2]; dst[3 * i] = Minv[m] * a + Minv[m + 1] * b + Minv[m + 2] * c; dst[3 * i + 1] = Minv[m + 3] * a + Minv[m + 4] * b + Minv[m + 5] * c; dst[3 * i + 2] = Minv[m + 6] * a + Minv[m + 7] * b + Minv[m + 8] * c; } project(dst); };
   prec(r, z);
   const p = Float64Array.from(z);
-  let rz = dot(r, z);
-  const f2 = Math.sqrt(dot(r, r)) || 1, tol = o.tol ?? 1e-10, maxIter = o.maxIter ?? Math.max(2000, 4 * N);
-  let it = 0;
-  for (; it < maxIter; it++) {
+  let rz = dot(r, z), rr = dot(r, r), it = 0;
+  const stop = (o.tol ?? 1e-10) * Math.sqrt(rr), maxIter = o.maxIter ?? Math.max(2000, 4 * N);
+  // the residual is tested before each step, never after one: a load the supports take whole (zero, or only on held
+  // nodes) leaves r = 0 here, and u = 0 is the answer rather than 0 / 0. A step divides only by a positive pᵀKp.
+  while (Math.sqrt(rr) > stop) {
+    if (it++ >= maxIter) throw new Error(`the iterative solver did not converge in ${maxIter} iterations`);
     Kmul(p, q); project(q);
-    const alpha = rz / dot(p, q);
+    const pq = dot(p, q);
+    if (!(pq > 0)) throw new Error('the stiffness is not positive along a search direction: the supports leave the part free to move');
+    const alpha = rz / pq;
     for (let i = 0; i < N; i++) { u[i] += alpha * p[i]; r[i] -= alpha * q[i]; }
-    if (Math.sqrt(dot(r, r)) <= tol * f2) break;
+    rr = dot(r, r);
+    if (Math.sqrt(rr) <= stop) break;
     prec(r, z);
     const rz2 = dot(r, z), beta = rz2 / rz; rz = rz2;
     for (let i = 0; i < N; i++) p[i] = z[i] + beta * p[i];
   }
-  if (it >= maxIter) throw new Error(`the iterative solver did not converge in ${maxIter} iterations`);
   // stresses at the integration points; reactions K u − f at the held nodes
   const S = new Float64Array(24 * ne);
   for (let e = 0; e < ne; e++) {

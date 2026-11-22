@@ -15,9 +15,7 @@ import { isQuantity, q as qParse } from './units.js';
 import { paramLayers, resolveAll, paramRows } from './params.js';
 import { hashStr } from './hash.js';
 import { solveJob, SOLVER_VERSION } from '../fea/solve.js';
-
-const G0 = 9806.65;   // mm/s²
-const AXES = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
+import { scalarIn, vectorIn } from './vectors.js';
 
 class FeaStudy {
   constructor(name, o) { this.name = name; this.o = o; Object.freeze(this); }
@@ -37,9 +35,9 @@ class FeaStudy {
   force(sel, value, o = {}) { return this._push('loads', { type: 'force', sel, value, dir: o.dir, label: o.label }); }
   /** a pressure (MPa), positive into the surface */
   pressure(sel, value, o = {}) { return this._push('loads', { type: 'pressure', sel, value, label: o.label }); }
-  /** the part's own weight: g along -Z, or a direction / vector in g */
-  gravity(v = '-Z', o = {}) { return this._push('loads', { type: 'gravity', value: v, label: o.label ?? 'gravity' }); }
-  /** a steady acceleration of the part (in g, or a quantity in mm/s²): its inertia loads it the other way */
+  /** the part's own weight: 1 g along a direction ('-Z'), a vector in g ([0, 0, -2] is 2 g), or a magnitude with { dir } */
+  gravity(v = '-Z', o = {}) { return this._push('loads', { type: 'gravity', value: v, dir: o.dir, label: o.label ?? 'gravity' }); }
+  /** a steady acceleration of the part, read as gravity is (numbers in g, quantities as accelerations): its inertia loads it the other way */
   accel(v, o = {}) { return this._push('loads', { type: 'accel', value: v, dir: o.dir, label: o.label ?? 'acceleration' }); }
   /** the loads of a component of a mechanism at a pose of a study (mechanism layer 5): its joint forces and inertia */
   from(asm, o = {}) { return this._w({ from: { asm, ...o, line: callerLine() } }); }
@@ -56,41 +54,6 @@ class FeaStudy {
 export function fea(name = 'study', o = {}) {
   if (typeof name === 'object' && name) { o = name; name = 'study'; }
   return new FeaStudy(name, { part: o.part ?? null, material: o.material ?? null, margin: o.margin ?? null, solver: o.solver ?? null, fixtures: [], loads: [], checks: [] });
-}
-
-// ── values ───────────────────────────────────────────────────────────────────
-function dirOf(d, what) {
-  if (Array.isArray(d)) { const v = d.map(Number), l = Math.hypot(...v); if (!(l > 0)) throw new Error(`${what}: the direction [${d}] has no length`); return v.map((x) => x / l); }
-  const m = /^([+-]?)([XYZ])$/i.exec(String(d ?? ''));
-  if (!m) throw new Error(`${what}: a direction is '+X', '-Z', … or [x, y, z], not ${JSON.stringify(d)}`);
-  return AXES[m[2].toUpperCase()].map((x) => (m[1] === '-' ? -x : x));
-}
-// a number in `unit` from a quantity, a param name or expression, or a plain number (taken as already in `unit`)
-function scalar(v, unit, values, what) {
-  if (typeof v === 'string') {
-    if (values && v in values) v = values[v];
-    else { try { v = qParse(v); } catch { throw new Error(`${what}: '${v}' is neither a param nor a quantity`); } }
-  }
-  if (isQuantity(v)) {
-    try { return v.in(unit); } catch { throw new TypeError(`${what} takes ${unit === 'N' ? 'a force (N)' : unit === 'MPa' ? 'a pressure (MPa)' : unit}, got ${v}`); }
-  }
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
-  throw new TypeError(`${what}: expected ${unit}, got ${v}`);
-}
-function vector(v, o, unit, values, what) {
-  if (Array.isArray(v) && v.length === 3) return v.map((x) => scalar(x, unit, values, what));
-  if (o.dir == null) throw new TypeError(`${what}: give a vector [fx, fy, fz] or a magnitude with { dir: '-Z' }`);
-  const d = dirOf(o.dir, what), s = scalar(v, unit, values, what);
-  return d.map((x) => x * s);
-}
-// an acceleration in mm/s²: a direction ('-Z', [x, y, z]) is 1 g along it; numbers are in g; quantities are
-// accelerations (j.q('3 m/s^2')); a magnitude takes { dir }
-function accelVec(v, dir, what) {
-  const comp = (x) => (isQuantity(x) ? x.value : Number(x) * G0);
-  if (typeof v === 'string') return dirOf(v, what).map((x) => x * G0);
-  if (Array.isArray(v) && v.length === 3) return v.map(comp);
-  if (dir == null) throw new TypeError(`${what}: give a vector [ax, ay, az] in g, or a magnitude with { dir: '-Z' }`);
-  return dirOf(dir, what).map((x) => x * comp(v));
 }
 
 // ── compile ──────────────────────────────────────────────────────────────────
@@ -148,7 +111,7 @@ function compileStudy(st, opts, { compilePart, finalize }) {
   const material = { name: mat.name, E: mat.modulus * 1000, nu: mat.nu ?? 0.35, strength: mat.strength, density: mat.density * 1e-9 };
   if (!(material.strength > 0)) fail('fea.material', `${mat} has no strength to judge the part against`, `${mat.name}.with({ strength: MPa(…) })`);
   const job = { name: st.name, faceNames: body.names.slice(), material, fixtures: [], loads: [], checks: [], margin: o.margin ?? 2, mesh: { ...(o.meshOpts ?? {}) }, solver: o.solver ?? 'auto' };
-  if (job.mesh.size != null) job.mesh.size = scalar(job.mesh.size, 'mm', pvals, 'mesh size');
+  if (job.mesh.size != null) job.mesh.size = scalarIn(job.mesh.size, 'mm', { values: pvals, what: 'mesh size' });
   for (const [i, fx] of (o.fixtures ?? []).entries()) {
     const label = fx.label ?? `${fx.type === 'roller' ? 'roller' : 'fixture'} ${i + 1}`;
     job.fixtures.push({ type: fx.type, faces: faceIndex(fx.sel, label), label, names: [] });
@@ -156,10 +119,12 @@ function compileStudy(st, opts, { compilePart, finalize }) {
   for (const [i, ld] of (o.loads ?? []).entries()) {
     const label = ld.label ?? `${ld.type} ${i + 1}`;
     try {
-      if (ld.type === 'force') job.loads.push({ type: 'force', faces: faceIndex(ld.sel, label), force: vector(ld.value, ld, 'N', pvals, label), label });
-      else if (ld.type === 'pressure') job.loads.push({ type: 'pressure', faces: faceIndex(ld.sel, label), p: scalar(ld.value, 'MPa', pvals, label), label });
-      else if (ld.type === 'gravity') job.loads.push({ type: 'body', rho: material.density, g: Array.isArray(ld.value) ? dirOf(ld.value, label).map((x) => x * G0) : accelVec(ld.value, null, label), label });
-      else if (ld.type === 'accel') job.loads.push({ type: 'body', rho: material.density, a0: accelVec(ld.value, ld.dir, label), label });
+      // one grammar for every vector (vectors.js): gravity and an acceleration read alike, and keep their magnitude
+      const vec = (unit) => vectorIn(ld.value, unit, { dir: ld.dir, values: pvals, what: label });
+      if (ld.type === 'force') job.loads.push({ type: 'force', faces: faceIndex(ld.sel, label), force: vec('N'), label });
+      else if (ld.type === 'pressure') job.loads.push({ type: 'pressure', faces: faceIndex(ld.sel, label), p: scalarIn(ld.value, 'MPa', { values: pvals, what: label }), label });
+      else if (ld.type === 'gravity') job.loads.push({ type: 'body', rho: material.density, g: vec('mm/s^2'), label });
+      else if (ld.type === 'accel') job.loads.push({ type: 'body', rho: material.density, a0: vec('mm/s^2'), label });
     } catch (e) { D.diagnostics.push({ level: 'error', kind: 'fea.load', at: label, message: e.message, line: ld.line }); }
   }
   // the mechanism's load case: the joints' wrenches on their seats, the inertia as a body load, one seat held
@@ -173,7 +138,7 @@ function compileStudy(st, opts, { compilePart, finalize }) {
     }
     if (lc.body) job.loads.push({ type: 'body', rho: material.density, ...lc.body, label: 'inertia and gravity' });
   }
-  for (const c of o.checks ?? []) if (c.kind === 'displacement') job.checks.push({ type: 'displacement', limit: scalar(c.limit, 'mm', pvals, 'displacement check'), faces: c.faces ? faceIndex(c.faces, 'displacement check') : null, label: c.label });
+  for (const c of o.checks ?? []) if (c.kind === 'displacement') job.checks.push({ type: 'displacement', limit: scalarIn(c.limit, 'mm', { values: pvals, what: 'displacement check' }), faces: c.faces ? faceIndex(c.faces, 'displacement check') : null, label: c.label });
   if (!job.fixtures.length) fail('fea.free', 'nothing holds the part', '.fix(faces) holds faces still; .roller(faces) lets them slide in their plane');
   if (!job.loads.length) fail('fea.unloaded', 'nothing loads the part', '.force(faces, N(…), { dir }), .pressure(faces, MPa(…)) or .gravity()');
   // the surface: the kernel's triangulation, each triangle with its face

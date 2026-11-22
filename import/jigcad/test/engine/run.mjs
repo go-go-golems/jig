@@ -1016,6 +1016,33 @@ await feaTest('55 stress study: a column on rollers under pressure (exact for qu
   assert(Math.abs(drop(p) / top - 1) < 1e-3, `top ${drop(p)} vs ${top}`);
   return `pH/E exact to ${Math.abs(drop(p) / top - 1).toExponential(1)} with weight; base ${base.toFixed(6)} N (${(Math.abs(p.fea.reaction[2] / base - 1)).toExponential(1)}), ${p.fea.solver}`;
 });
+await feaTest('56 stress study edges: a gravity vector keeps its magnitude; a load the supports take whole solves to zero', async () => {
+  // .gravity([0, 0, -2]) is 2 g, as .accel and an assembly's .gravity read it; a magnitude with { dir } reads alike
+  const col = script('55-fea-column.js'), withG = (g) => col.replace('  .gravity()\n', `  .gravity(${g})\n`);
+  const gOf = () => W.currentProgram().P.feaJob.loads.find((l) => l.label === 'gravity').g;
+  await compile(withG('[0, 0, -0.1]'));
+  assert(near(gOf()[2], -0.1 * 9806.65), `0.1 g: ${gOf()}`);
+  await compile(withG("0.5, { dir: [0, 0, -3] }"));
+  assert(near(gOf()[2], -0.5 * 9806.65), `0.5 g along a dir: ${gOf()}`);
+  const bad = await compile(withG("[0, 0, N(1)]"));
+  assert(errs(bad).some((d) => d.kind === 'fea.load' && /takes an acceleration/.test(d.message)), `a force is not an acceleration: ${JSON.stringify(errs(bad))}`);
+  await compile(withG('[0, 0, -2]'));
+  let p = await solveFea();
+  const base = 0.01 * 100 + 2 * 1.24e-9 * 9806.65 * 100 * 100, tol = /CalculiX/.test(p.fea.solver) ? 1e-6 : 1e-9;
+  assert(p.fea.status === 'solved' && Math.abs(p.fea.reaction[2] / base - 1) < tol, `2 g: base ${p.fea.reaction[2]} vs ${base}`);
+  // no work for the solver: a zero force, and a force on the held face; both solvers return u = 0 and the reaction
+  const beam = script('52-fea-cantilever.js'), solvers = /CalculiX/.test(p.fea.solver) ? ['', ".solver('js')"] : [''];
+  for (const s of solvers) {
+    await compile(beam.replace('.mesh({', `${s}.mesh({`), { options: { override: { F: 0 } } });
+    p = await solveFea();
+    assert(p.fea.status === 'solved' && !errs(p).length && p.fea.displacement.value === 0, `F = 0 ${s}: ${p.fea.status} ${JSON.stringify(errs(p))} ${p.fea.displacement?.value}`);
+    await compile(beam.replace("force(j.feat('body').endFace()", "force(j.feat('body').startFace()").replace('.mesh({', `${s}.mesh({`));
+    p = await solveFea();
+    assert(p.fea.status === 'solved' && !errs(p).length && Math.abs(p.fea.displacement.value) < 1e-12, `force on the held face ${s}: ${p.fea.status} ${JSON.stringify(errs(p))} ${p.fea.displacement?.value}`);
+    assert(near(p.fea.reaction[2], 20, 1e-6) && p.fea.balance < 1e-6, `the support takes the 20 N ${s}: ${p.fea.reaction}`);
+  }
+  return `2 g base ${p.fea.reaction[2].toFixed(3)} N; zero-work solves on ${solvers.length} solver${solvers.length > 1 ? 's' : ''}`;
+});
 await test('54 forces: slider-crank reactions balance energy (drive power = dKE/dt; statics: torque = dPE/dθ)', async () => {
   const base = script('43-slider-crank.js');
   const run = async (extra) => { await compile(base.replace(".report('stroke'", `${extra}\n  .report('stroke'`)); return W.currentProgram(); };

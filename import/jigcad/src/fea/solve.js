@@ -76,6 +76,8 @@ export async function solveJob(job, o = {}) {
       if (o.keepDeck) sol.deck = deck;
     } else { sol = solveStatic(problem); version = 'jig reference solver (JavaScript)'; }
     timings.solve = (timings.solve ?? 0) + now() - ts;
+    // whichever solver ran, a field that is not finite is a failed solve, never stresses to report
+    if (!sol.U.every(Number.isFinite) || !sol.S.every(Number.isFinite)) throw failure('fea.solverFailed', `${version} returned a displacement or stress that is not a number`, 'check the supports hold every rigid motion, and that the loads are finite');
     // the reaction is summed over the held nodes once each: a node on two supports (an edge where a base meets a
     // side) is printed in both sets
     const reaction = [0, 0, 0], seen = new Set();
