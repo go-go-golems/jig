@@ -1069,3 +1069,37 @@ bling.local, then implement phases 3–6; judge parity visually; report which Op
 
 ### Technical details
 - Evidence: `various/16-phase3-optix.txt`, `16-parity-optix-64spp.log`, `16-optix-compile-sweep.json`.
+
+## Step 17: Codex review of PR #1 — five P2 findings fixed
+
+Codex reviewed commit `1780050` and posted five P2 findings: one in the engine (`SceneSession` instances share
+parameter state), one race in the browser viewport, and three workbench bugs. All five were real; each is fixed in
+`6e05a36`, and the review threads have replies naming the commit.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 15) "…so we get the @codex review review?"
+**Assistant interpretation:** Act on the review once it arrives.
+
+### What I did
+- Params: `ParamScope` (`values`, `defs`, `order`, `derived`) with `withParamScope`/`withParamScopeAsync` in
+  `params.ts`; `SceneSession` swaps its own scope in around `build`, `seek` (behaviours), `posesFor` and `pack`;
+  `setParam(id, v)`; `headless.ts frame()` evaluates camera uniforms in the session's scope.
+- `Viewport.load()` → promise chain over `loadNow()`.
+- `Host.nextMineId()` (one past the highest `U-NN`), used by `saveAsMine` and `importProject`; `saveEdits()` writes
+  `deleted` tombstones, `loadPreset()` honours them.
+- `capture.ts`: CSS from every same-origin `document.styleSheets` entry.
+
+### What worked
+- New isolation check: B-02's packed uniforms identical before and after another session builds B-01; `setParam` in
+  one session leaves another's pack unchanged. Golden 105/105, `npm test`, `validate` 105/105, browser renders of
+  B-02 and W-01 fine; native renders still match WebGPU (B-01, B-02, K-09 displayed difference 0.00 %).
+
+### What didn't work
+- After the fix, `tests/session.test.ts` reported `FAIL K-09 session pack equals viewport pack at t=0 (differs: U)`.
+  The test's reference (`packDigest`) called `compiled.pack` with the *global* parameter scope, which no longer holds
+  K-09's definitions; the session was right. The reference now runs inside `withParamScope(s.params, …)`.
+
+### What warrants a second pair of eyes
+- Scopes are swapped by assignment around synchronous and awaited calls; two builds interleaving across awaits would
+  still collide (as other build globals would). The hosts never interleave builds.
+- Host and capture fixes have no automated test (browser-only code).
