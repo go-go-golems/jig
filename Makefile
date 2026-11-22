@@ -1,17 +1,17 @@
 # jig: the jigcad workbench (JavaScript, Rust → wasm) and its Go server (jigcad serve).
 #
 #   make web           build import/jigcad/dist (esbuild bundle, jig-compute wasm, OpenCascade wasm, Candela)
-#   make vendor-candela  copy Candela's engine from a pbr-spark checkout (CANDELA=…, CANDELA_REF=…) into vendor/candela
 #   make build         go build ./... (the server reads dist/ from disk: jigcad serve --dist)
 #   make build-bin     ./dist/jigcad with the workbench embedded (-tags embed; runs `make web` first)
 #   make test          Go tests and the JavaScript suites that need no network
 #   make lint          golangci-lint (pinned in .golangci-lint-version) and gofmt
 #   make goreleaser    a local snapshot release for this platform (no publishing)
 #
-# Tools: Go (go.mod), Node 24 (no npm packages in the repo; esbuild is installed into .bin/ by `make esbuild`),
+# Tools: Go (go.mod), Node 24 (jig's build needs no npm packages; esbuild is installed into .bin/ by `make esbuild`;
+# import/candela has its own package.json for Candela's development tools),
 # Rust with the wasm32-unknown-unknown target (optional: without it dist/ runs the JS implementations).
 
-.PHONY: all web esbuild occt vendor-candela build build-bin test test-go test-js lint lint-fix golangci-lint-install gofmt \
+.PHONY: all web esbuild occt build build-bin test test-go test-js lint lint-fix golangci-lint-install gofmt \
 	goreleaser goreleaser-check serve agent-eval-oracle clean
 
 all: lint test build
@@ -50,12 +50,6 @@ occt: $(WEB)/vendor/occt/replicad_single.wasm
 
 web: $(ESBUILD) occt
 	cd $(WEB) && ESBUILD=$(ESBUILD) node build.mjs
-
-# Candela (JIG-016): the renderer's engine source, pinned to one pbr-spark commit (vendor/candela/VERSIONS)
-CANDELA ?= ../../2026-11-21--pbr-spark
-CANDELA_REF ?= HEAD
-vendor-candela:
-	$(WEB)/tools/vendor-candela.sh $(CANDELA) $(CANDELA_REF)
 
 # ── Go ───────────────────────────────────────────────────────────────────────
 

@@ -10,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const V = p => join(ROOT, 'vendor', p);
+// Candela's engine (TypeScript, no npm dependencies) is read in place from the Candela tree (JIG-017)
+const CANDELA = join(ROOT, '..', 'candela');
 const watch = process.argv.includes('--watch');
 const minify = process.argv.includes('--minify');
 
@@ -106,11 +108,12 @@ async function run() {
     platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'],
     // the OpenCascade glue resolves its directory from import.meta.url even when it gets the bytes; a fixed base, never fetched
     define: { ...common.define, 'import.meta.url': '"https://sandbox.invalid/agent-worker.js"' } };
-  // Candela (JIG-016, vendor/candela): dist/candela.js, one ES module for the Render view and Node tests, and
-  // dist/candela-core.js, the non-DOM core as the IIFE candela-rt loads with --bundle (ES2020 for its V8 10.2)
+  // Candela (import/candela/src/engine): dist/candela.js, one ES module for the Render view and Node tests, and
+  // dist/candela-core.js, the non-DOM core as the IIFE candela-rt loads with --bundle (ES2020 for its V8 10.2). The
+  // core is built with the options of import/candela/scripts/bundle-core.ts (not minified), so both make the same bytes
   const candela = { ...common, entryPoints: [join(ROOT, 'src/render/candela.js')], outfile: join(ROOT, 'dist/candela.js'), platform: 'neutral' };
-  const candelaCore = { bundle: true, format: 'iife', globalName: 'Candela', platform: 'neutral', target: 'es2020', minify, logLevel: 'warning',
-    legalComments: 'none', entryPoints: [V('candela/src/engine/core.ts')], outfile: join(ROOT, 'dist/candela-core.js') };
+  const candelaCore = { bundle: true, format: 'iife', globalName: 'Candela', platform: 'neutral', target: 'es2020', logLevel: 'warning',
+    legalComments: 'none', entryPoints: [join(CANDELA, 'src/engine/core.ts')], outfile: join(ROOT, 'dist/candela-core.js') };
   const coreHash = () => { const sha = createHash('sha256').update(readFileSync(join(ROOT, 'dist/candela-core.js'))).digest('hex'); writeFileSync(join(ROOT, 'dist/candela-core.js.sha256'), sha + '\n'); };
   if (watch) {
     for (const cfg of [app, worker, agentWorker, candela, candelaCore]) (await context(cfg)).watch();
