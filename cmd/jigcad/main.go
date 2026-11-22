@@ -59,10 +59,10 @@ The agent panel calls POST /api/sample; the server runs model rounds through Pi'
 page to run each eval tool call. Credentials stay in Pi's files on this machine. The server binds 127.0.0.1 by
 default; set --token (or JIGCAD_TOKEN) before listening on another address, then open /?token=… once.
 
-With --render auto (the default) and candela-rt installed ($JIGCAD_CANDELA_RT, else on PATH), the server starts
-"candela-rt serve" on a localhost port with a random token, restarts it when it exits, and proxies its WebSocket
-at /rt; GET /api/render/capabilities says whether it is up. Without candela-rt the workbench renders in the
-browser. candela-rt loads candela-core.js from the workbench's built files.`,
+With --render auto (the default) and candela-rt installed ($JIGCAD_CANDELA_RT, else next to jigcad, else on
+PATH), the server starts "candela-rt serve" on a localhost port with a random token, restarts it when it exits, and
+proxies its WebSocket at /rt; GET /api/render/capabilities says whether it is up. Without candela-rt the workbench
+renders in the browser. candela-rt loads candela-core.js from the workbench's built files.`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return serve(cmd.Context(), f) },
 	}
 	fl := c.Flags()

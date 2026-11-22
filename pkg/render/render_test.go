@@ -157,6 +157,9 @@ func TestFind(t *testing.T) {
 
 	t.Setenv(EnvBinary, "")
 	t.Setenv("PATH", t.TempDir())
+	saved := selfDir
+	t.Cleanup(func() { selfDir = saved })
+	selfDir = func() string { return t.TempDir() }
 	for _, mode := range []string{"", "off"} {
 		_, err := Find(mode)
 		assert.ErrorIs(t, err, ErrOff, mode)
@@ -168,6 +171,14 @@ func TestFind(t *testing.T) {
 	got, err := Find("auto")
 	require.NoError(t, err)
 	assert.Equal(t, rt, got, "auto finds candela-rt on PATH")
+
+	beside := t.TempDir()
+	near := executable(t, beside, "candela-rt")
+	selfDir = func() string { return beside }
+	got, err = Find("auto")
+	require.NoError(t, err)
+	assert.Equal(t, near, got, "a candela-rt next to jigcad comes before PATH")
+	selfDir = func() string { return t.TempDir() }
 
 	t.Setenv(EnvBinary, other)
 	got, err = Find("auto")

@@ -20,11 +20,25 @@ var (
 	// ErrOff is Find's answer to --render off.
 	ErrOff = errors.New("rendering on candela-rt is off (--render off)")
 	// ErrNotFound means --render auto found no binary, the common case: rendering stays in the browser.
-	ErrNotFound = errors.New("no candela-rt binary (put it on PATH, set " + EnvBinary + ", or pass --render <path>)")
+	ErrNotFound = errors.New("no candela-rt binary (put it next to jigcad or on PATH, set " + EnvBinary + ", or pass --render <path>)")
 )
 
+// selfDir is the directory of the running jigcad binary, symlinks resolved: a release unpacks candela-rt beside it.
+// A variable so tests can point it elsewhere.
+var selfDir = func() string {
+	p, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		p = r
+	}
+	return filepath.Dir(p)
+}
+
 // Find resolves --render to a binary's absolute path. "off" or empty gives ErrOff; "auto" gives $JIGCAD_CANDELA_RT
-// when set, else candela-rt from PATH, else ErrNotFound; anything else is a path (or a name looked up on PATH).
+// when set, else a candela-rt next to the jigcad binary, else candela-rt from PATH, else ErrNotFound; anything else
+// is a path (or a name looked up on PATH).
 // A binary that is named, by the flag or the variable, and cannot be used is another error.
 func Find(mode string) (string, error) {
 	switch mode {
@@ -33,6 +47,11 @@ func Find(mode string) (string, error) {
 	case "auto":
 		if p := os.Getenv(EnvBinary); p != "" {
 			return lookup(p, "$"+EnvBinary)
+		}
+		if d := selfDir(); d != "" {
+			if p, err := exec.LookPath(filepath.Join(d, "candela-rt")); err == nil {
+				return filepath.Abs(p)
+			}
 		}
 		p, err := exec.LookPath("candela-rt")
 		if err != nil {
