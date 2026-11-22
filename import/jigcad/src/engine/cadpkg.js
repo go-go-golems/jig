@@ -23,27 +23,13 @@ import { meshBody, faceMeta } from './mesh.js';
 import { selectInPart } from './compile.js';
 import { finishTargets } from './assembly.js';
 import { hashStr } from './hash.js';
+import { S, R, pt, toCandelaMatrix } from '../render/frame.js';
 
 export const CAD_PACKAGE_FORMAT = 'jig-cad-package';
 export const CAD_PACKAGE_VERSION = 1;
 
-const S = 0.001;
-const R = (v) => [v[0], v[2], -v[1]];
-const pt = (p) => R(p).map((x) => x * S);
-const C = [S, 0, 0, 0, 0, 0, -S, 0, 0, S, 0, 0, 0, 0, 0, 1];          // column-major
-const Ci = [1 / S, 0, 0, 0, 0, 0, 1 / S, 0, 0, -1 / S, 0, 0, 0, 0, 0, 1];
-function mul4(a, b) {
-  const o = new Array(16);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-    let s = 0;
-    for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k];
-    o[c * 4 + r] = s;
-  }
-  return o;
-}
-const clean = (v) => (Math.abs(v) < 1e-12 ? 0 : v);
-/** a jig transform (column-major, mm) in Candela's frame */
-export const toCandelaMatrix = (T) => mul4(mul4(C, Array.from(T)), Ci).map(clean);
+// the frame change (metres, Y up) is src/render/frame.js, shared with the page
+export { toCandelaMatrix };
 export const toCandela = { point: pt, dir: R, length: (l) => l * S, matrix: toCandelaMatrix };
 
 // jig's engineering materials → Candela's appearance vocabulary (finish.ts: METAL_F0, POLYMERS). Polymers Candela

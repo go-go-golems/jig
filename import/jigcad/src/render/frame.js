@@ -1,7 +1,11 @@
-// The frame change between jig and Candela, for the page (src/engine/cadpkg.js does the same in the worker, where
-// the CAD package is made): jig is millimetres with Z up and the front toward −Y; Candela is metres with Y up.
+// The frame change between jig and Candela, for the worker (src/engine/cadpkg.js, the CAD package) and the page
+// (src/render/host.js, live poses): jig is millimetres with Z up and the front toward −Y; Candela is metres with Y up.
 // p' = 0.001·(x, z, −y); a transform T becomes C·T·C⁻¹. Matrices are column-major, as jig and Candela keep them.
-const S = 0.001;
+export const S = 0.001;
+/** a direction (a normal, an axis) in Candela's frame */
+export const R = (v) => [v[0], v[2], -v[1]];
+/** a point in Candela's frame */
+export const pt = (p) => R(p).map((x) => x * S);
 const C = [S, 0, 0, 0, 0, 0, -S, 0, 0, S, 0, 0, 0, 0, 0, 1];
 const Ci = [1 / S, 0, 0, 0, 0, 0, 1 / S, 0, 0, -1 / S, 0, 0, 0, 0, 0, 1];
 function mul4(a, b) {
