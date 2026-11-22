@@ -38,21 +38,69 @@ function decode(v, T) {
   return new T(u.buffer);
 }
 
-// mesh definitions (and their BVHs) outlive one build: a page rebuilding the same package reuses them
+// ---- mesh definitions (and their BVHs) outlive one build, and one package ----
+// jig's worker gives each package body content keys (cadpkg.js keysOf): `key` for all a definition holds, `meshKey`
+// for its triangles and face ids alone. A body whose key is held reuses that definition, whichever package it came
+// in, so a rebuild after an edit decodes and builds only the bodies the edit changed. A body whose meshKey is held
+// under another key (only face meta changed: a finish, a colour) gets a copy of that definition with its own face
+// table, which shares the triangles and the BVH (MeshDef.withMeta keeps them; the copy's name, meta and faces are
+// then set, before anything else sees it). The cache is bounded by a budget of triangles (a definition and its BVH
+// take about 0.2 kB a triangle): past it the least recently used definitions go, never one the build in progress
+// uses. A package without keys (one made by hand, or by an older jig) keeps one definition per body object.
+// globalThis.__jigCandelaStats counts what each build did: created (from arrays), derived (a copy for new face
+// meta), reused, evicted; defs and triangles are the cache's size now.
+const CACHE = (globalThis.__jigCandelaCache ??= { defs: new Map(), triangles: 0, budget: 1e6, build: 0 });
 const DEFS = (globalThis.__jigCandelaDefs ??= new WeakMap());
+const STATS = (globalThis.__jigCandelaStats ??= { created: 0, derived: 0, reused: 0, evicted: 0, defs: 0, triangles: 0 });
 
-function defOf(body, comp) {
-  let d = DEFS.get(body);
-  if (d) return d;
+function fromArrays(body, comp) {
   const A = {};
   for (const [k, T] of Object.entries(ARRAYS)) A[k] = decode(body[k], T);
-  d = mesh.fromArrays({
+  STATS.created++;
+  return mesh.fromArrays({
     name: body.id, positions: A.positions, normals: A.normals, indices: A.indices, faceIds: A.triFace,
     faces: body.faces.map((f) => ({ id: f.id, meta: f.meta })),
     meta: Object.assign({ component: body.component }, comp.look || {}),
   });
-  DEFS.set(body, d);
+}
+// a definition of the same triangles and face ids with this body's name, meta and face meta: the BVH is shared
+function derived(base, body, comp) {
+  const meta = new Map(body.faces.map((f) => [String(f.id), f.meta || {}]));
+  const d = base.withMeta({});
+  d.name = body.id;
+  d.meta = Object.assign({ component: body.component }, comp.look || {});
+  d.faces = base.faces.map((f) => ({ id: f.id, meta: Object.assign({}, meta.get(f.id) || {}) }));
+  STATS.derived++;
   return d;
+}
+// after a build has taken its definitions (realize), so it never evicts one it is about to use
+function evict() {
+  for (const [k, e] of CACHE.defs) {
+    if (CACHE.triangles <= CACHE.budget) break;
+    if (e.build === CACHE.build) continue;
+    CACHE.defs.delete(k); CACHE.triangles -= e.triangles; STATS.evicted++;
+  }
+  STATS.defs = CACHE.defs.size; STATS.triangles = CACHE.triangles;
+}
+function defOf(body, comp) {
+  if (body.key == null) {
+    let d = DEFS.get(body);
+    if (d) STATS.reused++;
+    else DEFS.set(body, (d = fromArrays(body, comp)));
+    return d;
+  }
+  let e = CACHE.defs.get(body.key);
+  if (e) {
+    CACHE.defs.delete(body.key); CACHE.defs.set(body.key, e);   // the most recently used last
+    e.build = CACHE.build; STATS.reused++;
+    return e.def;
+  }
+  let base = null;
+  if (body.meshKey != null) for (const x of CACHE.defs.values()) if (x.meshKey === body.meshKey) { base = x.def; break; }
+  const def = base ? derived(base, body, comp) : fromArrays(body, comp);
+  CACHE.defs.set(body.key, (e = { def, meshKey: body.meshKey, triangles: def.count, build: CACHE.build }));
+  CACHE.triangles += e.triangles;
+  return def;
 }
 
 // a rigid column-major 4×4 as Candela's placement: at(t), then rotations whose product is Rz·Ry·Rx
@@ -202,6 +250,7 @@ function studyOf(pkg, name, where) {
 }
 
 function realize(st) {
+  CACHE.build++;   // the definitions this build uses stay in the cache (evict, at the end), whatever its budget
   const comps = new Map(st.pkg.components.map((c) => [c.id, c]));
   const byComp = new Map();
   for (const b of st.pkg.bodies) {
@@ -236,6 +285,7 @@ function realize(st) {
     });
     groups.push(place(scene.group(nodes).id(cid), isIdentity(Tc) ? null : Tc));
   }
+  evict();
   return scene.group(groups).id(st.o.id || 'jig');
 }
 

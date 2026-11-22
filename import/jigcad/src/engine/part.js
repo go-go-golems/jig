@@ -11,8 +11,10 @@ const META0 = Object.freeze({ params: [], configs: null, config: null, overrides
 export const FINISH_KEYS = { finish: 'string', process: 'string', color: 'string', roughness: 'number' };
 export const PROCESSES = ['turned', 'faced', 'milled', 'ground', 'brushed', 'hobbed', 'polished', 'cast', 'forged'];
 export const FINISHES = ['black-oxide', 'zinc', 'zinc-yellow', 'galvanized', 'anodized', 'anodized-black', 'anodized-clear', 'paint', 'powder-coat', 'chrome', 'nickel', 'plastic', 'rubber', 'glass', ...PROCESSES];
-function finishMeta(m) {
-  if (!m || typeof m !== 'object' || Array.isArray(m)) throw new TypeError(`.finish(): give { finish, process, color, roughness }, e.g. .finish({ finish: 'black-oxide' }) or .finish(faces, { process: 'ground' })`);
+// checks a .finish() call's metadata where it is written (a part's, and an assembly's: assembly.js); `usage` is the
+// call's forms, for the message when no metadata is given
+export function finishMeta(m, usage = `.finish({ finish: 'black-oxide' }) or .finish(faces, { process: 'ground' })`) {
+  if (!m || typeof m !== 'object' || Array.isArray(m)) throw new TypeError(`.finish(): give { finish, process, color, roughness }, e.g. ${usage}`);
   for (const [k, v] of Object.entries(m)) {
     if (!(k in FINISH_KEYS)) throw new TypeError(`.finish(): unknown key '${k}' (keys: ${Object.keys(FINISH_KEYS).join(', ')})`);
     if (typeof v !== FINISH_KEYS[k]) throw new TypeError(`.finish(): ${k} is a ${FINISH_KEYS[k]}, got ${JSON.stringify(v)}`);
