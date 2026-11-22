@@ -180,3 +180,33 @@ testing, decision records, open questions, and file/API appendices.
   - Fact: `render.js` default stitch is 2 s → step-1 estimate is ~4 min per stitch at 1080p/64 spp, not 8.
   - Clarity: `vp.seek` in the step-2 sketch is proposed API → labelled; K-09 param ids (`scene`, `stitch`,
     `orbit`) named in step 1; "the earlier plan" defined in §1; section numbers and cross-references renumbered.
+
+## Step 3: Upload to reMarkable (one failure, worked around)
+
+Uploaded the guide as one PDF. The first attempt failed inside remarquee's PDF conversion because its built-in LaTeX
+header loads a package this machine's TeX installation does not have; a header file without that package fixed it.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Deliver the stored guide to reMarkable.
+**Inferred user intent:** Read the guide on the device.
+
+### Evidence and commits
+- Guide commit: `9af5365`.
+- Failure: `remarquee upload bundle <guide> --name "CANDELA-002 Candela on the DGX Spark - intern guide"
+  --remote-dir /ai/2026/11/21/CANDELA-002 --toc-depth 2 --non-interactive` →
+  `Error: pandoc failed: Error producing PDF. ! LaTeX Error: File 'stmaryrd.sty' not found.` (exit status 43).
+- Isolation: a two-line Markdown file renders with plain `pandoc --pdf-engine=xelatex`; `kpsewhich stmaryrd.sty`
+  finds nothing; `strings $(which remarquee)` shows the built-in header starts with `\usepackage{stmaryrd}` (for
+  `\llbracket` in chat math). The guide contains no math, so the package is not needed.
+- Fix: `scripts/06-remarquee-header-no-stmaryrd.tex` (the built-in header minus `stmaryrd`) passed as
+  `--latex-header-file` → `OK: uploaded CANDELA-002 Candela on the DGX Spark - intern guide.pdf -> /ai/2026/11/21/CANDELA-002`.
+- Evidence level: upload result only (cloud delivery; no device listing or rendered-PDF inspection).
+
+### Noteworthy decisions or failures
+- Did not install `texlive-science` (system package, needs sudo); the header override is local to this upload.
+  Every remarquee upload on this machine will hit the same error until `stmaryrd` is installed or the header is
+  overridden.
+
+### Remaining requirements and next action
+- Implementation tasks 3–5 (steps 1–3) are open; the guide is a design, not an implementation.
