@@ -34,6 +34,12 @@ WhenToUse: Before changing compile/pack, before writing native/ code, and when d
 
 ## 1. What this document is for
 
+> **Status (2026-11-21):** phase 0 done. `scripts/bundle-core.ts` bundles the engine core (`src/engine/core.ts`,
+> 320 KiB, ES2020); `native/rt` builds `candela-rt digest`, which runs it in V8 10.2 embedded through `libnode`.
+> All 105 presets build there (6.6 s in total; K-09 487 ms) and 104 match Node 26 byte for byte; the exception is
+> D-02, whose `Math.random()` makes it differ between any two runs (`various/13-phase0-v8-embedding.txt`). Embedding
+> note: the isolate uses `MicrotasksPolicy::kExplicit`, since the host drives promises itself.
+
 Candela is a renderer whose scenes are JavaScript programs. Today those programs run in a web browser and are drawn
 by a path tracer written in WGSL on WebGPU (or WebGL2). This document designs the next step: a native program,
 `candela-rt`, that runs the same scene files on the DGX Spark, executes their JavaScript in an embedded V8 engine, and
@@ -692,7 +698,7 @@ Three details deserve attention:
 ```text
 candela-rt render <preset-or-dir> [--param id=value]… [--size 1920x1080] [--spp 256] [--time t]
                   [--sequence --start 0 --end 2 --fps 24] [--format exr|png|mp4] [--denoise] [--out dir]
-candela-rt serve  [--port 8790] [--bind 127.0.0.1] [--dist dist/]
+candela-rt serve  [--port 8790] [--bind 0.0.0.0] [--dist dist/] [--token t]
 candela-rt check  <preset>…        # build in V8, print IR hash, translate + NVRTC-compile, render 16 spp
 ```
 
@@ -769,8 +775,9 @@ guides) and encoded with nvJPEG.
 
 ### 7.6 Exposure and security
 
-`candela-rt serve` binds to `127.0.0.1` by default. Binding to the network requires `--bind 0.0.0.0 --token <t>`; the
-browser passes the token in the WebSocket URL. Scene code runs in a context without I/O, under a heap limit and a
+`candela-rt serve` binds to `0.0.0.0` by default, so the workbench is reachable from other machines as
+`http://bling.local:<port>/` (the user's working setup). An optional `--token <t>` restricts access; the browser
+passes the token in the WebSocket URL. Scene code runs in a context without I/O, under a heap limit and a
 watchdog, so a hostile scene can exhaust its own budget but cannot reach the machine.
 
 ## 8. Render jobs on the backend (proposed)

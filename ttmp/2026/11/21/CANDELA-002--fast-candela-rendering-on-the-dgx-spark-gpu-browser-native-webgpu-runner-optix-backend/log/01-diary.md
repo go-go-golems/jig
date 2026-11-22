@@ -623,3 +623,80 @@ send the IR entirely to the backend? or do we have callbacks we would need to ru
 - Upload: `remarquee upload bundle design-doc/02-… --name "CANDELA-002 candela-rt - V8 and OptiX render runtime"
   --remote-dir /ai/2026/11/21/CANDELA-002 --toc-depth 2 --non-interactive` → `OK: uploaded CANDELA-002 candela-rt -
   V8 and OptiX render runtime.pdf -> /ai/2026/11/21/CANDELA-002` (design commit `1d9896b`).
+
+## Step 11: Phase 0 — the engine runs in V8 embedded in candela-rt; 104/105 presets byte-identical with Node
+
+Phase 0 of design doc 02: bundle the engine's non-DOM core, embed V8 (through Ubuntu's libnode, which the user
+installed) in a new native program, and show that the same bundle produces the same programs and buffers in both
+engines. It does, for every preset except D-02, whose `Math.random()` already differs between two Node runs.
+
+### Prompt Context
+**User prompt (verbatim):** "installed. implement, commit at appropriate intervals and keep a detailed diary as you
+work (using the diary format from the skill)." Mid-step: "when running anything, make sure to bind to 0.0.0.0 so i can
+access it on bling.local"
+**Assistant interpretation:** Implement design doc 02 phase by phase, starting with phase 0; any server I start
+binds 0.0.0.0.
+**Inferred user intent:** Working code toward candela-rt, verifiable at each step.
+**Commit (code):** see the commit after this entry ("CANDELA-002: phase 0 …")
+
+### What I did
+- `src/engine/digest.ts`: 64-bit hashes (two 32-bit lanes, plain JS) of `compiled.shared` and of every `pack` buffer
+  (`U`, `O`, `LI`, `BV`, `SDs`, `SDd`, plus metadata) at given times; `digestPreset` with build and per-frame timing.
+- `src/engine/core.ts`: bundle entry (build, cameraUniforms, inv34, loadCatalog/loadPresets, digest functions,
+  `digestCatalog`). `scripts/bundle-core.ts`: esbuild IIFE `globalThis.Candela`, platform neutral, ES2020, writes
+  `dist-core/candela-core.js` and its SHA-256. `dist-core/` ignored.
+- Inspected libnode: headers in `/usr/include/node` (V8 10.2), `libnode.so.109` exports `v8::platform::NewDefaultPlatform`,
+  `Isolate::New`, `Context::New`, `PerformMicrotaskCheckpoint`, `AllowCodeGenerationFromStrings`; `config.gypi` has
+  `v8_enable_pointer_compression: 0`, `v8_enable_31bit_smis_on_64bit_arch: 0` (no extra defines needed).
+- `native/rt/`: `JsRuntime` (platform init, isolate with heap limit, context whose global has only `console`,
+  `performance.now`, `atob`, `btoa`; `runScript`, `call` + `settle` for promises, JSON helpers, zero-copy typed-array
+  `view`), `main.cpp` with `candela-rt digest` (reads `content/` into a JS object, calls `Candela.digestCatalog`).
+- `scripts/core-digest.ts`: the same bundle in a Node `vm` context with the same globals; `--compare` files.
+- npm scripts `bundle:core`, `digest:core`. Design doc 02: phase 0 status; `serve` binds 0.0.0.0 by default.
+- Memory: user preference to bind servers to 0.0.0.0 (bling.local).
+
+### Why
+- Hashing in plain JS inside the bundle means both engines run the identical hashing code; only the engine differs.
+- The Node side uses a `vm` context with exactly candela-rt's globals, so a missing global would fail in Node too.
+
+### What worked
+- `candela-rt digest` → `105/105 presets built`; V8 `10.2.154.26-node.28`; bundle loads in 15 ms.
+- Node vs V8: `104/105 identical; differ: D-02 (t=0 O)`; Node vs Node: the same single difference.
+- Timings: embedded V8 builds all presets in 6.6 s (K-09 487 ms, faster than tsx in Node's main context, 576 ms).
+
+### What didn't work
+- First full run hung (killed after 600 s, no output). Under gdb single presets worked (B-01 85 ms, hashes equal
+  Node's). Two presets spun at 100% CPU. Plain `gdb -p` attach failed (`/proc/sys/kernel/yama/ptrace_scope` = 1);
+  running under gdb and sending SIGINT to the inferior (pid 739095, after first signalling the wrong pid) gave:
+  `#3 operator() … main.cpp:70` in `std::string::find(',')` — my `--ids` quoting loop replaced `,` with `","`, which
+  contains a comma: an infinite loop for any list with a comma. Replaced by `std::getline` splitting.
+- Before finding that, I set `MicrotasksPolicy::kExplicit` (suspecting `settle()`); it was not the cause but is the
+  correct policy for a host that drives promises, so it stays (documented in the code).
+- Node `vm` contexts are ~20× slower than the main context (B-01 1.4 s vs 76 ms) — irrelevant to candela-rt, but the
+  Node half of the check takes ~2.5 minutes.
+
+### What I learned
+- The engine needs nothing from its host beyond `console`, `performance.now` and `atob` (K-09); `new Function` must
+  be allowed; `async` module bodies settle with microtask checkpoints alone (no timers).
+- X-02 (10,000 objects) spends 85 ms per frame in `pack`, mostly rebuilding the top-level BVH — the first
+  profile-driven candidate, and unnecessary for the OptiX target.
+
+### What was tricky to build
+- Distinguishing "V8 hangs" from "my code hangs" without attach permission; gdb as the parent process with a signal
+  to the inferior was the reliable way.
+
+### What warrants a second pair of eyes
+- `JsRuntime` passes `this` to host callbacks through an internal field of a holder object per function; review the
+  lifetime (the runtime outlives its context, so the pointer is valid).
+- `atob` decodes leniently (skips invalid characters) where browsers throw.
+
+### What should be done in the future
+- Phase 1: golden recorder (from `digest.ts`), seeded `Math.random` (makes D-02 deterministic), then the split.
+
+### Code review instructions
+- `native/rt/src/js_runtime.cpp` (constructor: globals; `settle`), `src/engine/digest.ts`, `scripts/core-digest.ts`.
+- Reproduce: `npm run bundle:core && cmake -G Ninja -S native/rt -B build/rt && ninja -C build/rt &&
+  ./build/rt/candela-rt digest --json /tmp/v8.json && npx tsx scripts/core-digest.ts --compare /tmp/v8.json`.
+
+### Technical details
+- Evidence: `various/13-phase0-v8-embedding.txt`.

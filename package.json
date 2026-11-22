@@ -15,7 +15,9 @@
     "shot": "tsx scripts/shot.ts",
     "typecheck:strict": "tsx scripts/typecheck-strict.ts",
     "render": "tsx scripts/render-preset.ts",
-    "lockstitch": "tsx tools/lockstitch/render.ts"
+    "lockstitch": "tsx tools/lockstitch/render.ts",
+    "bundle:core": "tsx scripts/bundle-core.ts",
+    "digest:core": "tsx scripts/core-digest.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

@@ -35,3 +35,11 @@ Design doc 02: candela-rt (embedded V8 + OptiX), engine split into front end/Sce
 ### Related Files
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/ttmp/2026/11/21/CANDELA-002--fast-candela-rendering-on-the-dgx-spark-gpu-browser-native-webgpu-runner-optix-backend/design-doc/02-candela-as-a-compiler-with-backends-the-v8-and-optix-render-runtime.md — The design
+
+## 2026-11-21
+
+Phase 0: candela-rt embeds V8 10.2 (libnode); engine bundle builds 105/105 presets, 104 byte-identical with Node (D-02 Math.random)
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/js_runtime.cpp — V8 embedding
