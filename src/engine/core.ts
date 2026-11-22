@@ -69,7 +69,8 @@ import { build } from './candela';
 export async function openRenderPreset(content: Record<string, string>, id: string, o: HeadlessOptions) {
   const p = loadPresets(content).find(q => q.id === id);
   if (!p) return { ok: false, error: `no preset ${id}` };
-  return openRender(p.files, o);
+  // a still without a time renders at the preset's start time, as the workbench's render jobs do
+  return openRender(p.files, o.time == null ? Object.assign({}, o, { time: (p as any).time || 0 }) : o);
 }
 
 /** the CUDA program of every preset (or `ids`), for the NVRTC sweep: { id, ok, error?, source?, hash, lines, … } */

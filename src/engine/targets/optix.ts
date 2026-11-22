@@ -13,25 +13,39 @@
 //     translated hitObj, which applies the object's transform and motion poses itself;
 //   - unbounded objects (infinite planes) stay in the shim's loop, as in traceAll.
 //
-// Moving meshes are rendered at the frame time (their motion base is cleared in the copy of O); OptiX motion
-// transforms restore their blur in phase 6.
+// Moving meshes: their instance points at an SRT motion transform whose keys are the kernel's motion poses P_k
+// (quaternion, translation, uniform scale, K keys evenly over the shutter τ ∈ [0, 1]), above a static transform M_c
+// (the matrix at the frame time): world = P(τ)·M_c·object, as xfP computes it. OptiX interpolates SRT keys the way
+// poseQ/poseT do (component-wise, quaternion normalised); keys are sign-aligned so each step takes the short way.
+// Meshes are built once (optixMeshes); instances, motion and AABBs change from frame to frame (optixFrame).
 import { blasOf } from '../mesh';
 
 export interface OptixMesh { vertices: Float32Array; count: number; triBase: number }
-export interface OptixScene {
-  /** pack's object records with the motion base of mesh objects cleared */
+/** the frame-dependent part: instances, motion transforms, analytic AABBs */
+export interface OptixFrame {
+  /** pack's object records (motion base cleared for moving meshes only when motion transforms are off) */
   O: Float32Array;
-  meshes: OptixMesh[];
-  /** per mesh object, 16 floats: [mesh index, object index in O, visibility mask, 0, object→world 3×4 row-major] */
+  /** per mesh object, 16 floats: [mesh index, object index in O, visibility mask, motion slot + 1 (0: static),
+   *  object→world 3×4 row-major at the frame time] */
   instances: Float32Array;
+  /** per moving mesh object (motion slot), 12 + 16·motionKeys floats: world→object 3×4 at the frame time, then one
+   *  OptixSRTData (sx a b pvx sy c pvy sz pvz qx qy qz qw tx ty tz) per key */
+  srt: Float32Array;
+  motionKeys: number;
   /** per bounded analytic object, 6 floats: world AABB min, max */
   aabbs: Float32Array;
   /** the object index in O of each AABB */
   aabbObjects: Int32Array;
   nBounded: number;
   nObjects: number;
-  /** mesh objects whose motion blur is not rendered (phase 3) */
+  movingMeshes: number;
+  /** moving meshes rendered without blur (motion transforms off) */
   stilledMeshes: number;
+}
+export interface OptixScene extends OptixFrame {
+  meshes: OptixMesh[];
+  /** the pipeline needs motion support (motion blur on and meshes that can move) */
+  motion: boolean;
 }
 
 const MASK_CAMERA = 1, MASK_SHADOW = 2;
@@ -54,25 +68,59 @@ function verticesOf(def: any): Float32Array {
   return v;
 }
 
-export function optixScene(compiled: any, P: any): OptixScene {
-  const objs = compiled.objects as any[];
+/** mesh definitions in a stable order (by first use in compiled.objects), so indices hold from frame to frame */
+const meshTables = new WeakMap<object, { index: Map<object, number>; defs: any[] }>();
+function meshTable(compiled: any) {
+  let t = meshTables.get(compiled);
+  if (!t) {
+    t = { index: new Map(), defs: [] };
+    for (const o of compiled.objects as any[]) if (o.ty === 13 && !t.index.has(o.def)) { t.index.set(o.def, t.defs.length); t.defs.push(o.def); }
+    meshTables.set(compiled, t);
+  }
+  return t;
+}
+
+/** the GAS inputs, built once per scene: every mesh definition, with the base row of its triangle records */
+export function optixMeshes(compiled: any, P: any): OptixMesh[] {
+  const t = meshTable(compiled), objs = compiled.objects as any[];
+  const base = new Map<object, number>();
+  for (let k = 0; k < P.nObjs; k++) { const o = objs[P.order[k]]; if (o.ty === 13 && !base.has(o.def)) base.set(o.def, P.O[k * 24 + 17]); }
+  return t.defs.map(def => { const vertices = verticesOf(def); return { vertices, count: vertices.length / 9, triBase: base.get(def) ?? 0 }; });
+}
+
+/** motion keys of the kernel's poses at scene-data row mb, as OptixSRTData records, quaternions sign-aligned */
+function srtKeys(SD: Float32Array, mb: number, K: number, out: number[]) {
+  let px = 0, py = 0, pz = 0, pw = 1;
+  for (let j = 0; j < K; j++) {
+    const q = (mb + 2 * j) * 4, t = q + 4;
+    let qx = SD[q], qy = SD[q + 1], qz = SD[q + 2], qw = SD[q + 3];
+    if (j > 0 && px * qx + py * qy + pz * qz + pw * qw < 0) { qx = -qx; qy = -qy; qz = -qz; qw = -qw; }
+    px = qx; py = qy; pz = qz; pw = qw;
+    const sc = SD[t + 3];
+    out.push(sc, 0, 0, 0, sc, 0, 0, sc, 0, qx, qy, qz, qw, SD[t], SD[t + 1], SD[t + 2]);
+  }
+}
+
+/** the frame-dependent OptiX inputs from one pack (SD: static head + dynamic tail, as uploaded) */
+export function optixFrame(compiled: any, P: any, SD: Float32Array, o: { motion: boolean }): OptixFrame {
+  const objs = compiled.objects as any[], t = meshTable(compiled);
   const O = P.O.slice();
-  const meshIndex = new Map<object, number>();
-  const meshes: OptixMesh[] = [];
-  const inst: number[] = [], aabbs: number[] = [], aabbObjects: number[] = [];
-  let stilled = 0;
+  const K = Math.max(0, Math.round(P.U[24 * 4 + 1] || 0));
+  const inst: number[] = [], srt: number[] = [], aabbs: number[] = [], aabbObjects: number[] = [];
+  let stilled = 0, moving = 0;
   for (let k = 0; k < P.nObjs; k++) {
-    const oi = P.order[k], o = objs[oi];
-    if (o.ty === 13) {
-      let mi = meshIndex.get(o.def);
-      if (mi === undefined) {
-        const vertices = verticesOf(o.def);
-        mi = meshes.length; meshIndex.set(o.def, mi);
-        meshes.push({ vertices, count: vertices.length / 9, triBase: O[k * 24 + 17] });
+    const oi = P.order[k], ob = objs[oi];
+    if (ob.ty === 13) {
+      const mi = t.index.get(ob.def)!;
+      let slot = 0;
+      const mb = O[k * 24 + 22] - 1;
+      if (mb >= 0) {
+        moving++;
+        if (o.motion && K >= 2) { slot = moving; for (let j = 0; j < 12; j++) srt.push(O[k * 24 + 4 + j]); srtKeys(SD, mb, K, srt); }
+        else { O[k * 24 + 22] = 0; stilled++; }
       }
-      if (O[k * 24 + 22] > 0) { O[k * 24 + 22] = 0; stilled++; }
-      const mask = (o.flags & 1) ? MASK_CAMERA : MASK_CAMERA | MASK_SHADOW;
-      inst.push(mi, k, mask, 0, ...P.mats[oi]);
+      const mask = (ob.flags & 1) ? MASK_CAMERA : MASK_CAMERA | MASK_SHADOW;
+      inst.push(mi, k, mask, slot, ...P.mats[oi]);
     } else if (k < P.nBounded) {
       const b = P.boxes.subarray(k * 6, k * 6 + 6);
       // pad by a relative epsilon: the box is computed in double precision, the intersection in float
@@ -81,8 +129,16 @@ export function optixScene(compiled: any, P: any): OptixScene {
       aabbObjects.push(k);
     }
   }
+  // slots were numbered by moving meshes; renumber densely over those with transforms
+  let n = 0; for (let r = 0; r < inst.length; r += 16) if (inst[r + 3] > 0) inst[r + 3] = ++n;
   return {
-    O, meshes, instances: new Float32Array(inst), aabbs: new Float32Array(aabbs), aabbObjects: new Int32Array(aabbObjects),
-    nBounded: P.nBounded, nObjects: P.nObjs, stilledMeshes: stilled,
+    O, instances: new Float32Array(inst), srt: new Float32Array(srt), motionKeys: K, aabbs: new Float32Array(aabbs), aabbObjects: new Int32Array(aabbObjects),
+    nBounded: P.nBounded, nObjects: P.nObjs, movingMeshes: moving, stilledMeshes: stilled,
   };
+}
+
+/** everything the OptiX target needs for the first frame; `motion`: build the pipeline with motion transforms */
+export function optixScene(compiled: any, P: any, SD: Float32Array, o: { motion: boolean }): OptixScene {
+  const meshes = optixMeshes(compiled, P);
+  return { meshes, motion: o.motion, ...optixFrame(compiled, P, SD, o) };
 }

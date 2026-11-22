@@ -26,9 +26,10 @@ if(NOT EXISTS "${OptiX_INSTALL_DIR}/include/optix.h")
   message(FATAL_ERROR "OptiX SDK not found at ${OptiX_INSTALL_DIR}: pass -DOptiX_INSTALL_DIR=<sdk root>")
 endif()
 
-add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp src/optix_renderer.cpp)
+find_package(ZLIB REQUIRED)
+add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp src/optix_renderer.cpp src/post.cpp src/image_io.cpp)
 target_include_directories(candela-rt PRIVATE ${V8_INCLUDE_DIR} ${OptiX_INSTALL_DIR}/include src)
-target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc pthread ${CMAKE_DL_LIBS})
+target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc ZLIB::ZLIB pthread ${CMAKE_DL_LIBS})
 # NVRTC needs the OptiX device headers to compile a scene's OptiX program
 target_compile_definitions(candela-rt PRIVATE CANDELA_OPTIX_INCLUDE_DIR="${OptiX_INSTALL_DIR}/include" CANDELA_CUDA_INCLUDE_DIR="${CUDAToolkit_INCLUDE_DIRS}")
 # where NVRTC finds candela_wgsl.h and the target headers when --kernels is not given

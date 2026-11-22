@@ -7,6 +7,7 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <cstring>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -48,6 +49,12 @@ class JsRuntime {
   v8::Local<v8::Value> fromJSON(const std::string& json) const;
 
   // zero-copy view of a typed array's bytes (valid while the array is alive)
+  /** a new Float32Array holding a copy of data */
+  v8::Local<v8::Float32Array> floats(const float* data, size_t n) const {
+    auto ab = v8::ArrayBuffer::New(iso_, n * sizeof(float));
+    if (n) std::memcpy(ab->GetBackingStore()->Data(), data, n * sizeof(float));
+    return v8::Float32Array::New(ab, 0, n);
+  }
   template <class T> std::span<const T> view(v8::Local<v8::Value> v) const {
     auto a = v.As<v8::ArrayBufferView>();
     auto* base = static_cast<const uint8_t*>(a->Buffer()->GetBackingStore()->Data());

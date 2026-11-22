@@ -32,6 +32,8 @@
 #include "cuda_runner.h"
 #include "optix_renderer.h"
 #include "js_runtime.h"
+#include "image_io.h"
+#include "post.h"
 
 namespace fs = std::filesystem;
 
@@ -278,20 +280,39 @@ static int cmdCudaSweep(int argc, char** argv) {
   return ok == (int)jobsV.size() ? 0 : 2;
 }
 
-static void writePFM(const fs::path& f, int w, int h, const std::vector<float>& accum) {
-  std::ofstream o(f, std::ios::binary);
-  o << "PF\n" << w << " " << h << "\n-1.0\n";
-  std::vector<float> row(size_t(w) * 3);
-  for (int y = h - 1; y >= 0; y--) {
-    for (int x = 0; x < w; x++) {
-      const float* a = &accum[(size_t(y) * w + x) * 4];
-      const float n = a[3] != 0.f ? a[3] : 1.f;
-      row[x * 3] = a[0] / n; row[x * 3 + 1] = a[1] / n; row[x * 3 + 2] = a[2] / n;
-    }
-    o.write(reinterpret_cast<const char*>(row.data()), (std::streamsize)(row.size() * 4));
-  }
+static bool hasFlag(int argc, char** argv, const char* name) { for (int i = 1; i < argc; i++) if (std::string(argv[i]) == name) return true; return false; }
+static std::vector<std::string> args(int argc, char** argv, const char* name) {
+  std::vector<std::string> v;
+  for (int i = 1; i + 1 < argc; i++) if (std::string(argv[i]) == name) v.push_back(argv[i + 1]);
+  return v;
 }
+static std::string jsonString(const std::string& s) {
+  std::string o = "\"";
+  for (char c : s) { if (c == '"' || c == '\\') o += '\\'; if ((unsigned char)c < 0x20) { char b[8]; snprintf(b, sizeof b, "\\u%04x", c); o += b; } else o += c; }
+  return o + "\"";
+}
+// --param id=value: numbers, true/false, JSON arrays/objects as such; anything else is a string (choice params)
+static std::string paramsJSON(int argc, char** argv) {
+  std::string o = "{";
+  for (const auto& kv : args(argc, argv, "--param")) {
+    const size_t eq = kv.find('=');
+    if (eq == std::string::npos) throw std::runtime_error("--param wants id=value, got " + kv);
+    const std::string k = kv.substr(0, eq), v = kv.substr(eq + 1);
+    char* end = nullptr;
+    strtod(v.c_str(), &end);
+    const bool num = !v.empty() && end && *end == 0;
+    const bool lit = v == "true" || v == "false" || (!v.empty() && (v[0] == '[' || v[0] == '{'));
+    o += (o.size() > 1 ? "," : "") + jsonString(k) + ":" + (num || lit ? v : jsonString(v));
+  }
+  return o + "}";
+}
+static std::string pad4(int n) { char b[16]; snprintf(b, sizeof b, "%04d", n); return b; }
+static std::string msText(bool hit, double ms) { return hit ? "cached" : std::to_string((int)ms) + " ms"; }
 
+// render: a still or a sequence of one preset, through either target. Each frame: seek (behaviours step by 1/fps),
+// repack, upload, accumulate `spp` samples, then the requested outputs — PFM (linear, for parity), PNG and MP4 (the
+// display program: the workbench's denoise, exposure, tone map), EXR (beauty × exposure, albedo, normal, Z, ids).
+// The exposure is metered on the first frame and held, as the workbench's render queue does (output.ts runRender).
 static int cmdRender(int argc, char** argv) {
   if (argc < 3 || argv[2][0] == '-') { fprintf(stderr, "usage: candela-rt render <preset id> [options]\n"); return 1; }
   const std::string id = argv[2];
@@ -299,14 +320,32 @@ static int cmdRender(int argc, char** argv) {
   const std::string content = arg(argc, argv, "--content", "content");
   const std::string size = arg(argc, argv, "--size", "640x360");
   const int sppTarget = std::stoi(arg(argc, argv, "--spp", "64"));
-  const double time = std::stod(arg(argc, argv, "--time", "0"));
-  const fs::path outDir = arg(argc, argv, "--out", "build/parity");
   const std::string requested = arg(argc, argv, "--backend", "auto");
   if (requested != "cuda" && requested != "optix" && requested != "auto") { fprintf(stderr, "--backend auto|cuda|optix\n"); return 1; }
   const std::string kdir = kernelsDir(argc, argv);
-  const int w = std::stoi(size.substr(0, size.find('x'))), h = std::stoi(size.substr(size.find('x') + 1));
-  bool aov = false, noMotion = false;
-  for (int i = 1; i < argc; i++) { if (std::string(argv[i]) == "--aov") aov = true; if (std::string(argv[i]) == "--no-motion-blur") noMotion = true; }
+  int w = std::stoi(size.substr(0, size.find('x'))), h = std::stoi(size.substr(size.find('x') + 1));
+  const bool aov = hasFlag(argc, argv, "--aov"), noMotion = hasFlag(argc, argv, "--no-motion-blur");
+  // outputs
+  const std::string formats = arg(argc, argv, "--format", "pfm");
+  auto want = [&](const char* f) { return ("," + formats + ",").find(std::string(",") + f + ",") != std::string::npos; };
+  const bool wPfm = want("pfm"), wPng = want("png"), wExr = want("exr"), wMp4 = want("mp4");
+  if (!wPfm && !wPng && !wExr && !wMp4) { fprintf(stderr, "--format: a comma list of pfm, png, exr, mp4\n"); return 1; }
+  const bool parityOnly = wPfm && !wPng && !wExr && !wMp4;
+  if (wMp4) { w -= w % 2; h -= h % 2; }   // 4:2:0 video wants even dimensions
+  // time: a still at --time, or a sequence from --start to --end at --fps (end inclusive, as the workbench's jobs)
+  const bool sequence = hasFlag(argc, argv, "--sequence") || !args(argc, argv, "--end").empty() || !args(argc, argv, "--frames").empty();
+  const double fps = std::stod(arg(argc, argv, "--fps", "24"));
+  // a still without --time: the preset's start time (resolved by the engine); `start` is then reported as -1
+  const bool timeGiven = sequence || !args(argc, argv, "--time").empty();
+  const double start = std::stod(arg(argc, argv, sequence ? "--start" : "--time", timeGiven ? "0" : "-1"));
+  const double end = std::stod(arg(argc, argv, "--end", std::to_string(start + 1).c_str()));
+  const int frames = sequence ? (args(argc, argv, "--frames").empty() ? std::max(1, (int)std::lround((end - start) * fps) + 1) : std::stoi(arg(argc, argv, "--frames", "1"))) : 1;
+  if (wMp4 && !sequence) { fprintf(stderr, "--format mp4 needs a sequence (--end or --frames)\n"); return 1; }
+  const int seed = std::stoi(arg(argc, argv, "--seed", parityOnly ? "0" : "1"));
+  const bool fixedSeed = hasFlag(argc, argv, "--fixed-seed");
+  const int firstFrame = std::stoi(arg(argc, argv, "--first-frame", "1"));
+  const char* home = getenv("HOME");
+  const fs::path outDir = arg(argc, argv, "--out", parityOnly ? "build/parity" : (std::string(home ? home : ".") + "/data/pbr-spark/renders/" + id).c_str());
   fs::create_directories(outDir);
 
   crt::CudaContext cuda;
@@ -319,62 +358,129 @@ static int cmdRender(int argc, char** argv) {
   size_t nFiles = 0, nBytes = 0;
   auto contentObj = readContent(rt, content, &nFiles, &nBytes);
   const auto t0 = std::chrono::steady_clock::now();
-  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + ",\"time\":" + std::to_string(time) + ",\"target\":\"" + requested + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + "}");
+  auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + (timeGiven ? ",\"time\":" + std::to_string(start) : std::string()) + ",\"seed\":" + std::to_string(seed) +
+                          ",\"target\":\"" + requested + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + ",\"params\":" + paramsJSON(argc, argv) + "}");
   auto hr = rt.call("Candela", "openRenderPreset", {contentObj, rt.str(id), opts});
   if (!rt.get(hr, "ok")->IsTrue()) { fprintf(stderr, "%s: %s\n", id.c_str(), rt.toStdString(rt.get(hr, "error")).c_str()); return 2; }
   auto H = hr.As<v8::Object>();
   // the engine resolves 'auto': OptiX for meshes or many objects, plain CUDA otherwise (src/engine/headless.ts)
   const std::string backend = rt.toStdString(rt.get(H, "target"));
   const bool optix = backend == "optix";
+  const std::string stem = arg(argc, argv, "--name", parityOnly ? (id + "." + backend).c_str() : id.c_str());
   const double buildMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
   auto prog = rt.get(H, "cuda");
-  const std::string source = rt.toStdString(rt.get(prog, "source")), hash = rt.toStdString(rt.get(prog, "hash"));
   bool hit = false;
-  auto comp = compileCached(source, hash, id + ".cu", kdir, cuda.arch(), cacheDir(argc, argv), &hit, optix);
+  auto comp = compileCached(rt.toStdString(rt.get(prog, "source")), rt.toStdString(rt.get(prog, "hash")), id + ".cu", kdir, cuda.arch(), cacheDir(argc, argv), &hit, optix);
   if (!comp.ok) { fprintf(stderr, "%s: NVRTC failed:\n%s\n", id.c_str(), comp.log.c_str()); return 2; }
-  std::unique_ptr<crt::CudaRenderer> RC;
-  std::unique_ptr<crt::OptixRenderer> RO;
+  const bool display = wPng || wMp4;
+  std::unique_ptr<crt::PostProcessor> post;
+  bool postHit = false;
+  double postMs = 0;
+  if (display) {
+    auto pp = rt.get(H, "post");
+    auto pc = compileCached(rt.toStdString(rt.get(pp, "source")), rt.toStdString(rt.get(pp, "hash")), id + ".post.cu", kdir, cuda.arch(), cacheDir(argc, argv), &postHit, false);
+    if (!pc.ok) { fprintf(stderr, "%s: NVRTC failed on the display program:\n%s\n", id.c_str(), pc.log.c_str()); return 2; }
+    postMs = pc.ms;
+    post = std::make_unique<crt::PostProcessor>(pc.cubin, w, h);
+  }
+  std::unique_ptr<crt::Renderer> R;
+  crt::OptixRenderer* RO = nullptr;
+  auto X = rt.get(H, "optix");
   if (optix) {
-    RO = std::make_unique<crt::OptixRenderer>(cuda.ctx(), comp.cubin, w, h);
-    auto X = rt.get(H, "optix");
+    auto ro = std::make_unique<crt::OptixRenderer>(cuda.ctx(), comp.cubin, w, h, rt.get(X, "motion")->IsTrue());
+    RO = ro.get();
     std::vector<crt::OptixMeshInput> meshes;
     auto ma = rt.get(X, "meshes").As<v8::Array>();
     for (uint32_t i = 0; i < ma->Length(); i++) {
       auto m = ma->Get(rt.context(), i).ToLocalChecked();
       meshes.push_back({rt.view<float>(rt.get(m, "vertices")), (unsigned)rt.get(m, "count").As<v8::Number>()->Value()});
     }
-    RO->buildScene(meshes, rt.view<float>(rt.get(X, "instances")), rt.view<float>(rt.get(X, "aabbs")), rt.view<int>(rt.get(X, "aabbObjects")));
-    RO->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+    RO->buildMeshes(meshes);
+    R = std::move(ro);
   } else {
-    RC = std::make_unique<crt::CudaRenderer>(comp.cubin, w, h);
-    RC->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+    R = std::make_unique<crt::CudaRenderer>(comp.cubin, w, h);
   }
-  const auto t1 = std::chrono::steady_clock::now();
+  auto num = [&](v8::Local<v8::Value> o, const char* k) { return rt.get(o, k).As<v8::Number>()->Value(); };
+  double lastVersion = -1;
+  auto sync = [&]() {   // upload what the last seek changed
+    const double v = num(H, "version");
+    if (v == lastVersion) return;
+    lastVersion = v;
+    if (RO) RO->setFrame(rt.view<float>(rt.get(X, "instances")), rt.view<float>(rt.get(X, "srt")), (int)num(X, "motionKeys"), rt.view<float>(rt.get(X, "aabbs")), rt.view<int>(rt.get(X, "aabbObjects")));
+    R->upload(rt.view<float>(rt.get(H, "O")), rt.view<float>(rt.get(H, "LI")), rt.view<float>(rt.get(H, "BV")), rt.view<float>(rt.get(H, "SD")));
+  };
+  std::unique_ptr<crt::VideoWriter> video;
+  if (wMp4) video = std::make_unique<crt::VideoWriter>(outDir / (stem + ".mp4"), w, h, fps, arg(argc, argv, "--codec", "h264"), arg(argc, argv, "--quality", "high"));
+
   int launches = 0;
-  double jsMs = 0;
-  while (rt.get(H, "spp").As<v8::Number>()->Value() < sppTarget) {
+  double jsMs = 0, renderMs = 0, outMs = 0, asMs = 0, ev = 0;
+  std::vector<double> frameMs;
+  const auto tJob = std::chrono::steady_clock::now();
+  for (int f = 0; f < frames; f++) {
     v8::HandleScope fs_(rt.isolate());
-    const auto a = std::chrono::steady_clock::now();
-    auto U = rt.callMethod(H, "frame", {});
-    jsMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - a).count();
-    if (optix) RO->launch(rt.view<float>(U)); else RC->launch(rt.view<float>(U));
-    launches++;
+    const double t = sequence ? start + f / fps : num(H, "time");
+    const auto ta = std::chrono::steady_clock::now();
+    if (f > 0) rt.callMethod(H, "seek", {v8::Number::New(rt.isolate(), t), v8::Number::New(rt.isolate(), 1.0 / fps), v8::Number::New(rt.isolate(), seed + (fixedSeed ? 0 : f))});
+    sync();
+    if (RO) asMs += RO->frameBuildMs();
+    while (num(H, "spp") < sppTarget) {
+      v8::HandleScope ls(rt.isolate());
+      const auto a = std::chrono::steady_clock::now();
+      auto U = rt.callMethod(H, "frame", {});
+      jsMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - a).count();
+      R->launch(rt.view<float>(U));
+      launches++;
+    }
+    R->sync();
+    const auto tb = std::chrono::steady_clock::now();
+    renderMs += std::chrono::duration<double, std::milli>(tb - ta).count();
+    const std::string fstem = sequence ? stem + "." + pad4(f + firstFrame) : stem;
+    std::vector<float> acc;
+    if (wPfm || wExr || (f == 0 && (display || wExr))) acc = R->readAccum();
+    if (f == 0 && (display || wExr)) ev = rt.callMethod(H, "meter", {rt.floats(acc.data(), acc.size())}).As<v8::Number>()->Value();
+    if (wPfm) {
+      crt::writePFM(outDir / (fstem + ".pfm"), w, h, acc);
+      if (aov) crt::writePFM(outDir / (fstem + ".albedo.pfm"), w, h, R->readAlbedo());
+    }
+    if (display) {
+      auto d = rt.callMethod(H, "display", {});
+      post->run(rt.view<float>(rt.get(d, "D")), (int)num(d, "steps"), (float)num(d, "sigma"), R->accumBuffer(), R->albedoBuffer(), R->normalBuffer());
+      auto rgba = post->readRGBA8();
+      if (wPng) crt::writePNG(outDir / (fstem + ".png"), w, h, rgba);
+      if (video) video->add(rgba);
+    }
+    if (wExr) {
+      auto alb = R->readAlbedo(), nrm = R->readNormal();
+      // the id pass overwrites the accumulation buffer: last
+      auto U = rt.callMethod(H, "idUniforms", {});
+      R->launch(rt.view<float>(U));
+      auto ids = R->readAccum();
+      auto bytes = rt.callMethod(H, "exr", {rt.floats(acc.data(), acc.size()), rt.floats(alb.data(), alb.size()), rt.floats(nrm.data(), nrm.size()), rt.floats(ids.data(), ids.size())});
+      auto view = rt.view<uint8_t>(bytes);
+      crt::writeFile(outDir / (fstem + ".exr"), view.data(), view.size());
+    }
+    const auto tc = std::chrono::steady_clock::now();
+    outMs += std::chrono::duration<double, std::milli>(tc - tb).count();
+    frameMs.push_back(std::chrono::duration<double, std::milli>(tc - ta).count());
+    if (sequence) printf("  frame %d/%d  t=%.4f  %.0f ms\n", f + 1, frames, t, frameMs.back()), fflush(stdout);
   }
-  auto acc = optix ? RO->readAccum() : RC->readAccum();
-  const double renderMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t1).count();
-  const int spp = (int)rt.get(H, "spp").As<v8::Number>()->Value();
-  const fs::path base = outDir / (id + "." + backend);
-  writePFM(base.string() + ".pfm", w, h, acc);
-  if (aov) writePFM(base.string() + ".albedo.pfm", w, h, optix ? RO->readAlbedo() : RC->readAlbedo());
-  const int regs = optix ? 0 : RC->registers(), local = optix ? 0 : RC->localBytes();
-  std::ofstream(base.string() + ".json") << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0) << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << time
-      << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
-      << ",\"renderMs\":" << renderMs << ",\"jsMs\":" << jsMs << ",\"registers\":" << regs << ",\"localBytes\":" << local
-      << ",\"sppPerSec\":" << spp * double(w) * h / (renderMs / 1000) << "}\n";
-  if (optix) printf("%s optix: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, pipeline %.0f ms, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms) → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
-         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), RO->pipelineMs(), RO->buildMs(), RO->gasBytes() / 1024.0, renderMs, jsMs, base.string().c_str());
-  else printf("%s cuda/nvrtc: %dx%d %d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), %d regs, %d B local → %s.pfm\n", id.c_str(), w, h, spp, launches, buildMs,
-         hit ? "cached" : (std::to_string((int)comp.ms) + " ms").c_str(), renderMs, jsMs, regs, local, base.string().c_str());
+  if (video) video->finish();
+  const double jobMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tJob).count();
+  const int spp = (int)num(H, "spp");
+  const int regs = optix ? 0 : static_cast<crt::CudaRenderer*>(R.get())->registers(), local = optix ? 0 : static_cast<crt::CudaRenderer*>(R.get())->localBytes();
+  std::ostringstream fm;
+  for (size_t i = 0; i < frameMs.size(); i++) fm << (i ? "," : "") << frameMs[i];
+  std::ofstream(outDir / (stem + ".json")) << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"formats\":" << jsonString(formats) << ",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0)
+      << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"motion\":" << (optix && RO->motion() ? "true" : "false") << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << (sequence ? start : num(H, "time"))
+      << ",\"frames\":" << frames << ",\"fps\":" << fps << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
+      << ",\"renderMs\":" << renderMs << ",\"outputMs\":" << outMs << ",\"jobMs\":" << jobMs << ",\"jsMs\":" << jsMs << ",\"ev\":" << ev << ",\"registers\":" << regs << ",\"localBytes\":" << local
+      << ",\"sppPerSec\":" << spp * double(w) * h * frames / (renderMs / 1000) << ",\"frameMs\":[" << fm.str() << "]}\n";
+  const std::string what = sequence ? std::to_string(frames) + " frames, " : "";
+  if (optix) printf("%s optix%s: %dx%d %s%d spp in %d launches; build %.0f ms, nvrtc %s, pipeline %.0f ms, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms), output %.0f ms → %s\n", id.c_str(), RO->motion() ? " +motion" : "", w, h, what.c_str(), spp, launches, buildMs,
+         msText(hit, comp.ms).c_str(), RO->pipelineMs(), sequence ? asMs : RO->buildMs(), RO->gasBytes() / 1024.0, renderMs, jsMs, outMs, (outDir / stem).string().c_str());
+  else printf("%s cuda/nvrtc: %dx%d %s%d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), output %.0f ms, %d regs, %d B local → %s\n", id.c_str(), w, h, what.c_str(), spp, launches, buildMs,
+         msText(hit, comp.ms).c_str(), renderMs, jsMs, outMs, regs, local, (outDir / stem).string().c_str());
+  if (display && !postHit) printf("  display program: nvrtc %.0f ms\n", postMs);
   return 0;
 }
 
@@ -383,7 +489,9 @@ int main(int argc, char** argv) {
     fprintf(stderr, "usage: candela-rt digest  [--bundle f] [--content dir] [--ids a,b] [--times 0,0.37] [--json out]\n"
                     "       candela-rt session [--bundle f] [--content dir] [--ids a,b] [--frames 48] [--fps 24] [--json out]\n"
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
-                    "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--out dir] [--aov] [--no-motion-blur]\n");
+                    "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--param id=value]… [--seed n]\n"
+                    "                 [--format pfm,png,exr,mp4] [--sequence --start s --end s | --frames n] [--fps 24] [--fixed-seed]\n"
+                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n");
     return 1;
   }
   crt::JsRuntime::initProcess(argv[0]);

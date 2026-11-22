@@ -19,7 +19,8 @@ __device__ TraceR traceAll(vec3f ro, vec3f rd, f32 tmax, bool shadow) {
   unsigned p0 = __float_as_uint(r.t), p1 = ~0u, p2 = ~0u, p3 = 0u, p4 = 0u;
   unsigned p5 = __float_as_uint(gTau), p6 = __float_as_uint(gTime), p7 = shadow ? 1u : 0u;
   optixTrace(params.ias, make_float3(ro.x, ro.y, ro.z), make_float3(rd.x, rd.y, rd.z),
-             EPS, r.t, 0.0f,                                   // tmin = EPS: hitMesh ignores hits closer than EPS
+             EPS, r.t,                                         // tmin = EPS: hitMesh ignores hits closer than EPS
+             fminf(fmaxf(gTau, 0.0f), 1.0f),                   // ray time = shutter τ (moving meshes' SRT keys span [0, 1])
              shadow ? CANDELA_MASK_SHADOW : (CANDELA_MASK_CAMERA | CANDELA_MASK_SHADOW),
              shadow ? OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT : OPTIX_RAY_FLAG_NONE,
              0, 1, 0, p0, p1, p2, p3, p4, p5, p6, p7);

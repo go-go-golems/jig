@@ -39,7 +39,8 @@ struct Empty {};
 
 static char logBuf[8192];
 
-OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int width, int height) : w_(width), h_(height) {
+OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int width, int height, bool motion) : motion_(motion) {
+  w_ = width; h_ = height;
   logBuf[0] = 0;
   OX(optixInit());
   OptixDeviceContextOptions co = {};
@@ -57,8 +58,9 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   if (const char* e = getenv("CANDELA_OPTIX_MAXREG")) mco.maxRegisterCount = atoi(e);
   mco.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
   OptixPipelineCompileOptions pco = {};
-  pco.usesMotionBlur = 0;
-  pco.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
+  // moving meshes: IAS → SRT motion transform → static transform → GAS, a graph of depth 4
+  pco.usesMotionBlur = motion_ ? 1 : 0;
+  pco.traversableGraphFlags = motion_ ? OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY : OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
   pco.numPayloadValues = 8;
   pco.numAttributeValues = 2;
   pco.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
@@ -85,7 +87,7 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
   for (auto& g : pg_) OX(optixUtilAccumulateStackSizes(g, &ss, pipe_));
   unsigned dcT = 0, dcS = 0, css = 0;
   OX(optixUtilComputeStackSizes(&ss, 1, 0, 0, &dcT, &dcS, &css));
-  OX(optixPipelineSetStackSize(pipe_, dcT, dcS, css, 2));
+  OX(optixPipelineSetStackSize(pipe_, dcT, dcS, css, motion_ ? 4 : 2));
   pipelineMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tp).count();
 
   SbtRecord<Empty> rg, ms, hg[2];
@@ -105,7 +107,8 @@ OptixRenderer::OptixRenderer(CUcontext cuctx, const std::vector<char>& ir, int w
 }
 
 OptixRenderer::~OptixRenderer() {
-  for (CUdeviceptr p : asBuffers_) cuMemFree(p);
+  for (CUdeviceptr p : meshBuffers_) cuMemFree(p);
+  for (CUdeviceptr p : frameBuffers_) cuMemFree(p);
   for (CUdeviceptr p : {U_, O_, LI_, BV_, SD_, acc_, aovA_, aovN_, aabbObj_, params_, sbt_.raygenRecord, sbt_.missRecordBase, sbt_.hitgroupRecordBase}) if (p) cuMemFree(p);
   if (pipe_) optixPipelineDestroy(pipe_);
   for (auto g : pg_) if (g) optixProgramGroupDestroy(g);
@@ -121,7 +124,7 @@ void OptixRenderer::put(CUdeviceptr& p, size_t& cap, const void* data, size_t by
 }
 
 // build and compact one acceleration structure; its buffer is kept for the renderer's lifetime
-OptixTraversableHandle OptixRenderer::buildAS(const OptixBuildInput& in, unsigned flags, CUdeviceptr* outBuf) {
+OptixTraversableHandle OptixRenderer::buildAS(const OptixBuildInput& in, unsigned flags, std::vector<CUdeviceptr>& keep) {
   OptixAccelBuildOptions o = {};
   o.buildFlags = flags | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
   o.operation = OPTIX_BUILD_OPERATION_BUILD;
@@ -141,16 +144,16 @@ OptixTraversableHandle OptixRenderer::buildAS(const OptixBuildInput& in, unsigne
     cuMemFree(out); out = small;
   } else compacted = sz.outputSizeInBytes;
   gasBytes_ += compacted;
-  asBuffers_.push_back(out);
-  *outBuf = out;
+  keep.push_back(out);
   return h;
 }
 
-void OptixRenderer::buildScene(const std::vector<OptixMeshInput>& meshes, std::span<const float> instances, std::span<const float> aabbs, std::span<const int> aabbObjects) {
+void OptixRenderer::buildMeshes(const std::vector<OptixMeshInput>& meshes) {
   const auto t0 = std::chrono::steady_clock::now();
-  CUdeviceptr out;
+  for (CUdeviceptr p : meshBuffers_) cuMemFree(p);
+  meshBuffers_.clear(); gasBytes_ = 0;
   // one GAS per mesh: non-indexed triangles in record order, any-hit disabled (opaque)
-  std::vector<OptixTraversableHandle> gas(meshes.size(), 0);
+  gas_.assign(meshes.size(), 0);
   for (size_t m = 0; m < meshes.size(); m++) {
     if (!meshes[m].count) continue;
     CUdeviceptr vb = alloc(meshes[m].vertices.size_bytes());
@@ -161,21 +164,87 @@ void OptixRenderer::buildScene(const std::vector<OptixMeshInput>& meshes, std::s
     t.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3; t.vertexStrideInBytes = 12; t.numVertices = meshes[m].count * 3; t.vertexBuffers = &vb;
     unsigned flags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT};
     t.flags = flags; t.numSbtRecords = 1;
-    gas[m] = buildAS(bi, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, &out);
+    gas_[m] = buildAS(bi, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, meshBuffers_);
     cuMemFree(vb);
   }
+  meshBytes_ = gasBytes_;
+  meshMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  buildMs_ = meshMs_;
+}
+
+// device layout of one moving instance's transforms: a static transform (frame-time matrix) and, after it, an SRT
+// motion transform with `keys` keys whose child is the static transform; both 64-byte aligned
+static size_t align64(size_t b) { return (b + OPTIX_TRANSFORM_BYTE_ALIGNMENT - 1) / OPTIX_TRANSFORM_BYTE_ALIGNMENT * OPTIX_TRANSFORM_BYTE_ALIGNMENT; }
+
+void OptixRenderer::setFrame(std::span<const float> instances, std::span<const float> srt, int keys, std::span<const float> aabbs, std::span<const int> aabbObjects) {
+  const auto t0 = std::chrono::steady_clock::now();
+  for (CUdeviceptr p : frameBuffers_) cuMemFree(p);
+  frameBuffers_.clear(); gasBytes_ = meshBytes_;
+  // motion transforms, one pair per motion slot
+  const size_t stBytes = align64(sizeof(OptixStaticTransform));
+  const size_t mtBytes = keys >= 2 ? align64(sizeof(OptixSRTMotionTransform) + size_t(keys - 2) * sizeof(OptixSRTData)) : 0;
+  const size_t slotFloats = keys >= 2 ? 12 + 16 * size_t(keys) : 0;
+  const size_t slots = slotFloats ? srt.size() / slotFloats : 0;
+  if (slots && !motion_) throw std::runtime_error("OptixRenderer: motion transforms in a pipeline built without motion");
+  std::vector<OptixTraversableHandle> mtHandle(slots + 1, 0);
+  if (slots) {
+    const size_t pair = stBytes + mtBytes;
+    std::vector<unsigned char> blob(pair * slots, 0);
+    CUdeviceptr tb = alloc(blob.size());
+    frameBuffers_.push_back(tb);
+    // the instance rows name each slot's mesh
+    std::vector<unsigned> slotMesh(slots + 1, 0);
+    for (size_t k = 0; k + 16 <= instances.size(); k += 16) { const unsigned sl = (unsigned)instances[k + 3]; if (sl && sl <= slots) slotMesh[sl] = (unsigned)instances[k]; }
+    for (size_t i = 0; i < slots; i++) {
+      const float* d = &srt[i * slotFloats];
+      const unsigned mesh = slotMesh[i + 1];
+      const CUdeviceptr stAddr = tb + i * pair, mtAddr = stAddr + stBytes;
+      auto* st = reinterpret_cast<OptixStaticTransform*>(&blob[i * pair]);
+      st->child = mesh < gas_.size() ? gas_[mesh] : 0;
+      // object→world (frame time) is the inverse of the world→object rows the engine sends; OptiX wants both
+      const float* m = d;   // world→object 3×4
+      float inv[12];
+      {
+        const double a = m[0], b = m[1], c = m[2], e = m[4], f = m[5], g = m[6], i2 = m[8], j = m[9], k2 = m[10];
+        const double det = a * (f * k2 - g * j) - b * (e * k2 - g * i2) + c * (e * j - f * i2);
+        const double r = det != 0 ? 1.0 / det : 0.0;
+        const double R[9] = {(f * k2 - g * j) * r, (c * j - b * k2) * r, (b * g - c * f) * r,
+                             (g * i2 - e * k2) * r, (a * k2 - c * i2) * r, (c * e - a * g) * r,
+                             (e * j - f * i2) * r, (b * i2 - a * j) * r, (a * f - b * e) * r};
+        const double tx = m[3], ty = m[7], tz = m[11];
+        for (int row = 0; row < 3; row++) {
+          inv[row * 4] = (float)R[row * 3]; inv[row * 4 + 1] = (float)R[row * 3 + 1]; inv[row * 4 + 2] = (float)R[row * 3 + 2];
+          inv[row * 4 + 3] = (float)-(R[row * 3] * tx + R[row * 3 + 1] * ty + R[row * 3 + 2] * tz);
+        }
+      }
+      std::memcpy(st->transform, inv, sizeof inv);
+      std::memcpy(st->invTransform, m, 12 * sizeof(float));
+      OptixTraversableHandle stH = 0;
+      OX(optixConvertPointerToTraversableHandle(ctx_, stAddr, OPTIX_TRAVERSABLE_TYPE_STATIC_TRANSFORM, &stH));
+      auto* mt = reinterpret_cast<OptixSRTMotionTransform*>(&blob[i * pair + stBytes]);
+      mt->child = stH;
+      mt->motionOptions.numKeys = (unsigned short)keys;
+      mt->motionOptions.flags = OPTIX_MOTION_FLAG_NONE;
+      mt->motionOptions.timeBegin = 0.0f;   // the kernel's shutter parameter τ: the ray time is gTau
+      mt->motionOptions.timeEnd = 1.0f;
+      std::memcpy(mt->srtData, d + 12, size_t(keys) * sizeof(OptixSRTData));
+      OX(optixConvertPointerToTraversableHandle(ctx_, mtAddr, OPTIX_TRAVERSABLE_TYPE_SRT_MOTION_TRANSFORM, &mtHandle[i + 1]));
+    }
+    CU_(cuMemcpyHtoD(tb, blob.data(), blob.size()));
+  }
   std::vector<OptixInstance> inst;
+  const float id[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
   for (size_t k = 0; k + 16 <= instances.size(); k += 16) {
     const float* r = &instances[k];
-    const unsigned mesh = (unsigned)r[0];
-    if (mesh >= gas.size() || !gas[mesh]) continue;
+    const unsigned mesh = (unsigned)r[0], slot = (unsigned)r[3];
+    if (mesh >= gas_.size() || !gas_[mesh]) continue;
     OptixInstance o = {};
-    std::memcpy(o.transform, r + 4, 12 * sizeof(float));
     o.instanceId = (unsigned)r[1];
     o.visibilityMask = (unsigned)r[2];
     o.sbtOffset = 0;
     o.flags = OPTIX_INSTANCE_FLAG_NONE;
-    o.traversableHandle = gas[mesh];
+    if (slot && slot <= slots) { std::memcpy(o.transform, id, sizeof id); o.traversableHandle = mtHandle[slot]; }
+    else { std::memcpy(o.transform, r + 4, 12 * sizeof(float)); o.traversableHandle = gas_[mesh]; }
     inst.push_back(o);
   }
   // analytic objects: one GAS of custom primitives in world space (hitObj applies each object's transform)
@@ -190,10 +259,9 @@ void OptixRenderer::buildScene(const std::vector<OptixMeshInput>& meshes, std::s
     c.aabbBuffers = &ab; c.numPrimitives = nA; c.strideInBytes = sizeof(OptixAabb);
     unsigned flags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT};
     c.flags = flags; c.numSbtRecords = 1;
-    OptixTraversableHandle h = buildAS(bi, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, &out);
+    OptixTraversableHandle h = buildAS(bi, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, frameBuffers_);
     cuMemFree(ab);
     OptixInstance o = {};
-    const float id[12] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0};
     std::memcpy(o.transform, id, sizeof id);
     o.instanceId = 0; o.visibilityMask = 3; o.sbtOffset = 1; o.flags = OPTIX_INSTANCE_FLAG_NONE; o.traversableHandle = h;
     inst.push_back(o);
@@ -205,11 +273,13 @@ void OptixRenderer::buildScene(const std::vector<OptixMeshInput>& meshes, std::s
     OptixBuildInput ii = {};
     ii.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     ii.instanceArray.instances = ib; ii.instanceArray.numInstances = (unsigned)inst.size();
-    ias_ = buildAS(ii, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, &out);
+    ias_ = buildAS(ii, OPTIX_BUILD_FLAG_PREFER_FAST_TRACE, frameBuffers_);
     cuMemFree(ib);
   }
   CU_(cuCtxSynchronize());
-  buildMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  frameMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  buildMs_ = meshMs_ + frameMs_;
+  meshMs_ = 0;   // later frames report only their own build
 }
 
 void OptixRenderer::upload(std::span<const float> O, std::span<const float> LI, std::span<const float> BV, std::span<const float> SD) {
@@ -224,8 +294,5 @@ void OptixRenderer::launch(std::span<const float> U) {
   logBuf[0] = 0;
   OX(optixLaunch(pipe_, 0, params_, sizeof p, &sbt_, (unsigned)w_, (unsigned)h_, 1));
 }
-void OptixRenderer::sync() { CU_(cuCtxSynchronize()); }
-std::vector<float> OptixRenderer::readAccum() { sync(); std::vector<float> v(size_t(w_) * h_ * 4); CU_(cuMemcpyDtoH(v.data(), acc_, v.size() * 4)); return v; }
-std::vector<float> OptixRenderer::readAlbedo() { sync(); std::vector<float> v(size_t(w_) * h_ * 4); CU_(cuMemcpyDtoH(v.data(), aovA_, v.size() * 4)); return v; }
 
 }  // namespace crt

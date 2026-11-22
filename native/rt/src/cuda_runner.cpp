@@ -77,7 +77,8 @@ std::string CudaContext::arch() const {
 }
 std::string CudaContext::deviceName() const { char n[256] = {0}; cuDeviceGetName(n, sizeof n, dev_); return n; }
 
-CudaRenderer::CudaRenderer(const std::vector<char>& cubin, int width, int height) : w_(width), h_(height) {
+CudaRenderer::CudaRenderer(const std::vector<char>& cubin, int width, int height) {
+  w_ = width; h_ = height;
   CU(cuModuleLoadData(&mod_, cubin.data()));
   CU(cuModuleGetFunction(&fn_, mod_, "candela_main"));
   size_t psize = 0;
@@ -112,8 +113,5 @@ void CudaRenderer::launch(std::span<const float> U) {
   CU(cuMemcpyHtoD(params_, p, sizeof p));
   CU(cuLaunchKernel(fn_, (w_ + 7) / 8, (h_ + 7) / 8, 1, 8, 8, 1, 0, nullptr, nullptr, nullptr));
 }
-void CudaRenderer::sync() { CU(cuCtxSynchronize()); }
-std::vector<float> CudaRenderer::readAccum() { sync(); std::vector<float> v(size_t(w_) * h_ * 4); CU(cuMemcpyDtoH(v.data(), acc_, v.size() * 4)); return v; }
-std::vector<float> CudaRenderer::readAlbedo() { sync(); std::vector<float> v(size_t(w_) * h_ * 4); CU(cuMemcpyDtoH(v.data(), aovA_, v.size() * 4)); return v; }
 
 }  // namespace crt

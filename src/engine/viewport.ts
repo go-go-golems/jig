@@ -1,7 +1,8 @@
 // viewport.js — drives a backend: compiles a scene's shaders, packs and uploads its data, accumulates samples,
 // meters the exposure, and answers screenshots and light-meter readings.
 import { posesAt, makePackEnv, frameUniforms } from './session';
-import { GPURenderer, GLRenderer, displaySource, TONEMAP_IX, type Backend } from './render';
+import { GPURenderer, GLRenderer, type Backend } from './render';
+import { displaySource, postSettings, displayUniforms, meterExposure, passesFromBuffers } from './display';
 import { U_BASE, vec3 as V } from './compile';
 import { Gen, genFunction, lift, E, node, withTracer, nodeOf, constNode, parseColor } from './fx';
 import { CandelaError } from './diag';
@@ -81,19 +82,8 @@ export class Viewport {
     this.compiled = compiled; this.engine = compiled.engine;
     const eng = compiled.engine;
     // post passes: tone map, denoise, bloom, false colour, vignette, grain, and user passes compiled from their kernels
-    const post = eng.post || [];
-    this.post = { tonemap: 'agx', denoise: !!eng.denoise, bloom: 0, falseColor: false, vignette: 0, grain: 0 };
-    const user: any[] = [];
-    for (const p of post) {
-      if (p.__pass === 'tonemap') this.post.tonemap = p.op;
-      else if (p.__pass === 'denoise') this.post.denoise = true;
-      else if (p.__pass === 'bloom') this.post.bloom = p.strength;
-      else if (p.__pass === 'falseColor') this.post.falseColor = true;
-      else if (p.__pass === 'vignette') this.post.vignette = p.strength;
-      else if (p.__pass === 'grain') this.post.grain = p.amount;
-      else if (p.__pass === 'custom') user.push(p);
-    }
-    this.userPasses = user.map((p, k) => compileUserPass(p, k));
+    const ps = postSettings(eng);
+    this.post = ps.post; this.userPasses = ps.userPasses;
     const disp = displaySource(this.userPasses);
     await this.backend.compile(compiled, disp);
     this.compileMs = performance.now() - t0;
@@ -158,45 +148,17 @@ export class Viewport {
   }
   show() {
     const b = this.backend, w = b.w, h = b.h, cam = this.cam || ({} as Record<string, any>);
-    const ev = this.exposureEV();
-    const D = new Float32Array(32 * 4);
-    D.set([w, h, Math.max(1, this.spp), 1 / (1.2 * Math.pow(2, ev))], 0);
     const view = { beauty: 0, albedo: 1, normal: 2, depth: 3 }[this.aov || 'beauty'] || 0;
-    D.set([TONEMAP_IX[this.tonemapOverride || this.post.tonemap] ?? 0, (this.falseColorOverride ?? this.post.falseColor) ? 1 : 0, view, 0], 4);
-    D.set([this.post.vignette || 0, this.post.grain || 0, this.post.bloom || 0, (this.frameN * 7.13) % 1], 8);
-    const tanH = Math.tan((cam.fov || 0.7) / 2); D.set([tanH, tanH * h / w, 0, 0], 12);
-    for (const p of this.userPasses) D.set(p.values(), (8 + p.slot * 4) * 4);
-    const den = (this.denoiseOverride ?? this.post.denoise) && view === 0 && this.spp < 512 ? { steps: this.spp < 64 ? 4 : this.spp < 192 ? 3 : 2, sigma: this.spp < 16 ? 1.2 : 0.6 } : null;
-    b.display(D, den);
+    const { D, denoise } = displayUniforms({ width: w, height: h, spp: this.spp, ev: this.exposureEV(), post: this.post, userPasses: this.userPasses, view, frameN: this.frameN, fov: cam.fov,
+      tonemap: this.tonemapOverride, falseColor: this.falseColorOverride, denoise: this.denoiseOverride });
+    b.display(D, denoise);
   }
   async meter() {
     this.metering = true;
     try {
       const f = await this.backend.readAccum(); const w = this.backend.w, h = this.backend.h;
-      // average luminance over blocks first (a log of noisy samples is biased low), then a centre-weighted log-average
-      const BX = 48, BY = 32, bw = w / BX, bh = h / BY; let s = 0, n = 0; const means: any[] = [];
-      for (let by = 0; by < BY; by++) for (let bx = 0; bx < BX; bx++) {
-        let sum = 0, cnt = 0;
-        const x0 = Math.floor(bx * bw), x1 = Math.max(x0 + 1, Math.floor((bx + 1) * bw)), y0 = Math.floor(by * bh), y1 = Math.max(y0 + 1, Math.floor((by + 1) * bh));
-        const sx = Math.max(1, (x1 - x0) >> 2), sy = Math.max(1, (y1 - y0) >> 2);
-        for (let y = y0; y < y1 && y < h; y += sy) for (let x = x0; x < x1 && x < w; x += sx) { const i = (y * w + x) * 4, c = f[i + 3] || 1; const L = (0.2126 * f[i] + 0.7152 * f[i + 1] + 0.0722 * f[i + 2]) / c; if (Number.isFinite(L)) { sum += L; cnt++; } }
-        if (!cnt) continue;
-        const cx = (bx + 0.5) / BX - 0.5, cy = (by + 0.5) / BY - 0.5, wgt = 1 + Math.exp(-(cx * cx + cy * cy) * 8);
-        means.push({ L: sum / cnt, wgt });
-      }
-      // blocks of empty void (no environment behind the scene) say nothing about exposure: leave out anything
-      // more than ~13 stops below the bright end of the frame
-      const sorted = means.map(m => m.L).sort((a, b) => a - b);
-      const L90 = sorted.length ? sorted[Math.floor(sorted.length * 0.9)] : 0;
-      const floor = Math.max(L90 * 1e-4, 1e-7);
-      for (const m of means) { if (m.L < floor && L90 > 0) continue; s += Math.log(Math.max(m.L, 1e-4)) * m.wgt; n += m.wgt; }
-      const Lavg = Math.exp(s / Math.max(n, 1));
-      // reflected-light meter: EV100 = log2(L·S/K), K = 12.5
-      let ev = Math.log2(Math.max(Lavg, 1e-4) * 100 / 12.5);
-      // highlight protection: a mostly dark frame (a stage, a night street) would push the lit part far past white;
-      // keep the 98th-percentile block within ~1.5 stops of saturation, but never darken by more than 4 stops
-      if (sorted.length > 16) { const L98 = sorted[Math.floor(sorted.length * 0.98)]; const evH = Math.log2(Math.max(L98, 1e-6) / (1.2 * 3)); if (evH > ev) ev = Math.min(evH, ev + 4); }
-      if (Number.isFinite(ev)) { this.ev = ev; this.metered++; this.lastMeter = { Lavg, ev }; }
+      const m = meterExposure(f, w, h);
+      if (m) { this.ev = m.ev; this.metered++; this.lastMeter = m; }
       this.emit();
     } catch (e) { /* readback can fail when the context is lost */ }
     finally { this.metering = false; }
@@ -227,17 +189,10 @@ export class Viewport {
   // the accumulated beauty (scene-linear, nits), albedo and normal, averaged over the samples so far
   async readPasses() {
     const b = this.backend; await b.idle();
-    const w = b.w, h = b.h, n = w * h;
-    const c = await b.readBuf('accum'), a = await b.readBuf('aovA'), nn = await b.readBuf('aovN');
-    const beauty = new Float32Array(n * 3), albedo = new Float32Array(n * 3), normal = new Float32Array(n * 3), depth = new Float32Array(n);
+    const w = b.w, h = b.h;
     // both backends return rows top-down
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const si = y * w + x, di = si, k = 1 / (c[si * 4 + 3] || 1);
-      for (let j = 0; j < 3; j++) { beauty[di * 3 + j] = c[si * 4 + j] * k; albedo[di * 3 + j] = a[si * 4 + j] * k; }
-      let nx = nn[si * 4], ny = nn[si * 4 + 1], nz = nn[si * 4 + 2]; const l = Math.hypot(nx, ny, nz) || 1;
-      normal[di * 3] = nx / l; normal[di * 3 + 1] = ny / l; normal[di * 3 + 2] = nz / l; depth[di] = nn[si * 4 + 3] * k;
-    }
-    return { width: w, height: h, beauty, albedo, normal, depth, spp: this.spp, exposureScale: 1 / (1.2 * Math.pow(2, this.exposureEV())) };
+    const c = await b.readBuf('accum'), a = await b.readBuf('aovA'), nn = await b.readBuf('aovN');
+    return { width: w, height: h, ...passesFromBuffers(c, a, nn, w, h), spp: this.spp, exposureScale: 1 / (1.2 * Math.pow(2, this.exposureEV())) };
   }
   async snapshot(type = 'image/png') {
     await this.backend.idle();
@@ -248,19 +203,3 @@ export class Viewport {
   async snapshotCanvas() { await this.backend.idle(); const img = await this.backend.readRGBA8(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d')!.putImageData(img, 0, 0); return c; }
 }
 
-// a user pass: pass.define(name, { params, kernel: ({ color, uv, albedo, normal }, params) => colour }) → WGSL
-function compileUserPass(p, k) {
-  // each pass gets four rows of the display uniforms, one per param: a scalar in .x or a colour in .xyz
-  const names = Object.keys(p.params || {}).slice(0, 4);
-  const isCol = n => { const d = p.params[n]; return !!(d && d.__def && d.__def.kind === 'color'); };
-  const pv: Record<string, any> = {};
-  names.forEach((n, i) => { pv[n] = E(node('ctx', isCol(n) ? 'v3' : 'f', [], '__p' + i)); });
-  const ctx = { color: E(node('ctx', 'v3', [], 'color')), uv: E(node('ctx', 'v2', [], 'uv')), albedo: E(node('ctx', 'v3', [], 'alb')), normal: E(node('ctx', 'v3', [], 'nrm')), luminance: E(node('dot', 'f', [node('ctx', 'v3', [], 'color'), constNode([0.2126, 0.7152, 0.0722])])) };
-  const root = lift(p.kernel(ctx, pv));
-  const fn = `upass_${k}`;
-  const cmap = { color: 'c', uv: 'uv', alb: 'alb', nrm: 'nrm' }; names.forEach((n, i) => { cmap['__p' + i] = isCol(n) ? `p${i}.xyz` : `p${i}.x`; });
-  const code = genFunction(fn, [['c', 'vec3f'], ['uv', 'vec2f'], ['alb', 'vec3f'], ['nrm', 'vec3f'], ['p0', 'vec4f'], ['p1', 'vec4f'], ['p2', 'vec4f'], ['p3', 'vec4f']], 'v3', root, { ctx: cmap, uniform: () => { throw new CandelaError('E207', 'a pass kernel reads its own params, not the scene\'s'); }, label: 'a pass' });
-  const valueOf = n => { const d = p.params[n]; let v = p.opts && p.opts[n] != null ? p.opts[n] : d && d.__def ? d.__def.def : d; if (isCol(n)) { const c = typeof v === 'string' ? parseColor(v) : Array.isArray(v) ? v : [v, v, v]; return [c[0], c[1], c[2], 0]; } return [+v || 0, 0, 0, 0]; };
-  const rows = names.map(valueOf);
-  return { fn, code, slot: k, stage: p.stage || 'hdr', name: p.name, values: () => { const out = new Float32Array(16); rows.forEach((r, i) => out.set(r, i * 4)); return out; } };
-}

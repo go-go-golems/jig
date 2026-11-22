@@ -2,6 +2,7 @@
 // NVRTC, load it with the driver API, upload the WebGPU target's storage buffers, launch candela_main once per frame
 // with that frame's uniforms, and read the accumulation buffer back.
 #pragma once
+#include "renderer.h"
 #include <cuda.h>
 
 #include <cstdint>
@@ -38,17 +39,14 @@ class CudaContext {
   CUcontext ctx_ = nullptr;
 };
 
-class CudaRenderer {
+class CudaRenderer : public Renderer {
  public:
   CudaRenderer(const std::vector<char>& cubin, int width, int height);
   ~CudaRenderer();
   /** scene buffers, uploaded once: objects, lights, top-level BVH, scene data */
-  void upload(std::span<const float> O, std::span<const float> LI, std::span<const float> BV, std::span<const float> SD);
+  void upload(std::span<const float> O, std::span<const float> LI, std::span<const float> BV, std::span<const float> SD) override;
   /** one launch: this frame's uniforms, then candela_main over the image in 8×8 blocks */
-  void launch(std::span<const float> U);
-  void sync();
-  std::vector<float> readAccum();
-  std::vector<float> readAlbedo();
+  void launch(std::span<const float> U) override;
   int localBytes() const { return localBytes_; }
   int registers() const { return registers_; }
  private:
@@ -57,8 +55,7 @@ class CudaRenderer {
   CUmodule mod_ = nullptr;
   CUfunction fn_ = nullptr;
   CUdeviceptr params_ = 0;
-  int w_, h_;
-  CUdeviceptr U_ = 0, O_ = 0, LI_ = 0, BV_ = 0, SD_ = 0, acc_ = 0, aovA_ = 0, aovN_ = 0;
+  CUdeviceptr U_ = 0, O_ = 0, LI_ = 0, BV_ = 0, SD_ = 0;
   size_t capU_ = 0, capO_ = 0, capLI_ = 0, capBV_ = 0, capSD_ = 0;
   int localBytes_ = 0, registers_ = 0;
 };

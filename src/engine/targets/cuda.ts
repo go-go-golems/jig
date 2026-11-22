@@ -18,6 +18,17 @@ const TARGETS: Record<CudaTargetKind, { omit: string[]; renameDefs?: Record<stri
   optix: { omit: ['traceAll'], prelude: '#include "candela_optix_params.h"', kernelPrelude: '#include "candela_accessors.inc"\n#include "candela_traversal.inc"', epilogue: '#include "candela_optix_programs.cuh"' },
 };
 
+// the display program (display.ts displaySource: denoise, exposure, bloom, tone map, user passes) over the renderer's
+// accumulation and AOV buffers; entry points candela_denoise and candela_display (native/rt/kernels/candela_post.cuh)
+const POST_TARGET = { omit: [], prelude: '#include "candela_post_params.h"', kernelPrelude: '#include "candela_post_accessors.inc"', epilogue: '#include "candela_post.cuh"' };
+
+export function cudaPostProgram(displayWgsl: string): CudaProgram {
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const t0 = now();
+  const { source, translation } = cudaSource(displayWgsl, POST_TARGET);
+  return { source, hash: digestString(source), lines: source.split('\n').length, functions: translation.functions.length, omitted: translation.omitted, translateMs: now() - t0 };
+}
+
 export function cudaProgram(compiled: { shared: string }, target: CudaTargetKind = 'cuda'): CudaProgram {
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const t0 = now();

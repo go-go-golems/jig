@@ -3,76 +3,9 @@
 // passes) is shared WGSL too. Shaders are cached by their source, so moving a slider never recompiles.
 import { WGSL_PRELUDE, WGSL_MAIN } from './wgsl-entry';
 import { wgslToGlsl } from './wgsl2glsl';
-import { POST } from './kernel';
-
-const TONEMAP_IX = { agx: 0, aces: 1, neutral: 2, reinhard: 3, filmic: 4, linear: 5 };
-export { TONEMAP_IX };
-
-// the display function: HDR in, display-referred out
-export function displaySource(userPasses: any[] = []) {
-  const args = p => [0, 1, 2, 3].map(i => `D(${8 + p.slot * 4 + i})`).join(', ');
-  const hdr = userPasses.filter(p => p.stage !== 'display').map(p => `  c = ${p.fn}(c, uv, alb, nrm, ${args(p)});`).join('\n');
-  const dsp = userPasses.filter(p => p.stage === 'display').map(p => `  t = ${p.fn}(t, uv, alb, nrm, ${args(p)});`).join('\n');
-  return POST + userPasses.map(p => p.code).join('\n') + `
-fn denoisePx(p: vec2i, stp: i32, res: vec2i, sc: f32, ex: f32) -> vec3f {
-  let c0: vec3f = cAt(p);
-  let n0: vec4f = nAt(p);
-  let a0: vec3f = aAt(p);
-  let e0: vec3f = c0 * ex;
-  var sum: vec3f = vec3f(0.0, 0.0, 0.0);
-  var ws: f32 = 0.0;
-  for (var j: i32 = -2; j <= 2; j++) {
-    for (var i: i32 = -2; i <= 2; i++) {
-      let q: vec2i = clamp(p + vec2i(i, j) * stp, vec2i(0, 0), res - vec2i(1, 1));
-      let kx: f32 = select(select(0.375, 0.25, abs(i) == 1), 0.0625, abs(i) == 2);
-      let ky: f32 = select(select(0.375, 0.25, abs(j) == 1), 0.0625, abs(j) == 2);
-      let c1: vec3f = cAt(q);
-      let n1: vec4f = nAt(q);
-      let w: f32 = kx * ky * atrousW(e0, c1 * ex, n0.xyz, n1.xyz, a0, aAt(q), sc, 32.0, 0.05) * exp(-abs(n0.w - n1.w) / max(0.03 * n0.w, 0.001));
-      sum = sum + c1 * w;
-      ws = ws + w;
-    }
-  }
-  return sum / max(ws, 1e-8);
-}
-fn grainHash(p: vec2f, s: f32) -> f32 { return fract(sin(dot(p + s, vec2f(12.9898, 78.233))) * 43758.5453); }
-fn displayPx(p: vec2i, res: vec2i) -> vec4f {
-  let d0: vec4f = D(0);
-  let d1: vec4f = D(1);
-  let d2: vec4f = D(2);
-  let d3: vec4f = D(3);
-  let uv: vec2f = (vec2f(f32(p.x), f32(p.y)) + 0.5) / vec2f(f32(res.x), f32(res.y));
-  let alb: vec3f = aAt(p);
-  let nrm: vec3f = nAt(p).xyz;
-  let view: i32 = i32(d1.z);
-  if (view == 1) { return vec4f(srgbEnc(clamp(alb, vec3f(0.0, 0.0, 0.0), vec3f(1.0, 1.0, 1.0))), 1.0); }
-  if (view == 2) { return vec4f(srgbEnc(nrm * 0.5 + 0.5), 1.0); }
-  if (view == 3) { let z: f32 = 1.0 - exp(-nAt(p).w * 0.15); return vec4f(z, z, z, 1.0); }
-  var c: vec3f = cAt(p) * d0.w;
-  if (d2.z > 0.0) {
-    var g: vec3f = vec3f(0.0, 0.0, 0.0);
-    for (var k: i32 = 0; k < 12; k++) {
-      let a: f32 = f32(k) * 2.39996;
-      let r: f32 = 3.0 + f32(k) * 2.2;
-      let q: vec2i = clamp(p + vec2i(i32(cos(a) * r), i32(sin(a) * r)), vec2i(0, 0), res - vec2i(1, 1));
-      g = g + max(cAt(q) * d0.w - 1.0, vec3f(0.0, 0.0, 0.0));
-    }
-    c = c + g * (d2.z / 12.0);
-  }
-${hdr}
-  if (d1.y > 0.5) { return vec4f(falseColor(lum(c)), 1.0); }
-  if (d2.x > 0.0) {
-    let ndc: vec2f = uv * 2.0 - 1.0;
-    let tc: f32 = 1.0 / sqrt(1.0 + sq(ndc.x * d3.x) + sq(ndc.y * d3.y));
-    c = c * mix(1.0, tc * tc * tc * tc, d2.x);
-  }
-  var t: vec3f = tonemap(c, i32(d1.x));
-  if (d2.y > 0.0) { let n: f32 = grainHash(vec2f(f32(p.x), f32(p.y)), d2.w) - 0.5; t = t * (1.0 + n * d2.y * 2.0); }
-${dsp}
-  return vec4f(srgbEnc(clamp(t, vec3f(0.0, 0.0, 0.0), vec3f(1.0, 1.0, 1.0))), 1.0);
-}
-`;
-}
+import { displaySource, TONEMAP_IX } from './display';
+// the display program and tone-map indices live in display.ts (shared with candela-rt); re-exported for old imports
+export { displaySource, TONEMAP_IX };
 
 // ---------------- WebGPU ----------------
 export class GPURenderer {
