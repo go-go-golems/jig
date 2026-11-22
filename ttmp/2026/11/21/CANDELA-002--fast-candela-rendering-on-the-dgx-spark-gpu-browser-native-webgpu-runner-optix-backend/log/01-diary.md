@@ -1,0 +1,1369 @@
+---
+Title: Diary
+Ticket: CANDELA-002
+Status: active
+Topics:
+    - pbr
+    - gpu
+    - webgpu
+    - optix
+DocType: log
+Intent: long-term
+Owners: []
+RelatedFiles: []
+ExternalSources: []
+Summary: ""
+LastUpdated: 2026-11-21T19:54:26.75884683-05:00
+WhatFor: ""
+WhenToUse: ""
+---
+
+# Diary
+
+## Step 1: Ticket, hardware probe and measurements on the Spark
+
+Created the ticket for the GPU plan and, before writing any guide, measured what this machine actually does: which
+GPU headless Chromium reaches with which flags, how many samples per second the existing renderer gets on it, what
+Dawn in Node exposes, and which video encoders exist. The plan pasted earlier was written without access to the
+hardware, so its claims are inputs to check, not facts.
+
+Outcome: step 1 of that plan works today with no code changes. Headless Chromium reaches the GB10 for both WebGL2
+(ANGLE on Vulkan) and WebGPU, and the existing renderer is 18–50× faster than SwiftShader on the same machine. Dawn
+works natively in Node on arm64. Chromium has no hardware video encoders here.
+
+### Prompt Context
+**User prompt (verbatim):** "Ok, create a new docmgr ticket. This machine is the spark, you have access to the GPU. Create  a detailed analysis / design / implementation guide that is for a new intern, explaining all the parts of the system needed to understand what it is, with prose paragraphs and bullet point sand pseudocode and diagrams and api references and file references. It should be very clear and technical. Store in the ticket and the nupload to remarkable."
+**Follow-up (verbatim):** "commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Context:** the plan being analysed was pasted in the previous turn (a three-step plan: GPU browser flags, a
+native Dawn runner with NVENC, an OptiX backend).
+**Assistant interpretation:** Write an intern-level guide to Candela's renderer and the Spark GPU plan, grounded in
+measurements on this machine; store it in a new ticket; upload it to reMarkable. Analysis and design, not
+implementation of the three steps.
+**Inferred user intent:** Someone new should be able to understand the system and start the GPU work.
+
+### What I did
+- `docmgr ticket create-ticket --ticket CANDELA-002 …` (topics pbr, gpu, webgpu, optix; added vocab `gpu`, `optix`),
+  a design doc and this diary.
+- Hardware/toolchain probe → `various/00-hardware-probe.txt`: GB10, driver 580.178.04, compute capability 12.1,
+  CUDA 13.0 (`nvcc` V13.0.88), `libnvoptix.so.1` and `libnvidia-encode.so.1` installed, no OptiX SDK headers
+  (`optix.h` not found), no system ffmpeg (Ubuntu candidate 6.1.1), 20 cores, 121 GiB.
+- `scripts/01-gpu-probe.ts` → `various/01-gpu-probe.txt`: WebGL2 renderer string and WebGPU adapter per flag set.
+- `scripts/02-throughput.ts` → `various/02-…`, `03-…`: samples/s of the workbench's own render queue
+  (`host.render` → `runRender` → `accumulate`) on `dist/`.
+- `scripts/03-webcodecs-probe.ts` → `various/04-webcodecs-probe.txt`: `VideoEncoder.isConfigSupported` at 4K.
+- `scripts/04-dawn-probe.mjs` → `various/05-dawn-probe.txt`: `webgpu@0.6.2` adapter in Node.
+
+### Why
+- The guide's performance statements should cite numbers from this machine, not the earlier estimate.
+
+### What worked
+- Flags `--use-angle=vulkan --enable-features=Vulkan --enable-unsafe-webgpu` with Playwright's default headless
+  shell (`chromium_headless_shell-1255`, Chrome 159): WebGL2 = `ANGLE (NVIDIA, Vulkan 1.4.312 (NVIDIA NVIDIA GB10
+  (0x00002E12)), NVIDIA)`; WebGPU adapter vendor `nvidia`, `maxStorageBuffersPerShaderStage: 16`,
+  `maxStorageBufferBindingSize: 2147483644`, `maxBufferSize: 4294967292`, no `shader-f16`.
+- Throughput at 64 spp (render queue, still, PNG), samples per pixel per second:
+
+  | preset | size | WebGPU (GB10) | WebGL2 (GB10) |
+  | --- | --- | --- | --- |
+  | B-01 sphere | 640×360 | 190 | 386 |
+  | B-01 | 1920×1080 | 94.5 | 92.3 |
+  | M-07 car paint | 640×360 | 136 | 151 |
+  | M-07 | 1920×1080 | 23.8 | 22.4 |
+  | K-01 gear meshes | 640×360 | 32.2 | 21.4 |
+  | K-01 | 1920×1080 | 4.5 | 3.2 |
+  | K-09 lockstitch (16 spp) | 640×360 / 1080p | 65.7 / 12.4 | – |
+
+- SwiftShader on this machine (20 cores), 640×360, 4 spp: B-01 3.7 spp/s, K-01 1.8 spp/s. GPU/SwiftShader:
+  B-01 ≈ 51× (WebGPU), K-01 ≈ 18×.
+- Dawn in Node: adapter `nvidia-gb10`, description `NVIDIA: 580.178.04`, `maxBufferSize: 1099511627776`,
+  features include `timestamp-query`, `subgroups`, `primitive-index`; no `shader-f16`.
+
+### What didn't work
+- `navigator.gpu` was missing in every configuration when the page was `about:blank`: WebGPU is exposed only in
+  secure contexts. Serving a blank page from `http://localhost:8791/` fixed it (localhost counts as secure).
+- New headless mode (`channel: 'chromium'`) with Vulkan flags: `"webgl": "no webgl2"`, `"webgpu": "null"` — the
+  full Chromium binary does not get a GPU process headless here; the headless *shell* does.
+- `--use-gl=egl` without Vulkan falls back to SwiftShader.
+- WebCodecs: `prefer-hardware` false for H.264, HEVC, AV1, VP9; software only H.264 and VP9; HEVC/AV1 10-bit not
+  available at all. NVENC is not reachable from the browser.
+
+### What I learned
+- At small sizes WebGL2 can beat WebGPU (B-01 640×360: 386 vs 190 spp/s): per-sample fixed costs dominate
+  there (each sample is one dispatch followed by `backend.idle()`; see `accumulate` in `src/engine/output.ts`).
+  At 1080p both converge, and on meshes WebGPU wins (K-01: 4.5 vs 3.2).
+- The earlier "≈1 s per sample at 640×360" fits SwiftShader on 2 cores; on 20 cores it is ≈0.3–0.55 s.
+- The plan's "100×" is not what step 1 delivers on the mesh scenes: K-01 is ≈18× over 20-core SwiftShader.
+
+### What was tricky to build
+- `02-throughput.ts` must wait until the build *and* the shader compile are done
+  (`vp.compiled && !host.compiling && vp.spp > 0`) or the first render includes pipeline compilation.
+
+### What warrants a second pair of eyes
+- One run per configuration, no warm-up repeats: numbers are indicative (±10–20%), not a benchmark suite.
+- GPU utilisation during the runs was not recorded; the claim that small sizes are sync-bound is a deduction from
+  the code and the size scaling, not a measurement.
+
+### What should be done in the future
+- Record `nvidia-smi dmon` alongside throughput runs; add repeats.
+
+### Code review instructions
+- `npm run build && npx tsx ttmp/…/CANDELA-002…/scripts/02-throughput.ts B-01 K-01` (env `SIZES`, `SPP`, `CONFIGS`).
+
+### Technical details
+- Headless shell launch: `chromium.launch({ args: ['--use-angle=vulkan', '--enable-features=Vulkan', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] })`.
+
+## Step 2: Reading the renderer and writing the intern guide
+
+Read the parts of the engine the GPU work touches (kernel call tree, backends, buffer packing, viewport, output
+loop, mesh BVH, lockstitch tooling), measured scene sizes, and wrote the guide
+`design-doc/01-candela-on-the-dgx-spark-intern-guide-to-the-renderer-and-the-gpu-plan.md`. Then reviewed the draft
+against the source and the intern reader before revising.
+
+Outcome: an ~870-line guide covering a path-tracing primer, the five stages from scene file to pixels with buffer
+layouts and kernel pseudocode, the Spark measurements, designs for the three steps (APIs, pseudocode, diagrams),
+testing, decision records, open questions, and file/API appendices.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Intern-level analysis/design/implementation guide, evidence-backed, stored in the ticket.
+**Inferred user intent:** Onboard someone to do the GPU work without this conversation.
+**Commit (code):** see the commit after this entry ("CANDELA-002: intern guide …")
+
+### What I did
+- Read `src/engine/kernel.ts` (`renderPixel`, `tracePath`, `traceAll`, `hitMesh`, `cameraRay`), `render.ts`
+  (`GPURenderer.create/compile/resize/upload/uploadSD/trace/display/readRGBA8`), `compile.ts` (`compile`, `pack`,
+  `SHAPE_TYPE`, object record layout), `viewport.ts` (`frame`, `show`, `meter`), `output.ts` (`runRender`,
+  `accumulate`), `mesh.ts` (`blasOf`), `test.ts` (`furnace`), `tools/lockstitch/{README.md,render.js}`.
+- `scripts/05-scene-stats.ts` → `various/06-scene-stats.txt` (objects, triangles, buffer sizes per preset).
+- Wrote the guide; second pass with review notes before revising (below).
+
+### Why
+- The guide had to correct the earlier plan where the code says otherwise; that needed source reading, not just
+  the plan's text.
+
+### What worked
+- `docmgr doctor --ticket CANDELA-002 --stale-after 30` → all checks passed.
+
+### What didn't work
+- No tool failures. Review found draft errors (next section).
+
+### What I learned
+- The engine already supports several samples per dispatch (`renderPixel` loops `U(0).w`, `engine.sppPerFrame`);
+  the per-sample wait is in `accumulate` (output.ts), not the kernel.
+- `GPURenderer.create` caps requested limits at 10 storage buffers and 1 GiB per binding/buffer: the real limit for
+  big CAD scenes is the single 1 GiB `sd` binding, not the 8-buffer default the plan named.
+- Quantised meshes are a file format only; the GPU gets 112-byte fp32 triangles (`blasOf`).
+- `tools/lockstitch/render.js` uses `channel: 'chromium'`, which has no GPU here, and the unported harness.
+- The large `sd` heads of K-01/K-09 (17–19 MiB) are mostly the 1024×512 HDRI tables (16 MiB).
+
+### What was tricky to build
+- Keeping measured, read and proposed statements separate; the guide labels each.
+
+### What warrants a second pair of eyes
+- OptiX API names (OptiX 8/9: `optixModuleCreate`, `optixTraverse`/`optixReorder`/`optixInvoke`, denoiser model
+  kinds) are from knowledge, not from installed headers (none installed); the guide says to check them.
+- The NVENC capability of GB10 (AV1, 10-bit HEVC) is unverified and marked as an open question.
+
+### What should be done in the future
+- Steps 1–3 as tasks 3–5 in `tasks.md`.
+
+### Code review instructions
+- Read the guide top to bottom; spot-check §2.6 buffer table against `pack` and §2.8 limits against
+  `GPURenderer.create`.
+
+### Technical details
+- Second-pass review notes (recorded before revising):
+  - Comprehension: BVH, SAH, NEE, MIS, Russian roulette, AOV, EV100, à-trous used before explanation → added
+    §2.1 "Path tracing in one page".
+  - Fact: B-01 roughness is 0.4 (draft said 0.35).
+  - Fact: limits are capped in code (10 buffers, 1 GiB) → rewrote §2.8, added refactor 5.2.3 (lift the cap, split `sd`).
+  - Fact: `render.js` default stitch is 2 s → step-1 estimate is ~4 min per stitch at 1080p/64 spp, not 8.
+  - Clarity: `vp.seek` in the step-2 sketch is proposed API → labelled; K-09 param ids (`scene`, `stitch`,
+    `orbit`) named in step 1; "the earlier plan" defined in §1; section numbers and cross-references renumbered.
+
+## Step 3: Upload to reMarkable (one failure, worked around)
+
+Uploaded the guide as one PDF. The first attempt failed inside remarquee's PDF conversion because its built-in LaTeX
+header loads a package this machine's TeX installation does not have; a header file without that package fixed it.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 1)
+**Assistant interpretation:** Deliver the stored guide to reMarkable.
+**Inferred user intent:** Read the guide on the device.
+
+### Evidence and commits
+- Guide commit: `9af5365`.
+- Failure: `remarquee upload bundle <guide> --name "CANDELA-002 Candela on the DGX Spark - intern guide"
+  --remote-dir /ai/2026/11/21/CANDELA-002 --toc-depth 2 --non-interactive` →
+  `Error: pandoc failed: Error producing PDF. ! LaTeX Error: File 'stmaryrd.sty' not found.` (exit status 43).
+- Isolation: a two-line Markdown file renders with plain `pandoc --pdf-engine=xelatex`; `kpsewhich stmaryrd.sty`
+  finds nothing; `strings $(which remarquee)` shows the built-in header starts with `\usepackage{stmaryrd}` (for
+  `\llbracket` in chat math). The guide contains no math, so the package is not needed.
+- Fix: `scripts/06-remarquee-header-no-stmaryrd.tex` (the built-in header minus `stmaryrd`) passed as
+  `--latex-header-file` → `OK: uploaded CANDELA-002 Candela on the DGX Spark - intern guide.pdf -> /ai/2026/11/21/CANDELA-002`.
+- Evidence level: upload result only (cloud delivery; no device listing or rendered-PDF inspection).
+
+### Noteworthy decisions or failures
+- Did not install `texlive-science` (system package, needs sudo); the header override is local to this upload.
+  Every remarquee upload on this machine will hit the same error until `stmaryrd` is installed or the header is
+  overridden.
+
+### Remaining requirements and next action
+- Implementation tasks 3–5 (steps 1–3) are open; the guide is a design, not an implementation.
+
+## Step 4: Tooling installed; NVENC verified; OptiX SDK inspected
+
+The user installed `texlive-science`, `ffmpeg`, `vulkan-tools`, `openexr` and `ninja-build`, and downloaded the OptiX
+SDK. I verified NVENC on the GB10 and inspected the SDK installer without running it.
+
+### Prompt Context
+**User prompts (verbatim):** "install texlive-science", "what do I need to install to go further?", "check ~/DOwnloads",
+"all the rest is installed", "it says it should have arm64 too"
+**Assistant interpretation:** Confirm the prerequisites for steps 2–3 are in place and check the downloaded SDK.
+**Inferred user intent:** Unblock the implementation steps.
+
+### Evidence and commits
+- `texlive-science` 2023.20240207-1 installed (by the user; my `sudo -n` failed: `sudo: a password is required`).
+- NVENC: `various/07-nvenc-probe.txt` — 4K H.264, HEVC Main 10, AV1 10-bit and HEVC 4:4:4 all encode; this closes
+  the guide's NVENC open question (guide §3.5 and §9 updated).
+- `~/Downloads/NVIDIA-OptiX-SDK-9.1.0-linux64-x86_64.sh` (sha256 `4902adeb…c8585`), a CPack self-extracting
+  archive (payload = `tail -n +216 | gunzip | tar`). Listed without running: 1105 entries — `include/optix*.h`
+  (19 headers), `SDK/` (sample sources, CMake, data), `doc/`, licences, and `lib64/libglfw.so.3.4`, the only
+  native binary, built for x86_64.
+
+### Noteworthy decisions or failures
+- Did not run the installer: it requires accepting NVIDIA's EULA (`--skip-license` would accept it on the user's
+  behalf).
+
+### Remaining requirements and next action
+- Choose the SDK package (aarch64 installer or this one) and install to `~/opt/`; then build `optixTriangle`
+  for `sm_121` (step 3, phase 1).
+
+## Step 5: OptiX SDK 9.1 installed and built; it cannot run on this driver
+
+Installed the aarch64 OptiX SDK and built the `optixTriangle` sample for `sm_121` to verify it. The build works;
+running fails because the driver's OptiX runtime is older than the SDK.
+
+### Prompt Context
+**User prompt (verbatim):** "ko, downloaded aarch64, install the other one"
+**Assistant interpretation:** Install the aarch64 SDK (the one just downloaded, "the other one" relative to the x86_64
+file inspected before); the instruction to install covers accepting the licence.
+**Inferred user intent:** Get OptiX working so step 3 can start.
+
+### What I did
+- Checked the installer: CPack header identical to the x86_64 one apart from the architecture name; the aarch64
+  payload bundles no prebuilt libraries. `sha256 bc9fd96f…62b88`.
+- `sh NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64.sh --prefix=$HOME/opt --include-subdir --skip-license` →
+  `~/opt/NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64` (`OPTIX_VERSION 90100`).
+- Configured the SDK samples out of tree in `~/opt/optix-9.1.0-build` with Ninja and `CUDA_MIN_SM_TARGET=sm_121`;
+  built `optixTriangle`; ran it with `--file`.
+
+### Why
+- Building one sample is the cheapest proof that headers, nvcc and the driver runtime work together.
+
+### What worked
+- `ninja optixTriangle` → `[40/40] Linking CXX executable bin/optixTriangle` (OptiX-IR compiled by nvcc 13.0 for sm_121).
+
+### What didn't work
+- First configure: `CMake Error at support/glfw-3.4/src/CMakeLists.txt:192 (message): Xinerama headers not found;
+  install libxinerama development package`. Worked around with `-DGLFW_BUILD_X11=OFF -DGLFW_BUILD_WAYLAND=OFF`
+  (GLFW's null platform; the samples can still write images with `--file`).
+- Run: `Caught exception: OPTIX_ERROR_UNSUPPORTED_ABI_VERSION: Optix call 'optixInit()' failed`.
+
+### What I learned
+- `strings /usr/lib/aarch64-linux-gnu/libnvoptix.so.1` → `OptiX Version:[9.0002.0.0.0.0] Branch:[r582_73] … ABI
+  Version:[110]`. SDK 9.1.0 has `OPTIX_ABI_VERSION 118` (`include/optix_function_table.h`). The guide's earlier
+  "driver 580 is new enough for OptiX 9.x" was wrong for 9.1; corrected in §6.1 and §9.
+
+### What was tricky to build
+- Nothing beyond the GLFW platform flags.
+
+### What warrants a second pair of eyes
+- Whether to update the DGX OS driver (affects the whole machine) or pin SDK 9.0.x.
+
+### What should be done in the future
+- Get the OptiX SDK 9.0.x aarch64 installer (NVIDIA's previous-versions page), install beside 9.1, rebuild
+  `optixTriangle`, run it. Or update the driver to one whose OptiX runtime reports ABI ≥ 118.
+
+### Code review instructions
+- `various/08-optix-sdk-install.txt` has the commands and outputs.
+
+### Technical details
+- Interactive SDK samples need `libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev` (and Wayland/xkbcommon
+  dev packages) for a windowed GLFW; not needed for `--file` output or for Candela's backend.
+
+## Step 6: OptiX SDK 9.0.0 runs on the GB10 (step 3, phase 1 done)
+
+Installed the 9.0.0 SDK the user downloaded, rebuilt `optixTriangle` for `sm_121`, and ran it: the first OptiX
+program on this machine works.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, 9.0.0 in ~/Downloads"
+**Assistant interpretation:** Install SDK 9.0.0 (licence acceptance covered by the earlier install instruction) and verify.
+**Inferred user intent:** Unblock step 3.
+
+### Evidence and commits
+- `NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64.sh`, sha256 `2ef1ca95…69fa4b`; header identical to 9.1.0's apart from the
+  version; `OPTIX_ABI_VERSION 105` (≤ the driver runtime's 110).
+- Install → `~/opt/NVIDIA-OptiX-SDK-9.0.0-linux64-aarch64` (`OPTIX_VERSION 90000`); build dir `~/opt/optix-9.0.0-build`.
+- `ninja optixTriangle` → `[44/44] Linking CXX executable bin/optixTriangle`; `./optixTriangle --file out.png` → exit 0,
+  1024×768 PNG with the expected gradient triangle (`various/09-optixTriangle-9.0.0.png`).
+- Full commands/outputs: `various/08-optix-sdk-install.txt`.
+
+### Noteworthy decisions or failures
+- My first parse of the installer's payload offset failed (`tail: invalid number of lines: '+'`) because the 9.0.0 header
+  formats the line slightly differently; my fallback diff then dumped binary payload (49 MB output, saved by the
+  harness). Read the line directly (`tail … +216`) instead; no effect on the install.
+- Standardise on SDK 9.0.0 for the backend; keep 9.1.0 installed for a future driver.
+
+### Remaining requirements and next action
+- Step 3 phase 2: the scene package writer (TS) and reader (C++); phases 3–7 per guide §6.8. Steps 1 and 2 are also open.
+
+## Step 7: Step 1 implemented — render any preset (and the lockstitch scenes) on the GPU from the command line
+
+Re-uploaded the corrected guide as a new document (v2, so annotations on v1 survive), then implemented step 1:
+`scripts/render-preset.ts` drives the built workbench in Playwright's headless shell with the GPU flags and runs a
+job through the workbench's own render queue; `tools/lockstitch/render.ts` replaces `render.js` on top of it. One
+1080p lockstitch stitch at 64 spp now takes 3.9 minutes on the GB10.
+
+### Prompt Context
+**User prompt (verbatim):** "ok, update, then continue, commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Re-upload the revised guide, then implement the plan in order, starting with step 1.
+**Inferred user intent:** Turn the design into working tools, with the diary as the record.
+**Commit (code):** see the commit after this entry ("CANDELA-002: step 1 …")
+
+### What I did
+- `remarquee upload bundle <guide> --name "CANDELA-002 Candela on the DGX Spark - intern guide v2" …` →
+  `OK: uploaded … intern guide v2.pdf -> /ai/2026/11/21/CANDELA-002` (default header; `stmaryrd` is installed now).
+- Read `host.ts` (`params()`, `onParam` → static params rebuild after 30 ms, `_seq`, `building`/`compiling`, the
+  `RenderQueue` job shape `{status, progress, note, files}`), `params.ts` (handle `set`, `isStatic`, choices are
+  static), `tools/lockstitch/render.js` (source patching of `scene`/`stitch`/`orbit`, `end: dur - 1/fps`).
+- Wrote `scripts/render-preset.ts`: `openSession` (serve `dist/`, launch with `GPU_ARGS`), `renderWith(session,
+  opts)` (load `#preset`, refuse non-NVIDIA backends, apply params, `workbench.render({...job, autosave:false})`,
+  poll, stream files back in 3 MiB base64 chunks via `page.exposeFunction`), `renderPreset`, `parseArgs`, CLI.
+- Wrote `tools/lockstitch/render.ts` (same flags as `render.js`, one session for all scenes, params instead of
+  source patching, default output `~/data/pbr-spark/lockstitch`); deleted `render.js`; `reel.sh` default dir; README;
+  npm scripts `render`, `lockstitch`; `tools/` added to `tsconfig.json` `include`.
+- Committed the `webgpu` dependency the user installed (`package.json`/`package-lock.json`).
+
+### Why
+- Going through `workbench.render` reuses `runRender` (seeding, exposure lock, sequences, encoders) instead of
+  reimplementing output; the browser is only the GPU host here.
+- Default output under `~/data/` per the global instruction for media.
+
+### What worked
+- B-01 1080p/64 spp still: 2.0 s; visually correct (red sphere, soft shadow).
+- K-09 with `--param "scene=S-03 Rotary hook"`: rebuilt and rendered the rotary hook; 13-frame 720p MP4 (h264).
+- Full stitch: `npx tsx tools/lockstitch/render.ts --scenes 7 --size 1920x1080 --spp 64` → 48 frames, 230.5 s render
+  (13.3 spp/s), h264 High 1080p (`various/10-step1-render-preset.txt`).
+- `npx tsc --noEmit -p .` clean (now including `tools/`).
+
+### What didn't work
+- First lockstitch run design flaw (caught before it bit): setting a static param to its current value (K-09's
+  default scene `S-07 Whole head`) triggers no rebuild, so waiting for `_seq` to advance would time out after 60 s.
+  Fixed by comparing `h.value` first and logging `(unchanged)`; verified by the S-07 still finishing in 2.0 s.
+
+### What I learned
+- The render queue's video path (WebCodecs H.264 in the browser) is not the bottleneck at 1080p: 48 frames encode
+  inside the 230 s; the path tracer is (~4.8 s per 64-spp frame).
+- 13.3 spp/s on the full stitch vs 12.4 in the throughput probe: per-sample overhead is amortised slightly better in
+  a sequence.
+
+### What was tricky to build
+- Getting files out of the page: `job.files[].data` are `Uint8Array`s inside the page; `page.evaluate` return values
+  are JSON-serialised, so a 1080p EXR or MP4 would be a huge array. Chunked base64 through an exposed function keeps
+  each message ≤4 MiB and writes straight to disk.
+
+### What warrants a second pair of eyes
+- `renderWith` sets `workbench.running = false` before the job so the clock does not advance while a still renders;
+  check that sequences still drive time through `seek` (the MP4 frames do animate in the 13-frame test).
+- Numeric parsing of `--param`: a choice keeps the string; other string values that parse as numbers become numbers.
+  Colour/vector params are not supported from the CLI yet.
+
+### What should be done in the future
+- Steps 2 and 3. A comparison against `render.js` on SwiftShader at 1080p/64 spp was not run (estimated >1 h).
+
+### Code review instructions
+- Start at `scripts/render-preset.ts` `renderWith`; then `tools/lockstitch/render.ts`.
+- Validate: `npm run build && npx tsx tools/lockstitch/render.ts --still --scenes 3,7 --size 960x540 --spp 32`.
+
+### Technical details
+- GPU flags: `--use-angle=vulkan --enable-features=Vulkan --enable-unsafe-webgpu --ignore-gpu-blocklist`.
+- Backend check: `/nvidia/i` against `vp.backend.name + vp.backend.info` ("WebGPU nvidia").
+
+## Step 8: OptiX traversal spike — Candela's AO on the RT cores is ~16× the WebGPU kernel on K-09
+
+The user asked "what about using optix?" while step 1 was finishing. Rather than argue from the plan, I built the
+smallest thing that measures it: a version-0 scene package exported from the real build (triangles, instance
+transforms from the packed object records, camera rows) and a C++ OptiX program running Candela's AO integrator on
+it. Same scene, camera, radius and estimator as the WebGPU kernel's AO mode, so the two numbers compare directly.
+
+Result: 1,721 vs 105 full-frame samples/s at 1080p (~16×), with matching images (mean AO 0.9894 in both, mean 8-bit
+difference 0.10).
+
+### Prompt Context
+**User prompts (verbatim):** "you'll need a backend server, right?", "what about using optix?", "install",
+"when something is missing, install it", "or tell me how"
+**Assistant interpretation:** Show whether OptiX pays off on this machine before building the backend; install
+missing dependencies (or give the sudo command) instead of working around them.
+**Inferred user intent:** Decide where to invest: the Dawn runner (step 2) or OptiX (step 3).
+**Commit (code):** see the commit after this entry ("CANDELA-002: OptiX traversal spike …")
+
+### What I did
+- Read how geometry reaches the GPU: `compile` returns `objects` (with `def` for meshes); `pack` writes 24 floats per
+  object with the world→object 3×4 row-major matrix at +4 and `origIdx` at +21; `MeshDef.tris` is 24 floats per
+  triangle (positions first); `cameraUniforms` gives U rows 1–4; `viewport.repack` passes `animation(t)` poses.
+- `scripts/scene-package.ts` (v0): positions per unique mesh def → `geometry.bin`, instances with
+  `inv34(Mi)` (= OptiX's instance transform layout), camera; planes/rects/boxes as exact triangles; `--engine` and
+  `withEngine()` to override a scene's engine (prepend an import, append `export const engine`).
+- `scripts/render-preset.ts`: `--engine` (same override through `setFile` + rebuild), timing from the queue's
+  `job.ms` with 100 ms polling, and stills default to the preset's start time.
+- `native/optix/`: `params.h`, `ao.cu` (raygen with Candela's camera and cosHemi AO, closest hit using
+  `optixGetTriangleVertexData`, two misses), `main.cpp` (GAS per mesh with compaction, IAS, pipeline, SBT, timed
+  launches, EXR writer), `CMakeLists.txt` (nvcc `-optix-ir` for sm_121, FetchContent for nlohmann/json), README.
+- Ticket script `07-exr-stats.py` (EXR reader, coverage/mean, `--pgm`); run via `uv run --with numpy`.
+
+### Why
+- AO isolates traversal (one camera + one occlusion ray, almost no shading), which is exactly what OptiX changes.
+- Using the packed object records and `cameraUniforms` means the package is the GPU's own view of the scene, so
+  any mismatch would show up as an image difference, not be hidden by a second export path.
+
+### What worked
+- First build of `native/optix` compiled and linked cleanly; first run produced a correct image.
+- `candela-optix-ao … --spp 1024` → `594.9 ms → 1721.2 full-frame spp/s, 3569 Msamples/s, 7138 Mrays/s`; GAS build
+  for 36 meshes 22.6 ms.
+- WebGPU: `render-preset.ts K-09 --engine "E.offline().integrator(I.ao({ radius: 0.05 }))" --spp 1024 --time 0` →
+  104.7 spp/s; `07-exr-stats.py` mean 0.9894, coverage 1.0.
+- Diff: mean 0.101, p99 3.0, 0.016% of pixels > 16 (`various/11-*`).
+
+### What didn't work
+- Appending `import … from 'candela'` at the end of `scene.js`: `scene.js: syntax error: Cannot use import
+  statement outside a module`. Imports must lead the file → `withEngine` prepends the import.
+- The AO PNGs were black: K-09 fixes exposure (EV 9.6 → ×1.07e-3), so AO ≈ 1 maps to black. The EXR comment
+  ("beauty × exposure (1.0738e-3)") confirmed it; stats divide it out.
+- First timing: 2 s polling made 64 spp and 256 spp look like 31.8 and 63.7 spp/s; switched to the queue's `job.ms`.
+- First comparison showed different handwheel/disc angles: the WebGPU still rendered at the time the clock reached
+  while loading, the package at t=0. Rerun with `--time 0` matched; fixed the default in `render-preset.ts`.
+- `import numpy` failed (not installed; `sudo -n apt-get install python3-numpy` → `sudo: a password is required`).
+  Started rewriting the reader without numpy; the user interrupted ("install", "when something is missing, install
+  it", "or tell me how"). Used `uv run --with numpy` (no sudo) instead and saved that preference to memory.
+- `nlohmann/json` missing → CMake FetchContent of the v3.11.3 release (system alternative noted in the README).
+
+### What I learned
+- OptiX's instance transform is the same 3×4 row-major layout Candela's `pack` uses, so instances map one to one.
+- K-09's 23.7k triangles compact to a 671 KiB GAS total; building all of them takes ~23 ms, so rebuilding per frame
+  is affordable, and animated poses only need an IAS refit/rebuild (7 KiB).
+- Earlier step-1 stills without `--time` were rendered at a load-dependent time (not reproducible).
+
+### What was tricky to build
+- Making the comparison honest: same estimator (camera jitter, Ng facing the ray, 4·EPS offset, cosine lobe,
+  radius), same geometry including the backdrop plane and box, same time; and checking both mean and per-pixel
+  difference before believing the ratio.
+
+### What warrants a second pair of eyes
+- The 16× is for AO. The path tracer shades every bounce, samples lights and (on WebGPU) waits per sample; its
+  OptiX speed-up is not measured yet. Expect less than 16×; how much less is what phases 3–5 will show.
+- `main.cpp` leaks device buffers (one-shot benchmark); fine for the spike, not for the backend.
+
+### What should be done in the future
+- Step 3 phase 2 proper: package v1 (materials, lights, env, params, normals/uvs, motion) and the WGSL→CUDA translator.
+- Decide whether step 2 (Dawn runner) is still worth doing before OptiX (see the reply to the user).
+
+### Code review instructions
+- `scripts/scene-package.ts` `scenePackage()`; `native/optix/src/ao.cu`; `native/optix/src/main.cpp` from
+  "geometry:" to "launch".
+- Reproduce: `npx tsx scripts/scene-package.ts K-09 && cmake -G Ninja -S native/optix -B build/optix && ninja -C
+  build/optix && ./build/optix/candela-optix-ao ~/data/pbr-spark/packages/K-09 --spp 1024`.
+
+### Technical details
+- Payload: camera ray 4 × u32 (t, Ng.xyz), shadow ray 1 × u32 (visible). SBT: 1 raygen, 2 misses, 2 hit records
+  (stride RAY_TYPES = 2), instance sbtOffset 0. Pipeline: single-level instancing, maxTraceDepth 1, stack sizes from
+  `optixUtilComputeStackSizes`, max traversable depth 2.
+- Build flags: GAS `PREFER_FAST_TRACE | ALLOW_RANDOM_VERTEX_ACCESS | ALLOW_COMPACTION`; geometry `DISABLE_ANYHIT`.
+
+## Step 9: Design for compiling the JS API to OptiX and a live OptiX workbench; vault deep-dive report
+
+The user asked how the JavaScript scene API can be compiled down to run on OptiX, with a live workbench that shows
+OptiX renders, and then asked for the answer as a pedagogical deep-dive project report in the Obsidian vault
+(textbook style, no analogies), committed and pushed. I read the seams the design depends on, then wrote the report.
+No code changed in this step.
+
+### Prompt Context
+**User prompts (verbatim):** "Ok, now how can we take our JS API, and target / compile it down so it can be run with
+optix, and we can have a live workbench that renders and displays GPU optix renders"; "yeah in fact use the knowledge
+you gather to then  write a detailed project report for the obsidian vault as a deep dive technical analysis blog post
+using a textbook writing style (no analogies, see skill). Commit and push the bsidian vault when done (go-go-parc
+vault)."; "make the report pedagogical and introduce everything to someone who is new to the subject and new to the
+codebase and new to the technologies"
+**Assistant interpretation:** Design (not implement) the compile path and the live workbench, grounded in the code,
+and publish it as a vault PROJECT REPORT.
+**Inferred user intent:** A shareable explanation and plan before committing to the OptiX backend.
+
+### What I did
+- Read: `wgsl2glsl.ts` (59 lines, relies on the kernel's strict WGSL subset); the backend interface shared by the
+  WebGPU and WebGL2 classes in `render.ts` (`compile/resize/upload/uploadSD/setUniforms/trace/busy/display/readAccum/
+  readBuf/idle/saveAccum/restoreAccum/dispose`); `kernel.ts` `traceAll` (the single traversal function; `traceScene`
+  and `occluded` call it), `hitObj`, `hitMesh` (sets `gTri`/`gBary`), `finishHit`, `xfP`/`xfD` (motion poses),
+  the six `var<private>` globals and the `ETAB` private table; `viewport.ts` (`repack`, `posesFor`, metering via
+  `readRGBA8`); `host.ts` engine-mode override.
+- Wrote `go-go-parc/Projects/2026/11/21/PROJECT REPORT - Candela on the DGX Spark - From a JavaScript Scene API to
+  OptiX Ray Tracing - A Technical Deep Dive.md` (559 lines) with five figures in `_assets/candela-spark-*`.
+- Vault commit `940ccdb1` (after `git pull --rebase`; the first push was rejected as non-fast-forward), pushed.
+
+### Why
+- The design keeps `build`/`compile`/`pack` and adds a CUDA target because traversal is concentrated in `traceAll`,
+  the kernel is already machine-translated for WebGL2, and the viewport only depends on the backend interface.
+
+### What worked
+- `git push` after rebase: `## main...origin/main` (in sync).
+
+### What didn't work
+- First vault push: rejected (`hint: 'git pull' before pushing again`); fixed with `git pull --rebase`.
+
+### What I learned
+- `blasOf` reorders a mesh's triangles; `finishHit` indexes the reordered records with `gTri`, so an OptiX GAS must
+  be built in kernel order (the AO spike's original order is fine for AO but not for shading).
+- Intersection programs cannot see raygen's per-thread state; `gTime` must travel in a payload register.
+- `var<private>` globals must become members of a per-thread `Kernel` struct (CUDA `__device__` globals are shared).
+
+### What was tricky to build
+- Keeping the report honest about what is measured (AO 16×), what is implemented (step 1, spike) and what is design
+  (translator, shim, server, remote backend); each is labelled in the report.
+
+### What warrants a second pair of eyes
+- The proposed `RemoteOptixBackend` changes who counts samples (host-owned progressive loop); the viewport's
+  assumptions about `trace()` per frame need checking when implementing.
+- NVRTC compile time and the path-tracing speed-up are unmeasured and decide the order of steps 2 and 3.
+
+### What should be done in the future
+- Phase 1 of the design: `src/engine/wgsl2cuda.ts` + header; compile every preset's translated kernel with nvcc.
+
+### Code review instructions
+- Read the report's Parts 5–6 against `kernel.ts` `traceAll`/`hitObj`/`finishHit` and `render.ts`'s backend methods.
+
+### Technical details
+- Report sections: foundations (path tracing, GPU programs, RT cores/OptiX concepts, the machine), Candela's
+  pipeline and buffers, measurements, the spike, the compile design (translation rules, `Kernel` struct, traversal
+  shim, run-time compilation), the live workbench (architecture, method mapping, frames, denoiser, final renders),
+  phases with image-comparison exit checks, failure modes, open questions.
+
+## Step 10: Design doc 02 — candela-rt (V8 + OptiX), the engine split, the live protocol
+
+After a design conversation (what a preset's program is, emitting CUDA directly, where JavaScript must run, which
+callbacks exist), the user settled the direction: keep the JS callbacks and run V8 on the backend. I wrote
+`design-doc/02-candela-as-a-compiler-with-backends-the-v8-and-optix-render-runtime.md` as an intern guide and
+uploaded it to reMarkable. No engine code changed.
+
+### Prompt Context
+**User prompt (verbatim):** "let's keep the JS callbacks, let's use V8 on the backend. let's go, you design it out
+you're good at that. Create  a detailed analysis / design / implementation guide that is for a new intern, explaining
+all the parts of the system needed to understand what it is, with prose paragraphs and bullet point sand pseudocode
+and diagrams and api references and file references. It should be very clear and technical. Store in the ticket and
+the nupload to remarkable."
+(Preceding questions in the conversation: "what's a preset's kernel?", "can we compile to something other than WGSL
+to target optix more directly?", "…run a JS sandbox in the backend process (say, quickjs)…", "basically like a
+compiler with different backends", "what are number-heavy loops…", "what are some examples in our presets?", "we can
+ofc use v8 if we are already doing c++ anyway... and those are part of the backend, no?", "the preset code is kind of
+the only code that should be run on the backend, and the rest should potentially be ported to C++…", "Or maybe you can
+send the IR entirely to the backend? or do we have callbacks we would need to run?")
+**Assistant interpretation:** Turn the agreed direction into a complete, phased design with interfaces and tests.
+**Inferred user intent:** A plan an intern can execute, and a record of why each boundary is where it is.
+
+### What I did
+- Measured in Node: build+compile B-01 72 ms, K-01 209 ms, K-09 570 ms; per-frame animation+pack 0.04/0.13/0.24 ms
+  (`scripts/08-time-build.mts`, rerun 76/219/576 ms, 0.03/0.09/0.20 ms). CPU-profiled K-09's build
+  (`scripts/09-profile-build.mts`): diagnostics stack capture ~35%, `blasOf` 74 ms, `ggxAlbedoTable` 50 ms,
+  `studioImg`+`envTables` 88 ms (`various/12-build-timing-and-profile.txt`).
+- Catalogued callbacks: `animation` (K-01, K-02, K-07, K-08, K-09), behaviours (W-01, run in `host.ts:204`),
+  derived params (B-02, W-03; `params.ts:99`), static params (E-01, E-04, E-07, X-05, K-09); external poses (K-08).
+- Checked host requirements: modules run as `async` bodies via `new Function` (`candela.ts:77`); no timers/fetch/DOM
+  in the front end; K-09 uses `atob`; D-02 uses `Math.random()` at build time.
+- Checked toolchain: NVRTC has `nvrtcGetOptiXIR`; nvJPEG ships with CUDA 13; OptiX 9.0 has `optixTraverse`/
+  `optixReorder`/`optixInvoke` and the AOV denoiser; `libnode-dev` 18.19.1 is the apt candidate (not installed).
+- Wrote doc 02 (sections: system in one page, background incl. V8 embedding, decisions D1–D10, TypeScript split with
+  types, session, determinism, targets, dialects, bundle; candela-rt structure, JsRuntime, OptixRenderer, device
+  programs and shim, output, CLI; live protocol and sequence; jobs; phases; tests; risks; API and file references).
+- Second pass found and fixed: RNG claim (the translated kernel keeps `pcgH`, so parity should be tighter than AO's),
+  phase 0 exit referenced an IR hash that only exists after phase 1, glowing analytic objects need a separate GAS
+  (masks are per instance), moving meshes need `motionBase = 0` until SRT motion, metering source named, evidence
+  moved from the scratchpad into the ticket.
+- Reworded three tasks to the doc-02 phases; added phase 0, 1 and 4 tasks; index lists doc 02.
+
+### Why
+- Callbacks (`animation`, behaviours, derived params) must run where frames are produced; with V8 in the native
+  process they run there directly, and the browser only needs to send inputs.
+
+### What worked
+- `docmgr doctor` clean (below).
+
+### What didn't work
+- First timing script failed as `.ts` with top-level await under tsx (`TransformError`); `.mts` works.
+
+### What I learned
+- Behaviours and the clock live in the app layer (`host.ts`), so the backend needs them moved into the engine
+  (`SceneSession`) — a refactor the browser also benefits from.
+- The largest JS cost of a build is diagnostics' stack capture, not scene code.
+
+### What was tricky to build
+- Keeping the replicated-front-end design honest: it only works with deterministic builds, hence seeded
+  `Math.random`, bundle-hash checks and an IR hash per build.
+
+### What warrants a second pair of eyes
+- D3 (embed V8 via libnode 18 / V8 10.2) versus a self-built V8; phase 0 decides.
+- D9 (single process) trades crash isolation for simplicity; the browser-owns-state rule is what makes it safe.
+
+### What should be done in the future
+- Phase 0 (needs `sudo apt install libnode-dev`) and the phase-1 golden recorder, before touching `compile.ts`.
+
+### Code review instructions
+- Read doc 02 sections 4–6 against `kernel.ts:523` (`traceAll`), `compile.ts:633` (`pack`), `host.ts:204–226`.
+
+### Technical details
+- Supersedes: the vault report's buffer-level `RemoteOptixBackend`; step 2 (Dawn runner) deferred (D10).
+- Upload: `remarquee upload bundle design-doc/02-… --name "CANDELA-002 candela-rt - V8 and OptiX render runtime"
+  --remote-dir /ai/2026/11/21/CANDELA-002 --toc-depth 2 --non-interactive` → `OK: uploaded CANDELA-002 candela-rt -
+  V8 and OptiX render runtime.pdf -> /ai/2026/11/21/CANDELA-002` (design commit `1d9896b`).
+
+## Step 11: Phase 0 — the engine runs in V8 embedded in candela-rt; 104/105 presets byte-identical with Node
+
+Phase 0 of design doc 02: bundle the engine's non-DOM core, embed V8 (through Ubuntu's libnode, which the user
+installed) in a new native program, and show that the same bundle produces the same programs and buffers in both
+engines. It does, for every preset except D-02, whose `Math.random()` already differs between two Node runs.
+
+### Prompt Context
+**User prompt (verbatim):** "installed. implement, commit at appropriate intervals and keep a detailed diary as you
+work (using the diary format from the skill)." Mid-step: "when running anything, make sure to bind to 0.0.0.0 so i can
+access it on bling.local"
+**Assistant interpretation:** Implement design doc 02 phase by phase, starting with phase 0; any server I start
+binds 0.0.0.0.
+**Inferred user intent:** Working code toward candela-rt, verifiable at each step.
+**Commit (code):** see the commit after this entry ("CANDELA-002: phase 0 …")
+
+### What I did
+- `src/engine/digest.ts`: 64-bit hashes (two 32-bit lanes, plain JS) of `compiled.shared` and of every `pack` buffer
+  (`U`, `O`, `LI`, `BV`, `SDs`, `SDd`, plus metadata) at given times; `digestPreset` with build and per-frame timing.
+- `src/engine/core.ts`: bundle entry (build, cameraUniforms, inv34, loadCatalog/loadPresets, digest functions,
+  `digestCatalog`). `scripts/bundle-core.ts`: esbuild IIFE `globalThis.Candela`, platform neutral, ES2020, writes
+  `dist-core/candela-core.js` and its SHA-256. `dist-core/` ignored.
+- Inspected libnode: headers in `/usr/include/node` (V8 10.2), `libnode.so.109` exports `v8::platform::NewDefaultPlatform`,
+  `Isolate::New`, `Context::New`, `PerformMicrotaskCheckpoint`, `AllowCodeGenerationFromStrings`; `config.gypi` has
+  `v8_enable_pointer_compression: 0`, `v8_enable_31bit_smis_on_64bit_arch: 0` (no extra defines needed).
+- `native/rt/`: `JsRuntime` (platform init, isolate with heap limit, context whose global has only `console`,
+  `performance.now`, `atob`, `btoa`; `runScript`, `call` + `settle` for promises, JSON helpers, zero-copy typed-array
+  `view`), `main.cpp` with `candela-rt digest` (reads `content/` into a JS object, calls `Candela.digestCatalog`).
+- `scripts/core-digest.ts`: the same bundle in a Node `vm` context with the same globals; `--compare` files.
+- npm scripts `bundle:core`, `digest:core`. Design doc 02: phase 0 status; `serve` binds 0.0.0.0 by default.
+- Memory: user preference to bind servers to 0.0.0.0 (bling.local).
+
+### Why
+- Hashing in plain JS inside the bundle means both engines run the identical hashing code; only the engine differs.
+- The Node side uses a `vm` context with exactly candela-rt's globals, so a missing global would fail in Node too.
+
+### What worked
+- `candela-rt digest` → `105/105 presets built`; V8 `10.2.154.26-node.28`; bundle loads in 15 ms.
+- Node vs V8: `104/105 identical; differ: D-02 (t=0 O)`; Node vs Node: the same single difference.
+- Timings: embedded V8 builds all presets in 6.6 s (K-09 487 ms, faster than tsx in Node's main context, 576 ms).
+
+### What didn't work
+- First full run hung (killed after 600 s, no output). Under gdb single presets worked (B-01 85 ms, hashes equal
+  Node's). Two presets spun at 100% CPU. Plain `gdb -p` attach failed (`/proc/sys/kernel/yama/ptrace_scope` = 1);
+  running under gdb and sending SIGINT to the inferior (pid 739095, after first signalling the wrong pid) gave:
+  `#3 operator() … main.cpp:70` in `std::string::find(',')` — my `--ids` quoting loop replaced `,` with `","`, which
+  contains a comma: an infinite loop for any list with a comma. Replaced by `std::getline` splitting.
+- Before finding that, I set `MicrotasksPolicy::kExplicit` (suspecting `settle()`); it was not the cause but is the
+  correct policy for a host that drives promises, so it stays (documented in the code).
+- Node `vm` contexts are ~20× slower than the main context (B-01 1.4 s vs 76 ms) — irrelevant to candela-rt, but the
+  Node half of the check takes ~2.5 minutes.
+
+### What I learned
+- The engine needs nothing from its host beyond `console`, `performance.now` and `atob` (K-09); `new Function` must
+  be allowed; `async` module bodies settle with microtask checkpoints alone (no timers).
+- X-02 (10,000 objects) spends 85 ms per frame in `pack`, mostly rebuilding the top-level BVH — the first
+  profile-driven candidate, and unnecessary for the OptiX target.
+
+### What was tricky to build
+- Distinguishing "V8 hangs" from "my code hangs" without attach permission; gdb as the parent process with a signal
+  to the inferior was the reliable way.
+
+### What warrants a second pair of eyes
+- `JsRuntime` passes `this` to host callbacks through an internal field of a holder object per function; review the
+  lifetime (the runtime outlives its context, so the pointer is valid).
+- `atob` decodes leniently (skips invalid characters) where browsers throw.
+
+### What should be done in the future
+- Phase 1: golden recorder (from `digest.ts`), seeded `Math.random` (makes D-02 deterministic), then the split.
+
+### Code review instructions
+- `native/rt/src/js_runtime.cpp` (constructor: globals; `settle`), `src/engine/digest.ts`, `scripts/core-digest.ts`.
+- Reproduce: `npm run bundle:core && cmake -G Ninja -S native/rt -B build/rt && ninja -C build/rt &&
+  ./build/rt/candela-rt digest --json /tmp/v8.json && npx tsx scripts/core-digest.ts --compare /tmp/v8.json`.
+
+### Technical details
+- Evidence: `various/13-phase0-v8-embedding.txt`.
+
+## Step 12: Phase 1 begins — golden baseline, then deterministic builds (seeded Math.random)
+
+Phase 1 must not change any output, so its first commit records what the engine produces today. The golden test
+digests, for all 105 presets, the generated WGSL and every buffer `pack` writes at three times with the viewport's
+exact `env`. Then the first deliberate change: scene code's `Math.random` is seeded per build, which makes D-02 (the
+only nondeterministic preset) reproducible and brings Node ↔ embedded V8 to 105/105 identical.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11) Mid-step: "Don't forget the diary, and  write a detailed project report for
+the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see
+skill). Commit and push the bsidian vault when done (go-go-parc vault).   (we can continue updating the report as we
+go at each milestone)"
+**Assistant interpretation:** Continue phase 1 with diary entries; publish a vault report at this milestone and
+update it at later ones.
+**Inferred user intent:** A readable record that grows with the implementation.
+**Commit (code):** golden baseline `9cf9c6e`; determinism: the commit after this entry.
+
+### What I did
+- `digest.ts` `packEnv`: mirrors `Viewport.repack` (`viewport.ts:96–108`): poses from `animation(t)`, seed, and
+  motion-blur samples (`compiled.motionBlur`, K presets) — so the golden covers the multi-sample `pack` path too.
+- `tests/golden-pack.test.ts` (`npm run test:golden`, `--update`, `--ids`): 105 presets × t ∈ {0, 0.37, 1.5}; WGSL
+  hash, lines, `nU`, hashes of `U O LI BV SDs SDd` and pack metadata. Baseline committed before any engine change
+  (`9cf9c6e`, 94 KB JSON). Second run: 104/105 identical (D-02).
+- Seeded scene `Math` (`candela.ts`): `sceneMath = Object.create(Math, { random: sceneRandom })` passed as a
+  `new Function` parameter named `Math`; mulberry32 state reset by `build(files, { seed })` (default 0).
+- W501 kept: `scene.ts` `withBuildLambda` now sets a flag; `noteSceneRandom()` (called by `sceneRandom` and by the
+  still-patched global for engine code) warns once per lambda. Message changed from "the scene hash will change on
+  every run (no caching, no reproducible renders)" to "its values depend on every earlier Math.random() call in the
+  build, so edits elsewhere change this part of the scene" — the old text is false once seeded.
+- Docs updated to match: `content/presets/D-02-stages.md` (notes), `content/docs/40-design-examples.md` (W501 example).
+
+### Why
+- Design doc 02 D8: browser and backend build the same scene from the same inputs; D-02 was the counterexample.
+
+### What worked
+- D-02: seed 0 twice → `O 805fc8807a5ece63` both times; seed 7 → `ebb08ba50c825763`; W501 still reported at
+  `scene.js:13`.
+- `tests/golden-pack.test.ts --update --ids D-02` then two full runs: `golden pack: 105/105 identical in 8.0 s`.
+- Rebundled (sha256 `364788cc…`); `candela-rt digest` 105/105 built; `core-digest.ts --compare`: `105/105 identical`.
+- `npm run validate` 105/105 build; `npm test` agent loop ok; `tsc` clean.
+
+### What didn't work
+- Nothing failed in this step.
+
+### What I learned
+- Candela already had a determinism rule (docs/08-invariants: "Build lambdas are deterministic", W501) and a seeded
+  `rng` per group (`makeRng(1)`), so seeding `Math.random` extends an existing invariant rather than adding one.
+- `fx.ts:444` evaluates the expression op `rand` on the CPU with the global (unseeded) `Math.random`; no preset's
+  golden changed because of it, but it is a remaining nondeterminism to remove when touching `evalNode`.
+
+### What was tricky to build
+- Keeping W501's detection when scene code no longer calls the global `Math.random`: the flag-based hook serves both
+  the seeded scene `Math` and engine code.
+
+### What warrants a second pair of eyes
+- The user-visible W501 wording and the D-02 notes changed; check they read well in the workbench.
+- `sceneMath` is shared by all modules of a build; the stream order follows module evaluation order, which is
+  deterministic but makes values depend on `lib/` load order.
+
+### What should be done in the future
+- Phase 1 continues: `SceneSession` (clock, behaviours, poses out of `host.ts`/`viewport.ts`), then the
+  `lower`/targets split, all gated by `npm run test:golden`.
+
+### Code review instructions
+- `src/engine/candela.ts` (`sceneMath`, `seedSceneRandom`, the `new Function` parameter list), `src/engine/scene.ts`
+  (`noteSceneRandom`, `withBuildLambda`), `tests/golden-pack.test.ts`, `src/engine/digest.ts` (`packEnv`).
+- Validate: `npm run test:golden` (105/105), `npm run bundle:core && ./build/rt/candela-rt digest --json /tmp/v8.json
+  && npx tsx scripts/core-digest.ts --compare /tmp/v8.json` (105/105).
+
+## Step 13: SceneSession — clock, behaviours and poses move into the engine; callbacks run in embedded V8
+
+The backend must run scene callbacks without a browser, but the clock and behaviours lived in the app's `Host` and
+the pose/env logic in `Viewport`. I moved that logic into `src/engine/session.ts` as shared functions (the browser
+now calls them) plus a `SceneSession` class for headless hosts, added a test with closed-form answers, and a
+`candela-rt session` command. All six moving presets step identically in V8-in-C++ and Node, frame by frame.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11)
+**Assistant interpretation:** Next phase-1 item from design doc 02 §5.2.
+**Inferred user intent:** Callbacks running in the native process, without changing the browser.
+**Commit (code):** the commit after this entry ("CANDELA-002: SceneSession …")
+
+### What I did
+- `src/engine/session.ts`: `posesAt` (from `Viewport.posesFor`), `makePackEnv` (from `Viewport.repack`),
+  `vecHandle` and `stepBehaviors` (from `Host.runBehaviors`), moved verbatim; `SceneSession` (build with seed, clock,
+  behaviour state, external poses, `seek(t, dt)` with Host.seek's reset rule, `env`, `pack`, injected `world`).
+- `viewport.ts` `repack`/`posesFor` and `host.ts` `runBehaviors` now call them (one-toast error rule kept via
+  `onError`); `digest.ts` `packEnv` uses `makePackEnv`.
+- `tests/session.test.ts` (`npm run test:session`): W-01 stepped 48 frames at 24 fps, positions read back from `pack`'s
+  object records via `inv34` and compared with the closed forms in the preset; top rotation exact; reset on seek back;
+  K-09 session pack = viewport pack; D-02 determinism per seed.
+- Bundle exports `SceneSession`, `sessionTrace`, `sessionCatalog`; `candela-rt session` steps moving presets (those with
+  `.behavior(` or an `animation` export) and digests `U`, `O`, `SDd` per frame; `core-digest.ts --session` is the
+  Node side.
+
+### Why
+- Moving verbatim and making the browser use the moved code keeps one implementation; the golden test and a browser
+  render check that nothing changed.
+
+### What worked
+- Session test: W-01 max error 5.84e-8 over 48 frames; all checks pass. Golden 105/105. `validate` 105/105; agent test ok.
+- `candela-rt session`: 6/6 (W-01 behaviours; K-01, K-02, K-07, K-08, K-09 animation); Node: `6/6 identical frame by
+  frame`. Per-frame cost in V8: 0.04–1.0 ms.
+- Browser: W-01 sequence on WebGPU shows ball and pendulum moving (`various/14-w01-behaviours-webgpu-strip.png`).
+
+### What didn't work
+- My first test asserted that `seek(0, 0)` leaves no behaviour state; `Host.seek` (and the session) reset and then run
+  behaviours once with `dt = 0`, recreating fresh state. Corrected the test to check the top's rotation is back to 0.
+
+### What I learned
+- Behaviour overrides reach `pack` through `nodeXf` (`compile.ts:68–80`): position replaces `at`, rotation is applied
+  as x, y, z rotations after the node's own, scale multiplies the linear part.
+
+### What was tricky to build
+- Reading positions back: `O` holds world→object matrices in BVH order; `+21` maps back to `compiled.objects` (which
+  carry ids), and `inv34` gives the translation.
+
+### What warrants a second pair of eyes
+- `SceneSession.world` defaults to a minimal object (`time`, `ids`); W-01 doesn't use `world`. A behaviour that patches
+  the scene through `world.$(…)` works in the browser only for now.
+- The viewport still owns its own `seed`/`motionOverride`; the session mirrors them as fields.
+
+### What should be done in the future
+- The `lower`/targets split of `compile`/`pack`; then the CUDA dialect.
+
+### Code review instructions
+- `src/engine/session.ts`, the diffs in `viewport.ts` (`repack`, `posesFor`) and `host.ts` (`runBehaviors`),
+  `tests/session.test.ts`, `native/rt/src/main.cpp` `cmdSession`.
+- Validate: `npm run test:session && npm run test:golden && npm run bundle:core && ninja -C build/rt &&
+  ./build/rt/candela-rt session --json /tmp/s.json && npx tsx scripts/core-digest.ts --session --compare /tmp/s.json`.
+
+### Technical details
+- Evidence: `various/14-scene-session.txt`.
+
+## Step 14: Phase 2 — WGSL → CUDA translation, a plain-CUDA target, and pixel parity with WebGPU
+
+Phase 2 asks whether every preset's program can be compiled for CUDA. I went one step further: a plain-CUDA target
+that runs the translated program (including the translated `traceAll` over Candela's own BVH) in `candela-rt`, and a
+WebGPU reference renderer in Node (Dawn), so the translation can be checked by comparing images pixel by pixel before
+OptiX enters. The first comparison exposed a real semantic gap — evaluation order of side effects — and after fixing
+it, 101/105 presets agree with WebGPU on ≥ 99 % of pixels at 1 spp.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11)
+**Assistant interpretation:** Phase 2 of design doc 02, with a measurable exit check.
+**Inferred user intent:** A CUDA backend that renders the same images as the browser.
+**Commit (code):** `1b79006` (translator, CUDA target, B-01 parity); the commit after this entry (sweeps, fast math,
+Dawn fix, docs).
+
+### What I did
+- Inventory of the WGSL constructs the generated programs use (`scripts/10-wgsl-inventory.mts` and a stricter scratch
+  pass on code lines without comments): typed declarations only, structs with one member per line, `select`, `loop`,
+  `for (var …)`, `++`, `%` on i32 only, one private table (`ETAB`), no pointers, switches or generics.
+- Decision: translate the whole program (`compiled.shared`) rather than add `Gen` dialects (§5.6); `wgsl2glsl.ts`
+  already translates the same text for WebGL2, so the generated code is known to stay in the subset.
+- `native/rt/kernels/candela_wgsl.h`: WGSL types (`f32`, `vec3f`, …) and built-ins in namespace `wgsl`; swizzles as
+  member functions; operators as friends so `v * 2` converts like WGSL abstract ints.
+- `src/engine/wgsl2cuda.ts`: constants → `constexpr`, structs, never-written private arrays → `__constant__`; other
+  private variables and all functions → members of a per-thread `struct Kernel`; `let` → `const T`; `var x: T;` →
+  `T x{}` (WGSL zero-init); `1.0` → `1.0f`; `v.xyz` → `v.xyz()`; `select` → `?:`; `bitcast<u32>` → `bitcast_u32`.
+- `src/engine/targets/cuda.ts` (`cudaProgram`), `src/engine/headless.ts` (`openRender`: one scene packed at one time,
+  `frame()` gives each launch's uniforms), `src/engine/wgsl-entry.ts` (the WebGPU prelude/main, now shared by
+  `render.ts` and the Dawn renderer), `frameUniforms` moved from `Viewport.frame` to `session.ts`.
+- candela-rt: `cuda_runner.{h,cpp}` (NVRTC → cubin, driver API, `params` in constant memory, cubin cache in
+  `~/data/candela/cubin-cache` keyed by source, header and option hashes), `candela-rt cuda-sweep` (V8 translates all
+  presets, 10 NVRTC threads), `candela-rt render <id>` (PFM out). `JsRuntime` gained `callMethod` and `get`.
+- `scripts/wgsl-render.ts` (Dawn via the `webgpu` npm package), `scripts/compare-pfm.ts`, `scripts/parity-sweep.ts`.
+
+### Why
+- Comparing the translated program with the original on identical inputs isolates translation errors from OptiX
+  integration errors, which phase 3 would otherwise mix together.
+
+### What worked
+- First nvcc compile of B-01's translation succeeded (158 registers, 1088 B stack); W-01 and K-09 too.
+- NVRTC sweep: 105/105 translate (8–21 ms), compile and load. IEEE math: 11.7 s mean per preset under 10 threads;
+  with `--use_fast_math`: 4.5 s mean, 7.8 s max, 48.5 s wall, 152–232 registers, ≤ 1152 B local
+  (`various/15-nvrtc-sweep-fastmath.json`, measured with `CUDA_CACHE_DISABLE=1`).
+- After sequencing (below), B-01 at 1 spp: 100 % of pixels within 0.1 %, rel. RMSE 0.00 %; at 1024 spp 99.9 %,
+  rel. RMSE 0.01 %; the CUDA target took 451 ms against Dawn's 1063 ms for 1024 spp at 640×360.
+- Parity sweep at 320×180, 1 spp: IEEE math 85/105 presets with ≥ 99 % of pixels within 0.1 %; fast math 101/105
+  (`various/15-parity-1spp-*.log`). The four remaining (F-03, F-04, G-03, R-04) differ only in noise realizations
+  (`various/15-parity-residual-noise-presets.png`).
+- At 64 spp (fast math): every preset's mean luminance within 0.3 % of WebGPU (median 0.0000 %, worst R-04 +0.289 %).
+- Speed at 960×540, 256 spp, same algorithm and BVH: B-01 3.8×, K-09 5.4×, X-02 7.3×, V-04 1.9× faster than Dawn.
+- Browser unchanged after moving `frameUniforms` and the WGSL entry text: golden 105/105, B-01 and K-09 render.
+
+### What didn't work
+- First B-01 comparison: means within 0.095 %, but only 27 % of pixels within 0.1 %; at 1 spp 22 % of pixels had a
+  different *albedo AOV* — not rounding. Cause: C++ evaluates `sampleLobe(L, woL, rnd2(), rnd())`'s arguments in an
+  unspecified order, and `gTau = select(0.5, (f32(s) + rnd()) / f32(spp), …)` became a `?:` that skips `rnd()` when
+  motion blur is off, shifting the whole random stream. Fixed by sequencing (below).
+- `nvrtc: error: unrecognized option --gpu-arch=sm_121 found` → the option is `--gpu-architecture=`.
+- `scripts/wgsl-render.ts`: `TypeError: Cannot read properties of undefined (reading '0')` — `parseArgs` returns
+  `rest`, not `pos`.
+- After refactoring the Dawn renderer into `dawnDevice()`/`wgslRender()`: exit 139 (SIGSEGV) or `terminate called
+  after throwing an instance of 'std::system_error' what(): Invalid argument`. The GPU instance from `create([])` was
+  only referenced inside `dawnDevice`; once collected, Dawn tore it down under the device. Fixed by keeping the
+  instance and adapter reachable.
+- A sweep reported NVRTC times of 43–400 ms: the CUDA driver's compute cache (`~/.nv/ComputeCache`, 769 MB) also
+  serves NVRTC results. Honest numbers need `CUDA_CACHE_DISABLE=1`.
+
+### What I learned
+- NVIDIA's Vulkan driver evaluates WGSL `sin`/`cos` (and likely exp/log/division) with the approximate hardware
+  units. Candela's noise hash `fract(sin(dot(p, k)) * 43758.5453)` multiplies `sin`'s last bits by 43758, so IEEE
+  `sinf` gives unrelated noise: G-03 (terrain) was off by −17.5 % in mean luminance until `__sinf`/`__cosf`
+  (83 % of pixels within 0.1 %) and then `--use_fast_math` (87 %, 99.7 % within 1 %).
+- The same hash makes the browser's own noise differ between GPU vendors; an integer hash (the kernel already has
+  `pcgH`) would make noise identical everywhere, at the cost of changing every noise preset's look once.
+
+### What was tricky to build
+- Sequencing side effects: the translator finds impure functions by fixpoint (assigns a `var<private>` or calls an
+  impure function), splits each line into statements at top-level `;`, `{`, `}`, and, when a statement has two impure
+  calls or one inside a `select`, hoists them post-order left to right (`const auto _sN = rnd2();`). It refuses
+  (throws) where hoisting would be wrong: `else if`, `for`/`while` headers, short-circuit operators.
+- `.b` is a struct member (`Frame.b`), so only 2–4-component `xyzw` swizzles are rewritten.
+
+### What warrants a second pair of eyes
+- `--use_fast_math` as the default (`kNvrtcOptions` in `cuda_runner.cpp`): it is chosen to match WebGPU on this GPU,
+  not IEEE accuracy.
+- The sequencing pass covers the cases the presets contain; a future kernel edit with an impure call inside `&&` will
+  fail translation loudly rather than silently.
+- `candela_wgsl.h` defines `min`/`max`/`clamp` as templates returning the common type; WGSL forbids mixed vector/scalar
+  forms, so none are provided.
+
+### What should be done in the future
+- Phase 3: the OptiX target — omit `traceAll`, add the traversal shim, GAS/IAS from the pack data, then the same
+  parity sweep against WebGPU.
+- Decide on an integer noise hash (changes the look of the noise presets once; makes noise backend-independent).
+
+### Code review instructions
+- `src/engine/wgsl2cuda.ts` (`impureFunctions`, `sequence`, `stmt`, `wgslToCuda`), `native/rt/kernels/*`,
+  `native/rt/src/cuda_runner.cpp`, `native/rt/src/main.cpp` (`cmdCudaSweep`, `cmdRender`, `compileCached`).
+- Validate: `npm run bundle:core && ninja -C build/rt && ./build/rt/candela-rt cuda-sweep` (105/105), then
+  `npx tsx scripts/parity-sweep.ts --size 320x180 --spp 1` (≥ 99 % within 0.1 % for 101/105).
+
+### Technical details
+- Evidence: `various/15-phase2-cuda-translation.txt`, `15-nvrtc-sweep-fastmath.json`, `15-parity-1spp-ieee.log`,
+  `15-parity-1spp-fastmath.log`, `15-b01-before-sequencing-64spp.png`, `15-b01-after-sequencing-1spp.png`,
+  `15-parity-residual-noise-presets.png`.
+
+## Step 15: Published for review — GitHub PR #1 against an empty main; vault report updated
+
+The user asked for the work to be pushed and reviewed by Codex as one unit. The remote `main`
+(`wesen/2026-11-21--pbr-spark`, public) already held only the docmgr scaffolding commit `749182c`, which is the root of
+the local history, so no force push was needed: the work went to a branch and a PR against that `main` shows the
+whole codebase.
+
+### Prompt Context
+**User prompt (verbatim):** "how far are we?" and "can we push to github ? / make a PR against an empt main, so we get
+the @codex review review?"
+**Assistant interpretation:** Push everything, open a PR whose diff is the entire project, request a Codex review.
+
+### What I did
+- `git switch -c candela-rt`; `git branch -f main origin/main` (local `main` = the scaffolding commit, so a stray push
+  cannot merge the PR); `git push -u origin candela-rt`.
+- `gh pr create --base main --head candela-rt` → https://github.com/wesen/2026-11-21--pbr-spark/pull/1
+  (687 files, +57,040/−4); commented `@codex review`.
+- Vault report (go-go-parc, commit `7b92fe78`): Part 7 on the CUDA translation, evaluation order, the sine hash, the
+  measurements; figures in `_assets/candela-rt-*`.
+- Checked before pushing: no `.env`/key files tracked, no API-key patterns in tracked files, largest file 1.3 MB.
+
+### What should be done in the future
+- Work continues on `candela-rt`; read Codex's review comments on PR #1 and address them.
+
+## Step 16: Phase 3 — the OptiX target: RT-core traversal under the unchanged translated kernel
+
+Phase 3 swaps one function of the translated program, `traceAll` (the walk over Candela's top-level BVH), for
+`optixTrace` on the RT cores, and leaves everything else — `hitObj`, `finishHit`, materials, lights, the path loop —
+as translated. The user also re-set the goal mid-step: renders must *look* the same as the WebGPU prototype, not match
+per pixel, and Candela may diverge where OptiX offers something better.
+
+### Prompt Context
+**User prompt (verbatim):** "close trellis-bench. then when the servers are running, continue with phase 3-6"; later
+"wedon't need matches to be all that close, we care about the looks" and "this was a first prototype (the webgpu,
+glsl etc...) anyway, since we use a different engine, that's fine if it allows us to benefit from improvements and
+things don't look drrastically different. What of optix are we using? commit at appropriate intervals and keep a
+detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Stop trellis-bench (port 8090), serve the parity gallery and the workbench on
+bling.local, then implement phases 3–6; judge parity visually; report which OptiX features are in use.
+**Inferred user intent:** A faster renderer whose images look like the workbench's, with room to use OptiX's features.
+**Commit (code):** `9ebcbee` (OptiX target), the commit after this entry (sweep, gallery, timings).
+
+### What I did
+- Servers: stopped `trellis-bench` (pid 1674386, `--addr 0.0.0.0:8090`); `python3 -m http.server 8090 --bind 0.0.0.0
+  --directory build/parity-gallery` (gallery from `scripts/parity-gallery.ts`); `npx vite --host 0.0.0.0 --port 5173`
+  — Vite answered 403 to `Host: bling.local` until `server.allowedHosts` listed bling's names (`vite.config.ts`).
+- Read the contracts the shim must keep: `hitMesh` records `gTri` = scene-data row of the 7-row triangle record and
+  `gBary`; it ignores hits with t ≤ EPS; `pack` writes O rows `[ty, mat, light, flags] [M⁻¹ (3 rows)] [pr]
+  [irand, objectIndex, motionBase+1, bound]` and relative poses `P_k = M_k·M_c⁻¹` for moving objects.
+- `pack` also returns `boxes` (world box per packed object, swept when moving; NaN for unbounded) and `nBounded`.
+- `src/engine/targets/optix.ts` (`optixScene`): GAS input per mesh definition from `blasOf(def).tris` in record order
+  (v0, v0+e1, v0+e2); instance per mesh object (transform = `P.mats[oi]`, id = O index, mask 1|2, glowing → 1);
+  AABB per bounded analytic object (padded by 1e-4 relative); motion base of moving meshes cleared in a copy of O.
+- `native/rt/kernels/candela_traversal.inc`: `traceAll` member — loop over unbounded planes, then `optixTrace`
+  (tmin = EPS, shadow rays mask 2 + terminate on first hit), payload 0–7 (t, object, primitive, barycentrics, gTau,
+  gTime, shadow flag); sets `gTri = pr.y + 7·primitive`, `gBary`.
+- `candela_optix_programs.cuh`: raygen = WebGPU main; triangle CH; analytic IS = translated `hitObj` on the world
+  ray with a fresh `Kernel` carrying gTau/gTime from the payload; analytic CH; empty miss.
+- `optix_renderer.{h,cpp}`: OptiX context on the driver-API context, module from NVRTC OptiX-IR, 4 program groups,
+  stack sizes, SBT (hit records: triangle, analytic), GAS/IAS builds with compaction, launch per frame.
+- `candela-rt render --backend optix`, `cuda-sweep --backend optix`, `--no-motion-blur` (both renderers),
+  `parity-sweep.ts --backend optix`, an 8×8-block luminance metric in `compare-pfm.ts` and the gallery.
+
+### Why
+- Keeping `traceAll`'s contract means the OptiX target reuses every line of shading code; only traversal changes.
+
+### What worked
+- First compile of K-09's OptiX program with nvcc (2.7 s, only unused-variable warnings) and first OptiX render of
+  B-01: 100 % of pixels within 0.1 % of WebGPU at 1 spp, albedo AOV too.
+- K-09 (34 meshes, 23,701 triangles): 99.9 % of pixels within 0.1 % at 1 spp — OptiX triangles + the shim reproduce
+  `hitMesh`'s `gTri`/`gBary`.
+- `cuda-sweep --backend optix`: 105/105 compile to OptiX-IR (2.0 s mean, 3.4 s max) and create pipelines.
+- 64-spp sweep, all presets: 104/105 look the same (displayed 8×8 blocks within 2 % of white); F-03's Voronoi cells
+  take different colours (the sine hash). Gallery: http://bling.local:8090/optix/ (and /cuda/ for phase 2).
+- Register limit: `maxRegisterCount = 255` took K-09 from 2.9 s (OptiX default, 128) to 0.75 s; OptiX then beats
+  plain CUDA on meshes (K-09 0.74 s vs 0.97 s) and many objects (X-02 1.14 s vs 2.0 s).
+- `--backend auto` (default): OptiX when the scene has meshes or > 64 analytic objects, plain CUDA otherwise. At
+  960×540, 256 spp against Dawn: B-01 3.8×, K-09 7.0×, X-02 12.9×, V-04 1.7× (`various/16-phase3-optix.txt`).
+
+### What didn't work
+- X-02 (10,000 spheres): 91.6 % of pixels within 0.1 % at 1 spp although the plain-CUDA target matches 100 % and the
+  albedo AOV matches 99.9 %. Secondary paths diverge on the silhouettes of tiny spheres; the intersection program is
+  compiled by OptiX's backend from OptiX-IR, so its float arithmetic is not bit-identical to the cubin. At 64 spp the
+  mean agrees to 0.006 % and 8×8 blocks to 0.99 % — it looks the same.
+
+- OptiX at its default register limit was *slower* than plain CUDA on every scene but X-02 (B-01 904 ms vs 141, K-09
+  2,863 vs 973, V-04 7,569 vs 4,671).
+- Keeping the translated BVH walk inside the OptiX program for small scenes (`traceAllBVH`, chosen per scene) helped
+  B-01 (173 ms) but not V-04 (7.7 s) and slowed K-09 to 929 ms (bigger raygen); reverted in favour of choosing the
+  target per scene.
+- The first linear "block" metric flagged X-03 (584 %), V-04 and S-02, which look identical: a few fireflies (X-03's
+  sun glint on the sea) dominate linear differences. The metric is now computed on tone-mapped display values.
+- A Bash call with `rm -rf` was rejected by the user ("use python for dangerous commands like that"); deletions now
+  go through a Python script with explicit, checked targets (saved as a memory).
+
+### What I learned
+- Per-pixel identity is the wrong bar between compilers; the user confirmed "looks" is the bar.
+- Running the whole path tracer in the raygen program makes every `optixTrace` save and restore a lot of live
+  state; the RT cores win only where traversal dominates (meshes, thousands of objects). For compute-heavy scenes
+  with few objects (volumes), OptiX's compilation of the shading code is slower than NVRTC's cubin even without
+  traces in the hot loop.
+
+### What was tricky to build
+- The IS program runs outside the raygen's `Kernel`, so per-thread state `hitObj` reads (gTau for motion poses,
+  gTime for animated fields) travels in the payload.
+
+### What warrants a second pair of eyes
+- Moving meshes lose motion blur on OptiX (phase 6: SRT motion transforms).
+- AABB padding (1e-4 relative) is a guess; too small would drop hits at box faces.
+- `AUTO_OPTIX_MIN_OBJECTS = 64` is set from two data points (B-01, X-02); presets with 64–1,000 analytic objects
+  have not been timed.
+- OptiX module compiles take 8–17 s the first time at 255 registers; fine offline, slow for live structure edits.
+
+### What should be done in the future
+- Reduce per-trace cost: shader execution reordering (`optixTraverse`/`optixReorder`/`optixInvoke`), built-in sphere
+  primitives instead of the generic intersection program, smaller live state across traces.
+- The OptiX denoiser (AOV model with albedo and normal guides) — the largest visible improvement at low spp.
+- Phase 4 (sequences, EXR, video) and phase 5 (live server).
+
+### Code review instructions
+- `src/engine/targets/optix.ts`, `src/engine/headless.ts` ('auto'), `native/rt/kernels/candela_traversal.inc`,
+  `candela_optix_programs.cuh`, `native/rt/src/optix_renderer.cpp`, `cmdRender` in `main.cpp`.
+- Validate: `./build/rt/candela-rt cuda-sweep --backend optix` (105/105), `npx tsx scripts/parity-sweep.ts --backend
+  optix --no-motion-blur --spp 64` then `npx tsx scripts/parity-gallery.ts --in build/parity-sweep --out
+  build/parity-gallery/optix`.
+
+### Technical details
+- Evidence: `various/16-phase3-optix.txt`, `16-parity-optix-64spp.log`, `16-optix-compile-sweep.json`.
+
+## Step 17: Codex review of PR #1 — five P2 findings fixed
+
+Codex reviewed commit `1780050` and posted five P2 findings: one in the engine (`SceneSession` instances share
+parameter state), one race in the browser viewport, and three workbench bugs. All five were real; each is fixed in
+`6e05a36`, and the review threads have replies naming the commit.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 15) "…so we get the @codex review review?"
+**Assistant interpretation:** Act on the review once it arrives.
+
+### What I did
+- Params: `ParamScope` (`values`, `defs`, `order`, `derived`) with `withParamScope`/`withParamScopeAsync` in
+  `params.ts`; `SceneSession` swaps its own scope in around `build`, `seek` (behaviours), `posesFor` and `pack`;
+  `setParam(id, v)`; `headless.ts frame()` evaluates camera uniforms in the session's scope.
+- `Viewport.load()` → promise chain over `loadNow()`.
+- `Host.nextMineId()` (one past the highest `U-NN`), used by `saveAsMine` and `importProject`; `saveEdits()` writes
+  `deleted` tombstones, `loadPreset()` honours them.
+- `capture.ts`: CSS from every same-origin `document.styleSheets` entry.
+
+### What worked
+- New isolation check: B-02's packed uniforms identical before and after another session builds B-01; `setParam` in
+  one session leaves another's pack unchanged. Golden 105/105, `npm test`, `validate` 105/105, browser renders of
+  B-02 and W-01 fine; native renders still match WebGPU (B-01, B-02, K-09 displayed difference 0.00 %).
+
+### What didn't work
+- After the fix, `tests/session.test.ts` reported `FAIL K-09 session pack equals viewport pack at t=0 (differs: U)`.
+  The test's reference (`packDigest`) called `compiled.pack` with the *global* parameter scope, which no longer holds
+  K-09's definitions; the session was right. The reference now runs inside `withParamScope(s.params, …)`.
+
+### What warrants a second pair of eyes
+- Scopes are swapped by assignment around synchronous and awaited calls; two builds interleaving across awaits would
+  still collide (as other build globals would). The hosts never interleave builds.
+- Host and capture fixes have no automated test (browser-only code).
+
+## Step 18: Phase 4 — render jobs: sequences, the display program on the GPU, OptiX motion blur, PNG/EXR/NVENC
+
+Phase 4 turns `candela-rt render` from a parity tool (one linear PFM) into a render-job runner: a still or a
+sequence, with the frames the workbench would show (its own denoise, exposure and tone map), EXR passes for
+compositing, and video through NVENC. Moving meshes now blur on the OptiX target too (SRT motion transforms), which
+the lockstitch scenes need. Exit check: the lockstitch head renders one 1080p stitch at 64 spp in 45 s, against the
+~234 s of the browser render queue.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 16) "close trellis-bench. then when the servers are running, continue with
+phase 3-6"
+**Assistant interpretation:** Phase 4 of design doc 02 (§6.5, §8, §9): sequences, motion samples, EXR with AOVs,
+NVENC; exit check: the lockstitch reel rendered by candela-rt, timed against the 230 s/stitch WebGPU baseline.
+**Inferred user intent:** Produce the lockstitch videos (and any preset's) fast on the Spark, looking as in the
+workbench.
+
+### What I did
+- `src/engine/display.ts` (new): the display side shared by the browser and the headless renderers — `displaySource`
+  and `TONEMAP_IX` (moved from render.ts, re-exported there), `compileUserPass` (moved from viewport.ts),
+  `postSettings(engine)`, `displayUniforms(...)` → `{ D, denoise }`, `denoiseStepUniforms`, `meterExposure(accum,
+  w, h)`, `passesFromBuffers(...)`. `Viewport.load/show/meter/readPasses` call them (same arithmetic as before).
+- `targets/cuda.ts cudaPostProgram(displayWgsl)`: the display program through wgsl2cuda with
+  `candela_post_params.h` (pointers dsp/src/aovA/aovN/dst/out), `candela_post_accessors.inc` (the WGSL `pre`:
+  D, W, cAt, aAt, nAt, sq, lum, safeNorm) and `candela_post.cuh` (`candela_denoise`, `candela_display` → RGBA8).
+- `headless.ts`: `params` (set before the build; unknown ids are an error), `seed`, `seek(t, dt, seed)` (behaviours
+  step, repack, `version++`), `idUniforms()`, `meter(accum)`, `display()`, `exr(accum, aovA, aovN, ids)`
+  (passesToEXR), `post` (the CUDA display program). `openRenderPreset` defaults a still to the preset's time.
+- `targets/optix.ts`: split into `optixMeshes` (once; mesh indices from a stable per-scene table — `P.order` changes
+  when objects move) and `optixFrame` (per frame: instances, SRT keys, AABBs). Moving mesh instances carry a motion
+  slot; per slot 12 floats world→object at the frame time + 16 per key (OptixSRTData: uniform scale, the kernel's
+  pose quaternion — sign-aligned key to key — and translation).
+- `OptixRenderer`: pipeline variant with `usesMotionBlur` + `ALLOW_ANY` graph + traversable depth 4 when the scene
+  can move (K ≥ 2 shutter samples and animation/behaviours); `buildMeshes` once, `setFrame` per frame (instance →
+  SRT motion transform (τ ∈ [0, 1]) → static transform (M_c, inverse computed on the host) → GAS); the shim passes
+  `gTau` as the ray time.
+- `renderer.h` (base for both targets: buffers, read-back), `post.{h,cpp}` (PostProcessor: à-trous passes ping-pong,
+  then display, as GPURenderer.display), `image_io.{h,cpp}` (PFM, PNG via zlib, `VideoWriter` = ffmpeg with
+  h264/hevc/av1_nvenc on a pipe), `JsRuntime::floats`.
+- `candela-rt render`: `--format pfm,png,exr,mp4`, `--sequence --start --end | --frames`, `--fps`, `--param id=v`,
+  `--seed` (job default 1, seed + frame unless `--fixed-seed`), `--codec`, `--quality`, `--name`; exposure metered
+  on frame 0 and held; outputs default to `~/data/pbr-spark/renders/<id>/` (parity runs still to `build/parity`).
+- `tools/lockstitch/render.ts --engine rt`: one candela-rt process per scene.
+
+### Why
+- Translating the display program (rather than re-implementing tone mapping in C++) keeps one definition of "what
+  the workbench shows", including user passes; it costs one ~120 ms NVRTC compile per scene, cached.
+- SRT motion transforms reproduce the kernel's pose interpolation exactly (component-wise lerp, normalised
+  quaternion, K keys over the shutter), so OptiX and WebGPU blur moving meshes the same way.
+
+### What worked
+- PFM parity unchanged after the refactor (B-01, K-09 at 1 spp: displayed difference 0.00 %).
+- PNG stills vs the browser's render queue (640×360, 64 spp): B-02 0.01 %, S-02 0.25 %, K-09 1.39 % of white
+  (displayed 8×8 blocks); K-09 S-03 at t = 0.25 with motion blur: OptiX 0.02 %, CUDA 0.02 %.
+- Motion blur: S-03 at 0.5 s/stitch, the spinning bevel gear smears into a disc on OptiX as on CUDA/WebGPU; sharp
+  teeth with `--no-motion-blur`.
+- Sequence: K-09 S-03, 12 frames 640×360 16 spp, ~45 ms per frame including PNG + MP4.
+- S-07 one stitch (48 frames), 1920×1080, 64 spp, MP4: 44.9 s wall (render 42.7 s, 0.89 s/frame; per-frame IAS +
+  transforms 0.9 ms).
+
+- Browser baseline in the same session (`tools/lockstitch/render.ts --scenes 7 --size 1920x1080 --spp 64`):
+  render 224.0 s, wall 225.9 s → candela-rt 5.0× faster per stitch. Frame 24 of both videos: displayed difference
+  0.39 % of white (`various/18-lockstitch-s07-frame24-rt-vs-browser.png`).
+- Full reel (all seven scenes, S-07 as four orbiting stitches, 1080p, 64 spp): 528 frames in 462 s including
+  first-time compiles, `reel.sh` 5 s → `~/data/pbr-spark/lockstitch-rt/lockstitch-reel.mp4` (32 s); per stitch
+  37–48 s. Linked from the gallery: http://bling.local:8090/lockstitch/lockstitch-reel.mp4
+- EXR: B-02 with R G B A, albedo.RGB, N.XYZ, Z, id.instance, id.face (exrheader); ids −1 (sky, alpha 0), 0, 1, 2.
+
+### What didn't work
+- The first EXR write failed in embedded V8: `ReferenceError: TextEncoder is not defined` (writeEXR encodes
+  attribute strings). TextEncoder/TextDecoder are Web APIs, not ECMAScript; `JsRuntime` now installs UTF-8
+  versions (`kWebGlobals`) next to atob/btoa.
+- `tools/lockstitch/reel.sh` expects Inter (`/usr/share/fonts/opentype/inter/Inter-Medium.otf`), not installed
+  here; it now falls back to DejaVu Sans (`sudo apt install fonts-inter` restores the original captions).
+
+### What I learned
+- `P.order` (the top-level BVH order) changes from frame to frame when objects move; anything indexed by it
+  (mesh numbering for GASes built once) must come from a stable table instead.
+
+### What was tricky to build
+- The graph for a moving mesh: the SRT transform must apply *outside* M_c (world = P(τ)·M_c·x), and an SRT cannot
+  hold a general affine M_c, so a static transform sits between the motion transform and the GAS (depth 4).
+
+### What warrants a second pair of eyes
+- Exposure is metered on the converged first frame; the browser meters at 2/8/32 spp — EVs can differ slightly.
+- The motion pipeline is chosen at open time from "animation or behaviours exist"; a scene whose meshes move only
+  through other means would render them unblurred (stilled) as before.
+
+### What should be done in the future
+- Phase 5 (live server), phase 6 (denoiser, SER).
+
+### Code review instructions
+- `src/engine/display.ts`, `headless.ts`, `targets/optix.ts`, `native/rt/src/{optix_renderer,post,image_io}.cpp`,
+  `cmdRender` in `main.cpp`, `native/rt/kernels/candela_post*`.
+- Validate: `./build/rt/candela-rt render B-02 --format png,exr --size 640x360 --spp 64`;
+  `npx tsx tools/lockstitch/render.ts --engine rt --scenes 3 --size 960x540 --spp 16`.
+
+### Technical details
+- Evidence: `various/18-phase4-jobs.txt`, `18-lockstitch-*.{json,log,png}`, `18-motion-blur-gear-*.png`,
+  `18-png-stills-rt-vs-browser.png`. Code commit `dc8a3b4` (+ TextEncoder, reel font fallback in the next commit).
+
+## Step 19: Phase 5 — candela-rt serve and the workbench's OptiX mode
+
+The workbench can now render on the Spark: an "OptiX" toggle in the viewport toolbar connects to `candela-rt
+serve`, which builds the same scene in its own V8, renders it with the CUDA/OptiX target and streams progressive
+JPEG frames. The browser keeps building every scene itself (editor, diagnostics, picking) and forwards its inputs.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 16) "close trellis-bench. then when the servers are running, continue with
+phase 3-6"
+**Assistant interpretation:** Design doc 02 §7: the inputs protocol, IR-hash handshake, nvJPEG frames, browser OptiX
+mode; bind 0.0.0.0 so it is reachable from bling.local.
+
+### What I did
+- `native/rt/src/serve.cpp`: IXWebSocket v11.4.6 (CMake FetchContent, no TLS, per-message deflate off — JPEGs do
+  not compress). IX threads push messages on a queue; one session thread owns the isolate, the CUDA context, the
+  renderer, the display program and the nvJPEG encoder, alternating between messages and a render batch.
+- Protocol in: `hello`, `files {files, params, time, seed}`, `param {id, value}`, `view {view, width, height}`,
+  `clock {t, playing, rate}`; out: `hello`, `status`, `built {ok, irHash, target, …}`, `error`, and binary frames
+  (uint32 header length + header JSON + JPEG).
+- Batches adapt to ~20 ms; a frame at most every 100 ms while converging, every tick while playing; exposure
+  metered at 1, 8 and 32 spp after scene/param/view changes (not on clock ticks); `--max-spp 2048`,
+  `--max-width 1920`; frames skipped while the socket has > 8 MiB queued. The renderer is kept across rebuilds that
+  do not change the program (`target:hash`).
+- `jpeg.{h,cpp}` (nvJPEG on the default stream, primary context); the display kernel also writes packed RGB.
+- `HeadlessRender`: `irHash` (digest of `compiled.shared`), `view`/`setView`, `resize`, `setParam` → `repack` |
+  `rebuild` | `unknown`, `paramValues`; `Renderer::resize` (the base owns the image buffers).
+- Browser: `src/app/remote.ts` (`RemoteRender`: connect to `?rt=` / `localStorage candela.rtUrl` / `ws://<page
+  host>:8790`, retry every 2 s, object-URL frames), `Host.setRemote`/`remoteFiles` (files + param values after each
+  build), param forwarding in `onParam`, camera + size and clock in `tick` (deduplicated), viewport `<img
+  class="vp-remote">` overlay, OptiX toggle, chips (state, spp, size, target, fps, "program differs").
+- `scripts/live-client.ts` (protocol test without a browser), `scripts/live-browser-check.ts` (Playwright on the
+  Vite dev server: toggle, wait for frames, orbit, param, back to WebGPU).
+
+### Why
+- Keeping the session's logic in the JS `HeadlessRender` (seek, setParam, view) leaves the C++ server as a loop over
+  queued messages and render batches; message parsing uses V8's own `JSON.parse`.
+- One thread for V8 + CUDA: the isolate must be entered from one thread, and so the GPU work is ordered without locks.
+
+### What worked
+- live-client B-02: built 113 ms (+ NVRTC 3.5 s the first time), first frame 26 ms after `built`, 2048 spp at
+  960×540 in ~1.5 s; a `gloss=0.9` change → new epoch, sharper reflections.
+- live-client K-09 S-03 (OptiX + motion): play for 3 s → 98 frames (33 fps at 8 spp, 960×540), the scene time
+  advancing on the server; pause → converges (1240 spp after 4 s).
+- Browser (Playwright, `http://localhost:5173/`): B-02 OptiX mode live after 0.5 s, `irHash` = local hash
+  `9318995807c81a63`; orbit and param restart the server's epoch; K-09 live after 1.0 s on `optix +motion`, hashes
+  equal (`f714741444cb697b`); server frame and local WebGPU frame (past 512 spp) look the same.
+
+### What didn't work
+- The first frame went out at the default EV 12 before any metering (B-02's metered EV is 14.84): a bright flash.
+  The server meters at 1 sample first (the viewport meters at 2, 8, 32).
+- A K-09 test timed out with 0 frames: after the header change every program recompiled (NVRTC 2 s + OptiX module
+  9.2 s) and the client's window was 9 s; a second run (cached) was live in 1 s.
+- Comparing the server frame (2048 spp) with local WebGPU at 93 spp looked like a param mismatch (blurred
+  reflections); it was the local preview denoiser (< 512 spp). Compared past 600 spp, they match.
+
+### What I learned
+- The program hash makes a mismatch visible at once: both sides build from the same sources, so equal hashes mean
+  the same scene program, whatever the transport did.
+
+### What was tricky to build
+- IXWebSocket's message callback gives a `WebSocket&`; to keep the client alive in the session thread, the server
+  looks the matching `shared_ptr` up in `getClients()`.
+
+### What warrants a second pair of eyes
+- One client at a time (the last to speak); a second browser takes over the session.
+- `--token` is checked as a substring of the URI; fine on the local network, not real authentication.
+- The workbench's engine override (Preview/Realtime) is not forwarded; the server renders the scene's own engine.
+
+### What should be done in the future
+- "Render on the Spark" in the Render dialog (`render` jobs over the socket); asset uploads (dropped HDRIs).
+- Phase 6: the OptiX denoiser for the live view.
+
+### Code review instructions
+- `native/rt/src/serve.cpp`, `jpeg.cpp`, `src/app/remote.ts`, `Host.tick/setRemote/remoteFiles`, `RemoteChips` in
+  `src/app/ui/viewport.tsx`.
+- Validate: `./build/rt/candela-rt serve` then `npx tsx scripts/live-client.ts B-02 --tweak gloss=0.9` and
+  `npx tsx scripts/live-browser-check.ts K-09`; in a browser: http://bling.local:5173/ → OptiX.
+
+### Technical details
+- Code commit `7e05db3`; evidence `various/19-live-*.png`.
+
+## Step 20: Project report for the vault — the whole project, the NVIDIA side (milestone)
+
+A new dated report covers the project from the imported Candela workspace to the live OptiX workbench, centred on
+the NVIDIA stack (GB10, headless-shell GPU access, CUDA/NVRTC, OptiX and the register limit, SRT motion transforms,
+NVENC, nvJPEG). The denoiser work (phase 6) was paused before any code for it was written.
+
+### Prompt Context
+**User prompt (verbatim):** "actually  write a detailed project report for the obsidian vault as a deep dive
+technical analysis blog post using a textbook writing style (no analogies, see skill). Commit and push the bsidian
+vault when done (go-go-parc vault)." Follow-up: "the report is about the whole project and implementation since we
+downloaded candela and started from it. focusin on the nvidia  of things". The user installed matplotlib with apt
+for the charts.
+
+### What I did
+- `Projects/2026/11/22/PROJECT REPORT - Candela on NVIDIA - From a Browser Path Tracer to OptiX, NVENC and a Live
+  Workbench on the DGX Spark - A Technical Deep Dive.md` in go-go-parc (vault commit `0cd2a18e`), with nine figures
+  in `_assets/candela-nvidia-*`: seven copied from earlier reports and two new charts (register limit vs K-09 render
+  time; speed-up over WebGPU per preset) made by `scripts/20-report-charts.py` (palette checked with the dataviz
+  validator; aqua below 3:1 contrast, so every bar carries a value label).
+- New note rather than an edit: the vault is append-only; it links the two earlier Candela reports.
+
+### What should be done in the future
+- Phase 6 resumes with the OptiX AI denoiser (AOV model, albedo and world-space normal guides).
+
+## Step 21: Phase 6 — the OptiX AI denoiser in render jobs and the live view
+
+The OptiX AI denoiser now runs between accumulation and the display program: 4 spp with it has a lower per-pixel
+error than 64 spp without it, and one 1080p stitch of the lockstitch head takes 13.9 s at 16 spp (44.9 s at 64 spp
+raw, 225.9 s in the browser).
+
+### Prompt Context
+**User prompt (verbatim):** "continue." (after the report; Step 20) and "commit at appropriate intervals and keep a
+detailed diary as you work (using the diary format from the skill)"
+**Assistant interpretation:** Resume phase 6 with the denoiser, measure it, keep commits and the diary going.
+
+### What I did
+- `denoiser.{h,cpp}` (`AiDenoiser`): own `OptixDeviceContext` on the CUDA context (so the plain-CUDA target can use
+  it), `OPTIX_DENOISER_MODEL_KIND_AOV` with `guideAlbedo`, `guideNormal`, alpha copied; per frame
+  `optixDenoiserComputeAverageColor` then `optixDenoiserInvoke` with one beauty layer. The AOV model wants normals in
+  world space (the header: camera space only for the deprecated LDR/HDR kinds) — what `aovN` already holds.
+- `candela_guides` in `candela_post.cuh`: beauty = `cAt` (radiance average), albedo = `aAt` clamped, normal = `nAt`,
+  launched with kernel arguments (the `post` constant block unchanged).
+- `PostProcessor::run(..., ai)`: guides → denoise → display pass on the denoised radiance (`D(1).w = 1`, no à-trous).
+- `candela-rt render --denoise scene|ai|off` (default scene); `serve --denoise` (default ai); frame headers carry the
+  denoiser and its time; the workbench chip says "AI denoised".
+
+### Why
+- Before tone mapping: the AOV model works on linear HDR; the display program (exposure, AgX, user passes) then sees
+  a clean image, so the denoiser does not need to know the workbench's look.
+- An 8×8-block metric hides noise by construction; the denoiser is judged per pixel (and per block for bias).
+
+### What worked
+- Quality and cost: `various/21-ai-denoiser.txt` (K-09 S-07, 960×540 vs 4096 spp: 4 spp + AI 1.19 % per-pixel
+  RMSE, 64 spp raw 1.71 %; 5.7–8.8 ms per frame; 18.3 ms at 1080p). Crops: noise gone at 16 spp, slight smoothing at
+  4 spp (`various/21-denoiser-k09-crops-*.png`).
+- Lockstitch S-07 stitch at 1080p, 16 spp + AI: 13.9 s wall; the frame's error 0.81 % vs 1.67 % for 64 spp raw.
+- Live (test server on 8791): K-09 plays at 24 fps with 4 spp + AI per frame; a playing frame looks like the
+  converged one (`various/21-live-4spp-ai-vs-converged.png`).
+
+### What didn't work
+- Nothing failed outright. The live stream trades frame rate for quality: 33 fps at 8 spp raw became 24 fps at
+  4 spp + AI, because the batch still targets 25 ms per tick and the denoiser adds ~7 ms.
+
+### What I learned
+- At these sample counts the denoiser is worth more than a 4–16× increase in samples; for final renders the sample
+  budget should be chosen with the denoiser on.
+
+### What warrants a second pair of eyes
+- The temporal AOV model (flow vectors) would stabilise denoised animation frames; frames are denoised
+  independently now, so low-spp sequences may flicker slightly in flat regions.
+- The live server's batch target (25 ms) ignores the denoiser's cost.
+
+### What should be done in the future
+- Temporal denoising for sequences; SER and built-in spheres (next).
+
+### Code review instructions
+- `native/rt/src/denoiser.cpp`, `post.cpp` (`run`), `candela_guides` in `native/rt/kernels/candela_post.cuh`,
+  `--denoise` in `main.cpp` and `serve.cpp`.
+- Validate: `./build/rt/candela-rt render K-09 --spp 16 --denoise ai --format png --size 960x540`.
+
+### Technical details
+- Code commit `b7c151b`; evidence `various/21-*`, script `scripts/21-image-error.py`.

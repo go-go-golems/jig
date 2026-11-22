@@ -1,0 +1,20 @@
+# SceneSession (src/engine/session.ts): clock, behaviours, poses outside the browser, 2026-11-21
+$ npx tsx tests/session.test.ts
+W-01: 48 frames stepped, max position error 5.84e-8          (ball parabola, pendulum, top rotation vs closed form)
+K-09: session pack = viewport pack at t = 0, 0.37, 1.5
+D-02: seed 3 → 0e1ea176a2ea38a1 twice; seed 4 → 77c150a7e409d817
+session: all checks passed
+$ npm run test:golden          → golden pack: 105/105 identical in 8.1 s   (Viewport/Host now call session.ts)
+$ ./build/rt/candela-rt session --json sess-v8.json            (callbacks in V8 10.2 embedded in C++)
+V8 10.2.154.26-node.28; 48 frames at 24 fps per moving preset
+  W-01   behaviours 3  animated no     last O 05d2d0a58f62130f  0.127 ms/frame
+  K-01   behaviours 0  animated yes    last O a21e801590fb2543  1.025 ms/frame
+  K-02   behaviours 0  animated yes    last O 6481e714f5f22310  0.277 ms/frame
+  K-07   behaviours 0  animated yes    last O b76a00ced87b4827  0.039 ms/frame
+  K-08   behaviours 0  animated yes    last O 9b9bfa7ab5ed8976  0.320 ms/frame
+  K-09   behaviours 0  animated yes    last O c495b2a1e4569c7c  0.601 ms/frame
+6/6 moving presets stepped
+$ npx tsx scripts/core-digest.ts --session --compare sess-v8.json    (Node 26)
+compare with sess-v8.json: 6/6 identical frame by frame
+# browser check: npm run build; render-preset.ts W-01 --sequence 0..1 s at 12 fps → ball and pendulum move
+# (various/14-w01-behaviours-webgpu-strip.png: frames 0, 6, 12); K-09 still renders.

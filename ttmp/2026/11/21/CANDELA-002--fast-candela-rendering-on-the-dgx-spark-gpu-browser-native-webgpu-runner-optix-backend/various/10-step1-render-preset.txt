@@ -1,0 +1,16 @@
+# Step 1: scripts/render-preset.ts and tools/lockstitch/render.ts on the GB10 (WebGPU, headless shell + GPU flags), 2026-11-21
+# times are the render job (render queue start → done, incl. PNG/WebCodecs encode), not page load/compile
+npx tsx scripts/render-preset.ts B-01 --size 1920x1080 --spp 64
+  B-01: WebGPU nvidia → B-01.png, 2.0 s (31.8 spp/s incl. encode)
+npx tsx scripts/render-preset.ts K-09 --param "scene=S-03 Rotary hook" --size 1920x1080 --spp 64 --time 0.7
+  param scene = S-03 Rotary hook (static: rebuilt) → K-09.png, 4.0 s
+npx tsx scripts/render-preset.ts K-09 --param "scene=S-01 Needle bar" --sequence --start 0 --end 0.5 --fps 24 --size 1280x720 --spp 16
+  → K-09.mp4: h264 1280x720, 13 frames, 4.0 s
+npx tsx tools/lockstitch/render.ts --still --scenes 3,7 --size 960x540 --spp 32
+  S-03 Rotary hook: 10177 tris, 19 materials · render 2.0 s
+  S-07 Whole head: 23701 tris, 30 materials · render 2.0 s   (scene = default → "unchanged", no rebuild wait)
+npx tsx tools/lockstitch/render.ts --scenes 7 --size 1920x1080 --spp 64 --fps 24 --stitch 2
+  S-07 Whole head: S-07-whole-head.mp4 · render 230.5 s (wall 3m52s incl. browser start and build)
+  ffprobe: h264 High 1920x1080, 48 frames, 4.69 Mb/s
+  48 × 64 = 3072 samples / 230.5 s = 13.3 samples/s at 1080p (guide §3.3 estimate: 12.4 → ~4 min). Original
+  render.js on SwiftShader: not measured at this size; K-01 640×360 was 1.8 spp/s on SwiftShader.
