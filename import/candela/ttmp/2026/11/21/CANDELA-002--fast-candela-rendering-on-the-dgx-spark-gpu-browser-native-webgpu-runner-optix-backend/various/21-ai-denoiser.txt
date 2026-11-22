@@ -1,0 +1,9 @@
+# Phase 6: OptiX AI denoiser (AOV model, albedo + world-space normal guides), 2026-11-22, GB10, OptiX 9.0.0
+## Quality: K-09 S-07 at t=0.6, 960x540, displayed PNG vs 4096 spp without denoising (scripts/21-image-error.py)
+4 spp  off  per-pixel RMSE 6.52 %  8x8-block 1.72 %      4 spp  ai  1.19 %  0.44 %
+16 spp off  3.42 %  0.64 %                                16 spp ai  0.84 %  0.24 %
+64 spp off  1.71 %  0.25 %                                64 spp ai  0.63 %  0.15 %
+1080p frame t=0.9583: 64 spp off 1.67 % / 0.24 %; 16 spp ai 0.81 % / 0.23 % (vs 1024 spp)
+## Cost: setup 7-20 ms; per frame 5.7-8.8 ms at 960x540, 18.3 ms at 1920x1080
+## Lockstitch S-07, one 1080p stitch (48 frames): 16 spp + AI 13.9 s wall (render 11.1 s); 64 spp raw 44.9 s; browser 225.9 s
+## Live (test server, K-09 S-03, 960x540): playing 71 frames / 3 s at 4 spp + AI (6.5-7.6 ms denoise); without AI 98 frames / 3 s at 8 spp

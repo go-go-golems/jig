@@ -1,0 +1,29 @@
+# OptiX traversal spike vs the WebGPU renderer, K-09 (S-07 Whole head, t = 0), 1920x1080, AO integrator, radius 0.05 m
+# Workload per sample: one jittered pinhole camera ray + one cosine-weighted occlusion ray where it hits
+# (kernel.ts traceAOV mode 4). Scene: 34 meshes + backdrop plane + box = 36 instances, 23,715 triangles.
+
+## package
+npx tsx scripts/scene-package.ts K-09
+  K-09 t=0: 36 meshes, 36 instances, 23715 triangles, skipped {} → ~/data/pbr-spark/packages/K-09
+
+## OptiX (OptiX SDK 9.0.0, driver 580.178.04, sm_121), build/optix/candela-optix-ao
+./build/optix/candela-optix-ao ~/data/pbr-spark/packages/K-09 --spp 1024 --per-launch 16 --radius 0.05
+  scene K-09 t=0: 36 meshes, 36 instances, 23715 triangles; GAS 671.0 KiB, IAS 7.2 KiB, built in 22.6 ms
+  1920x1080, 1024 spp (16 per launch), AO radius 0.05: 594.9 ms → 1721.2 full-frame spp/s, 3569 Msamples/s, 7138 Mrays/s
+  coverage 1.0000, mean AO over hits 0.9894
+  (64 spp: 37.2 ms → 1720.1 spp/s)
+
+## WebGPU (Chromium headless shell, Candela's own kernel), scripts/render-preset.ts
+npx tsx scripts/render-preset.ts K-09 --engine "E.offline().integrator(I.ao({ radius: 0.05 }))" --size 1920x1080 --spp 1024 --time 0 --format exr
+  done in 9.8 s (104.7 spp/s incl. encode)        [256 spp: 102.2; 1024 spp PNG: 106.3]
+  07-exr-stats.py: coverage 1.0000, R mean 0.9894 (exposure 1.0738e-3 divided out)
+
+## same image?
+8-bit gamma-encoded |WebGPU − OptiX| over the frame: mean 0.101, p99 3.0, pixels > 16: 0.016%   (11-ao-webgpu-vs-optix.png, crops)
+
+## result
+OptiX / WebGPU on the AO workload: 1721 / 105 ≈ 16×.
+For comparison, the full path tracer on WebGPU: 13.2 spp/s (K-09 1080p 64 spp, same session).
+Caveats: AO is traversal-bound and nearly shading-free; the path tracer also spends time in material evaluation,
+light sampling and its per-sample submit/wait, so its OptiX speed-up will be smaller than 16× by an amount this spike
+does not measure. The WebGPU figure includes Candela's per-sample dispatch + wait (step 2's batching would raise it).

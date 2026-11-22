@@ -1,0 +1,17 @@
+# Phase 2: WGSL -> CUDA translation and the plain-CUDA target, 2026-11-21 (GB10, CUDA 13.0, NVRTC, Dawn via webgpu 0.6.2)
+## NVRTC sweep (candela-rt cuda-sweep; CUDA_CACHE_DISABLE=1, empty cubin cache, 10 threads)
+IEEE math:          105/105 compiled and loaded; mean 11742 ms, max 21144 ms, wall 126.3 s
+--use_fast_math:    105/105 compiled and loaded; mean  4468 ms, max  7786 ms, wall  48.5 s (default since this step)
+translation 8-21 ms per preset; 1442-2059 lines; 152-232 registers; <= 1152 B local per thread
+## Evaluation order (B-01, 640x360)
+before sequencing, 1 spp: albedo AOV 77.7 % of pixels within 0.1 % (22 % take a different path)
+after  sequencing, 1 spp: 100.0 % within 0.1 %, rel. RMSE 0.00 %; 1024 spp: 99.9 %, rel. RMSE 0.01 %
+## Parity sweep, 320x180 (scripts/parity-sweep.ts; WGSL on Dawn vs CUDA in candela-rt)
+1 spp, IEEE sinf:        85/105 with >= 99 % of pixels within 0.1 %; worst mean dL -17.5 % (G-03)
+1 spp, fast math:       101/105; remaining F-03 75.9 %, F-04 86.7 %, G-03 86.9 % (99.7 % within 1 %), R-04 59.5 %
+64 spp, fast math:      100/105; |mean dL| median 0.0000 %, worst R-04 +0.289 %, F-03 +0.268 %, S-02 -0.162 %
+## Speed, 960x540, 256 spp (same algorithm and BVH; render time only)
+B-01  Dawn   510 ms   CUDA  136 ms   3.8x
+K-09  Dawn  5496 ms   CUDA 1014 ms   5.4x
+X-02  Dawn 14709 ms   CUDA 2005 ms   7.3x
+V-04  Dawn  8767 ms   CUDA 4675 ms   1.9x

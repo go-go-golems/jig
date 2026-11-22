@@ -1,0 +1,10 @@
+{
+ "H.264 high 5.1 prefer-hardware": false,
+ "H.264 high 5.1 prefer-software": true,
+ "HEVC main10 prefer-hardware": false,
+ "HEVC main10 prefer-software": false,
+ "AV1 main 10-bit prefer-hardware": false,
+ "AV1 main 10-bit prefer-software": false,
+ "VP9 profile 0 prefer-hardware": false,
+ "VP9 profile 0 prefer-software": true
+}

@@ -1,0 +1,14 @@
+# hardware/toolchain probe 2026-11-21T19:58:34-05:00
+name, driver_version, compute_cap, clocks.max.sm [MHz]
+NVIDIA GB10, 580.178.04, 12.1, 3003 MHz
+Cuda compilation tools, release 13.0, V13.0.88
+Build cuda_13.0.r13.0/compiler.36424714_0
+	libnvoptix.so.1 (libc6,AArch64) => /lib/aarch64-linux-gnu/libnvoptix.so.1
+	libnvidia-encode.so.1 (libc6,AArch64) => /lib/aarch64-linux-gnu/libnvidia-encode.so.1
+	libnvidia-encode.so (libc6,AArch64) => /lib/aarch64-linux-gnu/libnvidia-encode.so
+	libcuda.so.1 (libc6,AArch64) => /lib/aarch64-linux-gnu/libcuda.so.1
+optix.h:  (none found)
+ffmpeg:  Installed: (none)  Candidate: 7:6.1.1-3ubuntu5+esm15 
+Linux 7.0.0-1019-nvidia aarch64
+20
+Mem:             121           6          36           0          79         115

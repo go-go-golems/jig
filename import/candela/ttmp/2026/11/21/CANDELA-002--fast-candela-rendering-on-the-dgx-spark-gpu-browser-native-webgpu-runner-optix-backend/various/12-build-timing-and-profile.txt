@@ -1,0 +1,23 @@
+# Build/compile and per-frame cost of the engine in V8 (Node v26.8.1), 2026-11-21
+$ npx tsx scripts/08-time-build.mts      (rerun while writing design-doc 02)
+B-01: build+compile 76 ms (WGSL 1468 lines), first pack 1.1 ms, per-frame animation+pack 0.03 ms
+K-01: build+compile 219 ms (WGSL 1811 lines), first pack 0.5 ms, per-frame animation+pack 0.09 ms
+K-09: build+compile 576 ms (WGSL 2078 lines), first pack 0.4 ms, per-frame animation+pack 0.20 ms
+# first run (same session): B-01 72 ms, K-01 209 ms, K-09 570 ms build+compile; per frame 0.04 / 0.13 / 0.24 ms
+
+# K-09 CPU profile (node --import tsx --cpu-prof; scripts/09-profile-build.mts), build+compile 648 ms under the profiler,
+# 764 ms sampled; top self time:
+   97.0 ms  12.7%  RegExp (callSite stack-frame pattern)   diag.ts
+   85.3 ms  11.2%  callSite                                diag.ts
+   54.7 ms   7.2%  blasOf                                  mesh.ts
+   50.5 ms   6.6%  ggxAlbedoTable                          kernel.ts:1479
+   43.5 ms   5.7%  runCallSync                             (tsx)
+   38.6 ms   5.1%  serializeJSStackFrame                   (V8/tsx stack formatting)
+   37.5 ms   4.9%  envTables                               hdri.ts
+   32.4 ms   4.2%  studioImg                               hdri.ts
+   23.9 ms   3.1%  (garbage collector)
+   21.4 ms   2.8%  getOriginalSymbolName                   (source maps)
+   18.8 ms   2.5%  (anon)                                  mesh.ts
+   18.0 ms   2.4%  (anon)                                  hdri.ts
+# grouped: diagnostics/stack capture ~35% (partly tsx source-map overhead); target-side numeric loops ~28%
+# (blasOf 74 ms, ggxAlbedoTable 50 ms, studioImg+envTables 88 ms).

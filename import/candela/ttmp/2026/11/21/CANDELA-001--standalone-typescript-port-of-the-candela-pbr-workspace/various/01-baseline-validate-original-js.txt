@@ -1,0 +1,106 @@
+ok  B-01   Hello, sphere                             2 obj   2 mat  0 par 1468 ln 
+ok  B-02   Params are sliders                        3 obj   3 mat  4 par 1509 ln 
+ok  B-03   Builders are values                      26 obj   3 mat  0 par 1487 ln 
+ok  B-04   Diagnostics, as you type                  4 obj   4 mat  0 par 1513 ln W330,W335,W420
+ok  B-05   Defaults are announced                    5 obj   5 mat  0 par 1519 ln 
+ok  L-01   Lumens, candela, nits                     4 obj   4 mat  2 par 1484 ln 
+ok  L-02   Sunny 16                                  4 obj   4 mat  0 par 1499 ln 
+ok  L-03   The sun and the sky                       3 obj   3 mat  0 par 1487 ln 
+ok  L-04   Golden hour                               9 obj   3 mat  0 par 1487 ln 
+ok  L-05   Colour temperature                       24 obj   8 mat  7 par 1505 ln 
+ok  L-06   Size makes softness                       8 obj   6 mat  3 par 1511 ln 
+ok  L-07   Spotlights on a stage                     4 obj   4 mat  0 par 1506 ln 
+ok  L-08   The inverse-square law                    7 obj   3 mat  1 par 1476 ln 
+ok  L-09   Three-point lighting                      8 obj   7 mat  3 par 1551 ln 
+ok  L-10   A product in the studio                   4 obj   4 mat  0 par 1485 ln 
+ok  L-11   Night street                             11 obj   8 mat  4 par 1539 ln 
+ok  L-12   Neon: emission and MIS                    7 obj   7 mat  1 par 1534 ln 
+ok  M-01   The material chart                       14 obj  14 mat  0 par 1654 ln 
+ok  M-02   Measured metals                          11 obj  11 mat  0 par 1569 ln 
+ok  M-03   Fresnel at grazing angles                17 obj   2 mat  2 par 1468 ln 
+ok  M-04   Glass, water, diamond                     5 obj   5 mat  0 par 1505 ln 
+ok  M-05   Frosted glass                             7 obj   7 mat  0 par 1540 ln 
+ok  M-06   Coloured glass: Beer–Lambert              5 obj   2 mat  0 par 1461 ln 
+ok  M-07   Car paint                                12 obj   5 mat  3 par 1518 ln 
+ok  M-08   Velvet and sheen                          5 obj   3 mat  0 par 1480 ln 
+ok  M-09   Brushed metal: anisotropy                 5 obj   4 mat  3 par 1481 ln 
+ok  M-10   Thin-film interference                    9 obj   9 mat  1 par 1545 ln 
+ok  M-11   Wax, jade, skin                           6 obj   6 mat  1 par 1505 ln 
+ok  M-12   The white furnace                         8 obj   8 mat  0 par 1526 ln 
+ok  M-13   Infinity mirror                           6 obj   5 mat  1 par 1501 ln 
+ok  M-14   Clear coat                                5 obj   5 mat  0 par 1597 ln 
+ok  A-01   mix: blending two BSDFs                   3 obj   3 mat  1 par 1504 ln 
+ok  A-02   layer: varnish over wood                  4 obj   4 mat  1 par 1511 ln 
+ok  A-03   add: checked sums                         4 obj   4 mat  0 par 1508 ln W420
+ok  A-04   material.define: a tile material          2 obj   2 mat  2 par 1480 ln 
+ok  A-05   Fragments: rust and wear                  3 obj   3 mat  3 par 1535 ln 
+ok  A-06   Writing a fragment                        4 obj   2 mat  1 par 1479 ln 
+ok  F-01   Checker, stripes, ramps                   3 obj   3 mat  0 par 1511 ln 
+ok  F-02   Marble from noise                         3 obj   2 mat  2 par 1487 ln 
+ok  F-03   Voronoi: cobbles and cells                2 obj   2 mat  0 par 1492 ln 
+ok  F-04   Bump: hammered metal                      4 obj   4 mat  1 par 1522 ln 
+ok  F-05   Fields of time                            3 obj   3 mat  0 par 1497 ln 
+ok  F-06   Build time vs. run time                   3 obj   3 mat  0 par 1543 ln 
+ok  F-07   World space and local space               3 obj   3 mat  0 par 1511 ln 
+ok  F-08   One material, many instances            401 obj   2 mat  0 par 1485 ln 
+ok  G-01   Analytic primitives                      11 obj   7 mat  0 par 1563 ln 
+ok  G-02   Your own distance field                   4 obj   4 mat  1 par 1586 ln 
+ok  G-03   Heightfield terrain                       1 obj   1 mat  1 par 1467 ln 
+ok  G-04   900 cubes, one BVH                      901 obj   2 mat  0 par 1478 ln 
+ok  G-05   Scatter: a forest by density            442 obj   4 mat  0 par 1510 ln 
+ok  G-06   Hierarchy: an orrery                      4 obj   4 mat  0 par 1500 ln 
+ok  V-01   Fog and god rays                         12 obj   3 mat  0 par 1487 ln 
+ok  V-02   Phase functions                           5 obj   5 mat  1 par 1494 ln 
+ok  V-03   Smoke: a heterogeneous volume             2 obj   2 mat  0 par 1480 ln 
+ok  V-04   A cloud                                   2 obj   2 mat  0 par 1489 ln 
+ok  V-05   Water, wine and milk                      8 obj   5 mat  0 par 1497 ln 
+ok  S-01   Dispersion: hero wavelengths              4 obj   3 mat  0 par 1479 ln 
+ok  S-02   Diamond fire                              5 obj   5 mat  2 par 1511 ln 
+ok  S-03   Soap bubbles                              8 obj   7 mat  0 par 1521 ln 
+ok  S-04   Incandescence                             8 obj   8 mat  1 par 1610 ln 
+ok  C-01   Depth of field                           16 obj   3 mat  0 par 1503 ln 
+ok  C-02   Bokeh and blades                         43 obj   6 mat  1 par 1508 ln 
+ok  C-03   Focal length and perspective             27 obj   4 mat  0 par 1506 ln 
+ok  C-04   The exposure triangle                     5 obj   5 mat  0 par 1525 ln 
+ok  C-05   Tone mapping                              6 obj   6 mat  0 par 1526 ln 
+ok  C-06   Bloom, vignette, grain                    9 obj   3 mat  0 par 1489 ln 
+ok  E-01   Integrators: what the denoiser sees       4 obj   4 mat  0 par 1497 ln 
+ok  E-02   A custom integrator: toon shading         4 obj   4 mat  0 par 1533 ln 
+ok  E-03   How many bounces?                         8 obj   4 mat  1 par 1495 ln 
+ok  E-04   NEE, BSDF sampling, MIS                   9 obj   9 mat  4 par 1529 ln 
+ok  E-05   Fireflies and the clamp                   4 obj   4 mat  1 par 1488 ln 
+ok  E-06   A custom pass                             3 obj   3 mat  0 par 1487 ln 
+ok  E-07   Realtime, preview, offline                4 obj   4 mat  1 par 1481 ln 
+ok  X-01   One kernel, two backends                  3 obj   3 mat  0 par 1480 ln 
+ok  X-02   Ten thousand spheres                   10001 obj   2 mat  0 par 1480 ln 
+ok  X-03   A procedural planet                       3 obj   3 mat  0 par 1513 ln 
+ok  X-04   Menger sponge                             2 obj   2 mat  0 par 1538 ln 
+ok  X-05   Kernels are cached                        2 obj   2 mat  0 par 1486 ln 
+ok  W-01   Behaviours                                5 obj   5 mat  0 par 1511 ln 
+ok  W-02   Talk to the world                        15 obj   9 mat  1 par 1673 ln 
+ok  W-03   What does a change cost?                  7 obj   3 mat  1 par 1480 ln 
+ok  W-04   Kinetic sculpture                         7 obj   5 mat  0 par 1504 ln 
+ok  R-01   The Cornell box                           8 obj   4 mat  1 par 1495 ln 
+ok  R-02   Product shot: mug and spoon              10 obj   7 mat  2 par 1558 ln 
+ok  R-03   Still life by a window                   11 obj   9 mat  1 par 1578 ln 
+ok  R-04   Dunes at golden hour                      2 obj   1 mat  0 par 1493 ln 
+ok  R-05   Jewellery on velvet                      24 obj   7 mat  2 par 1543 ln 
+ok  R-06   Billiards                                13 obj  12 mat  0 par 1738 ln 
+ok  R-07   A colour chart in daylight               26 obj  26 mat  0 par 1924 ln 
+ok  R-08   Zen garden                                4 obj   2 mat  0 par 1536 ln 
+ok  R-09   Marble in a museum                        7 obj   4 mat  0 par 1499 ln 
+ok  R-10   Candlelight                              13 obj   7 mat  0 par 1551 ln 
+ok  K-01   A gear train in motion                   15 obj  18 mat  0 par 1811 ln 
+ok  K-02   A slider-crank, solved in JS              6 obj  17 mat  0 par 1811 ln 
+ok  K-03   Finishes: a chart of machined and coat   19 obj  31 mat  1 par 2107 ln 
+ok  K-04   Faces, parts and ids                      6 obj  11 mat  0 par 1647 ln 
+ok  K-05   Lit by an HDRI                            4 obj   5 mat  0 par 1520 ln 
+ok  K-06   A tray of fasteners: instancing         242 obj  12 mat  0 par 1690 ln 
+ok  K-07   Output: stills, sequences, video, EXR     7 obj  12 mat  0 par 1694 ln 
+ok  K-08   Poses from an animation engine            9 obj   8 mat  0 par 1636 ln 
+ok  K-09   Lockstitch head (jig CAD, kine rig)      36 obj  30 mat  1 par 2078 ln 
+ok  D-01   Units in practice                         4 obj   4 mat  1 par 1495 ln 
+ok  D-02   Build time, run time: the errors          6 obj   2 mat  1 par 1468 ln W501
+ok  D-03   Fragment contracts                        2 obj   2 mat  0 par 1486 ln 
+ok  D-04   Explain and the IR                        7 obj   4 mat  0 par 1499 ln 
+105/105 build
