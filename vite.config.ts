@@ -11,5 +11,8 @@ export default defineConfig(({ mode }) => ({
     outDir: mode === 'single' ? 'dist-single' : 'dist',
     chunkSizeWarningLimit: 4096,
   },
+  // dev server reachable from the LAN (http://bling.local:5173/); Vite rejects other Host headers with 403
+  server: { host: '0.0.0.0', allowedHosts: ['bling.local', 'bling', '.ts.net', 'localhost'] },
+  preview: { host: '0.0.0.0', allowedHosts: ['bling.local', 'bling', '.ts.net', 'localhost'] },
   plugins: mode === 'single' ? [viteSingleFile()] : [],
 }));
