@@ -27,8 +27,6 @@ RelatedFiles:
       Note: runRender and per-sample accumulate loop
     - Path: repo://src/engine/render.ts
       Note: WebGPU/WebGL2 backends; limits caps
-    - Path: repo://tools/lockstitch/render.js
-      Note: Lockstitch headless renderer to port for step 1
     - Path: repo://tools/lockstitch/render.ts
       Note: 'Step 1: lockstitch scenes on the GPU (replaces render.js)'
     - Path: repo://ttmp/2026/11/21/CANDELA-002--fast-candela-rendering-on-the-dgx-spark-gpu-browser-native-webgpu-runner-optix-backend/scripts/02-throughput.ts
@@ -358,7 +356,7 @@ plus Candela's own MP4 and WebM muxers). Exposure is metered on the first frame 
 animated by a kinematic rig (kine). `tools/lockstitch/convert.py` turns the CAD tessellation and baked joint frames
 into `content/presets/K-09-lockstitch/lockstitch-data.js`; the preset builds one mesh per body, assigns finishes
 from CAD face metadata (`autoFinish`, `src/engine/finish.ts`), and exports `animation(t)`.
-`tools/lockstitch/render.js` renders the seven scenes headless to MP4/PNG; `reel.sh` joins them with captions.
+`tools/lockstitch/render.js` (replaced by `render.ts` in step 1) renders the seven scenes headless to MP4/PNG; `reel.sh` joins them with captions.
 
 Two facts about `render.js` in *this* repository:
 
