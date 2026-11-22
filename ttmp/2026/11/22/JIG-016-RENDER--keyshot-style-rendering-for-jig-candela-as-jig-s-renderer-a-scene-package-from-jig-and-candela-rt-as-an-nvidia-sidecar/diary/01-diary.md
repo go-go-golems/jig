@@ -493,3 +493,92 @@ Node tests: `node --test test/render/*.test.mjs` 36 passed, and agent/UI 90 pass
 ### Code review instructions
 - Read `host.js` `followDrive`, `livePose`, `setMotion`, `timeAt` and `build()`; `stage.js` `poseStep` and `commitPose`; and the timeline row in `render.jsx`.
 - Validate: `make web`, then `NODE_PATH=<playwright> CHROMIUM=<chrome> node test/ui/render.cjs`.
+
+## Step 8: merged the lockstitch comparison and the engine work; fixed the two gaps the comparison found
+
+Two of the three agents reported, and both branches were reviewed and merged. The lockstitch comparison found two real jig gaps in the CAD package's process inference, and I fixed both after the engine branch, which also edits `cadpkg.js`, was in. Process agreement with the converter went from 3 faces to 123, and every remaining disagreement belongs to a named class with its reason.
+
+### Prompt Context
+**User prompt (verbatim):** see Step 7.
+**Assistant interpretation:** merge the agents' work as it lands, verify it, and fix what it finds.
+**Inferred user intent:** the remaining items done and trustworthy.
+**Commit (code):**
+- `586368c` merge of the lockstitch test;
+- `15041cb` merge of assembly finishes and render caching;
+- `1358880` "CAD package: processes for .add() primitives and pattern copies";
+- `4c3c0d4` "One copy of the jig-to-Candela frame change".
+
+### What I did
+**Lockstitch merge** (agent commits `7ef57a2`, `643ed6c`).
+- Adds `test/render/lockstitch.test.mjs` and fixtures. `scripts.json` holds the 27 part scripts. `expected.json` was produced by `gen-expected.py`, which runs convert.py itself and reads its `cyl_axis` with `ast`; a rerun gave byte-identical output.
+- The test compiles every part with the converter's material, exports, and compares names, axes and processes.
+
+**Engine merge** (`638e293`, `12aac9c`).
+- `asm.finish(component[, faces], meta)` takes ids, subassembly ids and globs. Unknown ids are a `finish.unresolved` warning with "did you mean".
+- Subassemblies carry finishes under their prefix, and `finishes: 'carried'` is in the FLEXIBLE table.
+- **Caching:** the worker keeps render meshes per Body in a WeakMap, and package bodies carry `meshKey` and `key`. The bridge caches definitions by key (LRU, 1M-triangle budget). A finish-only change derives a copy that shares the triangles and the BVH (`withMeta`).
+- I reviewed the bridge's cache code before merging. The merge was automatic: my `animate()` line and their cache sit in different hunks of `jig-candela.js`.
+
+**Fixes in `cadpkg.js`.**
+- `inferProcess` gets an `'add'` case. Round faces turn about their own axis; a concave one (a bore cut in) is ground. Flats across a round face of the same primitive are faced (`ctx.lathe` comes from `rounds` per feature and copy). Other flats are face-milled.
+- `sourceOf(name)` strips pattern and mirror prefixes. `spokes[1]/spoke/end` → feature `spoke`, type `extrude`, `meta.copy = 'spokes[1]'`, and the direction comes from `spokes[1]/spoke/end`.
+
+**Test updates.**
+- Lockstitch: the two gap classes are removed and the todo tests are now plain tests. The `not-a-lathe-part` and `off-the-lathe-axis` matchers accept any jig process, because jig now turns added pins. A new class, `add-box-milled` (3 faces), and new counts.
+- `appearance.test.mjs` gains two direct tests: `.add(j.cyl)` turned/faced/ground, and pattern copies.
+
+**Frame helpers:** `cadpkg.js` now imports `S`, `R`, `pt` and `toCandelaMatrix` from `src/render/frame.js`, the one copy.
+
+### Why
+- **I fixed the gaps myself, after the merges.** Both are in `cadpkg.js`, which the engine agent was editing.
+- **A copy's feature is its source.** `spokes[1]` is no node of the graph, so nothing could be inferred. Its source is an extrude, and a selector like `f.meta.featureType === 'hole'` should catch patterned holes. The instance stays readable as `meta.copy`.
+
+### What worked
+- **Lockstitch:** 8/8 tests pass. On processes, 123 faces agree on a process and 10 on none; the disagreements are:
+
+  | Class | Faces |
+  |---|---|
+  | `extrude-side-milled` | 3 |
+  | `extrude-end-milled` | 69 |
+  | `add-box-milled` | 3 |
+  | `not-a-lathe-part` | 231 |
+  | `gear-flank` | 312 |
+  | `off-the-lathe-axis` | 373 |
+
+  Names: all 1124 faces match. Axes: 108 cylinders exact (5e-5 mm). 44 turned faces agree with the converter's lathe axis exactly, and 153 faced faces too.
+- **Suites:**
+  - `node --test test/render/*.test.mjs`: 64 passed, 0 failed, 0 todo.
+  - `node test/engine/run.mjs`: 62 passed (41.9 s).
+  - `node test/engine-core/run.mjs`: 69 passed.
+  - `test/ui/render.cjs` on the merged engine work (before the fixes): 13/13. The engine agent had not run it.
+- **Engine agent's measurements** (Node, render quality, export / build / new definitions):
+  - **M-10, pose override:** 3418 → 19 ms export, 1491 → 89 ms build, 7 → 0 new definitions.
+  - **M-10, carrier edit:** 3141 → 47 ms export, 1206 → 95 ms build, 7 → 1 definition.
+  - **M-10, finish only:** 2533 → 20 ms, with 1 derived definition sharing its BVH.
+  - **F-06, pose override or finish:** 13 → 2–3 ms export.
+
+### What didn't work
+- **First run after the fixes:** `✖ 3. processes … AssertionError: a disagreement no class explains`.
+  - It listed 33+ faces such as `crank pinHead/side: convert.py polished, jig turned (add cylinder)` and `gate boss/top: convert.py polished, jig faced (add plane)`.
+  - Cause: the classes for converter-polished faces only allowed jig `milled` or `ground`. They now allow any process, with the reason extended.
+- **Second run** left three faces: `bobbinCase notch/bottom`, `spring/top` and `spring/bottom` (convert.py faced, jig milled, `add plane`). These are boxes added to a FACED part. They got the new class.
+
+### What I learned
+- **The converter's cone fit is wrong past a 35.26° half-angle.** The fit takes the smallest eigenvector of NᵀN, so steep cones come out 90° off. Through that, K-09 grooved the tension unit about the wrong axis. This is convert.py's bug, not jig's, and is documented in the test.
+- **The process "disagreements" are now mostly the converter's simplification**: one lathe axis per part, and only the parts on its LATHE list. jig infers per feature.
+
+### What was tricky to build
+- **"Faced" for an added primitive needs its sibling round face.** A flat face alone can't tell an end of a turned pin from a milled block. The rule looks for a round face of the same feature, within the same copy, whose axis is parallel to the flat's normal.
+
+### What warrants a second pair of eyes
+- **The bridge cache relies on Candela internals:** `withMeta` sharing the BVH, and writable `name`, `meta` and `faces` on the copy. `cache.test.mjs` checks both. A Candela upgrade must keep them, or the tests fail.
+- **Assembly finishes are not applied to print jobs of assemblies** (agent's note).
+
+### What should be done in the future
+- `j.lib.gear` flanks as "hobbed", once the library marks them.
+- Fix convert.py's cone fit upstream in pbr-spark: use the eigenvector of the largest separation, or jig's package instead of the fit.
+
+### Code review instructions
+- `cadpkg.js` `inferProcess` (the `add` case), `sourceOf`, and `faceRecords` (`rounds`, `across`, `typeOf`).
+- `jig-candela.js` `defOf`, `derived` and `evict`; `assembly.js` finishes.
+- Run `node --test test/render/*.test.mjs` and `node test/engine/run.mjs`.
