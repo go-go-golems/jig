@@ -1,9 +1,10 @@
 // Command jigcad serves the jigcad workbench and its agent's model backend.
 //
-//	jigcad serve [--listen 127.0.0.1:8787] [--dist import/jigcad/dist] [--token T]
+//	jigcad serve [--listen 127.0.0.1:8787] [--dist import/jigcad/dist] [--token T] [--render auto|off|PATH]
 //
 // Model calls go through Pi's agent directory (~/.pi/agent: models, credentials) with geppetto's providers/pi;
-// the default tiers use lunaroute (quick and default: glm-5.3-flash, complex: deepseek-4.1-flash).
+// the default tiers use lunaroute (quick and default: glm-5.3-flash, complex: deepseek-4.1-flash). On a machine
+// with candela-rt (Candela's NVIDIA renderer), the server runs it as a child process and proxies it at /rt.
 package main
 
 import (
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-go-golems/jig/import/jigcad"
+	"github.com/go-go-golems/jig/pkg/render"
 	"github.com/go-go-golems/jig/pkg/sample"
 	"github.com/go-go-golems/jig/pkg/sample/gepp"
 	"github.com/go-go-golems/jig/pkg/server"
@@ -32,6 +34,7 @@ var version = "dev"
 
 type serveFlags struct {
 	listen, dist, piDir, token string
+	render                     string
 	quick, def, complex        string
 	maxRounds                  int
 	noModels                   bool
@@ -54,7 +57,12 @@ func serveCmd() *cobra.Command {
 
 The agent panel calls POST /api/sample; the server runs model rounds through Pi's agent directory and asks the
 page to run each eval tool call. Credentials stay in Pi's files on this machine. The server binds 127.0.0.1 by
-default; set --token (or JIGCAD_TOKEN) before listening on another address, then open /?token=… once.`,
+default; set --token (or JIGCAD_TOKEN) before listening on another address, then open /?token=… once.
+
+With --render auto (the default) and candela-rt installed ($JIGCAD_CANDELA_RT, else on PATH), the server starts
+"candela-rt serve" on a localhost port with a random token, restarts it when it exits, and proxies its WebSocket
+at /rt; GET /api/render/capabilities says whether it is up. Without candela-rt the workbench renders in the
+browser. candela-rt loads candela-core.js from the workbench's built files.`,
 		RunE: func(cmd *cobra.Command, _ []string) error { return serve(cmd.Context(), f) },
 	}
 	fl := c.Flags()
@@ -67,6 +75,7 @@ default; set --token (or JIGCAD_TOKEN) before listening on another address, then
 	fl.IntVar(&f.maxRounds, "max-rounds", sample.DefaultRounds, fmt.Sprintf("model rounds per agent turn (at most %d)", sample.MaxRounds))
 	fl.StringVar(&f.token, "token", os.Getenv("JIGCAD_TOKEN"), "require this token on /api/ (env JIGCAD_TOKEN)")
 	fl.BoolVar(&f.noModels, "no-models", false, "serve the workbench without a model backend")
+	fl.StringVar(&f.render, "render", "auto", "the candela-rt renderer: auto ($"+render.EnvBinary+", else candela-rt on PATH), off, or its path")
 	return c
 }
 
@@ -77,12 +86,17 @@ func serve(ctx context.Context, f serveFlags) error {
 	if host, _, err := net.SplitHostPort(f.listen); err == nil && f.token == "" && !loopback(host) {
 		return fmt.Errorf("--listen %s is not a loopback address: set --token (or JIGCAD_TOKEN) so others cannot spend the Pi credentials", f.listen)
 	}
-	static, where, err := staticFiles(f.dist)
+	static, distDir, err := staticFiles(f.dist)
 	if err != nil {
 		return err
 	}
+	where := distDir
+	if distDir == "" {
+		where = "the embedded workbench"
+	}
+	rt := render.New(render.Config{Mode: f.render, DistDir: distDir, Dist: static})
 	tiers := map[string]string{"quick": f.quick, "default": f.def, "complex": f.complex}
-	cfg := server.Config{Static: static, Tiers: tiers, MaxRounds: f.maxRounds, Token: f.token}
+	cfg := server.Config{Static: static, Tiers: tiers, MaxRounds: f.maxRounds, Token: f.token, Render: rt}
 	if !f.noModels {
 		dir := f.piDir
 		if dir == "" {
@@ -110,9 +124,19 @@ func serve(ctx context.Context, f serveFlags) error {
 		return err
 	}
 	log.Printf("jigcad serving %s on http://%s/ (models: %v, max rounds %d)", where, ln.Addr(), cfg.Sample != nil, f.maxRounds)
+	if st := rt.Status(); st.State == render.StateStarting {
+		log.Printf("render: candela-rt %s", st.Bin)
+	} else {
+		log.Printf("render: %s (%s)", st.State, st.Reason)
+	}
 
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// The sidecar stops with the server, and serve returns once the child is gone.
+	rtCtx, rtStop := context.WithCancel(ctx)
+	rtDone := make(chan struct{})
+	go func() { defer close(rtDone); rt.Run(rtCtx) }()
+	defer func() { rtStop(); <-rtDone }()
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 	select {
@@ -128,12 +152,13 @@ func serve(ctx context.Context, f serveFlags) error {
 	return nil
 }
 
-// staticFiles picks the workbench's files: --dist, the embedded copy, or ./import/jigcad/dist.
+// staticFiles picks the workbench's files: --dist, the embedded copy, or ./import/jigcad/dist. It returns the
+// directory they are read from, or "" for the embedded copy.
 func staticFiles(dir string) (fs.FS, string, error) {
 	switch {
 	case dir != "":
 	case jigcad.Dist != nil:
-		return jigcad.Dist, "the embedded workbench", nil
+		return jigcad.Dist, "", nil
 	default:
 		dir = filepath.Join("import", "jigcad", "dist")
 	}
