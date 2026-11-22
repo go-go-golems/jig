@@ -940,3 +940,27 @@ Dawn fix, docs).
 - Evidence: `various/15-phase2-cuda-translation.txt`, `15-nvrtc-sweep-fastmath.json`, `15-parity-1spp-ieee.log`,
   `15-parity-1spp-fastmath.log`, `15-b01-before-sequencing-64spp.png`, `15-b01-after-sequencing-1spp.png`,
   `15-parity-residual-noise-presets.png`.
+
+## Step 15: Published for review — GitHub PR #1 against an empty main; vault report updated
+
+The user asked for the work to be pushed and reviewed by Codex as one unit. The remote `main`
+(`wesen/2026-11-21--pbr-spark`, public) already held only the docmgr scaffolding commit `749182c`, which is the root of
+the local history, so no force push was needed: the work went to a branch and a PR against that `main` shows the
+whole codebase.
+
+### Prompt Context
+**User prompt (verbatim):** "how far are we?" and "can we push to github ? / make a PR against an empt main, so we get
+the @codex review review?"
+**Assistant interpretation:** Push everything, open a PR whose diff is the entire project, request a Codex review.
+
+### What I did
+- `git switch -c candela-rt`; `git branch -f main origin/main` (local `main` = the scaffolding commit, so a stray push
+  cannot merge the PR); `git push -u origin candela-rt`.
+- `gh pr create --base main --head candela-rt` → https://github.com/wesen/2026-11-21--pbr-spark/pull/1
+  (687 files, +57,040/−4); commented `@codex review`.
+- Vault report (go-go-parc, commit `7b92fe78`): Part 7 on the CUDA translation, evaluation order, the sine hash, the
+  measurements; figures in `_assets/candela-rt-*`.
+- Checked before pushing: no `.env`/key files tracked, no API-key patterns in tracked files, largest file 1.3 MB.
+
+### What should be done in the future
+- Work continues on `candela-rt`; read Codex's review comments on PR #1 and address them.
