@@ -1,0 +1,12 @@
+# Phase 4: render jobs in candela-rt, 2026-11-21/22 (GB10, OptiX 9.0.0, NVENC via ffmpeg)
+## Display program parity (PNG, 640x360, 64 spp; displayed 8x8-block RMSE vs the browser render queue)
+B-02 0.01 %   S-02 0.25 %   K-09 1.39 %   K-09 S-03 t=0.25 (motion blur): OptiX 0.02 %, CUDA 0.02 %
+## Lockstitch S-07, one stitch: 48 frames, 1920x1080, 64 spp, MP4 (same machine, same session)
+browser render queue (headless Chromium, WebGPU): render 224.0 s, wall 225.9 s (4.7 s/frame)
+candela-rt (OptiX + SRT motion transforms, NVENC): render 42.7 s, wall 44.9 s (0.89 s/frame) -> 5.0x
+frame 24: displayed difference 0.39 % of white
+## Full reel with candela-rt (tools/lockstitch/render.ts --engine rt; reel.sh)
+S-01 40.3 s, S-02 36.9 s, S-03 39.0 s, S-04 47.9 s, S-05 40.9 s (48 frames each), S-06 82.5 s (96), S-07 174.2 s (192,
+four stitches, orbiting): 528 frames in 462 s incl. first-time NVRTC (~1.7 s) + OptiX module (~8 s) per scene;
+reel join 5 s; lockstitch-reel.mp4 32 s, 11.2 MB (~/data/pbr-spark/lockstitch-rt/)
+## EXR (B-02): R G B A, albedo.RGB, N.XYZ, Z, id.instance, id.face; ids -1 (sky, alpha 0), 0, 1, 2

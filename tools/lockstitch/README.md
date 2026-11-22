@@ -42,6 +42,20 @@ The lockstitch head (a sewing machine mechanism modelled in jig and animated by 
 
    Any other preset renders the same way: `npx tsx scripts/render-preset.ts <id> [--param id=value]…`.
 
+   **On candela-rt** (`--engine rt`, CANDELA-002 phase 4): the same scene program translated to CUDA, traced with
+   OptiX on the RT cores (moving parts blurred through SRT motion transforms), the workbench's own display program,
+   NVENC video. Build it first (`npx tsx scripts/bundle-core.ts`, then `cmake -S native/rt -B build/rt -G Ninja &&
+   ninja -C build/rt`). One 1080p stitch of S-07 at 64 spp: 45 s, against 224 s in the browser on the same machine.
+
+   ```sh
+   npx tsx tools/lockstitch/render.ts --engine rt --scenes 1,2,3,4,5,6 --size 1920x1080 --spp 64
+   npx tsx tools/lockstitch/render.ts --engine rt --scenes 7 --turns 4 --orbit -12 --name S-07-whole-head --size 1920x1080 --spp 64
+   sh tools/lockstitch/reel.sh ~/data/pbr-spark/lockstitch
+   ```
+
+   Or one scene directly: `./build/rt/candela-rt render K-09 --param "scene=S-03 Rotary hook" --param stitch=2
+   --sequence --start 0 --end 1.9583 --fps 24 --spp 64 --size 1920x1080 --format mp4,png`.
+
    Options: `--scenes 1,…,7`, `--size WxH`, `--spp`, `--fps`, `--stitch` (seconds per stitch), `--turns`,
    `--format mp4|webm|png`, `--quality draft|standard|high|max`, `--still [--time s]`, `--backend webgl2|webgpu`,
    `--orbit` (degrees per stitch the camera swings about the vertical), `--name` (file stem, for one scene).

@@ -5,6 +5,8 @@
 set -e
 D=${1:-$HOME/data/pbr-spark/lockstitch}
 FONT=${FONT:-/usr/share/fonts/opentype/inter/Inter-Medium.otf}
+# Inter (apt: fonts-inter) when installed, else DejaVu Sans
+[ -f "$FONT" ] || FONT=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
 cap() { printf "drawtext=fontfile=%s:text='%s':x=28:y=h-52:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.45:boxborderw=9" "$FONT" "$1"; }
 ffmpeg -v error -y \
   -stream_loop 1 -i "$D/S-01-needle-bar.mp4" -stream_loop 1 -i "$D/S-02-take-up-lever.mp4" -stream_loop 1 -i "$D/S-03-rotary-hook.mp4" \

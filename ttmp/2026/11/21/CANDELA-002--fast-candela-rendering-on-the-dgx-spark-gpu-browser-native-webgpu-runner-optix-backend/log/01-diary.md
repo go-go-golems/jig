@@ -1103,3 +1103,103 @@ parameter state), one race in the browser viewport, and three workbench bugs. Al
 - Scopes are swapped by assignment around synchronous and awaited calls; two builds interleaving across awaits would
   still collide (as other build globals would). The hosts never interleave builds.
 - Host and capture fixes have no automated test (browser-only code).
+
+## Step 18: Phase 4 — render jobs: sequences, the display program on the GPU, OptiX motion blur, PNG/EXR/NVENC
+
+Phase 4 turns `candela-rt render` from a parity tool (one linear PFM) into a render-job runner: a still or a
+sequence, with the frames the workbench would show (its own denoise, exposure and tone map), EXR passes for
+compositing, and video through NVENC. Moving meshes now blur on the OptiX target too (SRT motion transforms), which
+the lockstitch scenes need. Exit check: the lockstitch head renders one 1080p stitch at 64 spp in 45 s, against the
+~234 s of the browser render queue.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 16) "close trellis-bench. then when the servers are running, continue with
+phase 3-6"
+**Assistant interpretation:** Phase 4 of design doc 02 (§6.5, §8, §9): sequences, motion samples, EXR with AOVs,
+NVENC; exit check: the lockstitch reel rendered by candela-rt, timed against the 230 s/stitch WebGPU baseline.
+**Inferred user intent:** Produce the lockstitch videos (and any preset's) fast on the Spark, looking as in the
+workbench.
+
+### What I did
+- `src/engine/display.ts` (new): the display side shared by the browser and the headless renderers — `displaySource`
+  and `TONEMAP_IX` (moved from render.ts, re-exported there), `compileUserPass` (moved from viewport.ts),
+  `postSettings(engine)`, `displayUniforms(...)` → `{ D, denoise }`, `denoiseStepUniforms`, `meterExposure(accum,
+  w, h)`, `passesFromBuffers(...)`. `Viewport.load/show/meter/readPasses` call them (same arithmetic as before).
+- `targets/cuda.ts cudaPostProgram(displayWgsl)`: the display program through wgsl2cuda with
+  `candela_post_params.h` (pointers dsp/src/aovA/aovN/dst/out), `candela_post_accessors.inc` (the WGSL `pre`:
+  D, W, cAt, aAt, nAt, sq, lum, safeNorm) and `candela_post.cuh` (`candela_denoise`, `candela_display` → RGBA8).
+- `headless.ts`: `params` (set before the build; unknown ids are an error), `seed`, `seek(t, dt, seed)` (behaviours
+  step, repack, `version++`), `idUniforms()`, `meter(accum)`, `display()`, `exr(accum, aovA, aovN, ids)`
+  (passesToEXR), `post` (the CUDA display program). `openRenderPreset` defaults a still to the preset's time.
+- `targets/optix.ts`: split into `optixMeshes` (once; mesh indices from a stable per-scene table — `P.order` changes
+  when objects move) and `optixFrame` (per frame: instances, SRT keys, AABBs). Moving mesh instances carry a motion
+  slot; per slot 12 floats world→object at the frame time + 16 per key (OptixSRTData: uniform scale, the kernel's
+  pose quaternion — sign-aligned key to key — and translation).
+- `OptixRenderer`: pipeline variant with `usesMotionBlur` + `ALLOW_ANY` graph + traversable depth 4 when the scene
+  can move (K ≥ 2 shutter samples and animation/behaviours); `buildMeshes` once, `setFrame` per frame (instance →
+  SRT motion transform (τ ∈ [0, 1]) → static transform (M_c, inverse computed on the host) → GAS); the shim passes
+  `gTau` as the ray time.
+- `renderer.h` (base for both targets: buffers, read-back), `post.{h,cpp}` (PostProcessor: à-trous passes ping-pong,
+  then display, as GPURenderer.display), `image_io.{h,cpp}` (PFM, PNG via zlib, `VideoWriter` = ffmpeg with
+  h264/hevc/av1_nvenc on a pipe), `JsRuntime::floats`.
+- `candela-rt render`: `--format pfm,png,exr,mp4`, `--sequence --start --end | --frames`, `--fps`, `--param id=v`,
+  `--seed` (job default 1, seed + frame unless `--fixed-seed`), `--codec`, `--quality`, `--name`; exposure metered
+  on frame 0 and held; outputs default to `~/data/pbr-spark/renders/<id>/` (parity runs still to `build/parity`).
+- `tools/lockstitch/render.ts --engine rt`: one candela-rt process per scene.
+
+### Why
+- Translating the display program (rather than re-implementing tone mapping in C++) keeps one definition of "what
+  the workbench shows", including user passes; it costs one ~120 ms NVRTC compile per scene, cached.
+- SRT motion transforms reproduce the kernel's pose interpolation exactly (component-wise lerp, normalised
+  quaternion, K keys over the shutter), so OptiX and WebGPU blur moving meshes the same way.
+
+### What worked
+- PFM parity unchanged after the refactor (B-01, K-09 at 1 spp: displayed difference 0.00 %).
+- PNG stills vs the browser's render queue (640×360, 64 spp): B-02 0.01 %, S-02 0.25 %, K-09 1.39 % of white
+  (displayed 8×8 blocks); K-09 S-03 at t = 0.25 with motion blur: OptiX 0.02 %, CUDA 0.02 %.
+- Motion blur: S-03 at 0.5 s/stitch, the spinning bevel gear smears into a disc on OptiX as on CUDA/WebGPU; sharp
+  teeth with `--no-motion-blur`.
+- Sequence: K-09 S-03, 12 frames 640×360 16 spp, ~45 ms per frame including PNG + MP4.
+- S-07 one stitch (48 frames), 1920×1080, 64 spp, MP4: 44.9 s wall (render 42.7 s, 0.89 s/frame; per-frame IAS +
+  transforms 0.9 ms).
+
+- Browser baseline in the same session (`tools/lockstitch/render.ts --scenes 7 --size 1920x1080 --spp 64`):
+  render 224.0 s, wall 225.9 s → candela-rt 5.0× faster per stitch. Frame 24 of both videos: displayed difference
+  0.39 % of white (`various/18-lockstitch-s07-frame24-rt-vs-browser.png`).
+- Full reel (all seven scenes, S-07 as four orbiting stitches, 1080p, 64 spp): 528 frames in 462 s including
+  first-time compiles, `reel.sh` 5 s → `~/data/pbr-spark/lockstitch-rt/lockstitch-reel.mp4` (32 s); per stitch
+  37–48 s. Linked from the gallery: http://bling.local:8090/lockstitch/lockstitch-reel.mp4
+- EXR: B-02 with R G B A, albedo.RGB, N.XYZ, Z, id.instance, id.face (exrheader); ids −1 (sky, alpha 0), 0, 1, 2.
+
+### What didn't work
+- The first EXR write failed in embedded V8: `ReferenceError: TextEncoder is not defined` (writeEXR encodes
+  attribute strings). TextEncoder/TextDecoder are Web APIs, not ECMAScript; `JsRuntime` now installs UTF-8
+  versions (`kWebGlobals`) next to atob/btoa.
+- `tools/lockstitch/reel.sh` expects Inter (`/usr/share/fonts/opentype/inter/Inter-Medium.otf`), not installed
+  here; it now falls back to DejaVu Sans (`sudo apt install fonts-inter` restores the original captions).
+
+### What I learned
+- `P.order` (the top-level BVH order) changes from frame to frame when objects move; anything indexed by it
+  (mesh numbering for GASes built once) must come from a stable table instead.
+
+### What was tricky to build
+- The graph for a moving mesh: the SRT transform must apply *outside* M_c (world = P(τ)·M_c·x), and an SRT cannot
+  hold a general affine M_c, so a static transform sits between the motion transform and the GAS (depth 4).
+
+### What warrants a second pair of eyes
+- Exposure is metered on the converged first frame; the browser meters at 2/8/32 spp — EVs can differ slightly.
+- The motion pipeline is chosen at open time from "animation or behaviours exist"; a scene whose meshes move only
+  through other means would render them unblurred (stilled) as before.
+
+### What should be done in the future
+- Phase 5 (live server), phase 6 (denoiser, SER).
+
+### Code review instructions
+- `src/engine/display.ts`, `headless.ts`, `targets/optix.ts`, `native/rt/src/{optix_renderer,post,image_io}.cpp`,
+  `cmdRender` in `main.cpp`, `native/rt/kernels/candela_post*`.
+- Validate: `./build/rt/candela-rt render B-02 --format png,exr --size 640x360 --spp 64`;
+  `npx tsx tools/lockstitch/render.ts --engine rt --scenes 3 --size 960x540 --spp 16`.
+
+### Technical details
+- Evidence: `various/18-phase4-jobs.txt`, `18-lockstitch-*.{json,log,png}`, `18-motion-blur-gear-*.png`,
+  `18-png-stills-rt-vs-browser.png`. Code commit `dc8a3b4` (+ TextEncoder, reel font fallback in the next commit).

@@ -69,3 +69,12 @@ Phase 3: OptiX target (RT-core traversal under the translated kernel); 104/105 p
 
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/optix_renderer.cpp — OptiX pipeline, GAS/IAS builds, launch
 - /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/targets/optix.ts — OptiX build inputs from pack
+
+## 2026-11-22
+
+Phase 4: candela-rt render jobs — sequences, the workbench's display program translated to CUDA, OptiX SRT motion blur, PNG/EXR/NVENC; lockstitch reel by candela-rt (S-07 stitch 45 s vs 226 s in the browser)
+
+### Related Files
+
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/native/rt/src/post.cpp — the display program on the GPU
+- /home/manuel/code/wesen/2026-11-21--pbr-spark/src/engine/display.ts — display side shared by the browser and candela-rt

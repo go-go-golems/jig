@@ -13,4 +13,4 @@
 - [ ] Phase 5 (doc 02): candela-rt serve + browser OptiX mode (inputs protocol, IR-hash handshake, nvJPEG frames); supersedes the buffer-level RemoteOptixBackend <!-- t:x4t9 -->
 - [x] Phase 0: libnode-dev V8 embedding spike + scripts/bundle-core.ts (K-09 builds in embedded V8, hashes equal Node's) <!-- t:e6pt -->
 - [ ] Phase 1: golden pack recorder, then split compile into lower/SceneIR/FrameState/SceneSession/WebGpuTarget (byte-identical) <!-- t:cqz3 -->
-- [ ] Phase 4: candela-rt jobs (sequences, EXR AOVs, NVENC); lockstitch reel vs 230 s/stitch <!-- t:hgr5 -->
+- [x] Phase 4: candela-rt jobs (sequences, EXR AOVs, NVENC); lockstitch reel vs 230 s/stitch <!-- t:hgr5 -->

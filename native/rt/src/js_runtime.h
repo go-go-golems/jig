@@ -63,6 +63,7 @@ class JsRuntime {
 
   // the sink for console.* from scene and engine code (level: log, info, warn, error, debug)
   std::function<void(const std::string& level, const std::string& text)> onConsole;
+  static const char* const kWebGlobals;
 
  private:
   [[noreturn]] void rethrow(v8::TryCatch& tc) const;

@@ -123,7 +123,46 @@ JsRuntime::JsRuntime(size_t heapLimitBytes) {
   g->Set(ctx, str("btoa"), fn(hostBtoa, holder("btoa"))).Check();
   g->Set(ctx, str("globalThis"), g).Check();
   ctx_.Reset(iso_, ctx);
+  runScript(kWebGlobals, "candela-rt:web-globals");
 }
+
+// Web APIs the engine uses that ECMAScript does not define (V8 alone has none of them): TextEncoder/TextDecoder
+// (UTF-8; the EXR writer encodes attribute strings). Lone surrogates become U+FFFD, as in browsers.
+const char* const JsRuntime::kWebGlobals = R"JS(
+(() => {
+  if (typeof globalThis.TextEncoder === 'undefined') globalThis.TextEncoder = class TextEncoder {
+    get encoding() { return 'utf-8'; }
+    encode(s = '') {
+      s = String(s); const out = [];
+      for (let i = 0; i < s.length; i++) {
+        let c = s.codePointAt(i);
+        if (c > 0xffff) i++; else if (c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
+        if (c < 0x80) out.push(c);
+        else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+        else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+        else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      }
+      return new Uint8Array(out);
+    }
+  };
+  if (typeof globalThis.TextDecoder === 'undefined') globalThis.TextDecoder = class TextDecoder {
+    get encoding() { return 'utf-8'; }
+    decode(b) {
+      if (!b) return '';
+      const u = b instanceof Uint8Array ? b : new Uint8Array(b.buffer || b, b.byteOffset || 0, b.byteLength); let s = '';
+      for (let i = 0; i < u.length;) {
+        const c = u[i++];
+        if (c < 0x80) s += String.fromCharCode(c);
+        else if (c >= 0xc0 && c < 0xe0) s += String.fromCharCode(((c & 31) << 6) | (u[i++] & 63));
+        else if (c >= 0xe0 && c < 0xf0) s += String.fromCharCode(((c & 15) << 12) | ((u[i++] & 63) << 6) | (u[i++] & 63));
+        else if (c >= 0xf0) s += String.fromCodePoint(((c & 7) << 18) | ((u[i++] & 63) << 12) | ((u[i++] & 63) << 6) | (u[i++] & 63));
+        else s += '�';
+      }
+      return s;
+    }
+  };
+})();
+)JS";
 
 JsRuntime::~JsRuntime() {
   ctx_.Reset();
