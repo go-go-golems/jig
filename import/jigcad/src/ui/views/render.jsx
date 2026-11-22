@@ -73,7 +73,11 @@ export function RenderView({ host }) {
       <div class="renderbody">
         <div class="renderwrap" ref={wrap} onPointerDown={down} onPointerMove={move} onPointerUp={up} onWheel={wheel} onContextMenu={(e) => e.preventDefault()}>
           <canvas ref={canvas} />
-          {rh.status === 'error' && <div class="rendermsg bad">{rh.message}</div>}
+          {rh.status === 'error' && (
+            <div class="rendermsg bad">{rh.message}{' '}
+              {rh.vp && <><button class="btn sm" onClick={() => rh.restart()}>Restart</button>{' '}<button class="btn sm" onClick={() => { try { localStorage.setItem('jig.render.backend', 'webgl2'); } catch { /* */ } rh.restart('webgl2'); }}>Use WebGL2</button></>}
+            </div>
+          )}
           {rh.status === 'loading' && <div class="rendermsg">Starting Candela…</div>}
         </div>
         <div class="renderside">

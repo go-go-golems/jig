@@ -16,12 +16,17 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
   fs.mkdirSync(OUT, { recursive: true });
   const server = await serve(0);
   const url = `http://127.0.0.1:${server.address().port}/`;
-  // headless Chromium has no GPU here: WebGPU may be missing, and Candela falls back to WebGL2 (SwiftShader)
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader', '--enable-unsafe-webgpu'] });
-  const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  // the machine's GPU through ANGLE on Vulkan (a software adapter compiles Candela's kernel for half a minute and
+  // loses the device to the watchdog); RENDER_BACKEND=webgl2 forces Candela's WebGL2 backend
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined,
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=vulkan', '--use-vulkan', '--ignore-gpu-blocklist'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  if (process.env.RENDER_BACKEND) await context.addInitScript((b) => { try { localStorage.setItem('jig.render.backend', b); } catch { /* */ } }, process.env.RENDER_BACKEND);
+  const page = await context.newPage();
   const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(`${m.text()} ${m.location()?.url ?? ''}`.trim()); });
   page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('response', (r) => { if (r.status() >= 400) errors.push(`HTTP ${r.status()} ${r.url()}`); });
   try {
     await page.goto(url);
     await page.waitForFunction(() => window.jigHost && window.jigHost.program && !window.jigHost.compiling, null, { timeout: 60000 });
@@ -31,6 +36,7 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
     await page.waitForFunction(() => window.jigRender && (jigRender.status === 'error' || (jigRender.status === 'ready' && jigRender.vp?.spp >= 16)), null, { timeout: 120000 });
     const st = await page.evaluate(() => ({ status: jigRender.status, message: jigRender.message, backend: jigRender.backend, spp: jigRender.vp?.spp, objects: jigRender.result?.compiled?.objects?.length, diags: jigRender.diags.map((d) => `${d.severity} ${d.code} ${d.message}`) }));
     check('Candela renders F-06', st.status === 'ready', JSON.stringify(st));
+    console.log('     load', await page.evaluate(async () => { const a = await navigator.gpu?.requestAdapter(); const i = a?.info || {}; return `${Math.round(jigRender.loadMs)} ms (shader compile), ${jigRender.vp.spp} spp, adapter ${[i.vendor, i.architecture, i.description].filter(Boolean).join(' ') || 'n/a'}${a?.isFallbackAdapter ? ' (fallback)' : ''}`; }));
     await page.locator('.renderwrap').screenshot({ path: path.join(OUT, 'render-f06.png') });
 
     // find the rod's bore on screen: probe the view with the controller's own pick, then click there for real
@@ -53,7 +59,8 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
       await page.waitForFunction(() => jigRender.vp?.spp >= 16, null, { timeout: 60000 });
       await page.locator('.renderwrap').screenshot({ path: path.join(OUT, 'render-f06-brass.png') });
     }
-    check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+    const real = errors.filter((e) => !/Failed to load resource.*favicon/.test(e));   // the browser asks for /favicon.ico itself
+    check('no console errors', real.length === 0, real.slice(0, 6).join(' | '));
   } catch (e) {
     check('render test ran', false, e.message.split('\n')[0]);
   } finally {

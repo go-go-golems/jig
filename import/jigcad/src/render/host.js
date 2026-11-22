@@ -105,14 +105,27 @@ export class RenderHost {
   /** the look file's text: the project's look.js, else the default for the stage's current view */
   look() { return this.host.files.get(LOOK_FILE) ?? defaultLook({ view: ['axo', 'front', 'side', 'plan'].includes(this.host.view?.name) ? this.host.view.name : 'axo' }); }
 
-  async attach(canvas) {
+  /** start again, e.g. after a lost device: a fresh canvas and backend ('auto' | 'webgpu' | 'webgl2') */
+  async restart(prefer = this.prefer) {
+    const canvas = this.vp?.canvas ?? this.canvas;
+    this.detach();
+    const fresh = canvas.cloneNode();
+    canvas.replaceWith(fresh);
+    this.pkg = null; this._pkgKey = null; this._lookKey = null;
+    return this.attach(fresh, { prefer });
+  }
+
+  async attach(canvas, { prefer } = {}) {
     this.canvas = canvas;
+    let stored = null;
+    try { stored = localStorage.getItem('jig.render.backend'); } catch { /* no storage */ }
+    this.prefer = prefer ?? stored ?? 'auto';
     this.status = 'loading'; this.emit();
     try {
       const C = await loadCandela();
       this.C = C;
       this.vp = new C.Viewport(canvas);
-      await this.vp.init('auto');
+      await this.vp.init(this.prefer);
       this.backend = this.vp.backendName;   // the viewport may swap the canvas for WebGL2: listen on its parent
       this.vp.target = 1024;          // stop accumulating at 1024 samples per pixel
       this.offs = [this.host.on('program', () => this.refresh()), this.host.on('files', () => this.refresh())];
@@ -131,6 +144,10 @@ export class RenderHost {
     const step = () => {
       this._raf = requestAnimationFrame(step);
       if (!this.vp?.compiled || !this.vp.packed || this.loading || document.hidden) return;   // not while shaders compile
+      if (this.vp.backend?.lost && this.status !== 'error') {
+        // a GPU device can be lost (a driver reset, a dispatch past the watchdog on a software adapter)
+        this.status = 'error'; this.message = `The GPU device was lost after ${this.vp.spp | 0} samples (${this.backend}); restart the view, or try WebGL2.`; this.emit(); return;
+      }
       if (this.vp.frame()) this._spp !== this.vp.spp && ((this._spp = this.vp.spp), this.emit());
     };
     this._raf = requestAnimationFrame(step);
