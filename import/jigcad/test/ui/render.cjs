@@ -58,6 +58,8 @@ const check = (name, ok, detail = '') => { results.push({ ok: !!ok }); console.l
       await page.waitForFunction(() => jigHost.files.has('look.js') && jigRender.status === 'ready' && /brass/.test(jigRender._lookKey || ''), null, { timeout: 60000 });
       const look = await page.evaluate(() => jigHost.files.get('look.js'));
       check('Brass writes one .meta() line to look.js', /\.meta\("rod#body\/side\[s\.big\]", \{ material: "brass", finish: null \}\)/.test(look), look.split('\n').filter((l) => l.includes('.meta(')).join(' | '));
+      const dirty = await page.evaluate(() => jigHost.dirty);
+      check('a look edit leaves the model clean (no Run needed)', dirty === false, `dirty ${dirty}`);
       await page.waitForFunction(() => jigRender.vp?.spp >= 16, null, { timeout: 60000 });
       await page.locator('.renderwrap').screenshot({ path: path.join(OUT, 'render-f06-brass.png') });
     }

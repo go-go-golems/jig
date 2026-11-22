@@ -10,10 +10,10 @@ import LIB from '../generated/candela-lib.json';
 
 import { toCandelaMatrix } from './frame.js';
 
-export const LOOK_FILE = 'look.js';
-// project files the look may import (baked poses, shared materials): sent to Candela's build under their own names,
-// e.g. import poses from './shutter-poses.look.js'. jig's compile never runs them (only script.js runs).
-export const isLookFile = (path) => path === LOOK_FILE || /\.look\.js$/.test(path);
+// project files the look may import (baked poses, shared materials) are sent to Candela's build under their own
+// names, e.g. import poses from './shutter-poses.look.js'; jig's compile never sees them (src/render/files.js)
+import { LOOK_FILE, isLookFile } from './files.js';
+export { LOOK_FILE, isLookFile };
 export const LOOK_MARK = '// materials: the Render view adds lines here';
 
 /** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model,

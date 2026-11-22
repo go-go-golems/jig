@@ -214,3 +214,21 @@ export default scene().add(asm).add(light.env.hdri(hdri.studio()));`));
 export default scene().add(asm);`));
   assert.match(bad.error.message, /meta\("rod#body\/side\[s\.bgi\]"\): no face matches; did you mean .*rod#body\/side\[s\.big\]/);
 });
+
+// Candela compiles each machined finish's axis and centre into the shader: one form per axis line keeps the count down
+test('toolMeta: coaxial faces share one axis line; face-milled flats and axis-less faces drop their own centre', async () => {
+  // the bridge imports 'candela', which only Candela's build resolves; toolMeta needs none of it
+  const src = BRIDGE.replace(/^import .* from 'candela';$/m, 'const scene = null, shape = null, mesh = null, finish = null;');
+  const { toolMeta } = await import('data:text/javascript,' + encodeURIComponent(src));
+  const a = toolMeta({ process: 'turned', kind: 'cylinder', axis: [0, -2, 0], center: [0.01, 0.5, 0.02] });
+  const b = toolMeta({ process: 'faced', kind: 'plane', axis: [0, 1, 0], center: [0.01, -0.3, 0.02] });
+  assert.deepEqual(a.axis, [0, 1, 0], 'a unit direction, its first non-zero component positive');
+  assert.deepEqual(a.center, [0.01, 0, 0.02], 'the point of the line nearest the origin');
+  assert.deepEqual(b.center, a.center, 'a faced end on the same axis: the same line');
+  const tilted = toolMeta({ process: 'turned', kind: 'cylinder', axis: [1, 1, 0], center: [1, 0, 0] });
+  assert.deepEqual(tilted.center, [0.5, -0.5, 0]);
+  assert.deepEqual(toolMeta({ process: 'milled', kind: 'plane', axis: [0, 0, 1], center: [0.2, 0.3, 0.4] }).center, [0, 0, 0], 'a face mill about the body origin');
+  assert.deepEqual(toolMeta({ process: 'milled', kind: 'plane', normal: [1, 0, 0], direction: [0, 1, 0], center: [0.2, 0.3, 0.4], axis: [1, 0, 0] }).center, [0, 0.3, 0.4], 'straight passes keep their line');
+  assert.equal('center' in toolMeta({ process: 'milled', kind: 'bspline', center: [0.1, 0.2, 0.3] }), false, 'no axis: no centre');
+  assert.deepEqual(toolMeta({ kind: 'plane', center: [1, 2, 3] }), { kind: 'plane', center: [1, 2, 3] }, 'no process: untouched');
+});

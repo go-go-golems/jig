@@ -10,7 +10,7 @@
 //   const asm = jigScene(program, { autoFinish: true })
 //     .face(['rod#body/side[s.big]', 'rod#body/side[s.small]'], finish.ground({ metal: 'bearing-steel' }))  // the pin bores
 //     .material('crank', finish.blackOxide({ process: 'milled' }));             // every face of a component
-//   export default scene().add(asm).camera(camera.thinLens().at(asm.view('axo').at).target(asm.center()));
+//   export default scene().add(asm).camera(camera.thinLens().at(asm.view('axo').at).lookAt(asm.center()));
 //
 // Addresses: 'comp' | 'comp#face' | '#face' (a single-part model), with * globs in either half, a list of them, or a
 // predicate f({ component, id, meta }) such as f => f.meta.featureType === 'hole'. The node id of a
@@ -53,13 +53,34 @@ const CACHE = (globalThis.__jigCandelaCache ??= { defs: new Map(), triangles: 0,
 const DEFS = (globalThis.__jigCandelaDefs ??= new WeakMap());
 const STATS = (globalThis.__jigCandelaStats ??= { created: 0, derived: 0, reused: 0, evicted: 0, defs: 0, triangles: 0 });
 
+// Candela compiles a machined finish's axis and centre into the shader, so each distinct pair is a material of its
+// own (the Compur's 3,393 faces made 540 materials and a 492 KiB shader). The grooves depend only on the axis line
+// (fx.tangent.around(axis, center)), so Candela gets each line in one form: the direction with its first non-zero
+// component positive and the point of the line nearest the body's origin, both rounded to 1e-6 (a micrometre).
+// Coaxial faces then share a material. Where jig knows no tool axis the centre carries nothing: a milled face with
+// no axis (a B-spline flank) gets none, and a face-milled flat (rings about its normal; the tool's path is unknown)
+// has them about the body's origin, so a body's flats share a material per direction. Turned, ground and faced
+// faces keep their exact axes. The package itself keeps each face's own centre.
+const r6 = (x) => Math.round(x * 1e6) / 1e6 || 0;
+export function toolMeta(m) {
+  if (!m || !Array.isArray(m.center)) return m;
+  if (!Array.isArray(m.axis)) { if (!m.process) return m; const { center, ...rest } = m; return rest; }
+  if (m.process === 'milled' && m.kind === 'plane' && !m.direction) m = { ...m, center: [0, 0, 0] };
+  const l = Math.hypot(m.axis[0], m.axis[1], m.axis[2]) || 1;
+  let a = m.axis.map((v) => v / l);
+  const k = a.findIndex((v) => Math.abs(v) > 1e-9);
+  if (k >= 0 && a[k] < 0) a = a.map((v) => -v);
+  const c = m.center, t = c[0] * a[0] + c[1] * a[1] + c[2] * a[2];
+  return { ...m, axis: a.map(r6), center: [c[0] - t * a[0], c[1] - t * a[1], c[2] - t * a[2]].map(r6) };
+}
+
 function fromArrays(body, comp) {
   const A = {};
   for (const [k, T] of Object.entries(ARRAYS)) A[k] = decode(body[k], T);
   STATS.created++;
   return mesh.fromArrays({
     name: body.id, positions: A.positions, normals: A.normals, indices: A.indices, faceIds: A.triFace,
-    faces: body.faces.map((f) => ({ id: f.id, meta: f.meta })),
+    faces: body.faces.map((f) => ({ id: f.id, meta: toolMeta(f.meta) })),
     meta: Object.assign({ component: body.component }, comp.look || {}),
   });
 }
@@ -69,7 +90,7 @@ function derived(base, body, comp) {
   const d = base.withMeta({});
   d.name = body.id;
   d.meta = Object.assign({ component: body.component }, comp.look || {});
-  d.faces = base.faces.map((f) => ({ id: f.id, meta: Object.assign({}, meta.get(f.id) || {}) }));
+  d.faces = base.faces.map((f) => ({ id: f.id, meta: toolMeta(Object.assign({}, meta.get(f.id) || {})) }));
   STATS.derived++;
   return d;
 }
