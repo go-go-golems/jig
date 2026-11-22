@@ -618,8 +618,10 @@ provide *programs* that OptiX calls:
   and for temporal mode the previous output and a flow field).
 
 API names above follow the OptiX 8/9 SDK; check them against the headers you install (`optix_host.h`,
-`optix_device.h`). The installed driver (580) is new enough for the OptiX 9.0 SDK, which requires R570 or later;
-confirm the requirement for any later SDK release.
+`optix_device.h`). **SDK and driver must match** (verified after the first version of this guide,
+`various/08-optix-sdk-install.txt`): the driver's OptiX runtime here is 9.0.2 with ABI version 110, so the 9.1.0
+SDK (ABI 118) builds but fails at `optixInit()` with `OPTIX_ERROR_UNSUPPORTED_ABI_VERSION`. Use an OptiX 9.0.x SDK
+with driver 580, or update the driver before using 9.1.
 
 ### 6.2 Mapping Candela onto OptiX
 
@@ -812,8 +814,8 @@ code. Status: proposed.
 ## 9. Open questions
 
 - ~~Does GB10's NVENC support AV1 and 10-bit HEVC?~~ Answered: yes, both, with Ubuntu's `ffmpeg` (section 3.5).
-- Which OptiX SDK version to standardise on (9.0 or later) and how to distribute it (it requires an NVIDIA developer
-  download, so it cannot be an npm dependency). Blocks step 3 phase 1.
+- Which OptiX SDK version to standardise on: 9.0.x matches the installed driver (ABI 110); 9.1 needs a driver
+  update. The SDK is an NVIDIA developer download, so it cannot be an npm dependency. Blocks step 3 phase 1.
 - Is it acceptable that the OptiX backend shades in ray generation (simpler, identical path loop) rather than in
   closest-hit programs (more idiomatic, potentially faster with SER)? Decide after phase 4 measurements.
 - The lockstitch thread geometry: where does a curve description come from (the kine rig, or a new jig export)?

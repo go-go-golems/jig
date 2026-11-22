@@ -238,3 +238,56 @@ SDK. I verified NVENC on the GB10 and inspected the SDK installer without runnin
 ### Remaining requirements and next action
 - Choose the SDK package (aarch64 installer or this one) and install to `~/opt/`; then build `optixTriangle`
   for `sm_121` (step 3, phase 1).
+
+## Step 5: OptiX SDK 9.1 installed and built; it cannot run on this driver
+
+Installed the aarch64 OptiX SDK and built the `optixTriangle` sample for `sm_121` to verify it. The build works;
+running fails because the driver's OptiX runtime is older than the SDK.
+
+### Prompt Context
+**User prompt (verbatim):** "ko, downloaded aarch64, install the other one"
+**Assistant interpretation:** Install the aarch64 SDK (the one just downloaded, "the other one" relative to the x86_64
+file inspected before); the instruction to install covers accepting the licence.
+**Inferred user intent:** Get OptiX working so step 3 can start.
+
+### What I did
+- Checked the installer: CPack header identical to the x86_64 one apart from the architecture name; the aarch64
+  payload bundles no prebuilt libraries. `sha256 bc9fd96f…62b88`.
+- `sh NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64.sh --prefix=$HOME/opt --include-subdir --skip-license` →
+  `~/opt/NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64` (`OPTIX_VERSION 90100`).
+- Configured the SDK samples out of tree in `~/opt/optix-9.1.0-build` with Ninja and `CUDA_MIN_SM_TARGET=sm_121`;
+  built `optixTriangle`; ran it with `--file`.
+
+### Why
+- Building one sample is the cheapest proof that headers, nvcc and the driver runtime work together.
+
+### What worked
+- `ninja optixTriangle` → `[40/40] Linking CXX executable bin/optixTriangle` (OptiX-IR compiled by nvcc 13.0 for sm_121).
+
+### What didn't work
+- First configure: `CMake Error at support/glfw-3.4/src/CMakeLists.txt:192 (message): Xinerama headers not found;
+  install libxinerama development package`. Worked around with `-DGLFW_BUILD_X11=OFF -DGLFW_BUILD_WAYLAND=OFF`
+  (GLFW's null platform; the samples can still write images with `--file`).
+- Run: `Caught exception: OPTIX_ERROR_UNSUPPORTED_ABI_VERSION: Optix call 'optixInit()' failed`.
+
+### What I learned
+- `strings /usr/lib/aarch64-linux-gnu/libnvoptix.so.1` → `OptiX Version:[9.0002.0.0.0.0] Branch:[r582_73] … ABI
+  Version:[110]`. SDK 9.1.0 has `OPTIX_ABI_VERSION 118` (`include/optix_function_table.h`). The guide's earlier
+  "driver 580 is new enough for OptiX 9.x" was wrong for 9.1; corrected in §6.1 and §9.
+
+### What was tricky to build
+- Nothing beyond the GLFW platform flags.
+
+### What warrants a second pair of eyes
+- Whether to update the DGX OS driver (affects the whole machine) or pin SDK 9.0.x.
+
+### What should be done in the future
+- Get the OptiX SDK 9.0.x aarch64 installer (NVIDIA's previous-versions page), install beside 9.1, rebuild
+  `optixTriangle`, run it. Or update the driver to one whose OptiX runtime reports ABI ≥ 118.
+
+### Code review instructions
+- `various/08-optix-sdk-install.txt` has the commands and outputs.
+
+### Technical details
+- Interactive SDK samples need `libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev` (and Wayland/xkbcommon
+  dev packages) for a windowed GLFW; not needed for `--file` output or for Candela's backend.

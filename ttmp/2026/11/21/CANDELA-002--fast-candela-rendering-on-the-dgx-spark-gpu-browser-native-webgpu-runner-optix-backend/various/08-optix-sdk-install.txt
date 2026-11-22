@@ -1,0 +1,12 @@
+# OptiX SDK install and first sample, 2026-11-21T20:19:17-05:00
+installer: ~/Downloads/NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64.sh (sha256 bc9fd96f67325d8bc3a9271398c3c82fcbc2de4c182b6632d875e17b90562b88)
+  sh <installer> --prefix=$HOME/opt --include-subdir --skip-license   (licence accepted on the user's instruction)
+  -> ~/opt/NVIDIA-OptiX-SDK-9.1.0-linux64-aarch64, include/optix.h: OPTIX_VERSION 90100, optix_function_table.h: OPTIX_ABI_VERSION 118
+build: cmake -G Ninja -S <sdk>/SDK -B ~/opt/optix-9.1.0-build -DCMAKE_BUILD_TYPE=Release -DCUDA_MIN_SM_TARGET=sm_121 -DGLFW_BUILD_X11=OFF -DGLFW_BUILD_WAYLAND=OFF
+  (first configure without the GLFW flags failed: "Xinerama headers not found; install libxinerama development package")
+  ninja optixTriangle -> [40/40] Linking CXX executable bin/optixTriangle   (NVCC to OptiX-IR, sm_121)
+run: ./optixTriangle --file out.png
+  Caught exception: OPTIX_ERROR_UNSUPPORTED_ABI_VERSION: Optix call 'optixInit()' failed
+driver runtime (strings /usr/lib/aarch64-linux-gnu/libnvoptix.so.1):
+  OptiX Version:[9.0002.0.0.0.0] Branch:[r582_73] Build Number:[38463315] ABI Version:[110] CUDA Version:[13.0.0.0,]
+conclusion: driver 580.178.04 runs OptiX ABI <= 110 (OptiX 9.0.x); SDK 9.1.0 needs ABI 118 -> use SDK 9.0.x, or a newer driver.
