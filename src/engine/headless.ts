@@ -3,6 +3,7 @@
 // does in the browser. Its buffers are the WebGPU target's storage buffers; the program is given both as WGSL (for the
 // Node/Dawn reference, scripts/wgsl-render.ts) and as CUDA (for candela-rt).
 import { SceneSession, frameUniforms } from './session';
+import { withParamScope } from './params';
 import { cudaProgram, type CudaProgram, type CudaTargetKind, type CudaTargetChoice } from './targets/cuda';
 import { WGSL_PRELUDE, WGSL_MAIN } from './wgsl-entry';
 import { optixScene, type OptixScene } from './targets/optix';
@@ -58,7 +59,8 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     spp: 0, sppPerFrame: Math.max(1, (s.compiled.engine && s.compiled.engine.sppPerFrame) || 1),
     frame() {
       const U = P.U.slice();
-      const { sppF } = frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: h.spp, time });
+      // the camera can depend on params: evaluate it with this session's parameters
+      const { sppF } = withParamScope(s.params, () => frameUniforms(U, s.compiled, { width: h.width, height: h.height, spp: h.spp, time }));
       h.spp += sppF;
       return U;
     },

@@ -132,6 +132,32 @@ setParamResolver(resolveParam);
 // field arithmetic straight on a param: P.gloss.mul(2) is fx.float(P.gloss).mul(2) — a uniform in the kernel
 const FIELD_METHODS = new Set(['add', 'sub', 'mul', 'div', 'neg', 'abs', 'floor', 'ceil', 'fract', 'mod', 'sin', 'cos', 'pow', 'sqrt', 'exp', 'clamp', 'sat', 'oneMinus', 'mix', 'smoothstep', 'step', 'remap', 'gt', 'lt', 'gte', 'lte', 'between', 'dot', 'cross', 'length', 'normalize', 'luminance', 'x', 'y', 'z', 'r', 'g', 'b', 'xyz', 'rgb']);
 export const derivedRegistry = new Map();   // id → handle, for uniforms
+
+/** the parameter state a build creates and pack reads: slider values, the build's definitions and derived params.
+ *  The browser workbench uses the module-global one; each SceneSession keeps its own and swaps it in around its
+ *  build, seek and pack, so building one session cannot change what another packs (PR #1 review). Builds must not
+ *  interleave (they never do: the hosts await each build before starting the next). */
+export interface ParamScope { values: Map<string, any>; defs: Map<string, any>; order: any[]; derived: Map<string, any> }
+export const newParamScope = (): ParamScope => ({ values: new Map(), defs: new Map(), order: [], derived: new Map() });
+function swapIn(scope: ParamScope): ParamScope {
+  const prev: ParamScope = { values: store.values, defs: store.defs, order: store.order, derived: new Map(derivedRegistry) };
+  store.values = scope.values; store.defs = scope.defs; store.order = scope.order;
+  derivedRegistry.clear(); for (const [k, v] of scope.derived) derivedRegistry.set(k, v);
+  return prev;
+}
+function swapOut(scope: ParamScope, prev: ParamScope) {
+  // keep what the code inside created (a build replaces defs and order and fills the derived registry)
+  scope.values = store.values; scope.defs = store.defs; scope.order = store.order; scope.derived = new Map(derivedRegistry);
+  swapIn(prev);
+}
+export function withParamScope<T>(scope: ParamScope, fn: () => T): T {
+  const prev = swapIn(scope);
+  try { return fn(); } finally { swapOut(scope, prev); }
+}
+export async function withParamScopeAsync<T>(scope: ParamScope, fn: () => Promise<T>): Promise<T> {
+  const prev = swapIn(scope);
+  try { return await fn(); } finally { swapOut(scope, prev); }
+}
 export function registerParam(h) { if (h.derived) derivedRegistry.set(h.id, h); }
 
 // ---------- the public API ----------

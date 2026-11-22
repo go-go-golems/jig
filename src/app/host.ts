@@ -94,6 +94,7 @@ export class Host {
     this.preset = p; store.set('preset', p.id);
     const ed = o.discard ? null : store.get('edits:' + p.id, null);
     this.files = Object.assign({}, p.files, ed && ed.files || {});
+    for (const path of (ed && ed.deleted) || []) delete this.files[path];   // files of the preset the user deleted
     this.notes = ed && ed.notes != null ? ed.notes : (p.notes || '');
     paramStore.reset(); this.selection = null; this.freeCam = null; this.time = p.time || 0; this.anim = new Map(); this.state = {}; this._bErr = false;
     // some presets open on a still frame (it converges; motion blur still shows the motion): Pause runs the clock
@@ -106,7 +107,15 @@ export class Host {
   }
   isDirty(path?: string) { const orig = this.preset.files; return path ? orig[path] !== this.files[path] : Object.keys(this.files).some(k => orig[k] !== this.files[k]) || Object.keys(orig).some(k => !(k in this.files)); }
   notesDirty() { return (this.preset.notes || '') !== this.notes; }
-  saveEdits() { const orig = this.preset.files, files: Record<string, any> = {}; for (const [k, v] of Object.entries(this.files)) if (orig[k] !== v) files[k] = v; const notes = this.notesDirty() ? this.notes : null; store.set('edits:' + this.preset.id, Object.keys(files).length || notes != null ? { files, notes } : undefined); }
+  saveEdits() {
+    const orig = this.preset.files, files: Record<string, any> = {};
+    for (const [k, v] of Object.entries(this.files)) if (orig[k] !== v) files[k] = v;
+    const deleted = Object.keys(orig).filter(k => !(k in this.files));   // tombstones, so a reload does not resurrect them
+    const notes = this.notesDirty() ? this.notes : null;
+    store.set('edits:' + this.preset.id, Object.keys(files).length || deleted.length || notes != null ? { files, deleted, notes } : undefined);
+  }
+  // ids of saved projects: one past the highest in use, so deleting U-02 of U-01…U-03 cannot make the next save U-03
+  nextMineId() { const n = this.mine.reduce((m, p) => Math.max(m, parseInt(String(p.id).replace(/^U-/, ''), 10) || 0), 0) + 1; return 'U-' + String(n).padStart(2, '0'); }
   saveEditsSoon() { clearTimeout(this._saveT); this._saveT = setTimeout(() => this.saveEdits(), 400); }
   setFile(path, src) { this.files[path] = src; this.saveEditsSoon(); this.notify(); }
   setNotes(md) { this.notes = md; this.saveEditsSoon(); this.notify(); }
@@ -115,13 +124,13 @@ export class Host {
   revertFile(path) { const orig = this.preset.files; if (orig[path] != null) this.files[path] = orig[path]; else delete this.files[path]; this.saveEdits(); this.notify(); }
   revertAll() { store.set('edits:' + this.preset.id, undefined); this.loadPreset(this.preset.id, { discard: true }); this.toast('Back to the preset as published'); }
   saveAsMine(title) {
-    const n = this.mine.length + 1, id = 'U-' + String(n).padStart(2, '0');
+    const id = this.nextMineId();
     const p = { id, title: title || (this.preset.title + ' (mine)'), group: 'Mine', about: 'Saved from ' + this.preset.id, tries: this.preset.tries || [], files: Object.assign({}, this.files), notes: this.notes };
     this.mine.push(p); store.set('mine', this.mine); this.loadPreset(id); this.toast(`Saved as ${id}`); return p;
   }
   deleteMine(id) { this.mine = this.mine.filter(p => p.id !== id); store.set('mine', this.mine); store.set('edits:' + id, undefined); if (this.preset.id === id) this.loadPreset(this.builtins[0].id); this.notify(); }
   exportProject() { return { format: 'candela-project', version: 1, preset: this.preset.id, title: this.preset.title, files: this.files, notes: this.notes, params: Object.fromEntries(paramStore.values) }; }
-  importProject(obj) { if (!obj || obj.format !== 'candela-project' || !obj.files) throw new Error('not a Candela project file'); const n = this.mine.length + 1, id = 'U-' + String(n).padStart(2, '0'); const p = { id, title: (obj.title || 'Imported') + ' (imported)', group: 'Mine', about: 'Imported', files: obj.files, notes: obj.notes || '' }; this.mine.push(p); store.set('mine', this.mine); this.loadPreset(id); return p; }
+  importProject(obj) { if (!obj || obj.format !== 'candela-project' || !obj.files) throw new Error('not a Candela project file'); const id = this.nextMineId(); const p = { id, title: (obj.title || 'Imported') + ' (imported)', group: 'Mine', about: 'Imported', files: obj.files, notes: obj.notes || '' }; this.mine.push(p); store.set('mine', this.mine); this.loadPreset(id); return p; }
 
   // ---------- build ----------
   async build(o: Record<string, any> = {}) {

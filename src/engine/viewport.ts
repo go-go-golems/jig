@@ -67,7 +67,16 @@ export class Viewport {
   emit() { for (const f of this.listeners) try { f(this); } catch (e) { console.error(e); } }
 
   // ---- scene ----
-  async load(compiled, opts: Record<string, any> = {}) {
+  // loads run one after another: compile awaits, and two overlapping loads could otherwise commit one scene's
+  // pipeline with the other scene's buffers (PR #1 review); the last call wins
+  private loadChain: Promise<unknown> = Promise.resolve();
+  load(compiled, opts: Record<string, any> = {}) {
+    const run = () => this.loadNow(compiled, opts);
+    const p = this.loadChain.then(run, run);
+    this.loadChain = p.catch(() => undefined);
+    return p;
+  }
+  private async loadNow(compiled, opts: Record<string, any> = {}) {
     const t0 = performance.now();
     this.compiled = compiled; this.engine = compiled.engine;
     const eng = compiled.engine;

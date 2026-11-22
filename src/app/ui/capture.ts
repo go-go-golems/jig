@@ -27,7 +27,9 @@ export async function captureWorkbench(host: Host, maxW = 1400): Promise<HTMLCan
     else if (s instanceof HTMLSelectElement) { const o = d.querySelectorAll('option')[s.selectedIndex]; if (o) o.setAttribute('selected', 'selected'); }
     if ((s.scrollTop || s.scrollLeft) && d.children.length) { d.style.overflow = 'hidden'; for (const c of d.children) (c as HTMLElement).style.transform = `translate(${-s.scrollLeft}px, ${-s.scrollTop}px)`; }
   }
-  const css = [...document.querySelectorAll('style')].map(s => s.textContent).join('\n').replace(/@import[^;]+;/g, '');
+  // every stylesheet the page uses: <style> elements and linked files (a production build links its CSS); rules of
+  // cross-origin sheets cannot be read and are skipped (PR #1 review)
+  const css = [...document.styleSheets].map(sh => { try { return [...sh.cssRules].map(r => r.cssText).join('\n'); } catch { return ''; } }).join('\n').replace(/@import[^;]+;/g, '');
   const theme = document.documentElement.dataset.theme;
   const bg = getComputedStyle(document.body).backgroundColor, fg = getComputedStyle(document.body).color;
   const xhtml = new XMLSerializer().serializeToString(clone);

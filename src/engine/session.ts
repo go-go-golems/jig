@@ -3,6 +3,7 @@
 // below (one implementation); SceneSession bundles them for hosts without a browser, such as candela-rt, where the
 // scene's callbacks (animation(t), .behavior(), derived params) run in embedded V8.
 import { build } from './candela';
+import { newParamScope, withParamScope, withParamScopeAsync, type ParamScope } from './params';
 import { cameraUniforms } from './compile';
 import { cmf, xyzToLinearSRGB } from './fx';
 
@@ -97,6 +98,8 @@ export class SceneSession {
   errors: string[] = [];
   /** the `world` handed to behaviours; a browser host passes its live world, headless hosts a read-only one */
   world: any;
+  /** this session's parameters (values, definitions, derived params), independent of other sessions */
+  params: ParamScope = newParamScope();
 
   constructor(o: { seed?: number; world?: any } = {}) {
     this.seed = o.seed || 0;
@@ -104,7 +107,7 @@ export class SceneSession {
   }
 
   async build(files: Record<string, string>, o: Record<string, any> = {}) {
-    const r: any = await build(files, Object.assign({ seed: this.seed }, o));
+    const r: any = await withParamScopeAsync(this.params, () => build(files, Object.assign({ seed: this.seed }, o)));
     this.result = r;
     this.compiled = r.ok ? r.compiled : null;
     if (this.compiled) this.compiled.animation = r.animation || null;
@@ -115,13 +118,15 @@ export class SceneSession {
 
   get behaviors(): any[] { return (this.compiled && this.compiled.behaviors) || []; }
   setPoses(p: PoseSource) { this.externalPoses = p || null; }
-  posesFor(t: number): Poses { return posesAt(this.compiled && this.compiled.animation, this.externalPoses, t, m => { this.poseError = m; }); }
+  posesFor(t: number): Poses { return withParamScope(this.params, () => posesAt(this.compiled && this.compiled.animation, this.externalPoses, t, m => { this.poseError = m; })); }
+  /** set a parameter's value in this session (takes effect at the next pack; static params need a rebuild) */
+  setParam(id: string, value: any) { this.params.values.set(id, value); }
 
   /** move the clock to t (as Host.seek): seeking backwards with dt = 0 resets behaviour state; behaviours step by dt */
   seek(t: number, dt = 0): boolean {
     if (dt === 0 && t < this.time - 1e-9) this.beh = { anim: new Map(), state: {} };
     this.time = t;
-    return this.behaviors.length ? stepBehaviors(this.behaviors, this.beh, { t, dt, world: this.world, onError: m => this.errors.push(m) }) : false;
+    return this.behaviors.length ? withParamScope(this.params, () => stepBehaviors(this.behaviors, this.beh, { t, dt, world: this.world, onError: m => this.errors.push(m) })) : false;
   }
 
   /** the pack env at the current time (or `time`), with the session's behaviour overrides and seed */
@@ -131,5 +136,5 @@ export class SceneSession {
     return makePackEnv(t => this.posesFor(t), { time, overrides: this.beh.anim, seed: o.seed ?? 0, motion });
   }
 
-  pack(time = this.time, o: { seed?: number } = {}) { return this.compiled.pack(this.env(time, o)); }
+  pack(time = this.time, o: { seed?: number } = {}) { const env = this.env(time, o); return withParamScope(this.params, () => this.compiled.pack(env)); }
 }

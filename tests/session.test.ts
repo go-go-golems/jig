@@ -10,6 +10,7 @@ import { loadCatalogFromDisk } from '../src/content/node';
 import { SceneSession } from '../src/engine/session';
 import { inv34 } from '../src/engine/compile';
 import { digestBytes, packDigest } from '../src/engine/digest';
+import { withParamScope } from '../src/engine/params';
 
 let failures = 0;
 const check = (cond: boolean, what: string) => { if (!cond) { failures++; console.log('  FAIL ' + what); } };
@@ -65,7 +66,8 @@ function rotYZ(s: SceneSession, id: string) { const st = s.beh.anim.get(id)!; re
   for (const t of [0, 0.37, 1.5]) {
     s.seek(t, 0);
     const P = s.pack();
-    const viewport = packDigest(s.compiled, s.compiled.animation, t);
+    // the viewport-style env (digest.ts packEnv), packed with this session's parameters
+    const viewport = withParamScope(s.params, () => packDigest(s.compiled, s.compiled.animation, t));
     const mine: Record<string, string> = {};
     for (const k of ['U', 'O', 'LI', 'BV', 'SDs', 'SDd']) mine[k] = digestBytes(P[k]);
     const bad = Object.keys(mine).filter(k => mine[k] !== viewport[k]);
@@ -85,6 +87,27 @@ function rotYZ(s: SceneSession, id: string) { const st = s.beh.anim.get(id)!; re
   check(a === b, 'D-02: same seed → same objects');
   check(a !== c, 'D-02: different seed → different objects');
   console.log(`D-02: seed 3 → ${a} twice; seed 4 → ${c}`);
+}
+
+// ---- isolation: building another session must not change what an existing session packs (PR #1 review) ----
+{
+  const a = new SceneSession();
+  await a.build(filesOf('B-02'));
+  const before = digestBytes(a.pack(0).U);
+  const b = new SceneSession();
+  await b.build(filesOf('B-01'));
+  const after = digestBytes(a.pack(0).U);
+  check(before === after, `B-02's uniforms unchanged after another session builds B-01 (${before} vs ${after})`);
+  // a parameter set in one session stays there
+  const ids = [...a.params.defs.keys()];
+  if (ids.length) {
+    const id = ids[0], c = new SceneSession();
+    await c.build(filesOf('B-02'));
+    const u0 = digestBytes(c.pack(0).U);
+    a.setParam(id, typeof a.params.defs.get(id).value === 'number' ? a.params.defs.get(id).value + 0.123 : a.params.defs.get(id).value);
+    check(digestBytes(c.pack(0).U) === u0, `setParam('${id}') in one session leaves another session's pack unchanged`);
+  }
+  console.log(`isolation: B-02 uniforms ${before === after ? 'unchanged' : 'CHANGED'} after building B-01 in another session; params ${ids.join(', ') || '(none)'}`);
 }
 
 console.log(failures ? `session: ${failures} failure(s)` : 'session: all checks passed');
