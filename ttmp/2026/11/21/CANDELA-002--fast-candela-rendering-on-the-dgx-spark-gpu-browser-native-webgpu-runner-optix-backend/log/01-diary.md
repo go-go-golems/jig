@@ -700,3 +700,72 @@ binds 0.0.0.0.
 
 ### Technical details
 - Evidence: `various/13-phase0-v8-embedding.txt`.
+
+## Step 12: Phase 1 begins — golden baseline, then deterministic builds (seeded Math.random)
+
+Phase 1 must not change any output, so its first commit records what the engine produces today. The golden test
+digests, for all 105 presets, the generated WGSL and every buffer `pack` writes at three times with the viewport's
+exact `env`. Then the first deliberate change: scene code's `Math.random` is seeded per build, which makes D-02 (the
+only nondeterministic preset) reproducible and brings Node ↔ embedded V8 to 105/105 identical.
+
+### Prompt Context
+**User prompt (verbatim):** (see Step 11) Mid-step: "Don't forget the diary, and  write a detailed project report for
+the obsidian vault as a deep dive technical analysis blog post using a textbook writing style (no analogies, see
+skill). Commit and push the bsidian vault when done (go-go-parc vault).   (we can continue updating the report as we
+go at each milestone)"
+**Assistant interpretation:** Continue phase 1 with diary entries; publish a vault report at this milestone and
+update it at later ones.
+**Inferred user intent:** A readable record that grows with the implementation.
+**Commit (code):** golden baseline `9cf9c6e`; determinism: the commit after this entry.
+
+### What I did
+- `digest.ts` `packEnv`: mirrors `Viewport.repack` (`viewport.ts:96–108`): poses from `animation(t)`, seed, and
+  motion-blur samples (`compiled.motionBlur`, K presets) — so the golden covers the multi-sample `pack` path too.
+- `tests/golden-pack.test.ts` (`npm run test:golden`, `--update`, `--ids`): 105 presets × t ∈ {0, 0.37, 1.5}; WGSL
+  hash, lines, `nU`, hashes of `U O LI BV SDs SDd` and pack metadata. Baseline committed before any engine change
+  (`9cf9c6e`, 94 KB JSON). Second run: 104/105 identical (D-02).
+- Seeded scene `Math` (`candela.ts`): `sceneMath = Object.create(Math, { random: sceneRandom })` passed as a
+  `new Function` parameter named `Math`; mulberry32 state reset by `build(files, { seed })` (default 0).
+- W501 kept: `scene.ts` `withBuildLambda` now sets a flag; `noteSceneRandom()` (called by `sceneRandom` and by the
+  still-patched global for engine code) warns once per lambda. Message changed from "the scene hash will change on
+  every run (no caching, no reproducible renders)" to "its values depend on every earlier Math.random() call in the
+  build, so edits elsewhere change this part of the scene" — the old text is false once seeded.
+- Docs updated to match: `content/presets/D-02-stages.md` (notes), `content/docs/40-design-examples.md` (W501 example).
+
+### Why
+- Design doc 02 D8: browser and backend build the same scene from the same inputs; D-02 was the counterexample.
+
+### What worked
+- D-02: seed 0 twice → `O 805fc8807a5ece63` both times; seed 7 → `ebb08ba50c825763`; W501 still reported at
+  `scene.js:13`.
+- `tests/golden-pack.test.ts --update --ids D-02` then two full runs: `golden pack: 105/105 identical in 8.0 s`.
+- Rebundled (sha256 `364788cc…`); `candela-rt digest` 105/105 built; `core-digest.ts --compare`: `105/105 identical`.
+- `npm run validate` 105/105 build; `npm test` agent loop ok; `tsc` clean.
+
+### What didn't work
+- Nothing failed in this step.
+
+### What I learned
+- Candela already had a determinism rule (docs/08-invariants: "Build lambdas are deterministic", W501) and a seeded
+  `rng` per group (`makeRng(1)`), so seeding `Math.random` extends an existing invariant rather than adding one.
+- `fx.ts:444` evaluates the expression op `rand` on the CPU with the global (unseeded) `Math.random`; no preset's
+  golden changed because of it, but it is a remaining nondeterminism to remove when touching `evalNode`.
+
+### What was tricky to build
+- Keeping W501's detection when scene code no longer calls the global `Math.random`: the flag-based hook serves both
+  the seeded scene `Math` and engine code.
+
+### What warrants a second pair of eyes
+- The user-visible W501 wording and the D-02 notes changed; check they read well in the workbench.
+- `sceneMath` is shared by all modules of a build; the stream order follows module evaluation order, which is
+  deterministic but makes values depend on `lib/` load order.
+
+### What should be done in the future
+- Phase 1 continues: `SceneSession` (clock, behaviours, poses out of `host.ts`/`viewport.ts`), then the
+  `lower`/targets split, all gated by `npm run test:golden`.
+
+### Code review instructions
+- `src/engine/candela.ts` (`sceneMath`, `seedSceneRandom`, the `new Function` parameter list), `src/engine/scene.ts`
+  (`noteSceneRandom`, `withBuildLambda`), `tests/golden-pack.test.ts`, `src/engine/digest.ts` (`packEnv`).
+- Validate: `npm run test:golden` (105/105), `npm run bundle:core && ./build/rt/candela-rt digest --json /tmp/v8.json
+  && npx tsx scripts/core-digest.ts --compare /tmp/v8.json` (105/105).

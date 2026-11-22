@@ -4,6 +4,7 @@ import { CandelaError, collecting, userFiles, lineOffset, sources, callSite, toD
 import { u, Quantity, parseQuantity } from './units';
 import { fx, nodeOf, evalNode, E, lift } from './fx';
 import { param, params, store as paramStore, derivedRegistry, isParam } from './params';
+import { noteSceneRandom } from './scene';
 import { scene, shape, material, bsdf, ior, light, camera, medium, phase, engine, integrator, pass, post, fragment, useFragment, clearGlobalFragments, compOf, isEngine, setEvalField, makeRng, Comp } from './scene';
 import './stdlib';
 import { compile, directNormalLux } from './compile';
@@ -52,6 +53,20 @@ const SCOPE_NAMES = Object.keys(API).filter(k => /^[A-Za-z_$][\w$]*$/.test(k) &&
   try { userFiles.add('probe.js'); const f = new Function('"use strict";\nthrow new Error("probe");\n//# sourceURL=probe.js'); f(); }
   catch (e) { const m = String(e.stack).match(/probe\.js:(\d+)/); if (m) lineOffset.n = +m[1] - 2; }
 })();
+// Scene code's Math: the real Math with a seeded random (mulberry32), reset by every build, so the same files, params
+// and seed build the same scene in any engine (browser, Node, V8 in candela-rt; CANDELA-002 design doc 02, D8).
+let rngState = 0;
+export function seedSceneRandom(seed: number) { rngState = (seed ^ 0x9e3779b9) >>> 0; }
+function sceneRandom() {
+  noteSceneRandom();
+  rngState = (rngState + 0x6d2b79f5) >>> 0;
+  let t = rngState;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const sceneMath = Object.create(Math, { random: { value: sceneRandom, enumerable: false } });
+
 export async function runFiles(files, main = 'scene.js', extraScope: Record<string, any> = {}) {
   const cache = new Map(), logs: any[] = [];
   const consoleShim = { log: (...a) => logs.push(a.map(fmtLog).join(' ')), info: (...a) => logs.push(a.map(fmtLog).join(' ')), warn: (...a) => logs.push('warn: ' + a.map(fmtLog).join(' ')), error: (...a) => logs.push('error: ' + a.map(fmtLog).join(' ')) };
@@ -74,10 +89,10 @@ export async function runFiles(files, main = 'scene.js', extraScope: Record<stri
     const exportsObj: Record<string, any> = {};
     const body = transform(files[path]);
     let fn: any;
-    try { fn = new Function('__req', '__exports', '__def', 'console', ...SCOPE_NAMES, ...Object.keys(extraScope), '"use strict";\nreturn (async () => {\n' + body + '\n})();\n//# sourceURL=' + path); }
+    try { fn = new Function('__req', '__exports', '__def', 'console', 'Math', ...SCOPE_NAMES, ...Object.keys(extraScope), '"use strict";\nreturn (async () => {\n' + body + '\n})();\n//# sourceURL=' + path); }
     catch (e) { const m = e.message; const err = new CandelaError('E001', `${path}: syntax error: ${m}`, { loc: syntaxLoc(files[path], e, path) }); throw err; }
     loading.set(path, true);
-    await fn((s) => resolve(s, path), exportsObj, x => (x && x.default !== undefined ? x.default : x), consoleShim, ...SCOPE_NAMES.map(k => API[k]), ...Object.values(extraScope));
+    await fn((s) => resolve(s, path), exportsObj, x => (x && x.default !== undefined ? x.default : x), consoleShim, sceneMath, ...SCOPE_NAMES.map(k => API[k]), ...Object.values(extraScope));
     loading.delete(path); cache.set(path, exportsObj);
     return exportsObj;
   };
@@ -100,7 +115,7 @@ const fmtLog = x => typeof x === 'string' ? x : x && x[Symbol.for('candela.comp'
 // ---------- build: files → scene → compiled ----------
 export async function build(files, o: Record<string, any> = {}) {
   const t0 = performance.now();
-  paramStore.beginBuild(); derivedRegistry.clear(); clearGlobalFragments();
+  paramStore.beginBuild(); derivedRegistry.clear(); clearGlobalFragments(); seedSceneRandom(o.seed || 0);
   for (const k of [...sources.keys()]) sources.delete(k);
   let res: any, diags: any[] = [], logs: any[] = [], sceneB: any = null, engineB: any = null, compiled: any = null, error: any = null, animation: any = null;
   try {

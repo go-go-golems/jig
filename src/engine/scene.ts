@@ -486,11 +486,20 @@ export function makeRng(seed = 1) {
   r.angle = () => r() * 2 * Math.PI; r.sign = () => r() < 0.5 ? -1 : 1; r.normal = () => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
   return r;
 }
-// build lambdas must be deterministic: Math.random inside one is reported (W501)
+// build lambdas must be deterministic: Math.random inside one is reported (W501). Scene code sees a seeded
+// Math.random (candela.ts, sceneMath), which calls noteSceneRandom(); engine code still uses the global, patched here.
+let lambdaRandom: { used: boolean } | null = null;
+export function noteSceneRandom() {
+  if (lambdaRandom && !lambdaRandom.used) {
+    lambdaRandom.used = true;
+    warn('W501', 'Math.random() called inside a build lambda: its values depend on every earlier Math.random() call in the build, so edits elsewhere change this part of the scene', { hint: '→ use the seeded rng the lambda receives: (g, { rng }) => … rng.range(0, 10)' });
+  }
+}
 function withBuildLambda(fn) {
-  const orig = Math.random; let used = false;
-  Math.random = function () { if (!used) { used = true; warn('W501', 'Math.random() called inside a build lambda: the scene hash will change on every run (no caching, no reproducible renders)', { hint: '→ use the seeded rng the lambda receives: (g, { rng }) => … rng.range(0, 10)' }); } return orig(); };
-  try { fn(); } finally { Math.random = orig; }
+  const orig = Math.random, prev = lambdaRandom;
+  lambdaRandom = { used: false };
+  Math.random = function () { noteSceneRandom(); return orig(); };
+  try { fn(); } finally { Math.random = orig; lambdaRandom = prev; }
 }
 
 // functional edit: a new scene in which the selected node is replaced by fn(node)

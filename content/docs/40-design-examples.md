@@ -529,7 +529,7 @@ scene.group(g => g.add(rock.at(Math.random() * 10, 0, 0)));
 
 ```text
 ⚠ W501  Math.random() called inside a build lambda                      rocks.js:2:32
-        The scene hash will change on every run (no caching, no reproducible renders).
+        Its values depend on every earlier Math.random() call in the build, so edits elsewhere change this part of the scene.
         → scene.group((g, { rng }) => g.add(rock.at(rng.range(0, 10), 0, 0)))
 ```
 

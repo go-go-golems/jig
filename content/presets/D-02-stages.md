@@ -17,4 +17,4 @@ focus: console
 | `p.wo` in a heightfield | **E207** | there is no view direction when the geometry is built |
 | `fx.host(…)` in a material | **E710** | a host function cannot run on the GPU |
 
-The active line uses `Math.random()` inside a group's build lambda: it works, but the scene changes on every build — **W501** suggests the seeded `rng` the lambda already receives.
+The active line uses `Math.random()` inside a group's build lambda. Scene code's `Math.random` is seeded at every build, so the jitter repeats from build to build, but its values depend on every earlier `Math.random()` call in the files: an edit elsewhere moves the spheres. **W501** suggests the `rng` the lambda already receives, which starts from the same seed in every group and so depends on nothing else.
