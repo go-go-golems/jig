@@ -4,8 +4,9 @@ import * as K from './kernel.js';
 
 const V = K.V;
 
-// Tessellate a body: linear deflection relative to size (~0.05 mm for a 60 mm part), angular 0.3 rad.
-export function meshBody(body, { deflection, angular = 0.3 } = {}) {
+// Tessellate a body: linear deflection relative to size (~0.05 mm for a 60 mm part), angular 0.3 rad. The body keeps
+// the last tessellation; cache: false (a one-off finer mesh, cadpkg.js) leaves the stage's cached one in place.
+export function meshBody(body, { deflection, angular = 0.3, cache = true } = {}) {
   const oc = getOC();
   const bb = body.bbox();
   const size = bb ? V.dist(bb[0], bb[1]) : 100;
@@ -13,7 +14,7 @@ export function meshBody(body, { deflection, angular = 0.3 } = {}) {
   const key = `${lin}|${angular}`;
   if (body._mesh?.key === key) return body._mesh.mesh;
   const m = meshRaw(body, lin, angular);
-  body._mesh = { key, mesh: m };
+  if (cache) body._mesh = { key, mesh: m };
   return m;
 }
 function meshRaw(body, lin, angular) {

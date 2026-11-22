@@ -92,3 +92,113 @@ Each note says what is wrong, why it matters and the fix applied.
 **Delivery.** The command was `remarquee upload bundle <design-doc> --name "JIG-016 Rendering jig with Candela" --remote-dir /ai/2026/11/22/JIG-016-RENDER --toc-depth 2`. It answered `OK: uploaded JIG-016 Rendering jig with Candela.pdf -> /ai/2026/11/22/JIG-016-RENDER`. That is cloud upload evidence, not device sync. The PDF was not rendered locally, so its layout has not been checked.
 
 **Open.** Decisions D6 (orthographic camera), where `look.js` lives, and the agent's tool scope; see guide §11–12. Nothing was committed.
+
+## Step 4: Phase 0 and Phase 1: Candela vendored, the CAD package, the bridge, headless tests
+
+This step starts implementation. Candela's engine is vendored into jig, pinned to a pbr-spark commit, and built into two bundles. jig gained a `candela` export that writes the CAD package. The bridge is a Candela library module, built by Candela's own `build` in Node, and puts every F-06 body at its jig placement with materials joined by jig face names. Twelve Node tests cover it, and the transform test was mutation-checked.
+
+Two design points changed from the guide while building, both for the better:
+- **The bridge is a Candela library module.** It is a scene-file source handed to Candela's build as `jig-candela.js`, not part of Candela's core. Candela's core needs no change for it, and the same bytes run in candela-rt.
+- **The sidecar needs no new candela-rt command.** Readiness is the localhost port accepting connections, and the GPU comes from the existing `hello` reply.
+
+### Prompt Context
+**User prompts (verbatim):**
+- "ok let's go"
+- "commit at appropriate intervals and keep a detailed diary as you work (using the diary format from the skill)"
+- "you can use subagents if you want and there is opportunity to prallelize"
+
+**Assistant interpretation.** Start implementing the JIG-016 plan phase by phase on a branch. Commit at tested boundaries, keep this diary in the investigation format, and parallelise independent work.
+
+**Inferred user intent.** Working rendering in jig, built incrementally and reviewably.
+
+**Commit (code):** see Step 5 (the Phase 0/1 commit follows this entry).
+
+### What I did
+**Branch.** Created `jig-016-render` from `main` (3873732) and committed the ticket docs as `90b26ba`.
+
+**Vendoring.**
+- `import/jigcad/tools/vendor-candela.sh <checkout> [ref]` runs `git archive` of `src/engine` and `src/content/catalog.ts` into `vendor/candela/`, then writes `VERSIONS` and `SHA256SUMS`.
+- Make target: `make vendor-candela CANDELA=… CANDELA_REF=…`.
+
+**Upstream change.** On a local pbr-spark branch `jig-016-path-ids` (commit `38fc068`, not pushed), widened `.id()` to `^[\w-]+([./][\w-]+)*$` (`src/engine/scene.ts:79`). Vendored from that commit, then switched pbr-spark back to `main`.
+
+**Bundles.** `build.mjs` now builds:
+- `dist/candela.js` (ESM, 418 KiB) from `src/render/candela.js`: the core plus Viewport, renderers and RenderQueue, in one module graph;
+- `dist/candela-core.js` (IIFE, `globalName: 'Candela'`, ES2020, 370 KiB) plus `.sha256`, for candela-rt's `--bundle`;
+- `src/generated/candela-lib.json` holding the bridge's source.
+
+**The CAD package (worker side).**
+- New `src/engine/cadpkg.js`:
+  - `cadPackage(prog, { quality })` and `encodeCadPackage(pkg)`;
+  - `toCandelaMatrix`, `inferProcess` and `appearanceOf`.
+- `io.js`: added `exportAs(prog, 'candela')`, which returns `<name>.jigcad.json`.
+- `mesh.js`: `meshBody(…, { cache: false })`, so the render tessellation (0.1 rad) does not evict the stage's cached mesh.
+
+**The bridge.** New `src/render/jig-candela.js`:
+- `jigScene(pkg, o)` returns an immutable wrapper with `face(sel, m)`, `material(comp, m)`, `faces(sel)`, `components()`, `view(name)`, `center()` and `bounds()`.
+- A selector is an address (`comp#face`, with globs), a list of addresses, or a predicate.
+- A Proxy forwards symbol lookups to the realised Candela group, so `scene().add(asm)` works.
+
+**Tests.**
+- `test/render/bridge.test.mjs`, 12 tests, uses `node:test`.
+- Makefile `test-js` now runs `node --test test/render/*.test.mjs`.
+
+**Parallel work.** A subagent in its own worktree is building the Go sidecar (`pkg/render`, `--render` flag, `/rt` proxy, capabilities). Its brief records the verified candela-rt facts.
+
+### Why
+- **The bridge as a Candela module.**
+  - Candela's `runFiles` resolves only its own libraries plus files in `files` (`candela.ts:74-83`).
+  - A file `jig-candela.js` that imports `candela` therefore runs unchanged in the browser and in candela-rt's V8.
+  - The page passes the in-memory package through `build(files, { scope: { __jigPackage } })`, where `jig-program.js` is `export const program = __jigPackage;`.
+  - Rejected alternative: putting the bridge in Candela's core, which would change candela-core.js and its handshake hash for every jig change.
+- **Placement by decomposition.** Candela's placed nodes have `at`, `rotateX/Y/Z` and `scale`, but no matrix (`scene.ts:100-109`). `nodeXf` composes `M = R_n ⋯ R_1 · S` (`compile.ts:68-79`), so `.rotateX(a).rotateY(b).rotateZ(c)` is `Rz·Ry·Rx`, and every rigid rotation decomposes that way.
+  - Alternative 1, add `.matrix()` upstream: a second engine change.
+  - Alternative 2, bake transforms into the vertices: this breaks shared definitions and makes poses relative.
+- **Whole-component materials as `.face(allIds, m)`.** autoFinish dresses each face, and explicit `faceMats` override it in order (`compile.ts:236-251`). A shape material alone would lose to autoFinish.
+- **Processes only for metal parts.** fromMetadata defaults a material-less face with a process to steel (`finish.ts:107`). Inferring processes for F-06's material-less frame would have turned it into steel.
+
+### What worked
+- **F-06 export.** It took 60 ms, and the package text is 65,210 bytes.
+  - `rod/body1` face `body/side[s.big]` came out as: cylinder, axis (0, −1, 0), radius 0.003, `featureType: 'extrude'`, `process: 'ground'`. The concavity test classified it as a bore.
+  - The rod's placement (3.87, −43.17, 6) mm became (0.003875, 0.006, 0.0432) m.
+- **Candela `build` in Node.** It succeeded in 798 ms, with 5 objects (4 meshes plus the ground) and pose ids `jig, frame, crank, rod, slider, ground`. The only diagnostic was I206, for the material-less frame.
+- **`node --test test/render/bridge.test.mjs`:** all 12 pass, including identical `compiled.shared` and packed `O` digests for typed-array versus JSON packages.
+
+### What didn't work
+- **Wrong camera method.** The first look used `.target(v.target)`, and Candela reported `E104 'target' is not a method of camera.thinLens`. The method is `.lookAt()` (`scene.ts:399`). The guide's examples have the same mistake (fixed in Step 5).
+- **A bore check that failed.** The test asserting "bore material ≠ side material" failed with `Expected "actual" to be strictly unequal to: 9`.
+  - Cause: my glob `rod#body/side[s.*]` also matches the outline's sides `body/side[s.r.*]`, so all six side faces got the override.
+  - Fix: list selectors (`['rod#body/side[s.big]', 'rod#body/side[s.small]']`), plus a test documenting how the glob behaves. The guide's example used the same glob.
+- **A test-only decoding bug.** `new Float32Array(Buffer.from(b64,'base64').buffer.slice(0))` read Node's shared Buffer pool. Fixed by slicing with `byteOffset` and `byteLength`.
+- **A blind placement test.** Swapping the rotation order in `place()` still passed it, because F-06's parts only rotate about one axis and single-axis rotations commute. A new synthetic-package test covers a general rotation, ±90° about Y (the gimbal) and a near-180° rotation. It passes on the real code and fails on the mutated one: `✖ placement is exact for general rotations and at the gimbal (90° about Y)`.
+
+### What I learned
+- **Candela's module transform is line-based** (`candela.ts:30-47`). `import {…} from` becomes a `const` inside a nested async arrow function, so shadowing the injected scope names is legal. Top-level `await` works.
+- **The browser's IR hash** is `digestString(compiled.shared)` (`remote.ts:81`). Mesh data is not in it; it lives in `pack().O` and the scene data.
+- **`candela-rt serve`** takes `--token` and checks it as `token=` in the URI, closing with 4401 otherwise (`serve.cpp:369`). It defaults to `--bind 0.0.0.0`. Its protocol is `hello` / `files` / `param` / `view` / `clock`, with no jobs and no file endpoint (`serve.cpp:9-15`).
+- **jig's assembly parts are named by component id** (`assembly.js:847`), so `body.part` is the component path.
+
+### What was tricky to build
+- **The mesh cache.** `meshBody` caches one tessellation per body (`body._mesh`). A finer render mesh would have evicted the stage's cached one and forced a re-mesh on the next stage draw. `cache: false` keeps the two paths apart.
+- **Base64 without `Buffer`.** In the browser worker, `encodeCadPackage` falls back to chunked `btoa`.
+- **Bodies placed apart from their component.** Each body's node is placed relative to its component group with `inv(Tc)·Tb`, which is usually the identity and then skipped.
+
+### What warrants a second pair of eyes
+- **The inference rules** in `inferProcess` (`cadpkg.js`): extrude side planes are milled along the extrude direction, which is taken from the `<feature>/end` face normal. A cut's `end` face may point the other way; that is harmless for an `along` direction.
+- **Mutating vendored code.** `place()`'s gimbal branch sets `z = 0` and folds the rest into `x`. It is covered by the ±90° cases.
+- **The cache key.** `DEFS` is a WeakMap on `globalThis` keyed by the package's body object. A page that rebuilds with the same package object reuses the mesh definitions and BVHs. A new package object, for example after every jig compile, re-creates them. That is correct, but costs a BVH build per compile; it is a candidate for a content-hash key.
+
+### What should be done in the future
+- `posesAt` and study poses (Phase 4); `.finish()` and one shared vocabulary (Phase 2); the Render view (Phase 3).
+- Push pbr-spark `jig-016-path-ids` and open a PR: needs the user's go-ahead, since it is someone else's active repository.
+- Fix the guide's examples: `.lookAt`, list selectors, the immutable chain, no `find()`.
+
+### Code review instructions
+- **Start with** `import/jigcad/src/engine/cadpkg.js` (the frame conversion and inference), then `src/render/jig-candela.js` (`realize`, `place`, `parse`).
+- **Validate:** `cd import/jigcad && make -C ../.. web && node --test test/render/bridge.test.mjs`.
+
+### Technical details
+- **Package header:** `{ format: 'jig-cad-package', version: 1, frame: { units: 'm', up: '+y', fromJig: 'p = 0.001 * (x, z, -y)' } }`.
+- **Arrays:** `positions` and `normals` are Float32, `indices` and `triFace` are Uint32, base64 in JSON.
+- **C** (column-major) is `[S,0,0,0, 0,0,-S,0, 0,S,0,0, 0,0,0,1]` with S = 0.001; T′ = C·T·C⁻¹.
+- **Euler extraction** for `Rz·Ry·Rx`: y = asin(−r20), x = atan2(r21, r22), z = atan2(r10, r00).
