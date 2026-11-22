@@ -14,7 +14,7 @@ import { material as materialOf } from './inspect.js';
 import { isQuantity, q as qParse } from './units.js';
 import { paramLayers, resolveAll, paramRows } from './params.js';
 import { hashStr } from './hash.js';
-import { solveJob, SOLVER_VERSION } from '../fea/solve.js';
+import { solveJob, materialProblems, SOLVER_VERSION } from '../fea/solve.js';
 import { scalarIn, vectorIn } from './vectors.js';
 
 class FeaStudy {
@@ -60,27 +60,32 @@ export function fea(name = 'study', o = {}) {
 const RESULTS = new Map();   // job key → result (the last 16)
 function compileStudy(st, opts, { compilePart, finalize }) {
   const t0 = performance.now();
-  const o = st.o, diagnostics = [], decisions = [], trace = [];
-  const fail = (kind, message, fix, at = st.name) => diagnostics.push({ level: 'error', kind, at, message, fix });
+  const o = st.o, decisions = [], trace = [];
+  // one way in for every diagnostic: before the program exists, a list that finalize() takes in; after, the program's
+  // own list, looked up at each call (finalize copies the first, and a solve replaces the second)
+  let prog = null;
+  const early = [];
+  const report = (d) => (prog ? prog.data.diagnostics : early).push(d);
+  const fail = (kind, message, fix, at = st.name) => report({ level: 'error', kind, at, message, fix });
   // the study's own params: loads and margins people move with a slider
   let pvals = {}, prows = [];
   if (o.params && Object.keys(o.params).length) {
     const ov = Object.fromEntries(Object.entries(opts.override ?? {}).filter(([k]) => k in o.params).map(([k, v]) => [k, typeof v === 'number' && isQuantity(o.params[k]) && o.params[k].u ? qParse(`${v} ${o.params[k].u}`) : v]));
     const pres = resolveAll(paramLayers({ params: [o.params], compileOverride: ov }), {});
     pvals = pres.values ?? {}; prows = paramRows(pres).map((r) => ({ ...r, src: r.src === 'params' ? 'study' : r.src, part: null, shared: true }));
-    diagnostics.push(...(pres.diagnostics ?? []));
+    for (const d of pres.diagnostics ?? []) report(d);
   }
   // the part, and the load case from a mechanism when the study takes one
-  let part = o.part, lc = null;
+  let part = o.part, lc = null, fromError = null;
   if (o.from) {
     try { lc = o.from.asm.loadCase ? o.from.asm.loadCase(o.from, opts, { compilePart, finalize }) : (() => { throw new Error('.from() takes an assembly'); })(); }
-    catch (e) { fail('fea.from', `from: ${e.message}`, e.fix); }
+    catch (e) { fromError = e.message; fail('fea.from', `from: ${e.message}`, e.fix); }
     if (lc && !part) part = lc.part;
-    for (const d of lc?.diagnostics ?? []) diagnostics.push(d);
+    for (const d of lc?.diagnostics ?? []) report(d);
     for (const d of lc?.decisions ?? []) decisions.push(d);
     for (const t of lc?.trace ?? []) trace.push(t);
   }
-  if (!part?.isPart) throw new Error(`j.fea('${st.name}'): give the part to study: j.fea('${st.name}', { part })`);
+  if (!part?.isPart) throw new Error(fromError ? `j.fea('${st.name}'): from: ${fromError}` : `j.fea('${st.name}'): give the part to study: j.fea('${st.name}', { part })`);
   // the study's material is the part's for this program: its mass, cost and title say what was solved
   const studyMat = o.material ?? lc?.material ?? null;
   if (studyMat && part.meta.material !== studyMat) {
@@ -89,11 +94,11 @@ function compileStudy(st, opts, { compilePart, finalize }) {
     part = part.material(studyMat);
   }
   const res = compilePart(part, opts);
-  const prog = finalize({ kind: 'fea', name: st.name, parts: [{ name: part.name, part, res }], t0, opts, sharedParams: prows.length ? prows : null, extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace });
+  prog = finalize({ kind: 'fea', name: st.name, parts: [{ name: part.name, part, res }], t0, opts, sharedParams: prows.length ? prows : null, extraDiagnostics: early, extraDecisions: decisions, extraTrace: trace });
   const D = prog.data;
   const bodies = res.state.bodies;
   if (bodies.length !== 1) {
-    D.diagnostics.push({ level: 'error', kind: 'fea.bodies', at: part.name, message: `a stress study takes a part of one solid body; ${part.name} has ${bodies.length}`, fix: 'fuse the bodies into one (op: join), or study them one at a time' });
+    report({ level: 'error', kind: 'fea.bodies', at: part.name, message: `a stress study takes a part of one solid body; ${part.name} has ${bodies.length}`, fix: 'fuse the bodies into one (op: join), or study them one at a time' });
     return finish(prog);
   }
   const body = bodies[0];
@@ -102,14 +107,14 @@ function compileStudy(st, opts, { compilePart, finalize }) {
     if (Array.isArray(sel) && sel.every((x) => typeof x === 'number')) return sel;
     let recs;
     try { recs = (Array.isArray(sel) ? sel : [sel]).flatMap((s) => prog.faces(s)); }
-    catch (e) { D.diagnostics.push({ level: 'error', kind: 'fea.ref', at: what, message: `${what}: ${e.message}`, fix: 'check the selector with why(…)' }); return []; }
-    if (!recs.length) D.diagnostics.push({ level: 'error', kind: 'fea.ref', at: what, message: `${what}: ${String(sel)} names no face of ${part.name}`, fix: 'check the selector with why(…)' });
+    catch (e) { report({ level: 'error', kind: 'fea.ref', at: what, message: `${what}: ${e.message}`, fix: 'check the selector with why(…)' }); return []; }
+    if (!recs.length) report({ level: 'error', kind: 'fea.ref', at: what, message: `${what}: ${String(sel)} names no face of ${part.name}`, fix: 'check the selector with why(…)' });
     return [...new Set(recs.map((r) => r.index))];
   };
   // material: the study's, else the part's, else PLA
   const mat = materialOf(o.material ?? lc?.material ?? part.meta.material ?? 'PLA');
   const material = { name: mat.name, E: mat.modulus * 1000, nu: mat.nu ?? 0.35, strength: mat.strength, density: mat.density * 1e-9 };
-  if (!(material.strength > 0)) fail('fea.material', `${mat} has no strength to judge the part against`, `${mat.name}.with({ strength: MPa(…) })`);
+  for (const bad of materialProblems(material)) fail('fea.material', `${mat} has ${bad.what}`, `${mat.name}.with({ ${bad.fix} })`);
   const job = { name: st.name, faceNames: body.names.slice(), material, fixtures: [], loads: [], checks: [], margin: o.margin ?? 2, mesh: { ...(o.meshOpts ?? {}) }, solver: o.solver ?? 'auto' };
   if (job.mesh.size != null) job.mesh.size = scalarIn(job.mesh.size, 'mm', { values: pvals, what: 'mesh size' });
   for (const [i, fx] of (o.fixtures ?? []).entries()) {
@@ -125,13 +130,13 @@ function compileStudy(st, opts, { compilePart, finalize }) {
       else if (ld.type === 'pressure') job.loads.push({ type: 'pressure', faces: faceIndex(ld.sel, label), p: scalarIn(ld.value, 'MPa', { values: pvals, what: label }), label });
       else if (ld.type === 'gravity') job.loads.push({ type: 'body', rho: material.density, g: vec('mm/s^2'), label });
       else if (ld.type === 'accel') job.loads.push({ type: 'body', rho: material.density, a0: vec('mm/s^2'), label });
-    } catch (e) { D.diagnostics.push({ level: 'error', kind: 'fea.load', at: label, message: e.message, line: ld.line }); }
+    } catch (e) { report({ level: 'error', kind: 'fea.load', at: label, message: e.message, line: ld.line }); }
   }
   // the mechanism's load case: the joints' wrenches on their seats, the inertia as a body load, one seat held
   if (lc) {
     for (const s of lc.seats) {
       const faces = s.faces ? faceIndex(s.faces, `seat ${s.port}`) : seatFaces(body, s);
-      if (!faces.length) { D.diagnostics.push({ level: 'error', kind: 'fea.seat', at: s.port, message: `no face of ${part.name} seats port '${s.port}' (no cylinder on its axis)`, fix: `name them: .from(asm, { faces: { ${s.port}: j.feat(…).sideFaces() } })` }); continue; }
+      if (!faces.length) { report({ level: 'error', kind: 'fea.seat', at: s.port, message: `no face of ${part.name} seats port '${s.port}' (no cylinder on its axis)`, fix: `name them: .from(asm, { faces: { ${s.port}: j.feat(…).sideFaces() } })` }); continue; }
       if (s.held) job.fixtures.push({ type: 'fixed', faces, label: `seat ${s.port} (held)` });
       else job.loads.push({ type: 'wrench', faces, force: s.force, moment: s.moment, point: s.point, mode: s.bearing ? 'bearing' : 'uniform', label: `joint ${s.joint} at ${s.port}` });
       D.decisions.push({ at: `${st.name}:${s.port}`, kind: 'seat', chose: `${faces.map((k) => body.names[k]).join(', ')}`, alternatives: [], reason: s.faces ? 'named in .from(…, { faces })' : `the faces coaxial with port ${s.port}'s z` });
@@ -152,7 +157,7 @@ function compileStudy(st, opts, { compilePart, finalize }) {
     fixtures: job.fixtures.map(({ type, label, names }) => ({ type, label, faces: names })), loads: job.loads.map(({ type, label, names, force, p, moment }) => ({ type, label, faces: names ?? null, force: force ?? null, p: p ?? null, moment: moment ?? null })),
     pose: lc?.pose ?? null,
     mechanism: lc ? { held: lc.seats.filter((x) => x.held).map((x) => ({ port: x.port, joint: x.joint, force: x.force })), seats: lc.seats.map((x) => ({ port: x.port, joint: x.joint, held: x.held, force: x.force, moment: x.moment })), body: lc.body } : null };
-  if (RESULTS.has(key)) merge(prog, RESULTS.get(key), true);
+  if (D.fea.status !== 'blocked' && RESULTS.has(key)) merge(prog, RESULTS.get(key), true);
   prog.fea = (so = {}) => solveStudy(prog, so);
   return finish(prog);
 }
@@ -193,7 +198,7 @@ async function solveStudy(prog, so = {}) {
     if (deck) prog.P.feaDeck = deck;
     merge(prog, keep, false, performance.now() - t0);
   } catch (e) {
-    D.diagnostics.push({ level: 'error', kind: e.kind ?? 'fea.failed', at: D.fea.name, message: e.message, fix: e.fix });
+    D.diagnostics.push({ level: 'error', kind: e.kind ?? 'fea.failed', at: D.fea.name, message: e.message, fix: e.fix, stage: 'solve' });
     D.fea.status = 'failed'; D.fea.error = e.message;
     finish(prog);
   }
@@ -207,8 +212,10 @@ function merge(prog, r, cached, ms = 0) {
   D.metrics.displacement = { value: r.displacement.value, unit: 'mm', fidelity: 'approx', note: 'largest displacement' };
   D.metrics.feaDOF = { value: r.mesh.dof, unit: 'count', fidelity: 'exact', note: `${r.mesh.elements} C3D10 elements` };
   Object.assign(D.summary, { stress: +r.peak.value.toFixed(3), safetyFactor: +r.safetyFactor.toFixed(3), displacement: +r.displacement.value.toFixed(5) });
-  D.diagnostics = D.diagnostics.filter((d) => !String(d.kind).startsWith('fea.') || d.kind === 'fea.ref' || d.kind === 'fea.material' || d.kind === 'fea.load');
-  for (const f of r.findings) D.diagnostics.push({ ...f, part, at: f.at ?? D.fea.name });
+  // a solve replaces the previous solve's findings and no others: each carries stage 'solve', so the compile's own
+  // diagnostics stay whatever their kind
+  D.diagnostics = D.diagnostics.filter((d) => d.stage !== 'solve');
+  for (const f of r.findings) D.diagnostics.push({ ...f, part, at: f.at ?? D.fea.name, stage: 'solve' });
   D.decisions.push({ at: D.fea.name, kind: 'mesh', chose: `${r.mesh.elements} quadratic tetrahedra (C3D10), ${r.mesh.nodes} nodes, size ${r.mesh.size.toFixed(2)} mm`, alternatives: [], reason: r.mesh.refined ? `refined from ${r.mesh.refined.fromSize.toFixed(2)} mm because the safety factor was under 3 (peak ${r.mesh.refined.fromPeak.toFixed(1)} → ${r.mesh.refined.peak.toFixed(1)} MPa)` : prog.P.feaJob.mesh.size != null ? 'set by .mesh({ size })' : 'a thirtieth of the part\'s diagonal, finer where its surface is curved' });
   D.decisions.push({ at: D.fea.name, kind: 'solver', chose: r.solver, alternatives: [], reason: /CalculiX/.test(r.solver) ? 'the CalculiX module is present' : 'no CalculiX module: the reference solver states the same problem' });
   D.trace.push({ pass: 'fea', level: 'L6', ms: cached ? 0 : ms, cached, note: `${r.mesh.elements} elements, ${r.mesh.dof} dof, ${r.solver}; mesh ${(r.timings.mesh ?? 0).toFixed(0)} ms, solve ${(r.timings.solve ?? 0).toFixed(0)} ms` });
@@ -218,7 +225,7 @@ function merge(prog, r, cached, ms = 0) {
   if (mh) {
     const scale = Math.max(1e-9, Math.hypot(...mh.force), ...r.applied.map((a) => Math.hypot(...a.total)));
     const off = Math.hypot(...[0, 1, 2].map((k) => r.reaction[k] - mh.force[k])) / scale;
-    if (off > 0.02) D.diagnostics.push({ level: 'warning', kind: 'fea.mechanismBalance', part, at: mh.port, message: `the held seat carries [${r.reaction.map((x) => x.toFixed(3))}] N in the stress study, the mechanism says [${mh.force.map((x) => x.toFixed(3))}] N (${(off * 100).toFixed(1)} % apart)`, fix: 'check the seats found for each port (decisions), and the part\'s material' });
+    if (off > 0.02) D.diagnostics.push({ level: 'warning', kind: 'fea.mechanismBalance', stage: 'solve', part, at: mh.port, message: `the held seat carries [${r.reaction.map((x) => x.toFixed(3))}] N in the stress study, the mechanism says [${mh.force.map((x) => x.toFixed(3))}] N (${(off * 100).toFixed(1)} % apart)`, fix: 'check the seats found for each port (decisions), and the part\'s material' });
     else D.decisions.push({ at: D.fea.name, kind: 'balance', chose: `seat ${mh.port} carries [${r.reaction.map((x) => x.toFixed(3))}] N`, alternatives: [], reason: `the mechanism's joint ${mh.joint} gives [${mh.force.map((x) => x.toFixed(3))}] N (${(off * 100).toFixed(2)} % apart)` });
   }
   // each face's stress, for the stage's tones: the largest and the area-weighted mean of the nodal field on it

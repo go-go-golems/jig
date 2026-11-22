@@ -1041,7 +1041,31 @@ await feaTest('56 stress study edges: a gravity vector keeps its magnitude; a lo
     assert(p.fea.status === 'solved' && !errs(p).length && Math.abs(p.fea.displacement.value) < 1e-12, `force on the held face ${s}: ${p.fea.status} ${JSON.stringify(errs(p))} ${p.fea.displacement?.value}`);
     assert(near(p.fea.reaction[2], 20, 1e-6) && p.fea.balance < 1e-6, `the support takes the 20 N ${s}: ${p.fea.reaction}`);
   }
-  return `2 g base ${p.fea.reaction[2].toFixed(3)} N; zero-work solves on ${solvers.length} solver${solvers.length > 1 ? 's' : ''}`;
+  // what blocks a study is said, and blocks it: a check made after the program exists lands in its diagnostics
+  const blocked = async (src, kind, re) => {
+    const q = await compile(src), e = errs(q).find((d) => d.kind === kind);
+    assert(q.fea.status === 'blocked' && e && re.test(e.message), `${kind}: ${q.fea.status} ${JSON.stringify(errs(q))}`);
+  };
+  await blocked(beam.replace("j.material('steel')", "j.material('steel').with({ strength: undefined })"), 'fea.material', /no strength/);
+  await blocked(beam.replace(".force(j.feat('body').endFace(), 'F', { dir: '-Z', label: 'tip' })", ''), 'fea.unloaded', /nothing loads/);
+  await blocked(beam.replace(".fix(j.feat('body').startFace(), { label: 'root' })", ''), 'fea.free', /nothing holds/);
+  return `2 g base ${p.fea.reaction[2].toFixed(3)} N; zero-work solves on ${solvers.length} solver${solvers.length > 1 ? 's' : ''}; strength, loads, fixtures block`;
+});
+await test('57 mechanism: a lambda that throws is an error naming it and the pose, never a pose without it', async () => {
+  // a wrench whose lambda throws: the reactions would leave its load out, so the compile fails and says where
+  const mech = script('53-fea-from-mechanism.js').replace("row => row.clamp < -70 ? [0, N(4), 0] : null", 'row => row.nope.deeper');
+  const a = await compile(mech.replace(/return j\.fea[\s\S]*$/, 'return head'));
+  const w = errs(a).find((d) => d.kind === 'asm.wrench');
+  assert(w && /'needle in the cloth' threw at cycle at 0° \(and 360 more times\): Cannot read properties of undefined/.test(w.message), JSON.stringify(errs(a)));
+  // a stress study taking its loads from it does not compile either, and gives that reason
+  const r = await W.handle({ id: 1, op: 'compile', files: { 'script.js': mech }, options: {} });
+  const msg = r.ok ? JSON.stringify(errs(r.program)) : r.error.message;
+  assert(/from: the assembly does not compile: wrench 'needle in the cloth' threw/.test(msg), msg);
+  // an event whose lambda throws finds no crossings: an error too, not an event that never happens
+  const ev = await compile(script('46-couple.js').replace('w => w.hookAngle < 0', 'w => w.hookAngle.nope.deeper < 0'));
+  const e = errs(ev).find((d) => d.kind === 'asm.event');
+  assert(e && /event 'hook past 180°' threw at /.test(e.message), JSON.stringify(errs(ev)));
+  return `${w.message.slice(0, 60)}…`;
 });
 await test('54 forces: slider-crank reactions balance energy (drive power = dKE/dt; statics: torque = dPE/dθ)', async () => {
   const base = script('43-slider-crank.js');

@@ -232,7 +232,7 @@ export function solveAssembly(asm, opts, compilePart) {
       const dynOn = !!jn && (o.reactions ?? []).some((r) => r.study == null || r.study === st.name);
       const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
       const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps: st.steps ?? 360,
-        onRow: swept || dynOn ? (k, row) => { if (swept) poses[k] = S.transforms(); if (dynOn) { const d = forceRow(S, F, st.drive, row); dyn[k] = d; Object.assign(row, d.readings); } } : null }, measures, o.events ?? []);
+        onRow: swept || dynOn ? (k, row) => { if (swept) poses[k] = S.transforms(); if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } : null }, measures, o.events ?? []);
       studies[st.name] = res;
       if (dynOn) {
         const keys = Object.keys(dyn.find(Boolean)?.readings ?? {});
@@ -259,7 +259,7 @@ export function solveAssembly(asm, opts, compilePart) {
     const api = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, studyApi(v)]));
     reports = (o.reports ?? []).map(r => { let value = null, error = null; try { value = r.fn({ studies: api, measures: measured, mobility, joints: S.jointValues() }); } catch (e) { error = e.message; } return { name: r.name, value: typeof value === 'number' ? value : value == null ? null : String(value), unit: r.unit, digits: r.digits, error }; });
     for (const r of reports) if (r.error) diagnostics.push({ level: 'error', kind: 'asm.report', at: r.name, message: r.error });
-    if (S.measureError) diagnostics.push({ level: 'warning', kind: 'asm.measure', at: 'measure', message: S.measureError });
+    diagnostics.push(...S.calls.diagnostics());   // every lambda that threw, named, with where (mechanism.js UserCalls)
   }
   const T = S.transforms();
   [...comp.keys()].forEach((id, i) => { comp.get(id).T = T[i]; });
@@ -546,12 +546,15 @@ function forceSetup(S, comp, o, diagnostics, decisions) {
 const N3 = (v) => (v == null ? null : force(v, { what: 'wrench force' }));
 const NMM3 = (v) => (v == null ? [0, 0, 0] : moment(v, { what: 'wrench moment' }));
 // one sampled pose: wrench lambdas read the row, then kinematics (when the drive has a speed) and the reactions
-function forceRow(S, F, drive, row) {
+function forceRow(S, F, drive, row, where) {
   const rate = F.rate(drive);
   const kin = rate ? kinematics(S, drive, rate, F.masses) : null;
   const wr = [];
   for (const w of F.wrenches) {
-    let v; try { v = typeof w.fn === 'function' ? w.fn(row) : w.fn; } catch (e) { v = null; }
+    // a lambda that throws is an error the compile reports (S.calls), not a pose without this load
+    const r = typeof w.fn === 'function' ? S.calls.run('wrench', w.label, w.fn, row, where) : { ok: true, value: w.fn };
+    if (!r.ok) continue;
+    const v = r.value;
     if (v == null || v === false) continue;
     const arr = Array.isArray(v), F3 = arr ? N3(v) : N3(v.force) ?? [0, 0, 0], M3 = NMM3(arr ? w.moment : v.moment);
     wr.push({ bi: w.bi, comp: w.comp, port: w.port, label: w.label, point: w.point, force: F3, moment: M3 });

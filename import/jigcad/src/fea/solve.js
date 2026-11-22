@@ -21,7 +21,19 @@ import * as BK from './backends.js';
 export const SOLVER_VERSION = 'jig-fea 1';
 const DOF_BUDGET = 150000;
 
+// what a material lacks for a linear elastic solve; each would turn into NaN in the stiffness or the safety factor,
+// which no comparison (SF < 1, SF < margin) would catch. The compile blocks on them; solveJob refuses them too.
+export function materialProblems(m) {
+  const out = [];
+  if (!(m.E > 0 && Number.isFinite(m.E))) out.push({ what: 'no elastic modulus', fix: 'modulus: MPa(…) (GPa × 1000)' });
+  if (!(m.nu >= 0 && m.nu < 0.5)) out.push({ what: `a Poisson's ratio of ${m.nu}, outside 0 ≤ ν < 0.5`, fix: 'nu: 0.35' });
+  if (!(m.strength > 0 && Number.isFinite(m.strength))) out.push({ what: 'no strength to judge the part against', fix: 'strength: MPa(…)' });
+  if (!(m.density >= 0 && Number.isFinite(m.density))) out.push({ what: 'no density to weigh it', fix: 'density: q(\'1.24 g/cm^3\')' });
+  return out;
+}
 export async function solveJob(job, o = {}) {
+  const bad = materialProblems(job.material ?? {});
+  if (bad.length) throw failure('fea.material', `${job.material?.name ?? 'the material'} has ${bad.map((b) => b.what).join(', ')}`, bad.map((b) => b.fix).join(', '));
   const t0 = now(), timings = {}, notes = [];
   const findings = [];
   const surf = job.surface;

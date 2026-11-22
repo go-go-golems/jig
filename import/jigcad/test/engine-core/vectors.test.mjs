@@ -56,3 +56,31 @@ test('the reference solver returns u = 0 for a load the supports take whole', ()
   assert.ok(f.U.every(Number.isFinite) && f.U[3 * 3 + 2] < 0 && f.iterations > 0, 'a real load still solves');
   close3(f.RF.FIX.total, [0, 0, 5], 1e-9);
 });
+
+// ── the doors errors come through (PR #4 review): a lambda's throw is never a value; a material is checked whole ──
+import { UserCalls } from '../../src/engine/mechanism.js';
+import { materialProblems } from '../../src/fea/solve.js';
+
+test('a user lambda that throws is recorded, named, with where; it never answers null', () => {
+  const calls = new UserCalls();
+  const ok = calls.run('wrench', 'tip', (row) => (row.x > 1 ? [0, 0, 1] : null), { x: 0 });
+  assert.deepEqual(ok, { ok: true, value: null });   // "no load here" is a value
+  const bad = (row) => row.nope.deeper;
+  for (let i = 0; i < 3; i++) assert.equal(calls.run('wrench', 'tip', bad, {}, `cycle at ${i}°`).ok, false);
+  calls.run('measure', 'z', () => { throw new Error('no port'); }, {});
+  const d = calls.diagnostics();
+  assert.equal(d.length, 2);
+  assert.ok(d[0].level === 'error' && d[0].kind === 'asm.wrench' && /'tip' threw at cycle at 0° \(and 2 more times\)/.test(d[0].message), d[0].message);
+  assert.ok(d[1].level === 'warning' && d[1].kind === 'asm.measure', JSON.stringify(d[1]));
+});
+
+test('a material missing a number for the solve is named, NaN included', () => {
+  const steel = { name: 'steel', E: 200000, nu: 0.29, strength: 250, density: 7.85e-9 };
+  assert.deepEqual(materialProblems(steel), []);
+  const what = (m) => materialProblems({ ...steel, ...m }).map((b) => b.what).join('; ');
+  assert.match(what({ strength: undefined }), /no strength/);
+  assert.match(what({ strength: NaN }), /no strength/);
+  assert.match(what({ E: NaN }), /no elastic modulus/);
+  assert.match(what({ nu: 0.5 }), /Poisson/);
+  assert.match(what({ density: undefined }), /no density/);
+});
