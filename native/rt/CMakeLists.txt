@@ -34,7 +34,7 @@ set(USE_ZLIB ON CACHE BOOL "" FORCE)
 set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(ixwebsocket GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git GIT_TAG v11.4.6 GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(ixwebsocket)
-add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp src/optix_renderer.cpp src/post.cpp src/image_io.cpp src/jpeg.cpp src/serve.cpp)
+add_executable(candela-rt src/main.cpp src/js_runtime.cpp src/cuda_runner.cpp src/optix_renderer.cpp src/post.cpp src/image_io.cpp src/jpeg.cpp src/serve.cpp src/denoiser.cpp)
 target_include_directories(candela-rt PRIVATE ${V8_INCLUDE_DIR} ${OptiX_INSTALL_DIR}/include src)
 target_link_libraries(candela-rt PRIVATE ${NODE_LIB} CUDA::cuda_driver CUDA::nvrtc CUDA::nvjpeg CUDA::cudart ZLIB::ZLIB ixwebsocket pthread ${CMAKE_DL_LIBS})
 # NVRTC needs the OptiX device headers to compile a scene's OptiX program

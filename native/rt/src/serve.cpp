@@ -32,6 +32,7 @@
 #include "jpeg.h"
 #include "optix_renderer.h"
 #include "post.h"
+#include "denoiser.h"
 
 namespace fs = std::filesystem;
 using Clock = std::chrono::steady_clock;
@@ -82,6 +83,7 @@ class Live {
   Live(int argc, char** argv, Queue& q) : argc_(argc), argv_(argv), q_(q) {
     maxSpp_ = std::stoi(arg(argc, argv, "--max-spp", "2048"));
     maxW_ = std::stoi(arg(argc, argv, "--max-width", "1920"));
+    denoise_ = arg(argc, argv, "--denoise", "ai");   // ai | scene | off (the live view defaults to the AI denoiser)
   }
 
   void run() {
@@ -108,7 +110,7 @@ class Live {
       try { step(); } catch (const std::exception& e) { sendText("{\"type\":\"error\",\"message\":" + jstr(e.what()) + "}"); fprintf(stderr, "error: %s\n", e.what()); H_.Reset(); }
     }
     H_.Reset(); files_.Reset(); params_.Reset();
-    R_.reset(); post_.reset(); jpeg_.reset();
+    R_.reset(); post_.reset(); jpeg_.reset(); ai_.reset();
   }
 
  private:
@@ -239,6 +241,7 @@ class Live {
     postCubin_ = pc.cubin;
     post_ = std::make_unique<crt::PostProcessor>(postCubin_, w_, h_);
     post_->enableRGB(true);
+    if (denoise_ == "ai") { if (!ai_) ai_ = std::make_unique<crt::AiDenoiser>(cuda_->ctx(), w_, h_); else ai_->resize(w_, h_); }
     H_.Reset(rt().isolate(), Hn);
     if (!view_.IsEmpty()) rt().callMethod(Hn, "setView", {view_.Get(rt().isolate())});
     version_ = -1;
@@ -251,6 +254,7 @@ class Live {
     rt().callMethod(H(), "resize", {n(w_), n(h_)});
     if (R_) R_->resize(w_, h_);
     if (!postCubin_.empty()) { post_ = std::make_unique<crt::PostProcessor>(postCubin_, w_, h_); post_->enableRGB(true); }
+    if (ai_) ai_->resize(w_, h_);
   }
 
   // accumulation restarts; `meter`: meter the exposure again (scene, param or view changes; not clock ticks)
@@ -310,11 +314,11 @@ class Live {
     if (!client_ || client_->bufferedAmount() > (8 << 20)) return;   // the browser is behind: skip, the next one is newer
     auto Hn = H();
     auto d = rt().callMethod(Hn, "display", {});
-    post_->run(rt().view<float>(rt().get(d, "D")), (int)num(d, "steps"), (float)num(d, "sigma"), R_->accumBuffer(), R_->albedoBuffer(), R_->normalBuffer());
+    post_->run(rt().view<float>(rt().get(d, "D")), denoise_ == "off" ? 0 : (int)num(d, "steps"), (float)num(d, "sigma"), R_->accumBuffer(), R_->albedoBuffer(), R_->normalBuffer(), ai_.get());
     const std::string jpg = jpeg_->encode(post_->rgbBuffer(), w_, h_);
-    char head[320];
-    const int hl = snprintf(head, sizeof head, "{\"type\":\"frame\",\"t\":%.6f,\"spp\":%d,\"ev\":%.4f,\"width\":%d,\"height\":%d,\"renderMs\":%.1f,\"epoch\":%d,\"playing\":%s}",
-                            t_, (int)spp(), num(Hn, "ev"), w_, h_, renderMs_, epoch_, playing_ ? "true" : "false");
+    char head[400];
+    const int hl = snprintf(head, sizeof head, "{\"type\":\"frame\",\"t\":%.6f,\"spp\":%d,\"ev\":%.4f,\"width\":%d,\"height\":%d,\"renderMs\":%.1f,\"epoch\":%d,\"playing\":%s,\"denoise\":\"%s\",\"denoiseMs\":%.2f}",
+                            t_, (int)spp(), num(Hn, "ev"), w_, h_, renderMs_, epoch_, playing_ ? "true" : "false", denoise_.c_str(), post_->lastDenoiseMs());
     std::string payload(4, '\0');
     payload[0] = char(hl & 255); payload[1] = char((hl >> 8) & 255); payload[2] = char((hl >> 16) & 255); payload[3] = char((hl >> 24) & 255);
     payload.append(head, hl);
@@ -335,6 +339,8 @@ class Live {
   crt::OptixRenderer* RO_ = nullptr;
   std::unique_ptr<crt::PostProcessor> post_;
   std::unique_ptr<crt::JpegEncoder> jpeg_;
+  std::unique_ptr<crt::AiDenoiser> ai_;
+  std::string denoise_ = "ai";
   std::vector<char> postCubin_;
   std::string target_, programKey_;
   int w_ = 960, h_ = 540, seed_ = 1, maxSpp_ = 2048, maxW_ = 1920, batch_ = 1, metered_ = 0, epoch_ = 0;

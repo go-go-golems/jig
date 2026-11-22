@@ -34,6 +34,7 @@
 #include "js_runtime.h"
 #include "image_io.h"
 #include "post.h"
+#include "denoiser.h"
 #include "common.h"
 
 namespace fs = std::filesystem;
@@ -374,6 +375,13 @@ static int cmdRender(int argc, char** argv) {
   auto comp = compileCached(rt.toStdString(rt.get(prog, "source")), rt.toStdString(rt.get(prog, "hash")), id + ".cu", kdir, cuda.arch(), cacheDir(argc, argv), &hit, optix);
   if (!comp.ok) { fprintf(stderr, "%s: NVRTC failed:\n%s\n", id.c_str(), comp.log.c_str()); return 2; }
   const bool display = wPng || wMp4;
+  // denoising of displayed frames: the scene's own (the workbench's à-trous filter when the engine asks for it), the
+  // OptiX AI denoiser (AOV model, albedo + normal guides), or none
+  const std::string denoise = arg(argc, argv, "--denoise", "scene");
+  if (denoise != "scene" && denoise != "ai" && denoise != "off") { fprintf(stderr, "--denoise scene|ai|off\n"); return 1; }
+  std::unique_ptr<crt::AiDenoiser> ai;
+  if (display && denoise == "ai") ai = std::make_unique<crt::AiDenoiser>(cuda.ctx(), w, h);
+  double denoiseMs = 0;
   std::unique_ptr<crt::PostProcessor> post;
   bool postHit = false;
   double postMs = 0;
@@ -445,7 +453,8 @@ static int cmdRender(int argc, char** argv) {
     }
     if (display) {
       auto d = rt.callMethod(H, "display", {});
-      post->run(rt.view<float>(rt.get(d, "D")), (int)num(d, "steps"), (float)num(d, "sigma"), R->accumBuffer(), R->albedoBuffer(), R->normalBuffer());
+      post->run(rt.view<float>(rt.get(d, "D")), denoise == "off" ? 0 : (int)num(d, "steps"), (float)num(d, "sigma"), R->accumBuffer(), R->albedoBuffer(), R->normalBuffer(), ai.get());
+      denoiseMs += post->lastDenoiseMs();
       auto rgba = post->readRGBA8();
       if (wPng) crt::writePNG(outDir / (fstem + ".png"), w, h, rgba);
       if (video) video->add(rgba);
@@ -474,7 +483,7 @@ static int cmdRender(int argc, char** argv) {
   std::ofstream(outDir / (stem + ".json")) << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"formats\":" << jsonString(formats) << ",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0)
       << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"motion\":" << (optix && RO->motion() ? "true" : "false") << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << (sequence ? start : num(H, "time"))
       << ",\"frames\":" << frames << ",\"fps\":" << fps << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
-      << ",\"renderMs\":" << renderMs << ",\"outputMs\":" << outMs << ",\"jobMs\":" << jobMs << ",\"jsMs\":" << jsMs << ",\"ev\":" << ev << ",\"registers\":" << regs << ",\"localBytes\":" << local
+      << ",\"renderMs\":" << renderMs << ",\"outputMs\":" << outMs << ",\"jobMs\":" << jobMs << ",\"jsMs\":" << jsMs << ",\"ev\":" << ev << ",\"denoise\":" << jsonString(denoise) << ",\"denoiseMs\":" << denoiseMs << ",\"registers\":" << regs << ",\"localBytes\":" << local
       << ",\"sppPerSec\":" << spp * double(w) * h * frames / (renderMs / 1000) << ",\"frameMs\":[" << fm.str() << "]}\n";
   const std::string what = sequence ? std::to_string(frames) + " frames, " : "";
   if (optix) printf("%s optix%s: %dx%d %s%d spp in %d launches; build %.0f ms, nvrtc %s, pipeline %.0f ms, AS %.1f ms (%.0f KiB), render %.0f ms (js %.1f ms), output %.0f ms → %s\n", id.c_str(), RO->motion() ? " +motion" : "", w, h, what.c_str(), spp, launches, buildMs,
@@ -482,6 +491,7 @@ static int cmdRender(int argc, char** argv) {
   else printf("%s cuda/nvrtc: %dx%d %s%d spp in %d launches; build %.0f ms, nvrtc %s, render %.0f ms (js %.1f ms), output %.0f ms, %d regs, %d B local → %s\n", id.c_str(), w, h, what.c_str(), spp, launches, buildMs,
          msText(hit, comp.ms).c_str(), renderMs, jsMs, outMs, regs, local, (outDir / stem).string().c_str());
   if (display && !postHit) printf("  display program: nvrtc %.0f ms\n", postMs);
+  if (ai) printf("  AI denoiser: setup %.0f ms, %.1f ms per frame\n", ai->setupMs(), denoiseMs / frames);
   return 0;
 }
 
@@ -492,7 +502,7 @@ int main(int argc, char** argv) {
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
                     "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--param id=value]… [--seed n]\n"
                     "                 [--format pfm,png,exr,mp4] [--sequence --start s --end s | --frames n] [--fps 24] [--fixed-seed]\n"
-                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
+                    "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--denoise scene|ai|off] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
                     "       candela-rt serve [--port 8790] [--bind 0.0.0.0] [--token t] [--max-spp 2048] [--max-width 1920]\n");
     return 1;
   }
