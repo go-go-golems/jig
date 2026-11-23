@@ -12,7 +12,7 @@
 - [x] Candela README and old-repository references <!-- t:pref -->
 - [x] Intern guide (design doc) and candela-rt reference map <!-- t:demv -->
 - [x] Upload the guide to reMarkable <!-- t:nac7 -->
-- [ ] Next phase: scope in openRender and candela-rt serve <!-- t:7ssd -->
-- [ ] Next phase: Render view OptiX mode over /rt <!-- t:mdm5 -->
-- [ ] Next phase: render jobs, remote GPU, candela-rt release artifact <!-- t:m0wn -->
+- [ ] Next phase, moved to JIG-018-RT (T1): scope in openRender and candela-rt serve <!-- t:7ssd -->
+- [ ] Next phase, moved to JIG-018-RT (T2): Render view OptiX mode over /rt <!-- t:mdm5 -->
+- [ ] Next phase, moved to JIG-018-RT (T3-T5): render jobs, remote GPU, candela-rt release artifact <!-- t:m0wn -->
 - [x] Deprecate and archive pbr-spark with a notice pointing to jig <!-- t:3g3r -->

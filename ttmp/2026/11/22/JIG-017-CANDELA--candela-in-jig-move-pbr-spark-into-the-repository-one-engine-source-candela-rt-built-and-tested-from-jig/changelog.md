@@ -38,3 +38,7 @@ Guide and candela-rt reference map uploaded to reMarkable as one PDF: /ai/2026/1
 ## 2026-11-22
 
 pbr-spark deprecated and archived: README notice pointing to go-go-golems/jig import/candela (59b7036, pushed to its main), description and homepage set, gh repo archive; no open PRs or issues, main was e3b799e, the commit jig merged
+
+## 2026-11-22
+
+The next phase (scope, OptiX Render view, GPU jobs, remote GPU, release package) moved to JIG-018-RT, a handoff ticket for the DGX Spark
