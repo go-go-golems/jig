@@ -40,7 +40,7 @@ jobs:
           workspaces: import/jigcad/rust/jig-compute
       - name: Build the workbench
         run: make web
-      - name: JavaScript tests (agent, harness and oracles, engine core, engine on OpenCascade)
+      - name: JavaScript tests (agent, harness and oracles, engine core, engine on OpenCascade, render, Candela's engine)
         run: make test-js
       - name: Embedded binary
         run: make build-bin

@@ -1,0 +1,64 @@
+## swiftshader (old harness)
+{
+ "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+ "floatRT": true,
+ "webgpu": "null",
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.8154.6 Safari/537.36"
+}
+## headless-shell + vulkan
+{
+ "webgl": "ANGLE (NVIDIA, Vulkan 1.4.312 (NVIDIA NVIDIA GB10 (0x00002E12)), NVIDIA)",
+ "floatRT": true,
+ "webgpu": {
+  "info": {
+   "vendor": "nvidia",
+   "architecture": "",
+   "device": "",
+   "description": ""
+  },
+  "maxStorageBuffersPerShaderStage": 16,
+  "maxStorageBufferBindingSize": 2147483644,
+  "maxBufferSize": 4294967292,
+  "f16": false
+ },
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.8154.6 Safari/537.36"
+}
+## chromium new-headless + vulkan
+{
+ "webgl": "no webgl2",
+ "floatRT": false,
+ "webgpu": "null",
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.0.0 Safari/537.36"
+}
+## chromium new-headless + vulkan + gl=angle
+{
+ "webgl": "no webgl2",
+ "floatRT": false,
+ "webgpu": "null",
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.0.0 Safari/537.36"
+}
+## headless-shell + vulkan + webgpu adapter flags
+{
+ "webgl": "ANGLE (NVIDIA, Vulkan 1.4.312 (NVIDIA NVIDIA GB10 (0x00002E12)), NVIDIA)",
+ "floatRT": true,
+ "webgpu": {
+  "info": {
+   "vendor": "nvidia",
+   "architecture": "",
+   "device": "",
+   "description": ""
+  },
+  "maxStorageBuffersPerShaderStage": 16,
+  "maxStorageBufferBindingSize": 2147483644,
+  "maxBufferSize": 4294967292,
+  "f16": false
+ },
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.8154.6 Safari/537.36"
+}
+## chromium new-headless + egl (no vulkan)
+{
+ "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+ "floatRT": true,
+ "webgpu": "null",
+ "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/159.0.0.0 Safari/537.36"
+}

@@ -1,0 +1,15 @@
+# Phase 6: shader execution reordering (optixTraverse → optixReorder → optixInvoke) on camera/bounce rays, 2026-11-22
+# GB10, OptiX 9.0.0, 960x540, 256 spp, render time (two runs each agree within 1 %)
+## Forced OptiX (--backend optix), CANDELA_NVRTC_FLAGS=-DCANDELA_SER=1
+K-09 (34 meshes)  911 → 1130-1148 ms  (+24 %)
+K-01 (7 meshes)  1174 → 1617-1643 ms  (+39 %)
+X-02 (10,001 objects, no meshes)  1154 → 911 ms  (-21 %)
+M-07 (no meshes)   710 → 627 ms  (-12 %)
+with a 4-bit material coherence hint (optixReorder(hint, 4)): K-09 1129-1148, X-02 916-919, K-01 1604-1646, M-07 635-642 — no change; dropped
+## --ser auto (default since this step: SER only on OptiX scenes without meshes; --backend auto picks OptiX for these 4)
+F-08 (401 objects)    818 → 722 ms  (-12 %)
+G-04 (901 objects)    741 → 721 ms  ( -3 %)
+G-05 (441 objects)   2250 → 1767 ms (-21 %)
+X-02 (10,001)        1155 → 912 ms  (-21 %)
+images: displayed 8x8-block RMSE 0.00 % SER vs no SER for all four
+unaffected: K-09 auto (meshes, no SER) 928 ms; B-01 auto (plain CUDA) 133 ms

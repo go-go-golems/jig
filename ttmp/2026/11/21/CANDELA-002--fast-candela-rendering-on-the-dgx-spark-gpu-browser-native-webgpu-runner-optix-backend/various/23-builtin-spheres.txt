@@ -1,0 +1,79 @@
+# Phase 6: OptiX built-in sphere primitives, 2026-11-22 (GB10, OptiX 9.0.0)
+## First sweep: all spheres with a similarity transform and no shutter motion (320x180, 64 spp, --backend optix, custom vs builtin)
+A-01 RMSE 0.00 %
+A-02 RMSE 0.00 %
+A-03 RMSE 0.00 %
+A-04 RMSE 0.00 %
+A-06 RMSE 0.00 %
+B-01 RMSE 0.00 %
+B-02 RMSE 0.00 %
+B-03 RMSE 0.02 %
+B-04 RMSE 0.00 %
+B-05 RMSE 0.00 %
+C-01 RMSE 0.00 %
+C-02 RMSE 0.04 %
+C-03 RMSE 0.00 %
+C-04 RMSE 0.00 %
+C-05 RMSE 0.00 %
+C-06 RMSE 0.00 %
+D-01 RMSE 0.00 %
+D-02 RMSE 0.00 %
+E-01 RMSE 2.09 %
+E-02 RMSE 0.00 %
+E-04 RMSE 0.00 %
+E-05 RMSE 1.63 %
+E-06 RMSE 0.00 %
+E-07 RMSE 2.29 %
+F-01 RMSE 0.00 %
+F-02 RMSE 0.00 %
+F-03 RMSE 0.01 %
+F-04 RMSE 0.15 %
+F-05 RMSE 0.00 %
+G-01 RMSE 0.00 %
+G-05 RMSE 0.00 %
+G-06 RMSE 0.01 %
+K-05 RMSE 0.29 %
+L-01 RMSE 0.00 %
+L-02 RMSE 0.00 %
+L-03 RMSE 0.00 %
+L-04 RMSE 0.00 %
+L-05 RMSE 0.00 %
+L-07 RMSE 0.00 %
+L-08 RMSE 0.00 %
+L-11 RMSE 0.00 %
+L-12 RMSE 0.00 %
+M-01 RMSE 0.01 %
+M-02 RMSE 0.01 %
+M-04 RMSE 5.73 %
+M-05 RMSE 0.00 %
+M-09 RMSE 0.00 %
+M-10 RMSE 1.77 %
+M-11 RMSE 12.13 %
+M-12 RMSE 0.00 %
+M-13 RMSE 0.00 %
+R-03 RMSE 19.42 %
+R-05 RMSE 0.00 %
+R-06 RMSE 0.11 %
+S-01 RMSE 13.81 %
+S-02 RMSE 0.00 %
+S-03 RMSE 2.65 %
+S-04 RMSE 0.00 %
+V-01 RMSE 0.00 %
+W-01 RMSE 0.00 %
+W-02 RMSE 0.01 %
+W-03 RMSE 0.00 %
+W-04 RMSE 0.63 %
+X-01 RMSE 0.00 %
+X-02 RMSE 0.11 %
+X-03 RMSE 0.00 %
+## Cause of the large differences: rays starting inside a sphere get no hit from the built-in intersector
+R-03 (subsurface spheres glow), S-01 (glass ball refracts once): various/23-builtin-spheres-inside-rays-*.png
+## Fix: spheres whose material can let a path in (dielectric kind 3 unless reflect-only, thin kind 5, medium bounds
+## kind 6, interior medium) stay custom primitives (compile.ts enterableMaterial). Recheck of the remaining >0.1 %:
+E-05 0.01 %  M-10 0.00 %  F-04 0.15 %  R-06 0.11 %  X-02 0.11 %  K-05 0.29 %
+## Speed, 960x540, 256 spp
+X-02  custom, SER off 1161 ms | custom, SER on 906 ms | builtin, SER on 855-863 ms | builtin, SER off 845-859 ms (default now)
+G-05 / F-08 / G-04: <= 1 builtin sphere; unchanged (1762 / 715 / 718 ms)
+SER auto rule changed: no meshes AND > 64 custom primitives (X-02 now has 1 custom primitive, so no SER)
+defaults: X-02 849 ms (WebGPU 14829 ms: 17.5x), G-05 1767 ms (+ser), F-08 716 ms (+ser), K-09 919 ms (+motion)
+live: X-02 on a test server, first frame 42 ms after built, 1599 spp in 6 s

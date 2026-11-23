@@ -24,6 +24,10 @@ export const MATERIALS = {
   steel: { density: 7.85, cost: 2, modulus: 200, nu: 0.29, strength: 250, allowableStrain: 0.00125, glassTransition: null, shrink: 0 },
   stainless: { density: 8.0, cost: 6, modulus: 193, nu: 0.29, strength: 215, allowableStrain: 0.0011, glassTransition: null, shrink: 0 },
   aluminium: { density: 2.7, cost: 5, modulus: 69, nu: 0.33, strength: 275, allowableStrain: 0.004, glassTransition: null, shrink: 0 },
+  // copper alloys (JIG-016: the names Candela renders; C360 free-cutting brass, C932 bearing bronze, C110 copper)
+  brass: { density: 8.5, cost: 8, modulus: 97, nu: 0.31, strength: 310, allowableStrain: 0.0032, glassTransition: null, shrink: 0 },
+  bronze: { density: 8.9, cost: 12, modulus: 100, nu: 0.34, strength: 125, allowableStrain: 0.00125, glassTransition: null, shrink: 0 },
+  copper: { density: 8.94, cost: 10, modulus: 117, nu: 0.34, strength: 70, allowableStrain: 0.0006, glassTransition: null, shrink: 0 },
 };
 MATERIALS.aluminum = MATERIALS.aluminium;
 class Material {

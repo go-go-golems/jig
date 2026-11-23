@@ -5,10 +5,13 @@ const { build, context } = await import(process.env.ESBUILD ?? '/opt/npm-tools/n
 import { cpSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const V = p => join(ROOT, 'vendor', p);
+// Candela's engine (TypeScript, no npm dependencies) is read in place from the Candela tree (JIG-017)
+const CANDELA = join(ROOT, '..', 'candela');
 const watch = process.argv.includes('--watch');
 const minify = process.argv.includes('--minify');
 
@@ -46,6 +49,10 @@ function collectContent() {
     out.docs[f.replace(/\.md$/, '')] = readFileSync(join(ddir, f), 'utf8');
   mkdirSync(join(ROOT, 'src/generated'), { recursive: true });
   writeFileSync(join(ROOT, 'src/generated/content.json'), JSON.stringify(out));
+  // Candela library modules (JIG-016): sources the Render view hands to Candela's build as scene files, so the same
+  // bytes run on the page and in candela-rt
+  const lib = { 'jig-candela.js': readFileSync(join(ROOT, 'src/render/jig-candela.js'), 'utf8') };
+  writeFileSync(join(ROOT, 'src/generated/candela-lib.json'), JSON.stringify(lib));
   return out;
 }
 
@@ -101,13 +108,29 @@ async function run() {
     platform: 'browser', external: ['fs', 'path', 'module', 'url', 'node:*'],
     // the OpenCascade glue resolves its directory from import.meta.url even when it gets the bytes; a fixed base, never fetched
     define: { ...common.define, 'import.meta.url': '"https://sandbox.invalid/agent-worker.js"' } };
+  // Candela (import/candela/src/engine): dist/candela.js, one ES module for the Render view and Node tests, and
+  // dist/candela-core.js, the non-DOM core as the IIFE candela-rt loads with --bundle (ES2020 for its V8 10.2). The
+  // core uses the options of import/candela/scripts/bundle-core.ts (not minified) from Candela's root, so the two differ
+  // only by esbuild version (jig pins its own). Nothing compares bundle bytes: browser and candela-rt agree through the
+  // compiled scene's irHash, a hash of the generated WGSL.
+  const candela = { ...common, entryPoints: [join(ROOT, 'src/render/candela.js')], outfile: join(ROOT, 'dist/candela.js'), platform: 'neutral' };
+  const candelaCore = { bundle: true, format: 'iife', globalName: 'Candela', platform: 'neutral', target: 'es2020', logLevel: 'warning',
+    legalComments: 'none', absWorkingDir: CANDELA, entryPoints: ['src/engine/core.ts'], outfile: join(CANDELA, 'dist-core/candela-core.js'),
+    // the core is written where Candela's tools and candela-rt look by default (import/candela/dist-core/), and the
+    // same bytes go into jig's dist/ for jigcad to serve and embed
+    plugins: [{ name: 'core-copy', setup(b) { b.onEnd((r) => { if (!r.errors.length) coreCopy(); }); } }] };
+  function coreCopy() {
+    const bytes = readFileSync(join(CANDELA, 'dist-core/candela-core.js')), sha = createHash('sha256').update(bytes).digest('hex') + '\n';
+    writeFileSync(join(ROOT, 'dist/candela-core.js'), bytes);
+    for (const f of [join(ROOT, 'dist/candela-core.js.sha256'), join(CANDELA, 'dist-core/candela-core.js.sha256')]) writeFileSync(f, sha);
+  }
   if (watch) {
-    for (const cfg of [app, worker, agentWorker]) (await context(cfg)).watch();
+    for (const cfg of [app, worker, agentWorker, candela, candelaCore]) (await context(cfg)).watch();
     console.log('watching');
   } else {
-    await Promise.all([build(app), build(worker), build(agentWorker)]);
+    await Promise.all([build(app), build(worker), build(agentWorker), build(candela), build(candelaCore)]);
     const size = f => (statSync(join(ROOT, 'dist', f)).size / 1024).toFixed(0) + ' KiB';
-    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')} · dist/agent-worker.js ${size('agent-worker.js')}${computeBytes ? ` · dist/jig_compute.wasm ${size('jig_compute.wasm')}` : ''}`);
+    console.log(`dist/app.js ${size('app.js')} · dist/worker.js ${size('worker.js')} · dist/agent-worker.js ${size('agent-worker.js')} · dist/candela.js ${size('candela.js')} · dist/candela-core.js ${size('candela-core.js')}${computeBytes ? ` · dist/jig_compute.wasm ${size('jig_compute.wasm')}` : ''}`);
   }
 }
 run().catch(e => { console.error(e.message); process.exit(1); });

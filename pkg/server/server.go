@@ -3,6 +3,10 @@
 // sample.Backend and, when the model calls a tool, sends a `tool` event and waits until the page posts the result
 // to /api/sample/{call}/tools/{use}. Tools run in the page because they read and edit the workbench's live state.
 //
+// With a candela-rt sidecar (package render), GET /rt is its WebSocket, proxied on this origin, and
+// GET /api/render/capabilities says whether it is up. Both sit behind the same token as the rest of /api/; a page
+// opened with ?token=… carries it in the jigcad_token cookie, which the browser also sends with a WebSocket.
+//
 // The sample handlers are adapted from github.com/go-go-golems/slop-computer pkg/server/rt_sample.go (SLOP-010),
 // without slop's views, grants, consent and audit log: jigcad serves one operator, guarded by the listen address
 // and an optional bearer token.
@@ -24,6 +28,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-go-golems/jig/pkg/render"
 	"github.com/go-go-golems/jig/pkg/sample"
 )
 
@@ -44,6 +49,8 @@ type Config struct {
 	Tiers map[string]string
 	// MaxRounds bounds the model rounds of one call (0 = sample's default).
 	MaxRounds int
+	// Render is the candela-rt sidecar behind GET /rt and GET /api/render/capabilities; nil: rendering is off.
+	Render *render.Sidecar
 	// Static serves everything outside /api/ (the workbench's dist/); nil serves nothing there.
 	Static fs.FS
 	// Token, when set, must be presented on every /api/ request as a bearer token or the jigcad_token cookie.
@@ -76,6 +83,12 @@ func New(cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/sample", s.guard(s.start))
 	s.mux.HandleFunc("POST /api/sample/{call}/tools/{use}", s.guard(s.toolResult))
 	s.mux.HandleFunc("POST /api/sample/{call}/cancel", s.guard(s.cancel))
+	rt := cfg.Render
+	if rt == nil {
+		rt = render.Disabled("this server runs without a renderer")
+	}
+	s.mux.HandleFunc("GET /api/render/capabilities", s.guard(rt.ServeCapabilities))
+	s.mux.HandleFunc("GET /rt", s.guard(rt.ServeRT))
 	s.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) { fail(w, 404, "not_found", "No such endpoint") })
 	if cfg.Static != nil {
 		files := http.FileServerFS(cfg.Static)
@@ -88,7 +101,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.Serve
 
 // ── access ─────────────────────────────────────────────────────────────────────
 
-// guard rejects /api/ requests without the token (when one is configured).
+// guard rejects /api/ and /rt requests without the token (when one is configured).
 func (s *Server) guard(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.Token != "" && !s.authorized(r) {

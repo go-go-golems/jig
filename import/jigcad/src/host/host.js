@@ -22,6 +22,7 @@ import { store } from './store.js';
 import { content } from './content.js';
 import { followLink } from './lab.js';
 import labReference from '../agent/reference.js';
+import { modelFiles } from '../render/files.js';
 
 const D = Math.PI / 180;
 export const NAMED_VIEWS = {
@@ -281,7 +282,7 @@ export class Host {
     const mine = id && this.user.find(p => p.id === id);
     if (mine) { mine.files = Object.fromEntries(this.files); this._saveUser(); }   // yours save as you type
     else if (id) store.set(`files.${id}`, this.isEdited() ? Object.fromEntries(this.files) : null);
-    this.dirty = this._compiled !== JSON.stringify(Object.fromEntries(this.files));
+    this.dirty = this._compiled !== JSON.stringify(modelFiles(this.files));
     this.emit('files', this.files);
   }
 
@@ -303,7 +304,7 @@ export class Host {
   }
   async compile() {
     const seq = ++this._seq;
-    const files = Object.fromEntries(this.files);
+    const files = modelFiles(this.files);   // the look's files go to Candela, not to jig's compile
     const key = JSON.stringify(files);
     this.compiling = true;
     this.emit('compiling', true);
@@ -328,7 +329,7 @@ export class Host {
     // the inputs of the last good compile: the agent's sandbox compiles them again to answer reads (JIG-013)
     if (program.ok !== false) { this.lastGood = program; this.goodInputs = { files, override: override ?? {} }; }
     this._compiled = key;
-    this.dirty = this._compiled !== JSON.stringify(Object.fromEntries(this.files));
+    this.dirty = this._compiled !== JSON.stringify(modelFiles(this.files));
     this._refreshSelection();
     this.emit('compiling', false);
     this.emit('program', program);
@@ -372,7 +373,7 @@ export class Host {
   async check(files, options = {}) {
     const { merge = true, ...opts } = options || {};
     const given = typeof files === 'string' ? { 'script.js': files } : files instanceof Map ? Object.fromEntries(files) : (files || {});
-    const all = merge ? { ...Object.fromEntries(this.files), ...given } : { ...given };
+    const all = modelFiles(merge ? { ...Object.fromEntries(this.files), ...given } : { ...given });
     const o = { keep: false, ...opts };
     const t0 = performance.now();
     try {

@@ -4,6 +4,7 @@ import { getOC } from './oc.js';
 import { kineModule } from './kine.js';
 import * as K from './kernel.js';
 import { meshBody } from './mesh.js';
+import { cadPackage, encodeCadPackage } from './cadpkg.js';
 
 const V = K.V;
 
@@ -225,6 +226,13 @@ export function exportAs(prog, format, opts = {}) {
     case '3mf': case 'tmf': return tmf(prog, opts);
     case 'svg': return svg(prog, opts);
     case 'ir': return irBundle(prog, opts);
+    case 'candela': {
+      // the CAD package (JIG-016): bodies, faces with names, kinds, axes and inferred processes, components, in
+      // Candela's frame; a Candela scene reads it with jigScene() from src/render/jig-candela.js
+      const pkg = cadPackage(prog, opts);
+      return { data: encodeCadPackage(pkg), filename: `${prog.data?.name ?? 'model'}.jigcad.json`, mime: 'application/json',
+        report: { kept: ['meshes (render tessellation)', 'face names, kinds, axes', 'components and placements', 'materials'], approximated: ['machining process (inferred from features)'], dropped: ['B-rep', 'sketches', 'params'] } };
+    }
     case 'kine': {
       if (!prog.kine) throw new Error('kine export: only an assembly compiles to a kine program');
       const c = prog.kine(opts);
@@ -235,6 +243,6 @@ export function exportAs(prog, format, opts = {}) {
   throw new Error(`unknown export format '${format}'`);
 }
 export const exportTo = {
-  stl: (p, o) => stl(p, o), step: (p, o) => step(p, o), tmf: (p, o) => tmf(p, o), svg: (p, o) => svg(p, o), ir: p => irBundle(p), kine: (p, o) => exportAs(p, 'kine', o),
+  stl: (p, o) => stl(p, o), step: (p, o) => step(p, o), tmf: (p, o) => tmf(p, o), svg: (p, o) => svg(p, o), ir: p => irBundle(p), candela: (p, o) => exportAs(p, 'candela', o), kine: (p, o) => exportAs(p, 'kine', o),
   to: (fmt, p, o) => exportAs(p, fmt, o),
 };

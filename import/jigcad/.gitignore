@@ -4,3 +4,4 @@ vendor/occt/replicad_single.wasm
 rust/*/target
 src/generated
 test/agent-eval/out
+test/ui/out

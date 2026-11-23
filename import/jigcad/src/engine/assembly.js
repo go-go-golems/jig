@@ -1,7 +1,8 @@
 // Assemblies (README §4.10): components placed by transforms or joints between ports, grounding,
 // rigid/revolute/slider joints as placement constraints, print-in-place gap checks, BOM, mobility.
 import * as K from './kernel.js';
-import { callerLine } from './part.js';
+import { callerLine, finishMeta } from './part.js';
+import { stampLine } from './callsite.js';
 import { frameOf, matOf, orthoFrame } from './adapt.js';
 import { mobility, meshGap, meshGapNear, meshTris } from './inspect.js';
 import { meshBody } from './mesh.js';
@@ -78,6 +79,20 @@ class Assembly {
   interference(ids, o = {}) { return this._w({ interference: Array.isArray(ids) ? { ...o, ids } : { ...(ids ?? {}) } }); }
   // contact sets (Fusion's term): a drag stops where two of these components would touch; no ids: every component
   contact(ids) { return this._w({ contacts: [...(this.o.contacts ?? []), { ids: Array.isArray(ids) ? ids : null }] }); }
+  // how components are made and coated, for rendering (JIG-016), as a part's .finish() says it from inside the part:
+  // .finish('slider', { finish: 'paint', color: '#7a1f1f' }) for every face of a component (its id, a subassembly's id
+  // for every component in it, or a * glob over ids: 'sub/*', '*'), .finish('rod', faces, { process: 'ground' }) for
+  // some of its faces (a persistent name, a * glob, or a selector such as j.feat('body').sideFaces(), resolved in the
+  // component's part). They apply after the parts' own finishes (the assembly's word wins), in call order; an id that
+  // names no component is a warning of the compile, with the ids it may mean. Not geometry: it never re-runs a feature.
+  finish(comp, a, b) {
+    const usage = `.finish('slider', { finish: 'paint' }) or .finish('rod', faces, { process: 'ground' })`;
+    if (typeof comp !== 'string' || !comp) throw new TypeError(`.finish(component, meta) on an assembly: name the component first ('slider', 'sub/*', or '*' for all), e.g. ${usage}; got ${comp && typeof comp === 'object' ? 'an object' : JSON.stringify(comp)}`);
+    const [faces, meta] = b === undefined ? [null, a] : [a ?? null, b];
+    const rec = { comp, faces, meta: finishMeta(meta, usage) };
+    stampLine(rec);   // the line, for messages; not enumerable, as a part's
+    return this._w({ finishes: [...(this.o.finishes ?? []), Object.freeze(rec)] });
+  }
   use(...fns) { let a = this; for (const f of fns.flat()) a = typeof f === 'function' ? f(a) ?? a : a; return a; }
   with(fn) { return fn(this) ?? this; }
   get components() { return this.o.components.map(c => ({ id: c.id })); }
@@ -115,11 +130,17 @@ function programOf(name, solved, { t0, opts, finalize }) {
     measures: mech?.measures ?? {}, studies: mech?.studies ?? {}, reports: mech?.reports ?? [], forces: mech?.forces ?? null,
     // the bill of materials nests by subassembly; prog.bom({ group: 'flat' }) lists the parts alone
     bom: bomOf(eff.tree.children) };
+  // finishes (JIG-016): every level's, prefixed, checked once here against the expanded components; their faces are
+  // resolved where they are used, in the CAD package (cadpkg.js), as a part's own finishes are
+  diagnostics.push(...finishDiagnostics(o.finishes ?? [], [...comp.keys()]));
   const prog = finalize({ kind: 'assembly', name, parts, t0, opts, assembly: info, occurrences, placements,
     extraDiagnostics: diagnostics, extraDecisions: decisions, extraTrace: trace,
     extraMetrics: { assemblyDOF: { value: mob.solverDOF, unit: 'count', fidelity: 'exact', note: 'mobility 6n − rank J from the joint equations at the solved pose' } } });
-  prog.P.mech = mech; prog.P.comp = comp;
+  prog.P.mech = mech; prog.P.comp = comp; prog.P.finishes = o.finishes ?? [];
   prog.bom = (bo = {}) => (bo.group === 'flat' ? flatBom(info.bom) : info.bom);
+  // a study's poses (poseTrack): every component's world transform at each reached row; worker side only. No name:
+  // every study's, by name (a rigid subassembly's under '<sub>/<study>', its components placed in this world)
+  prog.studyPoses = (study) => (study == null ? { ...(mech?.poses ?? {}) } : mech?.poses?.[study] ?? null);
   // the product structure (STEP export): parts and subassemblies with their placements now
   prog.structure = () => structureOf(eff.tree, comp, name); prog.dof = () => ({ total: mob.solverDOF, grounded: groundId }); prog.occurrence = id => occurrences.find(x => x.id === id) ?? null;
   // compile the solved mechanism to a kine program (spec M7): { source, observe, notes, input }
@@ -284,7 +305,7 @@ export function solveAssembly(asm, opts, compilePart) {
   // a study row keeps its own x (drive value), q, ok, move and limit: a measure by one of those names would overwrite it
   const RESERVED = new Set(['x', 'q', 'ok', 'move', 'limit']);
   for (const m of o.measures ?? []) if (RESERVED.has(m.name)) diagnostics.push({ level: 'error', kind: 'asm.measure', at: m.name, message: `a measure cannot be called '${m.name}': study rows use that name`, fix: `rename it, e.g. '${m.name}1'` });
-  const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {};
+  const measures = (o.measures ?? []).filter(m => !RESERVED.has(m.name)), studies = {}, posesOf = {};
   let forceCtx = null; const dynLive = {};
   let measured = {}, reports = [];
   if (assembled && !opts.forPrint) {
@@ -299,13 +320,14 @@ export function solveAssembly(asm, opts, compilePart) {
       const full = jn && jn.kind !== 'slider' ? 2 * Math.PI : 10;
       // interference over the study: the named one(s), or every sweep when .interference() names none
       const ifr = o.interference, swept = !!ifr && (ifr.study ? [ifr.study].flat().includes(st.name) : st.name.startsWith('sweep:'));
-      const poses = [];
+      const poses = [], steps = st.steps ?? 360, track = poseTrack(S, steps + 1);
       // forces over the study (layer 5): joint reactions, driving torques and accelerations at every pose
       const dynOn = !!jn && (o.reactions ?? []).some((r) => r.study == null || r.study === st.name);
       const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
-      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps: st.steps ?? 360,
-        onRow: swept || dynOn ? (k, row) => { if (swept) poses[k] = S.transforms(); if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } : null }, measures, o.events ?? []);
+      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
+        onRow: (k, row) => { const Ts = track.add(row.x); if (swept) poses[k] = Ts; if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } }, measures, o.events ?? []);
       studies[st.name] = res;
+      if (!res.error) posesOf[st.name] = track.done(res);
       if (dynOn) {
         const keys = Object.keys(dyn.find(Boolean)?.readings ?? {});
         for (const k of keys) { res.keys.push(k); res.extrema[k] = extremaOf(res.rows, k); }
@@ -359,7 +381,7 @@ export function solveAssembly(asm, opts, compilePart) {
   };
   const studyRows = Object.fromEntries(Object.entries(studies).map(([k, v]) => [k, { ...v, rows: v.rows.map(r => ({ ...r })) }]));
   if (forceCtx?.redundantNote && mobility.redundant > 0) diagnostics.push({ level: 'info', kind: 'asm.forcesSplit', at: mobility.redundantJoints[0] ?? 'joints', message: `${mobility.redundant} joint equation(s) repeat: how ${mobility.redundantJoints.join(', ')} share the load along them is not fixed by statics; the least split is reported`, fix: 'a stress study of the parts that share it (bonded, with their stiffness) settles the split' });
-  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), dyn: dynLive, forces: forceCtx ? { gravity: forceCtx.g, masses: forceCtx.table, speed: o.speed ? { joint: o.speed.joint, rate: forceCtx.rate(o.speed.joint) } : null } : null, couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
+  const mech = { jointRefs: joints.map(j => ({ id: j.id, kind: j.kind, a: j.a, b: j.b })), dyn: dynLive, forces: forceCtx ? { gravity: forceCtx.g, masses: forceCtx.table, speed: o.speed ? { joint: o.speed.joint, rate: forceCtx.rate(o.speed.joint) } : null } : null, couples: S.couples.map(c => ({ id: c.id, a: c.a, b: c.b, ratio: c.ratio, offset: c.offset, kind: meshes.find(m => m.c.id === c.id)?.kind ?? 'joint' })), mobility, assembled, conflicts, residual, joints: jv, measures: measured, studies: studyRows, poses: posesOf, reports, drives: Object.fromEntries([...S.drives].map(([k, v]) => [k, v])), solver: S,
     ports: S.portFrames(), origins: Object.fromEntries(S.bodies.map((b) => [b.id, b.t.slice()])), ground: S.bodies.filter((b) => b.ground).map((b) => b.id) };
   // print-in-place / interference: minimum gap between components, at the print pose when one is given.
   // Bounding boxes rule out far pairs; small bodies get the exact B-rep distance; large ones (gears) a mesh
@@ -403,7 +425,36 @@ export function solveAssembly(asm, opts, compilePart) {
   }
   // a rigid subassembly's own studies, reports and readings (in its own frame), under its id
   Object.assign(mech.studies, E.childOut.studies); mech.reports.push(...E.childOut.reports); Object.assign(mech.measures, E.childOut.measures);
+  // and its studies' poses, of its own components, carried into this world: where its root now puts its frame
+  for (const [k, v] of Object.entries(E.childOut.poses)) { const R = comp.get(v.sub.root); if (R) mech.poses[k] = liftPoses(v, v.sub.id, K.matMul(R.T, K.matInverse(v.sub.rootLocal)), k); }
   return { parts, placements, occurrences, diagnostics, decisions, trace, comp, groundId, mech, eff: E };
+}
+// A study's poses (JIG-016): every component's world transform (jig's frame, column-major, as S.transforms() gives
+// them) at each row the study reached, packed per component. Every study keeps them, on the worker side only
+// (P.mech.poses, prog.studyPoses): a row costs one S.transforms() beside its solve, and a 361-row study of 30
+// components is 1.4 MB (0.7 MB as the CAD package's float32). The ProgramData sent to the page never carries them;
+// the CAD package (cadpkg.js) does, in Candela's frame. Rows the study could not reach (gaps, limits) have none.
+// → { study, drive, unit: 'deg' | 'mm', from, to, rows: [row index], x: Float64Array (drive values, in unit),
+//     T: { [componentId]: Float64Array(16 × x.length) } }
+function poseTrack(S, capacity) {
+  const ids = S.bodies.map(b => b.id), T = ids.map(() => new Float64Array(16 * capacity)), x = new Float64Array(capacity);
+  let n = 0;
+  return {
+    add(xv) { const Ts = S.transforms(); if (n < capacity) { for (let i = 0; i < ids.length; i++) T[i].set(Ts[i], 16 * n); x[n++] = xv; } return Ts; },
+    done(res) {
+      const rows = res.rows.flatMap((r, k) => (r.ok ? [k] : []));
+      return { study: res.name, drive: res.drive, unit: res.unit === 'mm' ? 'mm' : 'deg', from: res.from, to: res.to, rows, x: x.slice(0, n),
+        T: Object.fromEntries(ids.map((id, i) => [id, T[i].slice(0, 16 * n)])) };
+    },
+  };
+}
+// a rigid subassembly's study poses in its parent: its components under its prefix, each placed by F (where the
+// parent puts the subassembly's frame) · its pose in the subassembly's own solve; the drive keeps its own name, as
+// the study's record does
+function liftPoses(v, prefix, F, name) {
+  const lift = (A) => { const out = new Float64Array(A.length); for (let r = 0; r < A.length; r += 16) out.set(K.matMul(F, A.subarray(r, r + 16)), r); return out; };
+  const { sub, ...rest } = v;
+  return { ...rest, study: name, T: Object.fromEntries(Object.entries(v.T).map(([cid, A]) => [`${prefix}/${cid}`, lift(A)])) };
 }
 // a joint value: a number (rad or mm), a quantity, or quantity text such as '90 deg' (an override typed in the params view)
 const num = v => { if (typeof v === 'number') return v; if (typeof v === 'string') { try { return quantity(v).value; } catch { return NaN; } } return v?.value ?? Number(v); };
@@ -822,8 +873,8 @@ function geometryFrame(X, sel, o = {}, side = 'a') {
 function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
   const comps = new Map(), parts = [], subs = new Map(), presetPorts = [];
   const values = { ...declared };   // by full id: a flexible child's own values join under its prefix (gather)
-  const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [], wrenches: [], reactions: [], speeds: [] };
-  const childOut = { studies: {}, reports: [], measures: {} };
+  const extra = { joints: [], drives: {}, hints: {}, couples: [], measures: [], events: [], studies: [], sweeps: [], reports: [], contacts: [], wrenches: [], reactions: [], speeds: [], finishes: [] };
+  const childOut = { studies: {}, reports: [], measures: {}, poses: {} };
   const tree = { kind: 'assembly', id: '', item: asm.name, children: [] };
   const rootOf = A => A.o.ground ?? A.o.components.find(x => x.opts.ground)?.id ?? A.o.components[0]?.id;
   // a root is always a component: an id that names a subassembly (it grounds its parent, by .ground() or by coming
@@ -882,8 +933,12 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
       }
       subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
       for (const [k, v] of Object.entries(r.mech?.studies ?? {})) childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}` };
+      for (const [k, v] of Object.entries(r.mech?.poses ?? {})) childOut.poses[`${id}/${k}`] = { ...v, sub: sn };
       for (const rep of r.mech?.reports ?? []) childOut.reports.push({ ...rep, name: `${id}/${rep.name}` });
       for (const [k, v] of Object.entries(r.mech?.measures ?? {})) childOut.measures[`${id}/${k}`] = v;
+      // its finishes (its nested subassemblies' too, as its expansion names them): appearance, not motion, so a rigid
+      // one's come up as a flexible one's do, on its components under its prefix
+      for (const f of r.eff.o.finishes ?? []) extra.finishes.push(prefixFinish(f, id));
     }
   };
   // a flexible subassembly's declarations, as its parent's: every kind of declaration has a rule (FLEXIBLE: carried
@@ -910,6 +965,8 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
       for (const study of r.study == null ? all : [P(r.study)]) extra.reactions.push({ ...r, study });
     } },
     speed: (v, P, prefix) => { extra.speeds.push({ ...v, joint: P(v.joint), from: prefix }); },
+    // appearance (JIG-016): its finishes on its own components; faces stay named in each component's part
+    finishes: (v, P, prefix) => { for (const f of v) extra.finishes.push(prefixFinish(f, prefix)); },
   };
   const gather = (A, prefix, cv) => {
     const P = s => `${prefix}/${s}`;
@@ -942,6 +999,8 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
     studies: [...extra.studies, ...(own.studies ?? [])], sweeps: [...extra.sweeps, ...(own.sweeps ?? [])], reports: [...extra.reports, ...(own.reports ?? [])],
     contacts: [...extra.contacts, ...(own.contacts ?? [])],
     wrenches: [...extra.wrenches, ...(own.wrenches ?? [])], reactions: [...extra.reactions, ...(own.reactions ?? [])],
+    // a subassembly's finishes first, so the assembly's own, which come after, win
+    finishes: [...extra.finishes, ...(own.finishes ?? [])],
     // one drive rate per mechanism: the assembly's own, else the first flexible subassembly's (any other is said)
     speed: own.speed ?? extra.speeds[0] };
   for (const sp of extra.speeds) if (sp !== o.speed) diagnostics.push({ level: 'warning', kind: 'asm.flexible', at: sp.from, message: `${sp.from} is flexible: its .speed('${sp.joint}') is not carried into ${asm.name} (it runs at ${o.speed.joint}'s rate)`, fix: `one .speed() per mechanism: set it on ${asm.name}` });
@@ -954,6 +1013,7 @@ const FLEXIBLE = {
   components: 'walked', ground: 'walked', params: 'walked', overrides: 'walked',
   joints: 'carried', drives: 'carried', hints: 'carried', couples: 'carried', measures: 'carried', events: 'carried',
   studies: 'carried', sweeps: 'carried', reports: 'carried', contacts: 'carried', wrenches: 'carried', reactions: 'carried', speed: 'carried',
+  finishes: 'carried',   // a rigid subassembly's are carried too (walk): appearance is not part of its solve
   gravity: 'gravity is the top assembly\'s: its world\'s down',
   pip: 'print-in-place is planned for the assembly printed', interference: 'its pairs and study are named in its own ids',
   explode: 'an exploded view is the top assembly\'s', configs: 'configurations are chosen on the top assembly',
@@ -977,6 +1037,46 @@ function reroot(e, prefix) {
   if (e?.root?.type === 'on') return new Selector(e.kind, { ...e.root, comp: `${prefix}/${e.root.comp}` }, e.steps);
   if (isDeferred(e) && e.args?.[0]?.root?.type === 'on') return new Deferred(e.type, e.op, [reroot(e.args[0], prefix), ...e.args.slice(1)], e.chain);
   return e;
+}
+// a subassembly's .finish(), as its parent names it: the component under its prefix ('slider' → 'sub/slider', '*' →
+// 'sub/*'); the faces stay as they are, named in the component's part; the call's line stays out of sight of keys
+function prefixFinish(f, prefix) {
+  const r = { comp: `${prefix}/${f.comp}`, faces: f.faces, meta: f.meta };
+  if (f.line != null) Object.defineProperty(r, 'line', { value: f.line, enumerable: false });
+  return Object.freeze(r);
+}
+const finishGlob = (g) => new RegExp('^' + g.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+/** the component ids an assembly .finish() names among `ids`: the id itself, every component of a subassembly it
+ *  names ('sub' is 'sub/…'), or a * glob over ids ('sub/*', '*') */
+export function finishTargets(comp, ids) {
+  if (comp.includes('*')) { const re = finishGlob(comp); return ids.filter((id) => re.test(id)); }
+  return ids.filter((id) => id === comp || id.startsWith(comp + '/'));
+}
+// the few of `list` near `word` (an edit distance of at most a third of it, two at least), nearest first, for a
+// message that names what was meant
+function nearestIds(word, list, n = 3) {
+  const d = (a, b) => {
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  };
+  const most = Math.max(2, Math.ceil(word.length / 3));
+  return list.map((x) => [x, d(word, x)]).filter((x) => x[1] <= most).sort((a, b) => a[1] - b[1]).slice(0, n).map((x) => x[0]);
+}
+// an assembly .finish() that names no component: a warning (a finish is appearance; the model is whole without it)
+// with the ids it may mean, as the compile reports a joint's unknown component
+function finishDiagnostics(finishes, ids) {
+  const list = ids.slice(0, 12).join(', ') + (ids.length > 12 ? ', …' : '');
+  return finishes.filter((f) => !finishTargets(f.comp, ids).length).map((f) => {
+    const near = nearestIds(f.comp, ids);
+    return { level: 'warning', kind: 'finish.unresolved', at: f.comp, line: f.line ?? null,
+      message: `.finish('${f.comp}', …): no component '${f.comp}'; ${near.length ? `did you mean ${near.map((x) => `'${x}'`).join(', ')}?` : `components: ${list}`}`,
+      fix: `name a component (${list}), a subassembly, or a glob such as 'sub/*'` };
+  });
 }
 // readings written inside a subassembly see its own names
 function prefixReader(m, p) {
