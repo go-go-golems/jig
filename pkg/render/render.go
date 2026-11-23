@@ -51,7 +51,8 @@ const (
 
 // Config configures a Sidecar.
 type Config struct {
-	// Mode is --render: "auto" ($JIGCAD_CANDELA_RT, else candela-rt on PATH), "off" (or empty), or a binary's path.
+	// Mode is --render: "auto" ($JIGCAD_CANDELA_RT, else candela-rt next to jigcad or on PATH), "off" (or
+	// empty), or a binary's path.
 	Mode string
 	// DistDir is the workbench's built files on disk; candela-core.js is passed to the child in place.
 	DistDir string

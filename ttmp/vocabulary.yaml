@@ -23,6 +23,18 @@ topics:
       description: 'Physically based rendering: Candela, materials, lighting, render output'
     - slug: gpu
       description: 'GPU compute and rendering: WebGPU, CUDA, OptiX, the candela-rt sidecar'
+    - slug: pbr
+      description: Physically based rendering (Candela)
+    - slug: typescript
+      description: TypeScript code
+    - slug: webgpu
+      description: WebGPU and WGSL
+    - slug: port
+      description: Porting code between languages or platforms
+    - slug: optix
+      description: NVIDIA OptiX ray tracing
+    - slug: build
+      description: Build, packaging, CI and releases
 docTypes:
     - slug: design-doc
       description: Structured rationale and architecture notes
@@ -36,6 +48,8 @@ docTypes:
       description: Skill documentation (what it's for and when to use it)
     - slug: diary
       description: Chronological implementation diary
+    - slug: log
+      description: A chronological work log (Candela's tickets)
 intent:
     - slug: long-term
       description: Likely to persist

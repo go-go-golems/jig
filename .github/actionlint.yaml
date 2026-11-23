@@ -1,0 +1,4 @@
+# actionlint: labels of the self-hosted runners this repository uses
+self-hosted-runner:
+  labels:
+    - nvidia   # the DGX Spark: CUDA, OptiX SDK, NVENC (.github/workflows/candela-rt.yml)

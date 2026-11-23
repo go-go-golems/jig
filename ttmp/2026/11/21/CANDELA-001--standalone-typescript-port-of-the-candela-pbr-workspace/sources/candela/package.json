@@ -1,0 +1,16 @@
+{
+  "name": "candela",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A physically based rendering workbench: fluent JS scene API, WebGPU/WebGL2 path tracer, agent",
+  "scripts": {
+    "build": "node build/build.js --min",
+    "build:local": "node build/build.js --local",
+    "validate": "node test/validate.js",
+    "gallery": "node test/gallery.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "playwright": "^1.48.0"
+  }
+}
