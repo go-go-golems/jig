@@ -1,0 +1,7 @@
+# Tasks
+
+## TODO
+- [ ] Expose native study tracks to Stage <!-- t:1jly -->
+- [ ] Implement play, pause and scrub with posed overlays and picking <!-- t:94v3 -->
+- [ ] Verify playback lifecycle, gaps and native slider-crank behavior <!-- t:6kxe -->
+- [ ] Add phase-driven track authoring and validate the Singer two-revolution cycle <!-- t:gl8l -->
