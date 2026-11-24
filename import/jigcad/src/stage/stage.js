@@ -12,6 +12,7 @@ import { pickEdge } from './lines.js';
 import { handles, hitMark, drawSketchHover, pickOf } from './sketch.js';
 import { V, clamp } from './math.js';
 import { sketchToWorld } from './scene.js';
+import { studyAssembly } from './study-preview.js';
 
 const ORBIT = 0.008, PITCH = 0.006, THRESHOLD = 4;
 
@@ -43,7 +44,7 @@ export function createStage(element, host = {}, options = {}) {
     if (!W || !H) size();
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
     last = draw(canvas, posedProgram(), view, { width: W, height: H, dpr, overlays: on, selection, sketches: solved, sheet: options.sheet || (host.preset && host.preset.id) || 'J-01', colorsFrom: element, dragging: drag && drag.ref,
-      pose: posed && posed.pose, fitBox: heldFit && heldFit.name === (program && program.name) && view.name !== 'sketch' ? heldFit.box : null });
+      pose: preview?.pose ?? posed?.pose, fitBox: previewFit ?? (heldFit && heldFit.name === (program && program.name) && view.name !== 'sketch' ? heldFit.box : null) });
     // a sketch keeps the fit it was first drawn with, so solves and drags do not move the camera
     if (last.sketchView && !view.sketchFit && last.cam.fit) view = normView({ ...view, sketchFit: last.cam.fit });
     paintLayer();
@@ -98,7 +99,19 @@ export function createStage(element, host = {}, options = {}) {
   // the pose the joints allow nearest the pointer (host.call('dragPose')), draws it at once, and on release pins it
   // with overrides on the joints that hold it (the drives first), which compiles it for good
   let posed = null, pdrag = null, poseHandle = null, heldFit = null;
+  let preview = null, previewFit = null;
+  function setStudyPreview(frame) {
+    if (frame && (!program?.assembly || view.name === 'sketch' || pdrag)) return;
+    if (!frame && !preview) return;
+    if (frame && !preview) previewFit = last?.scene.fitBox;
+    preview = frame;
+    if (!preview) previewFit = null;
+    hover = null;
+    poseHandle = null;
+    invalidate();
+  }
   function posedProgram() {
+    if (preview) return { ...program, assembly: studyAssembly(program.assembly, preview) };
     if (!posed || !program || !program.assembly) return program;
     const A = program.assembly, byId = new Map((posed.joints || []).map(j => [j.id, j]));
     const origins = Object.fromEntries(Object.entries(posed.pose || {}).map(([id, T]) => [id, [T[12], T[13], T[14]]]));
@@ -107,7 +120,7 @@ export function createStage(element, host = {}, options = {}) {
   }
   function poseHandleAt(x, y) {
     const A = program && program.kind === 'assembly' && program.assembly;
-    if (!A || !last || last.sketchView || !on.has('joints') || !host.call || A.assembled === false) return null;
+    if (preview || !A || !last || last.sketchView || !on.has('joints') || !host.call || A.assembled === false) return null;
     const fixed = new Set(A.fixed || []), ports = (posed && posed.ports) || A.ports || [];
     let best = null, bd = 9;
     for (const pt of ports) {
@@ -144,6 +157,7 @@ export function createStage(element, host = {}, options = {}) {
   // a program that fails keeps the last good one on the sheet, but its sketches are still drawn as it solved them:
   // an over-constrained sketch fails the compile, and its conflict is what the sketch view has to show
   function setProgram(raw) {
+    setStudyPreview(null);
     program = shown(raw); solved.clear(); hover = null; hoverHandle = null;
     if (!pdrag) { posed = null; poseHandle = null; }
     // the fit held through a drag lasts for the compile the drag asked for, then the camera fits again
@@ -347,6 +361,7 @@ export function createStage(element, host = {}, options = {}) {
 
   // ---- host events, size, theme, fonts
   const sub = (ev, fn) => { if (host.on) { const off = host.on(ev, fn); if (typeof off === 'function') offs.push(off); } };
+  sub('studyPreview', setStudyPreview);
   sub('program', p => setProgram(p === undefined ? host.program : p));
   sub('selection', s => setSelection(s === undefined ? host.selection : s));
   sub('hover', h => { sketchHover = h === undefined ? host.hover : h; if (!sketchHover) hoverFromSheet = false; paintLayer(); });

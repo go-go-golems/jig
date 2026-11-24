@@ -99,3 +99,17 @@ import evaluates the file afresh with the same units, `j`, data and logger
 as the entry script. Files can import other project files. A missing file
 or circular import produces a compile error. The Script export saves the
 entry only; retain the companion files to reproduce a multi-file design.
+
+## Play a mechanism in the CAD Stage
+
+Open **F-06 Slider-crank** and press **Play** in the Stage study toolbar. Pause
+to inspect a joint, or drag the study slider to a particular crank angle. The
+arrow keys step through individual samples while the slider has focus. Orbit
+and zoom work with a pose held on screen. **Exit preview** restores the pose
+from the current compile. The controls appear on assemblies with motion
+studies. When a study reaches a gap or joint limit, playback holds the last
+reachable sample and displays the unavailable drive value.
+
+The **SG-03 Singer upper head** runs a coordinated 720° cycle. Compare the
+needle at 0° and 360° to see alternate penetrations. At 720° it returns to
+its starting side. A full study range plays in four seconds for inspection.

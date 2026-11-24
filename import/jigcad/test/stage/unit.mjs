@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 const runs = [];
 globalThis.Path2D = class { constructor() { this.n = 0; } moveTo() { this.n++; } lineTo() {} closePath() {} };
 const F = await import('./fixtures.js');
+const { studyAssembly } = await import('../../src/stage/study-preview.js');
 const { sceneOf, meshTopology, meshVolume } = await import('../../src/stage/scene.js');
 const { viewCam, makeCam, proj, VIEWS, nearestView, fitScale } = await import('../../src/stage/camera.js');
 const R = await import('../../src/stage/raster.js');
@@ -45,6 +46,35 @@ t('depth buffer: the box covers the projected centre of its top face; picking re
   const p = F.box(), { cam, buf, sc } = frame(p, 'axo'), q = proj(cam, [0, 0, 30]);
   const id = buf.id[Math.floor(q[1]) * buf.w + Math.floor(q[0])], inst = sc.instances[sc.faceInst[id]];
   assert.equal(inst.body.faces[id - inst.base].name, 'body/end');
+});
+t('study pose moves rotated occurrence ports, joint endpoints and selectable faces together', () => {
+  // Home rotates +X to +Y, translating the origin to (4, 7). Sampled child
+  // moves to (40, -10) with identity rotation, while the parent stays put.
+  const id = 'unit/slider';
+  const home = [0,1,0,0, -1,0,0,0, 0,0,1,0, 4,7,0,1];
+  const moved = [1,0,0,0, 0,1,0,0, 0,0,1,0, 40,-10,0,1];
+  const port = { ref: id + ':top', o: [4,9,30], x: [0,1,0], z: [0,0,1] };
+  const joint = { id: 'slide', portA: 'base:rail', portB: port.ref,
+    at: [0,0,0], atB: port.o, axis: [1,0,0], value: 2 };
+  const assembly = { components: [{ id, transform: home }], joints: [joint], ports: [port] };
+  const pose = { [id]: moved };
+  const row = { x: 45, tip: [42,-10,30] };
+  const shown = studyAssembly(assembly, { pose, row, drive: 'slide' });
+  assert.deepEqual(shown.ports[0].o, row.tip);
+  assert.deepEqual(shown.ports[0].x, [1,0,0]);
+  assert.deepEqual(shown.joints[0].atB, row.tip);
+  assert.deepEqual(shown.joints[0].at, joint.at);
+  assert.equal(shown.joints[0].value, 45);
+  assert.deepEqual(shown.measures.tip, row.tip);
+  assert.deepEqual(port.o, [4,9,30]);
+  const body = { ...F.box().bodies[0], part: id, transform: home };
+  const { sc, cam, buf } = frame({ bodies: [body] }, 'plan', 320, 240, { pose });
+  const [x, y] = proj(cam, shown.ports[0].o);
+  const face = buf.id[Math.floor(y) * buf.w + Math.floor(x)];
+  assert.ok(face >= 0);
+  const picked = sc.instances[sc.faceInst[face]];
+  assert.equal(picked.body.part, id);
+  assert.equal(picked.body.faces[face - picked.base].name, 'body/end');
 });
 t('pickEdge finds the top-right edge of the box', () => {
   const p = F.box(), { cam, lw } = frame(p, 'axo'), q = proj(cam, [30, 0, 30]), e = pickEdge(lw, q[0], q[1] + 1);

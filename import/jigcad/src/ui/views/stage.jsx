@@ -6,6 +6,7 @@ import { loadStage } from '../modules.js';
 import { NAMED_VIEWS, OVERLAYS, squareView, isSketchPick } from '../../host/host.js';
 import { qty, num, vec, metric, DASH, bare } from '../format.js';
 import { SketchInspector, pickLabel } from './sketch-inspector.jsx';
+import { StudyPlayback } from './study-playback.jsx';
 
 /** A persistent name that wraps only after "/" and "[". */
 export const Name = ({ text }) => String(text).split(/(?<=[/[])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
@@ -92,6 +93,9 @@ export function StageView({ host }) {
           <button class="btn sm" disabled={squared} title={`Back to the ${named?.title.toLowerCase() || 'axonometric'} view at zoom 1, centred on the part`}
             onClick={() => host.setView({ name: named ? v.name : 'axo', ...squareView() })}>Square up</button>
         </div>
+        {!fallback && !host.compiling && p?.ok && v.name !== 'sketch' && p.assembly?.studies && (
+          <StudyPlayback host={host} program={p} />
+        )}
         <div class="sheet">
           <div class="sheethost" ref={el} />
           {!good && p?.ok !== false && <p class="empty padded sheetnote">{host.compiling ? 'Compiling…' : `Nothing compiled yet. Press Run (${RUN_KEY}).`}</p>}

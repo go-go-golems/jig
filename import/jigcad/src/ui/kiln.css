@@ -212,6 +212,8 @@ button { cursor: pointer; }
 .toolbar { flex: none; min-height: 46px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 8px; padding: 6px 12px; flex-wrap: wrap; }
 .toolbar .lbl { color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; }
 .toolbar input[type=range] { width: 92px; }
+.studyplayback input[type=range] { flex: 1 1 110px; max-width: 300px; }
+.studyplayback output { min-width: 5ch; font-variant-numeric: tabular-nums; }
 .toolbar select { height: 30px; border: 1px solid var(--hair); background: var(--bg); padding: 0 6px; font-size: var(--fs-s); border-radius: 0; }
 .hint { flex: none; height: 30px; border-top: 1px solid var(--hair); display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: var(--fs-s); color: var(--ink-2); white-space: nowrap; overflow: hidden; }
 .hint b { color: var(--ink); font-weight: 700; }
