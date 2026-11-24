@@ -61,7 +61,7 @@ export async function runScript(code, { data = {}, extra = {}, file = 'script.js
   try { fn = (0, eval)(src); }
   catch (e) { throw scriptError(e, code, file, true, names); }
   try { return await fn(...values); }
-  catch (e) { throw scriptError(e, code, file); }
+  catch (e) { throw e.info ? e : scriptError(e, code, file); }
 }
 function scriptError(e, code, file, syntax = false, names = []) {
   const err = { message: e?.message ?? String(e), stack: e?.stack ?? '', file, kind: e?.kind };
@@ -75,7 +75,7 @@ function scriptError(e, code, file, syntax = false, names = []) {
       try { new Function(...names, lines.slice(0, i).join('\n') + '\n}}}}}}}}}}'); } catch (x) { if (!/Unexpected end|missing \) after|Unexpected token '}'/.test(x.message)) { err.line = i; break; } }
     }
   }
-  if (err.line != null) err.message = `${err.message} (script.js:${err.line}${err.column ? ':' + err.column : ''})`;
+  if (err.line != null) err.message = `${err.message} (${file}:${err.line}${err.column ? ':' + err.column : ''})`;
   return Object.assign(new Error(err.message), { info: err });
 }
 
@@ -91,7 +91,18 @@ export async function compileFiles({ files = {}, entry = 'script.js', data, opti
   let model;
   const ts = performance.now();
   const logs = [];
-  try { model = await runScript(code, { data: d, file: entry, extra: scriptLog(logs) }); }
+  const logger = scriptLog(logs);
+  // Resolve exact project keys, including in offline copies. Each import evaluates a new module scope.
+  function evaluate(file, ancestors) {
+    const importPartFile = async name => {
+      if (typeof name !== 'string' || !name.endsWith('.js') || !Object.hasOwn(files, name))
+        throw new Error(`Unknown part file: ${name}`);
+      if (ancestors.includes(name)) throw new Error(`Circular part import: ${[...ancestors, name].join(' -> ')}`);
+      return evaluate(name, [...ancestors, name]);
+    };
+    return runScript(files[file], { data: d, file, extra: { ...logger, importPartFile } });
+  }
+  try { model = await evaluate(entry, [entry]); }
   catch (e) {
     // script errors are failed replies with the position in script.js (and an error program for display)
     const info = e.info ?? { message: e.message, file: entry };
