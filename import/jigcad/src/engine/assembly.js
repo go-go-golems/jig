@@ -62,7 +62,20 @@ class Assembly {
   }
   measure(name, fn) { return this._w({ measures: [...(this.o.measures ?? []), { name, fn }] }); }
   event(name, fn) { return this._w({ events: [...(this.o.events ?? []), { name, fn }] }); }
-  study(name, o = {}) { return this._w({ studies: [...(this.o.studies ?? []), { name, ...o }] }); }
+  study(name, o = {}) {
+    if ('phase' in o) {
+      if (typeof o.phase !== 'string' || !o.phase || typeof o.at !== 'function' || o.drive != null)
+        throw Error(`study '${name}': use { phase: 'angle', at: degrees => ({ jointId: value }), from, to, steps }`);
+      if (o.steps != null && (!Number.isSafeInteger(o.steps) || o.steps < 1))
+        throw Error(`study '${name}': steps must be a positive integer`);
+      for (const bound of [o.from, o.to]) {
+        if (bound == null) continue;
+        if (!Number.isFinite(isQuantity(bound) ? bound.in('rad') : bound))
+          throw Error(`study '${name}': phase bounds must be finite angles`);
+      }
+    }
+    return this._w({ studies: [...(this.o.studies ?? []), { name, ...o }] });
+  }
   report(name, fn, o = {}) { return this._w({ reports: [...(this.o.reports ?? []), { name, fn, unit: o.unit ?? '', digits: o.digits ?? 3 }] }); }
   explode(steps) { return this._w({ explode: steps }); }
   // forces (spec v0.2, layer 5): the drive's speed turns per-radian rates into per-second ones; gravity (−Z, 1 g, by
@@ -118,9 +131,10 @@ function programOf(name, solved, { t0, opts, finalize }) {
   const values = new Map((mech?.joints ?? []).map(j => [j.id, j]));
   // every subassembly, a rigid one's nested ones too: the tree is the one record of the product structure
   const subOf = id => subNodes.map(n => n.id).filter(s => id.startsWith(s + '/')).sort((a, b) => b.length - a.length)[0] ?? null;
-  const info = { name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId, sub: subOf(id) })),
+  const info = { name, hash: null, components: [...comp.keys()].map(id => ({ id, ground: id === groundId, sub: subOf(id), transform: comp.get(id).T })),
     subassemblies: subNodes.map(S => ({ id: S.id, flexible: S.flexible, root: S.root, fixed: !!comp.get(S.root)?.fixed })),
     joints: o.joints.filter(j => !j.synthetic).map(j => ({ id: j.id, kind: j.kind, a: refText(j.a), b: refText(j.b), limits: limitsOf(j), slideLimits: slideLimitsOf(j), equations: equationCount(j.kind),
+      portA: values.get(j.id)?.a, portB: values.get(j.id)?.b,
       slide: values.get(j.id)?.slide ?? null,
       value: values.get(j.id)?.value ?? null, unit: values.get(j.id)?.unit ?? '', driven: values.get(j.id)?.driven ?? false, tree: values.get(j.id)?.tree ?? false,
       at: values.get(j.id)?.at ?? null, atB: values.get(j.id)?.atB ?? null, axis: values.get(j.id)?.axis ?? null, slideAxis: values.get(j.id)?.slideAxis ?? null })),
@@ -317,14 +331,14 @@ export function solveAssembly(asm, opts, compilePart) {
     for (const st of studyList) {
       const tq = performance.now();
       const jn = S.jointById.get(st.drive);
-      const full = jn && jn.kind !== 'slider' ? 2 * Math.PI : 10;
+      const full = (st.phase || (jn && jn.kind !== 'slider')) ? 2 * Math.PI : 10;
       // interference over the study: the named one(s), or every sweep when .interference() names none
       const ifr = o.interference, swept = !!ifr && (ifr.study ? [ifr.study].flat().includes(st.name) : st.name.startsWith('sweep:'));
       const poses = [], steps = st.steps ?? 360, track = poseTrack(S, steps + 1);
       // forces over the study (layer 5): joint reactions, driving torques and accelerations at every pose
       const dynOn = !!jn && (o.reactions ?? []).some((r) => r.study == null || r.study === st.name);
       const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
-      const res = runStudy(S, { name: st.name, drive: st.drive, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
+      const res = runStudy(S, { name: st.name, drive: st.drive, phase: st.phase, at: st.at, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
         onRow: (k, row) => { const Ts = track.add(row.x); if (swept) poses[k] = Ts; if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } }, measures, o.events ?? []);
       studies[st.name] = res;
       if (!res.error) posesOf[st.name] = track.done(res);
@@ -954,7 +968,11 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
     } },
     measures: (v, P, prefix) => { for (const m of v) extra.measures.push({ name: P(m.name), fn: mm => m.fn(prefixReader(mm, prefix)) }); },
     events: (v, P, prefix) => { for (const e of v) extra.events.push({ name: P(e.name), fn: row => e.fn(unprefixRow(row, prefix)) }); },
-    studies: (v, P) => { for (const st of v) extra.studies.push({ ...st, name: P(st.name), drive: P(st.drive) }); },
+    studies: (v, P) => {
+      for (const st of v) extra.studies.push(st.phase ? { ...st, name: P(st.name), phase: P(st.phase),
+        at: x => Object.fromEntries(Object.entries(st.at(x)).map(([key, value]) => [P(key), value])) }
+        : { ...st, name: P(st.name), drive: P(st.drive) });
+    },
     sweeps: (v, P) => { for (const sw of v) extra.sweeps.push({ ...sw, jointId: P(sw.jointId) }); },
     reports: (v, P, prefix) => { for (const rp of v) extra.reports.push({ ...rp, name: P(rp.name), fn: ctx => rp.fn(unprefixCtx(ctx, prefix)) }); },
     contacts: (v, P, prefix, A) => { for (const ct of v) extra.contacts.push({ ids: (ct.ids ?? A.o.components.map(x => x.id)).map(P) }); },

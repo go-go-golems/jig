@@ -1,3 +1,4 @@
+In SG-03, use Stage playback to inspect the two-revolution Stitch cycle.
 Use Code to set phase (shaft degrees) and amplitude (gate degrees). Rebuild at
 0, 180, 360 and 540 degrees to compare alternating needle entries and the
 two raised positions. Set amplitude to zero for a centered straight stitch.

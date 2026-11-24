@@ -1319,6 +1319,33 @@ await feaTest('53 stress study from a mechanism: the link at its worst pose; the
   return `${p0.fea.pose.x}° of ${p0.fea.pose.study}: ${bal.chose}; peak ${p.fea.peak.value.toFixed(2)} MPa`;
 });
 
+await test('phase study drives coordinated joints, including a flexible child', async () => {
+  const base = `
+const port = j.frame({ origin: j.pt(0,0,0), x: j.dir('+X'), z: j.dir('+Z') })
+const part = j.part('link').extrude(j.region.circle(1), mm(2)).port('p', port)
+const model = j.assembly('pair').add('base', part, {ground: true})
+  .add('a', part).add('b', part)
+  .joint('aPos', j.joint.slider(), 'base:p', 'a:p')
+  .joint('bPos', j.joint.slider(), 'a:p', 'b:p')
+  .params({aPos: mm(1), bPos: mm(3)})
+  .study('scan', {phase:'dial', from:deg(20), to:deg(0), steps:2,
+    at: angle => ({aPos:mm(angle), bPos:mm(angle/2)})})
+`;
+  for (const child of [false, true]) {
+    const p = await compile(base + (child
+      ? "return j.assembly('outer').add('sub', model, {flexible:true})" : 'return model'));
+    const prefix = child ? 'sub/' : '';
+    assert(!errs(p).length, JSON.stringify(errs(p)));
+    const track = await call('studyTrack', {name: prefix + 'scan'});
+    assert(track.x.join(',') === '20,10,0', 'descending driver');
+    assert(track.T[prefix + 'b'].length === 48, 'three complete matrices');
+    for (let k = 0; k < 3; k++) assert(near(track.T[prefix + 'b'][k*16 + 14], (2-k)*15), 'coupled travel');
+    assert(near(p.bodies.find(b => b.part === prefix + 'b').transform[14], 4), 'saved home pose');
+  }
+  const bad = await compile(base.replace('bPos:mm(angle/2)', 'missing:mm(angle)') + 'return model');
+  assert(errs(bad).some(d => d.kind === 'asm.phase' && d.message.includes('missing')), 'unknown drive diagnostic');
+});
+
 console.log(`\n${pass} passed, ${fail} failed · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 const { gc } = await import('../../src/engine/program.js');
 process.exit(fail ? 1 : 0);

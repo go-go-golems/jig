@@ -544,19 +544,43 @@ export class MechanismSolver {
 
 // sweep a drive by continuation and record the measures: { rows, keys, events, gaps, jump, extrema }
 export function runStudy(S, st, measures, events) {
-  const id = st.drive, jn = S.jointById.get(id);
-  if (!jn) return { name: st.name, error: `study ${st.name}: no joint '${id}'`, rows: [], keys: [], events: [], gaps: [] };
-  const ang = jn.kind !== 'slider', from = st.from, to = st.to, steps = st.steps ?? 360, k2u = ang ? 180 / Math.PI : 1;
+  const phase = st.phase != null;
+  const id = phase ? st.phase : st.drive, jn = S.jointById.get(id);
+  if (!phase && !jn) return { name: st.name, error: `study ${st.name}: no joint '${id}'`, rows: [], keys: [], events: [], gaps: [] };
+  const ang = phase || jn.kind !== 'slider', from = st.from, to = st.to, steps = st.steps ?? 360, k2u = ang ? 180 / Math.PI : 1;
   const home = S.pose, homeDrives = new Map(S.drives);
   const rows = [], gaps = [], limited = [];
-  if (!S.drives.has(id)) S.drives.set(id, S.value(jn));
+  let expectedKeys;
+  const readTargets = angle => {
+    const inputs = st.at(angle);
+    if (!inputs || typeof inputs !== 'object' || Array.isArray(inputs))
+      throw Error('return an object mapping joint coordinates to values');
+    const keys = Object.keys(inputs).sort();
+    if (!keys.length || expectedKeys && (keys.length !== expectedKeys.length || keys.some((key, i) => key !== expectedKeys[i])))
+      throw Error('return the same nonempty set of joint coordinates at each phase');
+    expectedKeys = keys;
+    return Object.fromEntries(keys.map(key => {
+      const c = S.coord(key);
+      if (!c) throw Error(`unknown joint coordinate '${key}'`);
+      const value = inputs[key], unit = S.linear(c.jn, c.part) ? 'mm' : 'rad';
+      const number = value?.isQuantity ? value.in(unit) : value;
+      if (!Number.isFinite(number)) throw Error(`expected a finite ${unit} value for '${key}'`);
+      return [key, number];
+    }));
+  };
+  const seek = (q, options) => {
+    if (!phase) return S.driveTo({ [id]: q }, options);
+    const targets = S.calls.run('phase', st.name, readTargets, q * k2u, `${+(q * k2u).toFixed(3)}°`);
+    return targets.ok && S.driveTo(targets.value, options);
+  };
+  if (!phase && !S.drives.has(id)) S.drives.set(id, S.value(jn));
   // the start: when continuation cannot reach `from`, driveTo leaves the drive at the last value it reached, so the
   // first row is a gap rather than a pose at some other drive value
-  const reached = S.driveTo({ [id]: from });
+  const reached = seek(from);
   let prev = null, jump = null;
   for (let k = 0; k <= steps; k++) {
     const q = from + (to - from) * k / steps, failing = rows.length && !rows[rows.length - 1].ok && !rows[rows.length - 1].limit;
-    const solved = k === 0 ? reached && S.solve() : S.driveTo({ [id]: q }, failing ? { depth: 1, maxIter: 25 } : {});
+    const solved = k === 0 ? reached && S.solve() : seek(q, failing ? { depth: 1, maxIter: 25 } : {});
     // a pose past a joint's limit closes, but the machine cannot be there: a gap marked with the joint
     const over = solved ? S.limitViolations() : [];
     const ok = solved && !over.length;
@@ -579,8 +603,8 @@ export function runStudy(S, st, measures, events) {
       const a = rows[k - 1], b = rows[k]; if (!a.ok || !b.ok) continue;
       const ta = test(a), tb = test(b); if (ta == null || tb == null || ta === tb) continue;
       let lo = a.q, hi = b.q;
-      S.pose = home; S.drives = new Map(homeDrives); if (!S.drives.has(id)) S.drives.set(id, S.value(jn)); S.driveTo({ [id]: lo });
-      for (let h = 0; h < 12; h++) { const mid = (lo + hi) / 2; S.driveTo({ [id]: mid }, { maxStep: 1 }); if (test({ x: mid * k2u, ...S.read(measures) }) === ta) lo = mid; else hi = mid; }
+      S.pose = home; S.drives = new Map(homeDrives); if (!phase && !S.drives.has(id)) S.drives.set(id, S.value(jn)); seek(lo);
+      for (let h = 0; h < 12; h++) { const mid = (lo + hi) / 2; seek(mid, { maxStep: 1 }); if (test({ x: mid * k2u, ...S.read(measures) }) === ta) lo = mid; else hi = mid; }
       evs.push({ name: ev.name, at: (lo + hi) / 2 * k2u, rising: !ta && tb });
     }
   }

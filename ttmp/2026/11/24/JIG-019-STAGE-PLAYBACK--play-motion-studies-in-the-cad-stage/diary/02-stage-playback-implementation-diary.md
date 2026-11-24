@@ -58,3 +58,51 @@ Run the ticket's scripts/01-check-study-transfer.mjs with Node from the Jig root
 ### Technical details
 
 A selected track returns its drive range, rows, sample values and 16 column-major world-transform values per component per reached row.
+
+## Step 2. Produce a coordinated Singer cycle from the existing assembly
+
+Step 1 landed in 7f4aad1. The Singer's analytic pose already computes a set of joint coordinates from one shaft angle. I exposed that computation as a sampled phase study and used the same function for the static assembly and moving poses.
+
+### Prompt Context
+
+See Step 1. The second producer supplies ordinary study tracks for mechanisms with several coordinated joint values.
+
+### What I did
+
+Extended assembly.study with an angular phase and an at(degrees) callback, added a named Singer study and documented the contract. Added a solver regression and a replay script comparing the new track to the earlier TSV.
+
+### Why
+
+Moving just the crank does not tilt the support or advance the two take-up joints. Rebuilding the upper-head geometry for every angle would also repeat work already done during compilation.
+
+### What worked
+
+The phase regression passed for descending drives, flexible child component IDs, invalid coordinate names and home restoration. SG-03 produced 145 samples. Maximum two-link closure residual was 2.003e-9 mm. The largest distance from the earlier rounded reference points was 0.00006713 mm.
+
+### What didn't work
+
+The two-point reference TSV alone cannot place the ten moving and fixed components. It served as an independent comparison after the solver generated complete placements.
+
+### What I learned
+
+Angular callbacks and native joint studies can share the existing sample storage. The Stage requires no Singer-specific code.
+
+### What was tricky to build
+
+The input angle is displayed in degrees; solved angular joint quantities use radians internally. Flexible subassemblies must prefix the coordinate names returned by the callback.
+
+### What warrants a second pair of eyes
+
+Check the phase callback when adding another mechanism with multiple branches or a joint limit.
+
+### What should be done in the future
+
+Compare the Singer motion against a physically indexed turn when the specimen is measured. That physical calibration remains in SINGER-001.
+
+### Code review instructions
+
+Read assembly.study, runStudy and the SG-03 preset entry. Run the engine case named “phase study” and the ticket's check-singer-study script.
+
+### Technical details
+
+The Singer samples 0 through 720 degrees at five-degree intervals and compares every second sample to the pre-existing ten-degree reference.

@@ -110,8 +110,20 @@ function pose(phase, swing) {
     lever: heading(elbow[0] - pin[0], elbow[1] - pin[1]),
     rocker: heading(elbow[0] - anchor[0], elbow[1] - anchor[1]) }
 }
-function assemble(mode, phase, swing) {
+function jointValues(mode, phase, swing) {
   const q = pose(phase, swing)
+  const params = { swing: deg(swing), slide: mm(q.slide) }
+  if (mode !== 'swing') {
+    params.turn = deg(phase)
+    params.rodAngle = deg(q.rod - swing)
+  }
+  if (mode === 'upper head') {
+    params.leverAngle = deg(q.lever - phase)
+    params.rockerAngle = deg(q.rocker)
+  }
+  return params
+}
+function assemble(mode, phase, swing) {
   let head = j.assembly('Singer 44S ' + mode)
     .add('head', frame(), { ground: true })
     .add('plate', plate(), { at: j.tx.move(0, 0, 0) })
@@ -121,24 +133,19 @@ function assemble(mode, phase, swing) {
     .joint('slide', j.joint.slider(), 'gate:slide', 'bar:slide')
     .joint('clamped', j.joint.fixed(), 'bar:clamp', 'clamp:seat')
     .joint('seated', j.joint.fixed(), 'clamp:needle', 'needle:shank')
-  const params = { swing: deg(swing), slide: mm(q.slide) }
   if (mode !== 'swing') {
     head = head.add('crank', crank())
       .add('rod', link('Needle connecting rod', rodLength, 5, '#939da5'))
       .joint('turn', j.joint.revolute(), 'head:shaft', 'crank:axis')
       .joint('rodAngle', j.joint.revolute(), 'bar:drivePin', 'rod:start')
-    params.turn = deg(phase)
-    params.rodAngle = deg(q.rod - swing)
   }
   if (mode === 'upper head') {
     head = head.add('lever', takeUp())
       .add('rocker', link('Take-up supporter', rockerLength, 10, '#778790'))
       .joint('leverAngle', j.joint.revolute(), 'crank:pin', 'lever:pin')
       .joint('rockerAngle', j.joint.revolute(), 'head:anchor', 'rocker:start')
-    params.leverAngle = deg(q.lever - phase)
-    params.rockerAngle = deg(q.rocker)
   }
-  return head.params(params)
+  return head.params(jointValues(mode, phase, swing))
 }
 // Alternate penetration sides every turn. Dwell through needle entry.
 // The smooth transfer around top dead center is a study cam law.
@@ -149,4 +156,4 @@ function swingAt(phase, amplitude) {
   const sign = cycle < 360 ? 1 : -1
   return amplitude * sign * Math.cos(Math.PI * u)
 }
-return { assemble, pose, swingAt }
+return { assemble, pose, swingAt, jointValues }
