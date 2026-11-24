@@ -7,5 +7,5 @@
   "about": "Inspect the housing, lens tube, full-open diaphragm envelope and front cover.",
   "view": "axo",
   "overlays": "shadows,grid",
-  "tries": "Hide the cover to inspect the optical bore | Compare the tube's external helical thread to its two cell seats"
+  "tries": "Hide the cover to inspect the optical bore | Inspect the rear housing flange thread and the separate front cell seat"
 }
