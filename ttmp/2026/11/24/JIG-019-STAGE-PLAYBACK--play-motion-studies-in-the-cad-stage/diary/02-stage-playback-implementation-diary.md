@@ -7,13 +7,21 @@ Topics:
 DocType: diary
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/src/stage/study-preview.js
+      Note: Coordinate transformation of joint annotations
+    - Path: repo://import/jigcad/src/ui/views/study-playback.jsx
+      Note: Playback state and lifecycle
+    - Path: repo://ttmp/2026/11/24/JIG-019-STAGE-PLAYBACK--play-motion-studies-in-the-cad-stage/scripts/01-check-stage.cjs
+      Note: Reproducible browser verification and screenshot capture
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-11-24T18:22:28.87952445-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
+
+# CAD Stage playback implementation diary
 
 ## Step 1. Expose the native study to the CAD Stage
 
@@ -154,3 +162,55 @@ Follow StudyPlayback and TrackControls in ui/views/study-playback.jsx through th
 ### Technical details
 
 Playback traverses the authored sample order in four seconds, pauses at the end and preserves source parameters. The range control indexes original rows and announces the actual drive coordinate in degrees or millimetres.
+
+## Step 4. Replay the deployed browser build and retain the evidence
+
+The Stage implementation landed in 33e6f3d. I replayed the browser acceptance script against the workbench on localhost:18965 using a fresh Chromium profile. The four captured views are linked from the ticket index.
+
+### Prompt Context
+
+See Step 1. The goal of this checkpoint was to verify the normal desktop-browser entry point and leave repeatable evidence.
+
+### What I did
+
+Rebuilt with make web, reran both worker checks and captured the final UI in Front and Plan views. The browser script drove Play, Pause, the sample slider, dynamic study selection and Exit preview. It compared sheet placements and joint markers against reference data.
+
+### Why
+
+Worker results alone do not establish what the drafting sheet actually draws or which face is picked when the user clicks a moving part.
+
+### What worked
+
+The final browser replay compared 73 displayed Singer samples to the archive. The largest single-coordinate error was 0.000050 mm. The maximum tested linkage gap was 1.98e-9 mm. A native limited hinge stopped at 110° when its next 120° sample was unavailable. Direct scrubbing into that gap held the shown pose; the descending study reached zero in the authored order.
+
+### What didn't work
+
+The sandbox prevented unrelated HTTP tests from opening loopback sockets. Running the repository suite with local socket access allowed those cases to execute.
+
+### What I learned
+
+The two error figures measure different quantities. The browser reports the largest individual coordinate difference from the rounded reference, while the worker script reports the largest planar distance.
+
+### What was tricky to build
+
+A late worker reply can arrive after the user switches presets. The test deliberately delayed a result, changed presets and confirmed the old track was ignored.
+
+### What warrants a second pair of eyes
+
+Review the four screenshots beside the original Singer reference and exercise the gap fixture by stepping with the keyboard.
+
+### What should be done in the future
+
+New mechanisms can use the same browser workflow. Capture a reference pose when the drive or geometry changes.
+
+### Code review instructions
+
+Run scripts/01-check-stage.cjs against a running workbench and pass an installed Playwright module path if Node cannot resolve it. The script uses an ephemeral profile; all four screenshots are written beneath sources/.
+
+### Technical details
+
+The two fixtures use a 360-degree native study and a 720-degree coordinated study. The limited-hinge fixture supplies an additional discontinuity and a descending range.
+
+The final boundary check added **Show pose** for studies with reachable samples but no adjacent playable pair. A hinge fixture with exactly one reachable angle confirmed the preview can be inspected and exited. Comparing it to a separately solved 110° pose with strict matrix equality initially failed on signed zero and roundoff (translation difference about 2e-14 mm). The cross-study assertion now uses a 1e-9 tolerance. The final browser replay passed.
+
+The full make test run passed with local sockets enabled, including the Go server tests, agent and UI tests, render and engine suites, and all 105 Candela golden comparisons. The separate Stage suite passed 21/21.

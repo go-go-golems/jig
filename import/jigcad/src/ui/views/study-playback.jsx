@@ -113,8 +113,10 @@ function TrackControls({ host, program, study }) {
     clock.current = requestAnimationFrame(tick);
   }
   return <>
-    <button class="btn sm" aria-label={playing ? 'Pause' : 'Play'}
-      disabled={!track?.playable} onClick={play}>{playing ? 'Ⅱ Pause' : '▶ Play'}</button>
+    {track?.rows.length > 0 && !track.playable
+      ? <button class="btn sm" onClick={() => show(current.current)}>Show pose</button>
+      : <button class="btn sm" aria-label={playing ? 'Pause' : 'Play'}
+        disabled={!track?.playable} onClick={play}>{playing ? 'Ⅱ Pause' : '▶ Play'}</button>}
     <input type="range" aria-label="Study sample" aria-valuetext={driveLabel(row)}
       min={0} max={last} step={1} value={row} disabled={!track?.rows.length}
       onInput={e => { const n = +e.currentTarget.value; pause(); if (!show(n)) e.currentTarget.value = current.current; }} />

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "06e34d26d359f68b82bd9a208032db648a59c52d145123323ffffe083f5fd1dd",
+  "request": {
+    "ticket": "JIG-019-STAGE-PLAYBACK",
+    "status": "complete",
+    "intent": "",
+    "entry": "Completed Stage playback, Singer integration, browser verification and repository regression testing."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-edfe0ea93ca1d465198bf99802b372be",
+    "state": "committed",
+    "created_at": "2026-11-24T23:28:44.207266634Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "214c45b9e1f9463e82636a8f7af97e81451dc812eca8725a46aee8f27b74ac2f",
+      "index.md": "aff2b587c090e8c47fd29fba0fea607a8739b8f666582772313400e029953b27"
+    },
+    "after": {
+      "changelog.md": "65137fdcec96d15120e826164170d4124b191e8d43966e9505e562fca10c6ecd",
+      "index.md": "f82faa2b196ac21a6a404ce18e1c6cdc49686876429091ce623027cfee05fc0f"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "214c45b9e1f9463e82636a8f7af97e81451dc812eca8725a46aee8f27b74ac2f",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKRG9jdW1lbnRlZCB0aGUgU3RhZ2UgcGxheWJhY2sgY29udHJhY3QsIG5hdGl2ZSBzdHVkeSByb2xsb3V0LCBhbmQgU2luZ2VyIHBoYXNlLWRyaXZlbiBhY2NlcHRhbmNlIGNyaXRlcmlhLgoKIyMgMjAyNi0xMS0yNAoKSW1wbGVtZW50ZWQgbmF0aXZlIGFuZCBjb29yZGluYXRlZCBDQUQgU3RhZ2UgcGxheWJhY2suIFZlcmlmaWVkIGJyb3dzZXIgcG9zZSBmaWRlbGl0eSwgcGlja2luZywgZ2FwIGhhbmRsaW5nIGFuZCByZWFkLW9ubHkgcmVwbGF5OyByZXRhaW5lZCBmb3VyIHNjcmVlbnNob3RzIGFuZCB0aGUgcmVwbGF5IHNjcmlwdHMuCgojIyAyMDI2LTExLTI0CgpDb21wbGV0ZWQgU3RhZ2UgcGxheWJhY2ssIFNpbmdlciBpbnRlZ3JhdGlvbiwgYnJvd3NlciB2ZXJpZmljYXRpb24gYW5kIHJlcG9zaXRvcnkgcmVncmVzc2lvbiB0ZXN0aW5nLgo="
+    },
+    {
+      "path": "index.md",
+      "before": "aff2b587c090e8c47fd29fba0fea607a8739b8f666582772313400e029953b27",
+      "after": "LS0tClRpdGxlOiBQbGF5IG1vdGlvbiBzdHVkaWVzIGluIHRoZSBDQUQgU3RhZ2UKVGlja2V0OiBKSUctMDE5LVNUQUdFLVBMQVlCQUNLClN0YXR1czogY29tcGxldGUKVG9waWNzOgogICAgLSBjYWQKRG9jVHlwZTogaW5kZXgKSW50ZW50OiBsb25nLXRlcm0KT3duZXJzOiBbXQpSZWxhdGVkRmlsZXM6IFtdCkV4dGVybmFsU291cmNlczogW10KU3VtbWFyeTogIiIKTGFzdFVwZGF0ZWQ6IDIwMjYtMTEtMjRUMTg6Mjg6NDQuMjA3MjIyMTMtMDU6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KCiMgUGxheSBtb3Rpb24gc3R1ZGllcyBpbiB0aGUgQ0FEIFN0YWdlCgpUaGUgW2Rlc2lnbiBwcm9wb3NhbF0oZGVzaWduLWRvYy8wMS1jYWQtc3RhZ2UtcGxheWJhY2stZm9yLW1vdGlvbi1zdHVkaWVzLWFuZC1waGFzZS1kcml2ZW4tbWVjaGFuaXNtcy5tZCkgc3BlY2lmaWVzIHJlYWQtb25seSBwbGF5YmFjayBvZiBzb2x2ZWQgbWVjaGFuaXNtIHBvc2VzIGluIHRoZSBkcmFmdGluZyBTdGFnZS4gRi0wNiBpcyB0aGUgbmF0aXZlLXN0dWR5IGFjY2VwdGFuY2UgZml4dHVyZS4gU0lOR0VSLTAwMSBzdXBwbGllcyBhIHNlY29uZCBmaXh0dXJlIGZvciBjb29yZGluYXRlZCwgcGhhc2UtZHJpdmVuIG1vdGlvbi4gSW1wbGVtZW50YXRpb24gYW5kIHZlcmlmaWNhdGlvbiBhcmUgcmVjb3JkZWQgaW4gdGhlIFtkaWFyeV0oZGlhcnkvMDItc3RhZ2UtcGxheWJhY2staW1wbGVtZW50YXRpb24tZGlhcnkubWQpLgoKIyMgVmVyaWZpZWQgU3RhZ2Ugdmlld3MKCk9wZW4gRi0wNiBvciBTRy0wMywgc2VsZWN0IFN0YWdlIGFuZCBwcmVzcyAqKlBsYXkqKi4gUGF1c2UgdG8gb3JiaXQgdGhlIG1lY2hhbmlzbS4gVGhlIHN0dWR5IHNsaWRlciBhbmQgYXJyb3cga2V5cyBzZWxlY3Qgc29sdmVkIHNhbXBsZXMuIEV4aXQgcHJldmlldyByZXN0b3JlcyB0aGUgY29tcGlsZWQgcG9zZS4gVGhlIHNjcmVlbnNob3RzIGJlbG93IHdlcmUgY2FwdHVyZWQgaW4gdGhlIGJyb3dzZXIgd2hpbGUgdGhlIHN0dWR5IHdhcyBwYXVzZWQuCgp8IEYtMDYgY3JhbmsgYXQgOTDCsCB8IFNpbmdlciBhdCAwwrAgfCBTaW5nZXIgYXQgMTgwwrAgfCBTaW5nZXIgYXQgMzYwwrAgfAp8LS0tfC0tLXwtLS18LS0tfAp8ICFbRi0wNiBjcmFua10oc291cmNlcy9mMDYtcXVhcnRlci10dXJuLnBuZykgfCAhW1NpbmdlciBmaXJzdCBwZW5ldHJhdGlvbl0oc291cmNlcy9zaW5nZXItMDAwLnBuZykgfCAhW1NpbmdlciByYWlzZWRdKHNvdXJjZXMvc2luZ2VyLTE4MC5wbmcpIHwgIVtTaW5nZXIgc2Vjb25kIHBlbmV0cmF0aW9uXShzb3VyY2VzL3Npbmdlci0zNjAucG5nKSB8CgpUaGUgdGlja2V0IHNjcmlwdHMgaW5kZXBlbmRlbnRseSBjaGVjayB3b3JrZXItYnVmZmVyIG93bmVyc2hpcCwgU2luZ2VyIHRyYWplY3RvcnkgYWdyZWVtZW50IGFuZCBpbnRlcmFjdGl2ZSBiZWhhdmlvci4gVGhlIGJyb3dzZXIgY2hlY2sgdmVyaWZpZXMgcGlja2luZywgcmVwbGF5IHdpdGhvdXQgd29ya2VyIGNhbGxzLCBhIGRlc2NlbmRpbmcgc3R1ZHksIGEgbGltaXQgZ2FwLCBmYWlsZWQgY29tcGlsYXRpb24gYW5kIGEgZGVsYXllZCByZXNwb25zZSBhZnRlciBzd2l0Y2hpbmcgcHJlc2V0cy4K"
+    }
+  ]
+}
