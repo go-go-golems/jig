@@ -114,7 +114,7 @@ The original screws' dimensions and seats, the axial play of both wheel arbors a
 
 ### What should be done in the future
 
-Fill the specimen worksheet in reference/fit-wheel-and-cartridge-registration.md. Repeat both the geometric check and the functional timing checks after measuring the actual unit.
+Fill the specimen worksheet in reference/03-fit-wheel-and-cartridge-registration.md. Repeat both the geometric check and the functional timing checks after measuring the actual unit.
 
 ### Code review instructions
 
@@ -123,3 +123,97 @@ Run scripts/05-count-plate-7.mjs and scripts/fit-wheel-kicker.mjs with Node from
 ### Technical details
 
 The study uses the rear threaded flange face as Z zero and positive Z toward the subject. The placement worksheet records the input arbor, second landmark, seat and an independent check point. The collision result pertains to the model at its reference pose.
+
+## Step 3. Recover the modeling scripts and replay the figures
+
+### Prompt Context
+
+The user asked to preserve the scripts retroactively and take screenshots. The previous report had nine published figures and several of its inputs lived in temporary working directories.
+
+### What I did
+
+Recovered 17 named scripts and 47 inline script bodies from the four earlier Compur work sessions. Preserved the static extractor and the commands for rebuilding the report images under scripts/recovered. The inventory records where each script came from and which historical scripts write to a checkout or vault.
+
+**Commits.** The mechanical analysis landed in 06d6d44 and the script recovery in bc82186.
+
+### Why
+
+The published images show the final poses. Reproducing them requires the source crops, original camera settings and the same model inputs.
+
+### What worked
+
+The five generated source and analysis images reproduced byte for byte. The four original workbench views were recaptured and checked visually. The two new CP-02 browser screenshots are in sources/plate-7. The web build and CP-02 preset check passed with 41 features, eight bodies and zero residual degrees of freedom.
+
+### What didn't work
+
+The historical inline snippets depend on temporary files and intermediate revisions. Replaying the historical mutation sequence on the current checkout would rewrite completed work. Those snippets were syntax-checked and archived.
+
+### What I learned
+
+A browser screenshot requires a camera, viewport and readiness condition. Capturing the URL alone loses enough state to make the comparison ambiguous.
+
+### What was tricky to build
+
+Extracting literal inline scripts required decoding the original tool arguments without executing the surrounding commands.
+
+### What warrants a second pair of eyes
+
+Review the archive inventory before using a historical installer. The two replay entry points document the inputs and output directories for new captures.
+
+### What should be done in the future
+
+Preserve the capture script alongside the first new figure for each assembly.
+
+### Code review instructions
+
+Open scripts/recovered/01-recovery-inventory.md and follow the replay procedure using a fresh output directory. Inspect the camera orientation and blade positions in both new CP-02 views.
+
+### Technical details
+
+The preserved inline sources comprise 16 blade, six control, 11 timing and 14 lead-session snippets. Sessions themselves are excluded.
+
+## Step 4. Establish the catalog denominator and revision limits
+
+### Prompt Context
+
+The original question asked whether all parts were represented and how dimensions and placement could be verified. Plate 7 answers this for one depicted assembly. A separate standard parts list was needed to assess the rest.
+
+### What I did
+
+Cross-referenced Honeywell's March 1967 Table 8-3 against the standard assembly, isolated presets, common repair plates and later factory supplements. Recorded every stock row in sources/catalog-standard-1210-000.tsv and rendered the governor and cam revision pages. Linked the catalog, fit worksheet and screenshots in the ticket.
+
+### Why
+
+A callout can have several stock revisions. One assembly occurrence can represent an ordered module, and one catalog row can cover several physical instances. Each count needs its own denominator.
+
+### What worked
+
+Grouping the evidence column independently yielded 19 M-11, three CP-06, one CP-07, three CP-08 and 49 unknown rows. The two factory supplement pages show features by which the early and replacement governor/cam pairs can be distinguished.
+
+### What didn't work
+
+The distributor transcription does not resolve nine stock numbers or 52 quantities. The repair binder supplies change notices and assembly drawings but does not resolve every uncertain order cell.
+
+### What I learned
+
+A visible 0.8 mm index hole on the replacement cam identifies a revision. The historical dates matter even when the last three identifier digits agree across publications.
+
+### What was tricky to build
+
+Two rows have the stem 623. Removing duplicates by stem would lose a stock-list entry and understate the denominator by one.
+
+### What warrants a second pair of eyes
+
+Check candidate order numbers against a legible image of Table 8-3. Record the specimen's camera-specific code and inspect the actual cam and governor before selecting a replacement pair.
+
+### What should be done in the future
+
+Measure the wheel stack, blade screw seats and cartridge landmarks on an identified size-0 shutter. Record uncertainty and the physical revision with each measurement.
+
+### Code review instructions
+
+Read reference/04-catalog-standard-reconciliation.md alongside the TSV. Count the rows by the prefix of the CAD_evidence field. Compare factory pages 253 and 254 with the descriptions in the revision table.
+
+### Technical details
+
+All 75 rows belong to the selected standard list. Of the 26 rows with an assigned counterpart, some represent roles or features within a combined solid. A correspondence alone supplies neither dimensional tolerance nor assembly clearance.

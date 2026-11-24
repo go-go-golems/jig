@@ -1,0 +1,76 @@
+catalog_stock_stem	role	CAD_evidence	stock_candidate_Honeywell_1967	quantity_supported
+101	body shell	M11:housing	1210 10 000 101 80	?
+102	mounting fitting	unknown	1210 80 000 102 80	?
+105	iris leaves	CP08:five leaves	1210 10 000 105 86	?
+106	slotted iris cover	CP08:cover study	1210 10 000 106 85	?
+108	iris control ring	unknown	1210 50 000 108 82	?
+109	body fixing screws	unknown	1210 30 000 109 80	?
+113	aperture pointer fixing	unknown	1210 30 000 113 80	?
+114	aperture pointer	unknown	1210 30 000 114 81	?
+115	body mounting fastener	unknown	1204 30 000 115 82	?
+116	exposure-side iris cover	CP08:cover study	1210 10 000 116 82	?
+117	cover fastening hardware	unknown	1210 30 000 117 80	?
+120	iris guide hardware	unknown	1110 30 000 120 83	?
+146	M/X detent spring	unknown	1110 40 000 146 81	?
+148	mode setting ring	unknown	1210 10 000 148 82	?
+151	setting-ring return	unknown	1210 30 000 151 80	?
+201	mechanism plate	M11:base	1210 10 000 201 83	?
+202	exposure leaf actuator	M11:ring	1210 10 000 202 82	?
+204	optical mount	M11:tube	1210 30 000 204 83	?
+208	three intermediate exposure leaves	M11:blade2,blade3,blade4	?	3
+225	exposure leaf support	M11:bladePlate	1210 10 000 225 80	?
+230	support plate fixings	unknown	?	?
+249	actuator return spring	unknown	1210 30 000 249 82	?
+260	stop fastening	unknown	1110 30 000 260 81	?
+261	optical mount fixings	unknown	1210 30 000 261 81	?
+267	final bent exposure leaf	M11:blade5	1210 10 000 267 80	1
+268	first bent exposure leaf	M11:blade1	1210 10 000 268 80	1
+299	mount-side stop	unknown	1210 30 000 299 83	?
+300	speed governor	M11:escapement group	1210 10 000 300 81	?
+304	long governor fixing	unknown	?	?
+320	anchor support spring	unknown	1110 40 000 320 83	?
+323	short governor fixing	unknown	1110 30 000 323 81	?
+344	check-lever spring	unknown	1110 30 000 344 81	?
+400	delay cartridge	CP07:isolated cartridge study	1110 10 000 400 81	?
+416	cartridge attachment	unknown	1110 30 000 416 81	?
+418	clamping fastener	unknown	1110 30 000 418 81	?
+420	delay lock spring	unknown	1110 30 000 420 82	?
+421	external delay detent	unknown	1210 20 000 421 80	?
+423	delay mechanism spring	unknown	1110 30 000 423 81	?
+508	release linkage	M11:release role only	?	?
+514	blade drive	M11:cam	?	?
+515	drive return spring	unknown	1210 30 000 515 81	?
+517	cocking transmission	M11:pinion	1210 10 000 517 80	?
+519	release lock return	unknown	?	?
+521	cocking-ring return	unknown	1210 40 000 521 80	1
+528	cocking actuator	M11:cockingRing	1210 10 000 528 80	1
+538	ring retaining screw	unknown	1110 30 000 538 82	1
+539	exposure control	M11:speedRing role only	1210 30 000 539 81	1
+540	front cover	M11:cover	1210 30 000 540 80	1
+547	threaded cover retainer	M11:cover.retainingRing feature	1210 30 000 547 81	?
+552	speed selection cam	M11:speedCam	1210 30 000 552 81	?
+559	release return	unknown	1210 30 000 559 81	1
+600	flash socket nipple	M11:housing.contactNipple feature	1110 20 000 600 83	?
+604	earth conductor	CP06:grounding strip study	1110 40 000 604 84	?
+608	electrical contact stop	unknown	1110 40 000 608 83	1
+612	bulb-flash closing lever	CP06:M lever role	?	1
+614	bulb-flash lever spring	unknown	1210 30 000 614 80	?
+615	electronic-flash contact lever	CP06:common contact lever role	?	1
+616	bulb-flash adjustment	unknown	1110 30 000 616 82	1
+618	adjuster fastening	unknown	1110 30 000 618 82	1
+619	bulb-flash check spring	unknown	1110 30 000 619 81	1
+620	bridge fastening	unknown	1110 30 000 620 81	1
+621	synchronizer bridge	M11:bridge	?	1
+623	detent spring rivet	unknown	1110 40 000 623 82	1
+623	earthing strip rivet	unknown	1210 40 000 623 80	?
+627	bulb-flash anchor support	unknown	1210 40 000 627 80	?
+632	bulb-flash spur wheel	unknown	1110 10 000 632 81	1
+635	bulb-flash detent	unknown	1210 10 000 635 80	?
+640	cocking lock return	unknown	1110 40 000 640 81	1
+641	detent return	unknown	1110 20 000 641 83	1
+664	detent lock	unknown	1210 20 000 664 81	1
+667	release lock	unknown	1210 10 000 667 81	?
+669	speed lever	unknown	1210 30 000 669 81	?
+671	speed lever fixing	unknown	1110 30 000 671 81	?
+672	locking lever return	unknown	1210 30 000 672 82	1
+696	bulb-flash cam check	unknown	1110 40 000 696 85	?
