@@ -116,3 +116,51 @@ Open SG-03-upper-head/singer.parts.js and follow pose(), assemble() and swingAt(
 ### Technical details
 
 The centered ideal stroke is twice the 12 mm crank radius. For a 2-degree gate command the solved tip positions at successive penetrations are approximately +2.65 and -2.65 mm. The gate changes sides around needle top and dwells around penetration. These are CAD outputs for the chosen dimensions.
+
+## Step 3. Compare the workbench captures and archive evidence
+
+The model checkpoint is 851353c. I saved front views of each isolated study and the combined head, plus an axonometric view and an X/Z trajectory plot.
+
+### Prompt Context
+
+See Step 1 for the request to preserve workbench screenshots and original visual evidence.
+
+### What I did
+
+Built the bundled content with make web, started the server in tmux session singer-44s on port 18965, and ran scripts/03-capture-workbench.cjs. Plotted the solved coordinates with scripts/04-plot-paths.py.
+
+### Why
+
+A screenshot confirms the browser loaded the shared library. The separate coordinate trace permits numerical inspection of the eye and needle travel.
+
+### What worked
+
+The capture waited for the expected 8, 6 and 10 body counts. I checked the combined front and axonometric captures visually beside the source frame and trajectory plot.
+
+### What didn't work
+
+The first capture using cached Playwright fd3bca3c548369c0 reported “Executable doesn't exist” for chromium_headless_shell-1187. Using the installed Playwright and Chromium revision 1228 produced all four images.
+
+### What I learned
+
+The CAD checker can verify joint closure while eye trajectory and physical fit require separate evidence.
+
+### What was tricky to build
+
+Waiting for the compiled body count distinguishes a loaded CAD scene from a workbench shell that has only finished navigation.
+
+### What warrants a second pair of eyes
+
+Inspect the relative eye and pin positions in the source gallery, particularly the occluded pin depth and lever orientation.
+
+### What should be done in the future
+
+Replace the estimated dimensions incrementally. Retain the angle-indexed samples as a baseline for checking changes.
+
+### Code review instructions
+
+Read the source comparison and follow the scripts in numerical order. Inspect the head in Front and Axo views and compare the default occurrence count against the cycle check.
+
+### Technical details
+
+All five generated workbench and plot images, the six archive stills, and the tabulated trajectories are stored under sources/. The default combined pose has a 55-degree shaft angle and a 2-degree zigzag amplitude.
