@@ -1,0 +1,11 @@
+{
+  "id": "CP-02",
+  "title": "Shutter blades and operating ring",
+  "group": "Synchro-Compur",
+  "order": 2,
+  "difficulty": "advanced",
+  "about": "Inspect five pivoted shutter leaves at an adjustable ring position.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Change stroke to 7.4 and rebuild | Hide both plates and inspect the five pivot holes"
+}

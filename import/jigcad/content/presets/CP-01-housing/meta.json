@@ -1,0 +1,11 @@
+{
+  "id": "CP-01",
+  "title": "Housing and optical stack",
+  "group": "Synchro-Compur",
+  "order": 1,
+  "difficulty": "advanced",
+  "about": "Inspect the housing, lens tube, full-open diaphragm envelope and front cover.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Hide the cover to inspect the optical bore | Compare the tube's external helical thread to its two cell seats"
+}

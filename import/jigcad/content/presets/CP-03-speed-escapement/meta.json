@@ -1,0 +1,11 @@
+{
+  "id": "CP-03",
+  "title": "Speeds escapement",
+  "group": "Synchro-Compur",
+  "order": 3,
+  "difficulty": "advanced",
+  "about": "Retard lever, inertia weight, compound train and pallet in the mechanism plate.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Inspect the shared post | Identify the star wheel and pallet"
+}

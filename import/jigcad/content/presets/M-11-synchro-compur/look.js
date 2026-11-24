@@ -19,6 +19,12 @@ const model = !CUTAWAY ? all : { ...all,
   bodies: all.bodies.filter((b) => !FRONT.includes(b.component)) };
 
 const asm = jigScene(model, { autoFinish: true })
+  // Give the rounded ends of the thin sheet slots the same through-thickness
+  // grain direction as their straight walls. Each retains its black oxide
+  // and ground roughness, with one tangent field shared across the sheets.
+  .meta(f => /^blade(?:[1-5]|Plate)$/.test(f.component)
+    && f.id.includes('/side[slot.') && f.meta.kind === 'cylinder',
+    { direction: [0, 1, 0] })
   // materials: the Render view adds lines here
   ;
 // the camera: in front of the shutter, 50° above its plate and a little to the

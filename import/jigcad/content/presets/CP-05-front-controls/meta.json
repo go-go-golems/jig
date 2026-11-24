@@ -1,0 +1,11 @@
+{
+  "id": "CP-05",
+  "title": "Front controls",
+  "group": "Synchro-Compur",
+  "order": 5,
+  "difficulty": "advanced",
+  "about": "Inspect the seated speed cam, setting ring and retaining plate.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Inspect the plan view | Inspect the stack from the side"
+}

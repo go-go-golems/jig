@@ -1,0 +1,11 @@
+{
+  "id": "CP-08",
+  "title": "Five-leaf diaphragm",
+  "group": "Synchro-Compur",
+  "order": 8,
+  "difficulty": "advanced",
+  "about": "Five pinned aperture leaves between the bearing cover and slotted guide cover, reconstructed at full aperture.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Hide the bearing cover to see the five individual blades | Inspect the guide pins on the underside"
+}

@@ -2,18 +2,18 @@
 const brass = j.material('brass'), steel = j.material('steel')
 const aluminium = j.material('aluminium')
 const tube = () => (() => {
-// Mounting tube 204 with the lens flange. [S] Spec sheet p. 1: cells M29.5×0.5 front and rear, flange M32.5×0.5,
-// flange tube 6.1 behind the housing; 20 between the cell seats.
-  const P = {
-    flangeOD: 32.5, flangeLen: 6.1,        // M32.5×0.5 mounting thread on the flange tube [S]
-    tubeOD: 31.6, bore: 28.9587,     // cell thread minor diameter D − 1.0825·P (ISO 724)
-    length: 20.0, seatLen: 3.0,                       // cell seats front and rear
-  }
-  return j.part('Mounting tube 204').color('#c9b37a')  // material: brass
-    .material(brass)
-    .extrude(j.region.circle(P.flangeOD / 2 - 0.3).subtract(j.region.circle(P.bore / 2)).on(j.plane.offset(j.plane.XY, mm(0))), mm(P.flangeLen), { id: 'flangeTube' })
-    .extrude(j.region.circle(P.tubeOD / 2).subtract(j.region.circle(P.bore / 2)).on(j.plane.offset(j.plane.XY, mm(6.1))), mm(P.length - P.flangeLen), { id: 'tube' })
-    .add(j.lib.thread('M32.5x0.5', { length: mm(P.flangeLen - 0.4) }), { at: j.axis.Z, id: 'flangeThread' })
+// The November 1956 manufacturer's section (PDF p009, upper drawing)
+  // shows separate front and rear seats on opposite sides of the leaves.
+  // The flange on the rear seat belongs to the housing. Seat depth and
+  // the clearance sector under the escapement are reconstruction choices.
+  const bore = 28.9587 / 2
+  const wall = j.region.circle(15.8).subtract(j.region.circle(bore))
+  const window = j.region.polygon([[0, 0], [20, -10], [20, 5]])
+  return j.part('Front mounting tube 204').color('#c9b37a').material(brass)
+    .extrude(wall.subtract(window).on(j.plane.offset(j.plane.XY, mm(11.52))),
+             mm(3.48), { id: 'relievedSeat' })
+    .extrude(wall.on(j.plane.offset(j.plane.XY, mm(15))),
+             mm(5), { id: 'frontSeat' })
 })()
   .port('ringPivot', j.frame({ origin: j.pt(0.0000, 0.0000, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
   .port('cockingRingPivot', j.frame({ origin: j.pt(0.0000, 0.0000, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
@@ -24,6 +24,14 @@ const housing = () => (() => {
     .material(brass).finish({ finish: 'paint' })  // black enamel over the drawn brass cup
     .extrude(j.region.circle(P.od / 2).subtract(j.region.circle(P.hole / 2)).on(j.plane.offset(j.plane.XY, mm(6.1))), mm(P.rearT), { id: 'rearWall' })
     .extrude(j.region.circle(P.od / 2).subtract(j.region.circle(P.od / 2 - P.wall)).on(j.plane.offset(j.plane.XY, mm(6.7))), mm(P.top - 6.7), { id: 'wall' })
+    // The rear threaded projection joins the web of the drawn cup.
+    .extrude(j.region.circle(16.48).subtract(j.region.circle(28.9587 / 2))
+             .on(j.plane.offset(j.plane.XY, mm(6.1))), mm(0.6),
+             { id: 'rearSeatShoulder' })
+    .extrude(j.region.circle(15.95).subtract(j.region.circle(28.9587 / 2))
+             .on(j.plane.XY), mm(6.1), { id: 'rearFlange' })
+    .add(j.lib.thread('M32.5x0.5', { length: mm(5.7) }),
+         { at: j.axis.Z, id: 'flangeThread' })
     .extrude(j.region.circle(1.6, { at: [-27.9559, -10.1751] }).on(j.plane.offset(j.plane.XY, mm(10.5))), mm(4), { id: 'contactNipple' })
 })()
 const base = () => (() => {
@@ -40,16 +48,24 @@ const base = () => (() => {
   plate = plate.subtract(slot(-178.8979, -166.8022))
   plate = plate.subtract(slot(-106.8979, -94.8022))
   plate = plate.subtract(slot(-34.8979, -22.8022))
+  // The reconstructed carrier post centre lies inside the annular bore.
+  // Add the narrow tongue required to support it at the archived pivot.
+  plate = plate.union(j.region.slot([13.8152, -1.2358], [17, -1.52], 1.5))
+  // The operating ring's downward stop lug sweeps through the top of 201.
+  // Keep both posts in that pocket, below ring 202's running surface.
+  const pocket = slot(-142.5, -123.8)
   return j.part('Mechanism plate 201').color('#5a5d63')  // material: brass
     .material(brass).finish({ finish: 'nickel' })  // nickel-plated brass
     .extrude(plate.on(j.plane.offset(j.plane.XY, mm(10.9))), mm(P.t), { id: 'plate' })
+    .cut(pocket.on(j.plane.offset(j.plane.XY, mm(10.97))),
+         mm(0.55), { id: 'stopLugTrack' })
     .extrude(j.region.circle(1, { at: [15.8704, 14.7994] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(3.25), { id: 'post1' })   // cam sleeve
     .extrude(j.region.circle(0.6, { at: [19.3306, 8.2054] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(2.5), { id: 'post2' })   // escapement post E
     .extrude(j.region.circle(0.5, { at: [16.2625, 20.1385] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(2.9), { id: 'post3' })   // latch pivot
     .extrude(j.region.circle(0.4, { at: [13.8152, -1.2358] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(1.9), { id: 'post4' })   // carrier pivot
     .extrude(j.region.circle(0.4, { at: [-22.9652, 1.2647] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(0.6), { id: 'post5' })   // detent post
-    .extrude(j.region.circle(0.5, { at: [-14.1136, -11.6875] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(1), { id: 'stop1' })   // ring closed stop
-    .extrude(j.region.circle(0.5, { at: [-10.7535, -14.8376] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(1), { id: 'stop2' })   // ring open stop
+    .extrude(j.region.circle(0.5, { at: [-14.1136, -11.6875] }).on(j.plane.offset(j.plane.XY, mm(10.97))), mm(0.59), { id: 'stop1' })   // ring closed stop
+    .extrude(j.region.circle(0.5, { at: [-10.7535, -14.8376] }).on(j.plane.offset(j.plane.XY, mm(10.97))), mm(0.59), { id: 'stop2' })   // ring open stop
     .extrude(j.region.circle(0.5, { at: [17.2595, 13.2213] }).on(j.plane.offset(j.plane.XY, mm(11.5))), mm(1), { id: 'stop3' })   // arresting stop
     .extrude(j.region.circle(0.6, { at: [15.8704, 14.7994] }).on(j.plane.offset(j.plane.XY, mm(10.1))), mm(0.8), { id: 'stud1' })   // blade 1 pivot stud
     .extrude(j.region.circle(0.6, { at: [-9.1708, 19.6669] }).on(j.plane.offset(j.plane.XY, mm(10.1))), mm(0.8), { id: 'stud2' })   // blade 2 pivot stud
@@ -68,17 +84,67 @@ const base = () => (() => {
 const bladePlate = () => (() => {
 // Blade plate 225 [M plate 7, CN-1210-000]: holds the blades against the mechanism plate; slots clear the pins.
   const P = { od: 55.3, id: 25.6, z0: 9.85, t: 0.2 }
-  return j.part('Blade plate 225').color('#26272b')  // material: steel
-    .material(steel).finish({ finish: 'black-oxide' })  // blackened steel
-    .extrude(j.region.circle(P.od / 2).subtract(j.region.circle(P.id / 2)).on(j.plane.offset(j.plane.XY, mm(9.85))), mm(P.t), { id: 'plate' })
+  // The size-0 inset on plate 7 shows five elongated openings.
+  // Their pitch follows the five studs. Radius, length and width are estimates.
+  let plate = j.region.circle(P.od / 2).subtract(j.region.circle(P.id / 2))
+  for (let index = 0; index < 5; index++) {
+    const angle = (79 + 72 * index) * Math.PI / 180
+    const point = offset => [21.7 * Math.cos(angle + offset),
+                             21.7 * Math.sin(angle + offset)]
+    plate = plate.subtract(j.region.slot(point(-0.14), point(0.14), 2.3))
+  }
+  return j.part('Blade plate 225').color('#26272b')
+    .material(steel).finish({ finish: 'black-oxide' })
+    .extrude(plate.on(j.plane.offset(j.plane.XY, mm(P.z0))),
+             mm(P.t), { id: 'plate' })
     .cut(j.region.circle(0.65, { at: [15.8704, 14.7994] }).on(j.plane.offset(j.plane.XY, mm(9.75))), mm(1), { id: 'studHole1' })
     .cut(j.region.circle(0.65, { at: [-9.1708, 19.6669] }).on(j.plane.offset(j.plane.XY, mm(9.75))), mm(1), { id: 'studHole2' })
     .cut(j.region.circle(0.65, { at: [-21.5383, -2.6446] }).on(j.plane.offset(j.plane.XY, mm(9.75))), mm(1), { id: 'studHole3' })
     .cut(j.region.circle(0.65, { at: [-4.1406, -21.3013] }).on(j.plane.offset(j.plane.XY, mm(9.75))), mm(1), { id: 'studHole4' })
     .cut(j.region.circle(0.65, { at: [18.9792, -10.5204] }).on(j.plane.offset(j.plane.XY, mm(9.75))), mm(1), { id: 'studHole5' })
 })()
+// At mid-stroke a neighbouring drive pin crosses the sector edge of
+// the archive's idealized leaf. Trim the swept pin envelope in leaf
+// coordinates. The extra 0.08 mm radial clearance is a design allowance.
+function relievedLeaf(sector, arm, pivot, index) {
+  const rad = Math.PI / 180
+  const rotate = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a),
+                                  x * Math.sin(a) + y * Math.cos(a)]
+  const pin = rotate([14.0835, 11.528], index * 72 * rad)
+  const heading = ([x, y]) => Math.atan2(y - pivot[1], x - pivot[0])
+  function nextPin(stroke) {
+    const swing = heading(rotate(pin, stroke)) - heading(pin)
+    const [x, y] = rotate(pin, stroke + 72 * rad)
+    const [dx, dy] = rotate([x - pivot[0], y - pivot[1]], -swing)
+    return [pivot[0] + dx, pivot[1] + dy]
+  }
+  // Widen the opposite edge so that the neighbouring leaf covers the
+  // perimeter vacated by the trim when the stack returns to closed.
+  const side = angle => rotate([13.4, 0], (angle + index * 72) * rad)
+  let leaf = j.region.polygon(sector).union(j.region.polygon(arm))
+    .union(j.region.polygon([sector[0], side(42), side(50), side(59),
+                             side(62)]))
+  const path = []
+  for (let step = 0; step <= 12; step++) {
+    path.push(nextPin(7.7 * rad * step / 12))
+  }
+  // Remove the small outer offcut as well as the track itself.
+  const outside = [[-32, -4], [-32, 24]].map(p => rotate(p, index * 72 * rad))
+  leaf = leaf.subtract(j.region.polygon([...path, ...outside]))
+  for (let step = 0; step < 12; step++) {
+    const start = nextPin(7.7 * rad * step / 12)
+    const end = nextPin(7.7 * rad * (step + 1) / 12)
+    leaf = leaf.subtract(j.region.slot(start, end, 1.06))
+  }
+  // Keep the full-open pupil clear. Transform its circular boundary
+  // back into the rigid leaf's closed-pose coordinates before cutting.
+  const [dx, dy] = rotate([-pivot[0], -pivot[1]], 36.7098 * rad)
+  return leaf.subtract(j.region.circle(12.9, {
+    at: [pivot[0] + dx, pivot[1] + dy]
+  }))
+}
 const blade1 = () => (() => {
-// Shutter blade 208, number 1 in the fitting order [M p. 3]: 0.08 spring steel, blued. The sector covers the
+// Shutter blade 268 (tip bend simplified flat), number 1 in the fitting order [M p. 3]: 0.08 spring steel, blued. The sector covers the
 // Ø25 opening with 7° overlap each side; the arm carries the pivot hole and, beside it, the slot the
 // ring's drive pin works in (pin 18.2 from the axis, 3.7275 from the pivot) [M plate 7].
   const P = { t: 0.08, z0: 10.1, pivot: [15.8704, 14.7994], hole: 0.63, slotW: 0.96 }
@@ -88,9 +154,9 @@ const blade1 = () => (() => {
   const slotRegion = (() => { const d = [slotB[0] - slotA[0], slotB[1] - slotA[1]], L = Math.hypot(...d), n = [-d[1] / L * P.slotW / 2, d[0] / L * P.slotW / 2]
     return j.region.polygon([[slotA[0] + n[0], slotA[1] + n[1]], [slotB[0] + n[0], slotB[1] + n[1]], [slotB[0] - n[0], slotB[1] - n[1]], [slotA[0] - n[0], slotA[1] - n[1]]])
       .union(j.region.circle(P.slotW / 2, { at: slotA })).union(j.region.circle(P.slotW / 2, { at: slotB })) })()
-  return j.part('Blade 208 (1)').color('#18191c')  // material: steel
+  return j.part('Blade 268 (1)').color('#18191c')  // material: steel
     .material(steel).finish({ finish: 'black-oxide' })  // blued spring steel
-    .extrude(j.region.polygon(sector).union(j.region.polygon(arm)).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.1))), mm(P.t), { id: 'blade' })
+    .extrude(relievedLeaf(sector, arm, P.pivot, 0).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.1))), mm(P.t), { id: 'blade' })
     .cut(slotRegion.on(j.plane.offset(j.plane.XY, mm(10.05))), mm(0.2), { id: 'slot' })
 })()
   .port('pivot', j.frame({ origin: j.pt(15.8704, 14.7994, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
@@ -107,7 +173,7 @@ const blade2 = () => (() => {
       .union(j.region.circle(P.slotW / 2, { at: slotA })).union(j.region.circle(P.slotW / 2, { at: slotB })) })()
   return j.part('Blade 208 (2)').color('#18191c')  // material: steel
     .material(steel).finish({ finish: 'black-oxide' })  // blued spring steel
-    .extrude(j.region.polygon(sector).union(j.region.polygon(arm)).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.22))), mm(P.t), { id: 'blade' })
+    .extrude(relievedLeaf(sector, arm, P.pivot, 1).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.22))), mm(P.t), { id: 'blade' })
     .cut(slotRegion.on(j.plane.offset(j.plane.XY, mm(10.17))), mm(0.2), { id: 'slot' })
 })()
   .port('pivot', j.frame({ origin: j.pt(-9.1708, 19.6669, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
@@ -124,7 +190,7 @@ const blade3 = () => (() => {
       .union(j.region.circle(P.slotW / 2, { at: slotA })).union(j.region.circle(P.slotW / 2, { at: slotB })) })()
   return j.part('Blade 208 (3)').color('#18191c')  // material: steel
     .material(steel).finish({ finish: 'black-oxide' })  // blued spring steel
-    .extrude(j.region.polygon(sector).union(j.region.polygon(arm)).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.34))), mm(P.t), { id: 'blade' })
+    .extrude(relievedLeaf(sector, arm, P.pivot, 2).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.34))), mm(P.t), { id: 'blade' })
     .cut(slotRegion.on(j.plane.offset(j.plane.XY, mm(10.29))), mm(0.2), { id: 'slot' })
 })()
   .port('pivot', j.frame({ origin: j.pt(-21.5383, -2.6446, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
@@ -141,12 +207,12 @@ const blade4 = () => (() => {
       .union(j.region.circle(P.slotW / 2, { at: slotA })).union(j.region.circle(P.slotW / 2, { at: slotB })) })()
   return j.part('Blade 208 (4)').color('#18191c')  // material: steel
     .material(steel).finish({ finish: 'black-oxide' })  // blued spring steel
-    .extrude(j.region.polygon(sector).union(j.region.polygon(arm)).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.46))), mm(P.t), { id: 'blade' })
+    .extrude(relievedLeaf(sector, arm, P.pivot, 3).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.46))), mm(P.t), { id: 'blade' })
     .cut(slotRegion.on(j.plane.offset(j.plane.XY, mm(10.41))), mm(0.2), { id: 'slot' })
 })()
   .port('pivot', j.frame({ origin: j.pt(-4.1406, -21.3013, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
 const blade5 = () => (() => {
-// Shutter blade 208, number 5 in the fitting order [M p. 3]: 0.08 spring steel, blued. The sector covers the
+// Shutter blade 267 (tip bend simplified flat), number 5 in the fitting order [M p. 3]: 0.08 spring steel, blued. The sector covers the
 // Ø25 opening with 7° overlap each side; the arm carries the pivot hole and, beside it, the slot the
 // ring's drive pin works in (pin 18.2 from the axis, 3.7275 from the pivot) [M plate 7].
   const P = { t: 0.08, z0: 10.58, pivot: [18.9792, -10.5204], hole: 0.63, slotW: 0.96 }
@@ -156,9 +222,9 @@ const blade5 = () => (() => {
   const slotRegion = (() => { const d = [slotB[0] - slotA[0], slotB[1] - slotA[1]], L = Math.hypot(...d), n = [-d[1] / L * P.slotW / 2, d[0] / L * P.slotW / 2]
     return j.region.polygon([[slotA[0] + n[0], slotA[1] + n[1]], [slotB[0] + n[0], slotB[1] + n[1]], [slotB[0] - n[0], slotB[1] - n[1]], [slotA[0] - n[0], slotA[1] - n[1]]])
       .union(j.region.circle(P.slotW / 2, { at: slotA })).union(j.region.circle(P.slotW / 2, { at: slotB })) })()
-  return j.part('Blade 208 (5)').color('#18191c')  // material: steel
+  return j.part('Blade 267 (5)').color('#18191c')  // material: steel
     .material(steel).finish({ finish: 'black-oxide' })  // blued spring steel
-    .extrude(j.region.polygon(sector).union(j.region.polygon(arm)).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.58))), mm(P.t), { id: 'blade' })
+    .extrude(relievedLeaf(sector, arm, P.pivot, 4).subtract(j.region.circle(P.hole, { at: P.pivot })).on(j.plane.offset(j.plane.XY, mm(10.58))), mm(P.t), { id: 'blade' })
     .cut(slotRegion.on(j.plane.offset(j.plane.XY, mm(10.53))), mm(0.2), { id: 'slot' })
 })()
   .port('pivot', j.frame({ origin: j.pt(18.9792, -10.5204, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
@@ -168,9 +234,21 @@ const ring = () => (() => {
 // holds the pallet control lever off (J), and five drive pins reaching back through the plate to the blades.
   const P = { bore: 32.8, od: 37.2, z0: 11.6, t: 0.5, studD: 1, pinD: 0.9 }
   const hook = [[17.2232, 6.1848], [20.8413, 8.7408], [21.3668, 11.7238], [19.4219, 11.5563], [15.3905, 9.9007]]
-  const body = j.region.circle(P.od / 2).subtract(j.region.circle(P.bore / 2))
+  let body = j.region.circle(P.od / 2).subtract(j.region.circle(P.bore / 2))
     .union(j.region.polygon(hook)).union(j.region.circle(0.9, { at: [21.1915, 11.6276] }))
     .union(j.region.circle(0.8, { at: [12.5793, 11.7304] })).union(j.region.circle(0.7, { at: [-13.3838, -12.4806] })).union(j.region.circle(0.6, { at: [-17.4688, 2.1449] }))
+  // Clear fixed posts E and the arrest stop over the 7.7-degree ring stroke.
+  // In ring coordinates the two stationary posts sweep clockwise.
+  for (const [x, y, diameter] of [[19.3306, 8.2054, 1.36],
+                                  [17.2595, 13.2213, 1.16]]) {
+    const end = -7.7 * Math.PI / 180
+    const at = a => [x * Math.cos(a) - y * Math.sin(a),
+                     x * Math.sin(a) + y * Math.cos(a)]
+    for (let i = 0; i < 3; i++) {
+      body = body.subtract(j.region.slot(at(end * i / 3),
+                                         at(end * (i + 1) / 3), diameter))
+    }
+  }
   return j.part('Blade operating ring 202').color('#9aa4ae')  // material: steel
     .material(steel)
     .extrude(body.on(j.plane.offset(j.plane.XY, mm(11.6))), mm(P.t), { id: 'ring' })
@@ -204,17 +282,20 @@ const cam = () => (() => {
   const closeBack = [[14.5465, 20.0906], [14.6648, 19.9597], [14.7671, 19.8333], [14.8576, 19.7079], [14.9365, 19.5846], [15.0042, 19.4642], [15.0612, 19.3473], [15.1079, 19.2352], [15.1448, 19.1285], [15.1729, 19.0276], [15.1926, 18.9334], [15.2048, 18.8469], [15.2106, 18.7685], [15.2108, 18.6983], [15.2065, 18.6372], [15.1975, 18.5772]]
   return j.part('Main drive cam 514').color('#b0b6bc')  // material: steel
     .material(steel)
-    .extrude(j.region.circle(P.hubR, { at: P.axis }).subtract(j.region.circle(P.bore, { at: P.axis })).on(j.plane.offset(j.plane.XY, mm(10.1))), mm(4.65), { id: 'sleeve' })
-    .extrude(lug('openingLug', 11.7, openFace, openBack).profiles(), mm(0.8), { id: 'openingLug' })
-    .extrude(j.region.polygon([[16.3611, 14.4542], [13.7937, 10.805], [12.8123, 11.4954], [15.3797, 15.1446]]).on(j.plane.offset(j.plane.XY, mm(11.7))), mm(0.8), { id: 'openingWeb' })
+    .extrude(j.region.circle(P.hubR, { at: P.axis }).subtract(j.region.circle(P.bore, { at: P.axis })).on(j.plane.offset(j.plane.XY, mm(11.55))), mm(3.2), { id: 'sleeve' })
+    .extrude(lug('openingLug', 12.15, openFace, openBack).profiles(), mm(0.4), { id: 'openingLug' })
+    .extrude(j.region.polygon([[16.3611, 14.4542], [13.7937, 10.805], [12.8123, 11.4954], [15.3797, 15.1446]]).on(j.plane.offset(j.plane.XY, mm(12.15))), mm(0.4), { id: 'openingWeb' })
     .extrude(lug('closingLug', 12.6, closeFace, closeBack).profiles(), mm(0.6), { id: 'closingLug' })
     .extrude(j.region.polygon([[15.2704, 14.7975], [15.2555, 19.518], [16.4555, 19.5218], [16.4704, 14.8013]]).on(j.plane.offset(j.plane.XY, mm(12.6))), mm(0.6), { id: 'closingWeb' })
     .extrude(j.region.polygon([[16.1536, 15.2115], [19.4501, 12.9458], [18.8837, 12.1217], [15.5872, 14.3873]]).union(j.region.circle(0.45, { at: [19.1669, 12.5338] })).on(j.plane.offset(j.plane.XY, mm(13.3))), mm(0.6), { id: 'retardLug' })
     .extrude(j.region.polygon([[15.5811, 14.4547], [13.5894, 16.1259], [14.1679, 16.8154], [16.1597, 15.1441]]).union(j.region.circle(0.4, { at: [13.8787, 16.4706] })).on(j.plane.offset(j.plane.XY, mm(14))), mm(0.4), { id: 'latchTab' })
     .extrude(j.region.polygon([[16.2268, 14.6178], [15.3188, 12.8358], [14.606, 13.199], [15.514, 14.981]]).union(j.region.circle(0.35, { at: [14.9624, 13.0174] })).on(j.plane.offset(j.plane.XY, mm(14.45))), mm(0.3), { id: 'cockTab' })
-    .extrude(j.region.circle(0.4, { at: [15.443, 16.6507] }).on(j.plane.offset(j.plane.XY, mm(11))), mm(1.5), { id: 'endPin' })
+    .extrude(j.region.circle(0.4, { at: [15.443, 16.6507] }).on(j.plane.offset(j.plane.XY, mm(11.55))), mm(1.1), { id: 'endPin' })
 })()
   .port('pivot', j.frame({ origin: j.pt(15.8704, 14.7994, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
+// Preserve the archive's animation ratio while allowing 0.05 mm of extra
+// centre distance. Phase the pinion gap towards the sector tooth at 43°.
+const cockingModule = 2 * (21.7 - 0.05) / (127 + 18)
 const pinion = () => (() => {
 // Cocking pinion 517 [M plate 2, L Fig. 39]: 18 teeth, module 0.3, on the cam's axis above it; driven by the
 // cocking ring's teeth, its downward lug picks up the cam's tab on the setting stroke.
@@ -240,15 +321,15 @@ const pinion = () => (() => {
     }
     return out
   }
-  const P = { m: 0.3, z: 18, axis: [15.8704, 14.7994], bore: 1 }
+  const P = { m: cockingModule, z: 18, axis: [15.8704, 14.7994], bore: 1 }
   return j.part('Cocking pinion 517').color('#c0c4c8')  // material: steel
     .material(steel)
-    .extrude(j.region.polygon(involute(P.m, P.z, P.axis)).subtract(j.region.circle(P.bore, { at: P.axis })).on(j.plane.offset(j.plane.XY, mm(15.15))), mm(0.4), { id: 'teeth' })
+    .extrude(j.region.polygon(involute(P.m, P.z, P.axis, 13)).subtract(j.region.circle(P.bore, { at: P.axis })).on(j.plane.offset(j.plane.XY, mm(15.15))), mm(0.4), { id: 'teeth' })
     .extrude(j.region.circle(0.4, { at: [15.7626, 16.7965] }).union(j.region.polygon([[15.5209, 14.7805], [15.4131, 16.7776], [16.1121, 16.8154], [16.2199, 14.8183]])).on(j.plane.offset(j.plane.XY, mm(14.45))), mm(0.7), { id: 'lug' })
 })()
   .port('pivot', j.frame({ origin: j.pt(15.8704, 14.7994, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))
 const cockingRing = () => (() => {
-// Cocking ring 528 with its setting lever [M plate 2, L Figs 39–41]: 127 teeth (module 0.3) over the arc that meshes
+// Cocking ring 528 with its setting lever [M plate 2, L Figs 39–41]: 127 nominal teeth over the arc that meshes
 // the pinion (centre distance = the cam axis radius 21.7); the lever reaches out past the housing.
 // involute spur outline: base circle rb = rp·cos 20°; a flank point at radius r lies at polar angle
 // θ(r) = π/(2z) + inv(20°) − inv(acos(rb/r)) from the tooth's centre line, inv(α) = tan α − α
@@ -272,12 +353,12 @@ const cockingRing = () => (() => {
     }
     return out
   }
-  const P = { m: 0.3, z: 127, bore: 32.2 }
+  const P = { m: cockingModule, z: 127, bore: 32.2 }
   const teeth = involute(P.m, P.z, [0, 0], 43, 3, 68)
   const sector = j.region.polygon([...teeth, [6.5369, 16.1794], [17.4261, 0.9133]])
   return j.part('Cocking ring 528').color('#a6adb4')  // material: steel
     .material(steel)
-    .extrude(j.region.circle(19.2).subtract(j.region.circle(P.bore / 2)).union(sector).union(j.region.polygon([[-16.2813, 9.4], [-27.6348, 12.3038], [-30.493, 11.0986], [-31.7409, 6.7467], [-29.7904, 5.2529], [-18.617, 2.6165]])).on(j.plane.offset(j.plane.XY, mm(15.15))), mm(0.4), { id: 'ring' })
+    .extrude(j.region.circle(P.m * (P.z / 2 - 1.25)).subtract(j.region.circle(P.bore / 2)).union(sector).union(j.region.polygon([[-16.2813, 9.4], [-27.6348, 12.3038], [-30.493, 11.0986], [-31.7409, 6.7467], [-29.7904, 5.2529], [-18.617, 2.6165]])).on(j.plane.offset(j.plane.XY, mm(15.15))), mm(0.4), { id: 'ring' })
     .extrude(j.region.circle(0.9, { at: [-30.4239, 8.7239] }).on(j.plane.offset(j.plane.XY, mm(15.55))), mm(1.6), { id: 'knob' })
 })()
   .port('pivot', j.frame({ origin: j.pt(0.0000, 0.0000, 0.000), x: j.dir('+X'), z: j.dir('+Z') }))

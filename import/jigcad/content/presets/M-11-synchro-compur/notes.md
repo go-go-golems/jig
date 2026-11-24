@@ -1,6 +1,6 @@
 # Synchro-Compur leaf shutter
 
-The Synchro-Compur 0-MXV is the leaf shutter of many cameras of the 1950s and 1960s. Five steel blades are pivoted round a 25 mm opening. A ring swings them open and shut, a spring-driven cam turns the ring once per exposure, and a gear train with a pallet escapement times the slow speeds. This model comes from the Compur project: 29 parts drawn in jig from the repair manual's dimensions, 118.7 g in brass, steel and aluminium, and a planar simulation of the mechanism written for them. The idea it shows: jig draws the parts, and an outside engine moves them in the Render view.
+The Synchro-Compur 0-MXV is the leaf shutter of many cameras of the 1950s and 1960s. Five steel blades are pivoted round a 25 mm opening. A ring swings them open and shut, a spring-driven cam turns the ring once per exposure, and a gear train with a pallet escapement times the slow speeds. This model comes from the Compur project: 29 components drawn in Jig using the factory envelope, plate-derived arrangements and estimated internal geometry, and a planar simulation of the mechanism written for them. The idea it shows: jig draws the parts, and an outside engine moves them in the Render view.
 
 > **Try it.** [Open the Render view](lab:show/render) and play the timeline: 0.5 s at rest, one 1/125 release slowed 250 times, then 1 s at rest. [Look from the front](lab:view/stage?view=plan) to see the parts as they are drawn: the blades shut and the cam with its opening lug on the ring's stud. In `look.js`, set `CUTAWAY` to `true` to leave out the front cover, the speed ring, the speed cam and the cocking ring and watch the mechanism under them.
 
@@ -18,7 +18,11 @@ Each part carries the material its comment names: brass for the mounting tube, h
 
 ## Changing it
 
-The poses are relative to where each part is drawn. Move a part or a pivot in the script and they no longer fit: run `node tools/compur-poses.mjs <compur>/web` again, which needs the Compur project's `web/` folder. `--speed 30` bakes another speed. The 29 parts take about 20 s to compile cold; the threads and the wheels' pinions are most of it.
+The poses are relative to where each part is drawn. Move a part or a pivot in the shared factory file and they no longer fit: run `node tools/compur-poses.mjs <compur>/web` again, which needs the Compur project's `web/` folder. `--speed 30` bakes another speed. The 29 parts take about 20 s to compile cold; the threads and the wheels' pinions are most of it.
+
+## Inspect individual assemblies
+
+Choose **Synchro-Compur** on the preset shelf. Start with [housing](lab:preset/CP-01) and [blades](lab:preset/CP-02), then follow the [timing train](lab:preset/CP-03), [cocking and release](lab:preset/CP-04), and [front controls](lab:preset/CP-05). The [flash contacts](lab:preset/CP-06), [delayed action](lab:preset/CP-07) and [diaphragm leaves](lab:preset/CP-08) have dedicated studies with their own evidence and assumptions. The complete shutter retains the archived diaphragm envelope and exposure animation. The factory section separates the lens seats on opposite sides of the blades. One unresolved internal fit is the first timing wheel overlapping the kicker. The subassembly notes identify the measurements needed to resolve these interfaces.
 
 ## Where next
 

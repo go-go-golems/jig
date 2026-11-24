@@ -1,0 +1,11 @@
+{
+  "id": "CP-04",
+  "title": "Cocking and release",
+  "group": "Synchro-Compur",
+  "order": 4,
+  "difficulty": "advanced",
+  "about": "Study the setting ring, pinion, cam and release foot on their bearings.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Inspect the plan view | Inspect the stack from the side"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "CP-07",
+  "title": "V delayed-action cartridge",
+  "group": "Synchro-Compur",
+  "order": 7,
+  "difficulty": "advanced",
+  "about": "Sectioned study of the self-timer input clutch, return spring and pallet lock.",
+  "view": "axo",
+  "overlays": "shadows,grid",
+  "tries": "Find the clutch spring | Inspect the locking lever at the pallet"
+}
