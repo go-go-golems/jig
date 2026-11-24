@@ -65,3 +65,37 @@ Choose **3MF** for a slicer: it keeps millimetres, so the part cannot arrive 25.
 - [How jig thinks about printing](lab:doc?id=printing): orientation, overhangs, teardrops, fit and slicing.
 - [The reference](lab:reference) lists every `j.*` name with its status.
 - [S-01 Cable clip for a desk edge](lab:preset/S-01) is the simplest part on the shelf: one sketch, one extrude.
+
+## Use a part drawn in another project
+
+Keep a reusable builder in its own file. For example, a project file named
+`washer.parts.js` can contain the following code.
+
+```js
+return {
+  washer: () => j.part('Washer').extrude(
+    j.region.circle(5).subtract(j.region.circle(2)).on(j.plane.XY),
+    mm(1), { id: 'blank' })
+}
+```
+
+In the Code view, open **Files** and choose **Copy a published part file**.
+Select the source preset and its `*.parts.js` file. Jig adds a project-local
+copy and opens it for editing. Existing filenames are disabled. Copy any
+sibling libraries the selected file imports as well.
+
+Include that file in the project that uses it. In the repository, the CP
+presets link to one source file. The workbench build reads each link and
+ships the contents with the preset. An opened project has its own editable
+copy. From its `script.js` call the factory inside the assembly.
+
+```js
+const parts = await importPartFile('washer.parts.js')
+return j.assembly('Seat').add('washer', parts.washer(), { ground: true })
+```
+
+The argument is an exact JavaScript file key in the current project. Each
+import evaluates the file afresh with the same units, `j`, data and logger
+as the entry script. Files can import other project files. A missing file
+or circular import produces a compile error. The Script export saves the
+entry only; retain the companion files to reproduce a multi-file design.

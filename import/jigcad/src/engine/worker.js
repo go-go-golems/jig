@@ -61,11 +61,12 @@ export async function runScript(code, { data = {}, extra = {}, file = 'script.js
   try { fn = (0, eval)(src); }
   catch (e) { throw scriptError(e, code, file, true, names); }
   try { return await fn(...values); }
-  catch (e) { throw e.info ? e : scriptError(e, code, file); }
+  catch (e) { throw e?.info ? e : scriptError(e, code, file); }
 }
 function scriptError(e, code, file, syntax = false, names = []) {
   const err = { message: e?.message ?? String(e), stack: e?.stack ?? '', file, kind: e?.kind };
-  const re = new RegExp(`${file.replace('.', '\\.')}:(\\d+):(\\d+)`);
+  const label = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`${label}:(\\d+):(\\d+)`);
   const m = re.exec(err.stack);
   if (m) { err.line = +m[1] - SCRIPT_HEADER_LINES; err.column = +m[2]; }
   else if (syntax) {
@@ -141,7 +142,7 @@ function scriptLog(logs) {
 }
 
 function errorProgram(info) {
-  return { ok: false, hash: null, kind: 'error', name: 'error', summary: { errors: 1 }, metrics: {}, diagnostics: [{ level: 'error', kind: info.kind ?? 'script.error', at: info.file ?? 'script.js', message: info.message, line: info.line, column: info.column }],
+  return { ok: false, hash: null, kind: 'error', name: 'error', summary: { errors: 1 }, metrics: {}, diagnostics: [{ level: 'error', kind: info.kind ?? 'script.error', at: info.file ?? 'script.js', file: info.file ?? 'script.js', message: info.message, line: info.line, column: info.column }],
     trace: [], decisions: [], params: [], graph: { nodes: [], edges: [] }, sketches: [], bodies: [], print: null, ir: { L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '' }, error: info };
 }
 

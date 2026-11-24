@@ -84,7 +84,10 @@ export function CodeView({ host }) {
     if (c && t) { t.setSelectionRange(c.start, c.end); t.scrollTop = c.scroll; sync(); }
   }, [cur]);
   const goTo = (line, f = cur) => {
-    if (f !== cur) { setFile(f); requestAnimationFrame(() => goTo(line, f)); return; }
+    if (f !== cur) setFile(f);
+    requestAnimationFrame(() => jumpToLine(line, f));
+  };
+  const jumpToLine = (line, f) => {
     const t = ta.current;
     if (!t) return;
     const ls = (host.files.get(f) ?? '').split('\n');
@@ -204,6 +207,22 @@ export function CodeView({ host }) {
           <div class="newfile" data-keep>
             <input placeholder="new file, e.g. holes.csv" aria-label="New file name" value={newName} onInput={e => setNewName(e.currentTarget.value)}
               onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) { const n = newName.trim(); if (host.addFile(n, '')) { setNewName(''); setFile(n); } else host.toast(`${n} exists already`, 'bad'); } }} />
+          </div>
+          <div class="newfile" data-keep>
+            <select aria-label="Copy a published part file" value="" onChange={e => {
+              const value = e.currentTarget.value;
+              e.currentTarget.value = '';
+              if (!value) return;
+              const [id, name] = JSON.parse(value);
+              const source = host.presetFiles(id)?.[name];
+              if (typeof source === 'string' && host.addFile(name, source)) setFile(name);
+            }}>
+              <option value="">Copy a published part file…</option>
+              {host.presets().filter(p => p.id !== pid).flatMap(p =>
+                p.files.filter(name => name.endsWith('.parts.js')).map(name =>
+                  <option key={p.id + '/' + name} value={JSON.stringify([p.id, name])}
+                    disabled={host.files.has(name)}>{p.id} / {name}</option>))}
+            </select>
           </div>
           <hr />
           <button disabled={!host.isEdited(cur)} onClick={() => { host.revertFile(cur); host.toast(`${cur} is back as published`); }}><span class="t">Revert {cur}</span><small>back to the published file</small></button>
