@@ -1,0 +1,4 @@
+from pathlib import Path
+p=Path('/tmp/compur-catalog-report.md')
+s=p.read_text().replace('On the May 1956 blade plate,','On the May 1956 exploded drawing of the blade assembly,').replace('gets','gets').replace('The factory returns fresh builders', 'Here a factory is a function that constructs a fresh part each time it is called. It returns builders').replace('At a module of 0.3 mm, the sum', 'The gear module is its pitch diameter divided by the number of teeth. The pitch radius is half that diameter. At a module of 0.3 mm, the sum').replace('could admit','could admit').replace('The drive','The drive').replace('The eight CP presets let us examine groups of those occurrences and three additional studies.', 'CP-01 through CP-05 isolate groups of those occurrences. CP-06 through CP-08 add separate contact, timer and diaphragm studies.').replace('One named','One named')
+p.write_text(s)

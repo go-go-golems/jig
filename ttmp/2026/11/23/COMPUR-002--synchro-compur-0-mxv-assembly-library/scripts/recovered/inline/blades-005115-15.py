@@ -1,0 +1,5 @@
+from pathlib import Path
+p=Path('import/jigcad/content/presets/CP-01-housing/meta.json')
+p.write_text(p.read_text().replace("Compare the tube's external helical thread to its two cell seats","Inspect the rear housing flange thread and the separate front cell seat"))
+p=Path('import/jigcad/content/presets/CP-02-shutter-blades/script.js')
+p.write_text(p.read_text().replace('const swing = Math.atan2(Math.sin(heading(x,y) - heading(px,py)),\n                         Math.cos(heading(x,y) - heading(px,py)))','const delta = heading(x, y) - heading(px, py)\nconst swing = Math.atan2(Math.sin(delta), Math.cos(delta))').replace("pack = pack.add('base', parts.base().port('ringAxis', centered), { ground: true })","const support = parts.base().port('ringAxis', centered)\npack = pack.add('base', support, { ground: true })").replace("  pack = pack.joint(id, j.joint.revolute(), 'base:' + id + 'Pivot', id + ':pivot')","  const stud = 'base:' + id + 'Pivot'\n  pack = pack.joint(id, j.joint.revolute(), stud, id + ':pivot')"))

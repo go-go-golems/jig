@@ -1,0 +1,1 @@
+async page => {await page.goto('http://127.0.0.1:18963/?preset=M-11-synchro-compur'); await page.getByText(/features.*bodies/).first().waitFor({timeout:90000}); await page.locator('canvas[aria-label="drafting sheet"]').first().screenshot({path:'/tmp/compur-report-figs/compur-m11.png'});}
