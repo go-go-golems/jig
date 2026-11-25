@@ -99,3 +99,9 @@ The native log reported approximately two seconds for each of the first frames. 
 ### Remaining verification
 
 The job must complete all four OptiX segments, composite all 312 frames and pass the encoder's decoded-frame checks. Record the timing from the four receipts and the Spark wall-clock logs, then check that the downloaded movie matches the receipt hash.
+
+### Completed render and review
+
+At c91de4e the verifier accepted all four segments at 1,024 SPP with fixed EV 6.50414. The segments took 147.349, 196.397, 102.459 and 147.792 seconds of native render time, totaling 593.997 seconds. The job started at 20:39:13.151 Eastern and finished verification at 20:49:40.554 Eastern on November 24. End-to-end elapsed time with pre-exported inputs was 627.403 seconds. The native phase including output took 604.8 seconds, compositing took 20.1 seconds and encoding with verification took 2.5 seconds.
+
+The H.264 export contains 312 frames at 24 fps. The six decoded-frame comparisons each reported a mean absolute channel difference between 1.008 and 2.011 on the 8-bit scale. Local and remote SHA-256 both equal fc4541c0d8c81ae3b9514c9fb32cf5f8fa31bd5aaf0d6bd73cfa539f74328397. Script 10 and the accompanying JSON receipt provide the reproduction and verification record.
