@@ -1,0 +1,10 @@
+{
+  "id": "SG-06",
+  "title": "Presser foot and hand lifter",
+  "group": "Singer 44S",
+  "order": 6,
+  "difficulty": "advanced",
+  "about": "Inspect the presser bar, shank, foot and loaded spring in the raised service-gauge pose.",
+  "view": "axo",
+  "tries": "Set lift to zero and rebuild to lower the sole onto the plate datum"
+}

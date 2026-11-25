@@ -1,0 +1,10 @@
+{
+  "id": "SG-05",
+  "title": "Swing support and pivot pin",
+  "group": "Singer 44S",
+  "order": 5,
+  "difficulty": "advanced",
+  "about": "Inspect the upper and lower bar bearings, relieved casting, pivot journal and sliding shaft.",
+  "view": "axo",
+  "tries": "Set spread to zero to register the pin and bar in the supporter"
+}

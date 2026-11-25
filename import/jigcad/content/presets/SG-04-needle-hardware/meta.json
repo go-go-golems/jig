@@ -1,0 +1,10 @@
+{
+  "id": "SG-04",
+  "title": "Needle, clamp and bar hardware",
+  "group": "Singer 44S",
+  "order": 4,
+  "difficulty": "advanced",
+  "about": "Inspect the socketed needle bar, bored clamp, slotted thumbscrew, drive bracket and needle.",
+  "view": "axo",
+  "tries": "Set spread to zero for the installed positions"
+}

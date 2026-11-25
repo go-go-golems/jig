@@ -1,12 +1,13 @@
-In SG-03, use Stage playback to inspect the two-revolution Stitch cycle.
-Use Code to set phase (shaft degrees) and amplitude (gate degrees). Rebuild at
-0, 180, 360 and 540 degrees to compare alternating needle entries and the
-two raised positions. Set amplitude to zero for a centered straight stitch.
-The crank drives the rod and the thread take-up linkage. The rod closes on
-the sliding needle bar inside the swinging guide. The eye is the small hole
-at the far end of the copper-colored take-up lever.
+In SG-03, press Play and enable Loop to inspect the two-revolution stitch
+cycle. The frame holds one set of parts. The presser foot is lowered while
+the needle bar, take-up rocker and thread eye move with the shaft.
 
-The plate top is Z=0. All dimensions, the common crank pin, the axial layers
-and the zigzag transfer law are study assumptions. The model covers the
-upper head. The presser system, hook, feed and selector cam are separate
-mechanisms. The exposed-head stills and motion samples are in SINGER-001.
+SG-04 isolates the needle and clamp. SG-05 shows the swinging guide.
+SG-06 shows the presser at the service-gauge setting. SG-07 isolates the
+take-up and SG-08 opens at the left-side needle-flow adjustment pose. These
+views reuse their hardware from the same library files.
+
+The service manual supplies the presser gauge and needle-flow height. Two
+video frames constrain the take-up profile; the pivot span, support anchor,
+stack depths and zigzag cam law are estimates. The hook, feed dog, tension
+assembly, threading device and selector linkage remain outside this model.

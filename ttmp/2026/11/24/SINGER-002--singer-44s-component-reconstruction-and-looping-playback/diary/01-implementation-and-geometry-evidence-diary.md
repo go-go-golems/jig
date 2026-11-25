@@ -58,3 +58,47 @@ Run the Stage sample tests and scripts/04-check-stage-loop.cjs against the built
 ### Technical details
 
 Loop defaults off. Replaying uses the cached component poses; a gap still stops the clock.
+
+## Step 2. Register the individual parts and test the assembled head
+
+The Loop checkpoint was ee2786e. The user then asked “commit the images as reference and to write up a vault report later on”. The original photographs, video sheets and source manifests landed in a45e84b. I compared two close-ups of the linkage with catalog plate A and the presser and needle hardware with plate E.
+
+### What I did
+
+Added five isolated studies, rebuilt the combined head from shared parts and retained a new numerical trajectory. The needle now has a rear flat, scarf, thread groove and open eye. The take-up eye is traced beyond the support pin. The presser uses a helical spring, lifting lever, shank and foot. The zigzag setup uses the manual's needle-flow height.
+
+### Why
+
+The previous eye extended from the opposite side of the crank pin. The two photographed pin-to-eye ratios agree on its side and approximate reach. Reconstructing the parts independently also exposes interfaces hidden by a single solid.
+
+### What worked
+
+All eight presets compiled. The refitted combined model has 29 bodies. The largest planar closure error across its 145 samples was 1.73e-9 mm. In the setup view the leftward needle tip was at X = −2.795 and Z = 5.000 mm. Exact-solid checks covered ten needle-hardware pairs at rest and 100 moving-pair tests across 25 phases.
+
+### What didn't work
+
+A guide rib initially occupied 4.4768 mm³ of the needle-bar envelope. After relieving the guide, a 0.9713 mm³ overlap still occurred at the top of the bracket stroke. At integration the complete-head audit found 93 positive intersections at nine sampled poses, including 199.0 mm³ between bar and crank. The initial results are preserved in sources/assembly-fit-initial.tsv.
+
+### What I learned
+
+Closed motion equations can describe bodies occupying the same volume. The open thread eye and forward face of the drive can be identified from the footage. The source does not fix all bearing depths.
+
+### What was tricky to build
+
+I separated the crank journal from the needle-bar sweep, added its bushing, moved the reference web clear of the gate boss, cut clip grooves, set the guard against the lever face and moved the estimated presser-axis spacing from 12 to 22 mm. That spacing is a fitting choice, still awaiting measurement on the actual head.
+
+### What warrants a second pair of eyes
+
+Measure shaft orientation, true bar separation, crank throw, both take-up centers, and the guard clearance on a specimen. The drawings do not establish the complete three-dimensional registration.
+
+### What should be done in the future
+
+Retake fixed-camera views with a scale and handwheel index. The captured original images and current workbench figures can be reused in the later vault report.
+
+### Code review instructions
+
+Run scripts/06-check-presser.mjs, 08-check-needle-hardware.mjs, 11-audit-head-fit.mjs and 12-check-registered-head.mjs from the repository root, using their ticket-relative paths. Open SG-04 and set spread to zero to inspect the fitted needle socket.
+
+### Technical details
+
+The final all-pairs audit sampled 49 shaft positions at 15° intervals. No pair exceeded 0.001 mm³ of common volume after the bounding-box screen. This checks sampled solid geometry. Fabric, elastic response, axial play, tolerances and continuous collision detection require additional evidence.
