@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "bb0044462bfff289a8367b976b04f16218cbb2ecf5ed9ab0a951e4abc4a202be",
+  "request": {
+    "ticket": "JIG-020-SHOT-STYLES",
+    "status": "complete",
+    "intent": "",
+    "entry": "Implemented code-authored shots, registered Candela color and CAD edges, capped sections, isolation, camera compositions and motion annotations. Exported the verified Singer demonstration."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-fba82c1b5b7ad90c697d952fae2fe0b2",
+    "state": "committed",
+    "created_at": "2026-11-25T01:19:40.387373784Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "index.md": "10c9b5d4122960aee94dc9b8d7b1b50ae06ca301a1f5faadbfeeb0fa372800ed"
+    },
+    "after": {
+      "changelog.md": "862754dd95b22830a503fed76de59b231c24323152e4ced0d3217e0a626629f9",
+      "index.md": "3767853f4acd5b7e985590944463b08f9fc7577a87b3767979f6740a5fe37e57"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKSW1wbGVtZW50ZWQgY29kZS1hdXRob3JlZCBzaG90cywgcmVnaXN0ZXJlZCBDYW5kZWxhIGNvbG9yIGFuZCBDQUQgZWRnZXMsIGNhcHBlZCBzZWN0aW9ucywgaXNvbGF0aW9uLCBjYW1lcmEgY29tcG9zaXRpb25zIGFuZCBtb3Rpb24gYW5ub3RhdGlvbnMuIEV4cG9ydGVkIHRoZSB2ZXJpZmllZCBTaW5nZXIgZGVtb25zdHJhdGlvbi4K"
+    },
+    {
+      "path": "index.md",
+      "before": "10c9b5d4122960aee94dc9b8d7b1b50ae06ca301a1f5faadbfeeb0fa372800ed",
+      "after": "LS0tClRpdGxlOiBBbmltYXRlZCBDQUQgYW5kIFBCUiByZW5kZXJpbmcgc3R5bGVzIGZvciBtZWNoYW5pc20gc3R1ZGllcwpUaWNrZXQ6IEpJRy0wMjAtU0hPVC1TVFlMRVMKU3RhdHVzOiBjb21wbGV0ZQpUb3BpY3M6CiAgICAtIGNhZAogICAgLSByZW5kZXJpbmcKRG9jVHlwZTogaW5kZXgKSW50ZW50OiBsb25nLXRlcm0KT3duZXJzOiBbXQpSZWxhdGVkRmlsZXM6IFtdCkV4dGVybmFsU291cmNlczogW10KU3VtbWFyeTogIiIKTGFzdFVwZGF0ZWQ6IDIwMjYtMTEtMjRUMjA6MTk6NDAuMzg3MzI3ODc1LTA1OjAwCldoYXRGb3I6ICIiCldoZW5Ub1VzZTogIiIKLS0tCgojIEFuaW1hdGVkIENBRCBhbmQgUEJSIHJlbmRlcmluZyBzdHlsZXMgZm9yIG1lY2hhbmlzbSBzdHVkaWVzCgojIyBPdmVydmlldwoKPCEtLSBQcm92aWRlIGEgYnJpZWYgb3ZlcnZpZXcgb2YgdGhlIHRpY2tldCwgaXRzIGdvYWxzLCBhbmQgY3VycmVudCBzdGF0dXMgLS0+CgojIyBLZXkgTGlua3MKCi0gKipSZWxhdGVkIEZpbGVzKio6IFNlZSBmcm9udG1hdHRlciBSZWxhdGVkRmlsZXMgZmllbGQKLSAqKkV4dGVybmFsIFNvdXJjZXMqKjogU2VlIGZyb250bWF0dGVyIEV4dGVybmFsU291cmNlcyBmaWVsZAoKIyMgU3RhdHVzCgpDdXJyZW50IHN0YXR1czogKiphY3RpdmUqKgoKIyMgVG9waWNzCgotIGNhZAotIHJlbmRlcmluZwoKIyMgVGFza3MKClNlZSBbdGFza3MubWRdKC4vdGFza3MubWQpIGZvciB0aGUgY3VycmVudCB0YXNrIGxpc3QuCgojIyBDaGFuZ2Vsb2cKClNlZSBbY2hhbmdlbG9nLm1kXSguL2NoYW5nZWxvZy5tZCkgZm9yIHJlY2VudCBjaGFuZ2VzIGFuZCBkZWNpc2lvbnMuCgojIyBTdHJ1Y3R1cmUKCi0gZGVzaWduLyAtIEFyY2hpdGVjdHVyZSBhbmQgZGVzaWduIGRvY3VtZW50cwotIHJlZmVyZW5jZS8gLSBQcm9tcHQgcGFja3MsIEFQSSBjb250cmFjdHMsIGNvbnRleHQgc3VtbWFyaWVzCi0gcGxheWJvb2tzLyAtIENvbW1hbmQgc2VxdWVuY2VzIGFuZCB0ZXN0IHByb2NlZHVyZXMKLSBzY3JpcHRzLyAtIFRlbXBvcmFyeSBjb2RlIGFuZCB0b29saW5nCi0gdmFyaW91cy8gLSBXb3JraW5nIG5vdGVzIGFuZCByZXNlYXJjaAotIGFyY2hpdmUvIC0gRGVwcmVjYXRlZCBvciByZWZlcmVuY2Utb25seSBhcnRpZmFjdHMK"
+    }
+  ]
+}
