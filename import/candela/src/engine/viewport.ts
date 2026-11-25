@@ -179,7 +179,7 @@ export class Viewport {
     try {
       const w = b.w, h = b.h;
       if (!this.cam) this.frame({ force: true, exclusive: true });
-      U.set([w, h, 0, 1], 0); U[7] = 0; U[87] = 20;
+      U.set([w, h, 0, 1], 0); U[7] = Math.min(0, U[7]); U[87] = 20;
       b.saveAccum(); b.setUniforms(U); b.trace();
       const data = await b.readBuf('accum');
       b.restoreAccum();

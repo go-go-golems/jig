@@ -912,5 +912,10 @@ export function cameraUniforms(camComp, o) {
   if (typeof p.exposure === 'number') { ev = p.exposure; mode = 'fixed'; }
   else if (isParam(p.exposure)) { ev = valueOf(p.exposure, env); mode = 'param'; }
   else if (p.exposure === 'physical') { ev = physical; mode = 'physical'; }
-  return { U1: [...at, lensR], U2: [...V.mul(r, tanH), focus], U3: [...V.mul(up, tanV), p.blades || 0], U4: [...f, o.time || 0], bladeRot: p.bladeRot || 0, ev, mode, physical, fov: 2 * Math.atan(tanH), focal, N, focus, at, target: tgt };
+  // A sheet supplies its complete basis (including roll in plan views) and
+  // vertical extent in world units. Negative aperture selects parallel rays.
+  const ortho = o.view?.orthographic;
+  const spanX = ortho ? V.mul(ortho.right, ortho.height * aspect / 2) : V.mul(r, tanH);
+  const spanY = ortho ? V.mul(ortho.up, ortho.height / 2) : V.mul(up, tanV);
+  return { U1: [...at, ortho ? -1 : lensR], U2: [...spanX, focus], U3: [...spanY, p.blades || 0], U4: [...f, o.time || 0], bladeRot: p.bladeRot || 0, ev, mode, physical, fov: 2 * Math.atan(tanH), focal, N, focus, at, target: tgt };
 }

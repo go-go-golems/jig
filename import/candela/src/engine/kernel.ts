@@ -1334,6 +1334,11 @@ fn cameraRay(px: vec2f, res: vec2f) -> Ray {
   let ndc: vec2f = vec2f((px.x + jit.x) / res.x * 2.0 - 1.0, 1.0 - (px.y + jit.y) / res.y * 2.0);
   let dir: vec3f = safeNorm(c4.xyz + c2.xyz * ndc.x + c3.xyz * ndc.y);
   var r: Ray;
+  if (c1.w < 0.0) {
+    r.o = c1.xyz + c2.xyz * ndc.x + c3.xyz * ndc.y;
+    r.d = c4.xyz;
+    return r;
+  }
   r.o = c1.xyz; r.d = dir;
   if (c1.w > 0.0) {
     // thin lens: a point on the aperture (a disc, or a polygon of blades), aimed at the focal plane

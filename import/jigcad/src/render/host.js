@@ -18,7 +18,7 @@ export const LOOK_MARK = '// materials: the Render view adds lines here';
 
 /** the look a project starts with: everything from metadata (autoFinish), a studio light, a floor under the model,
  *  and an assembly's first study as the timeline */
-export function defaultLook({ view = 'axo', study = null } = {}) {
+export function defaultLook({ view = 'axo', study = null, ground = true } = {}) {
   const motion = study ? `\n// the timeline: the study '${study}' in 4 s (asm.studies() lists them); add .motionBlur({ angle: 180, fps: 24 }) to the camera for blur\nexport const animation = asm.animate(${JSON.stringify(study)}, { duration: 4 });\n` : '';
   return `// look.js: how the model is rendered (materials, light, camera) as a Candela scene (JIG-016).
 // The Render view edits the chain under the marker: a material chosen for a face adds a .meta() line there.
@@ -32,8 +32,7 @@ const asm = jigScene(program, { autoFinish: true })
 const v = asm.view('${view}'), floor = asm.bounds() ? asm.bounds()[0][1] : 0;
 export default scene()
   .add(asm)
-  .add(shape.plane().at(0, floor, 0).material(material.pbr().baseColor(0.18).roughness(0.8)).id('floor'))
-  .add(light.env.hdri(hdri.studio(), { rotate: 30 }))
+${ground ? `  .add(shape.plane().at(0, floor, 0).material(material.pbr().baseColor(0.18).roughness(0.8)).id('floor'))\n` : ''}  .add(light.env.hdri(hdri.studio(), { rotate: 30 }))
   .camera(camera.thinLens().at(v.at).lookAt(v.target).focal(v.focal).fstop(8));
 ${motion}`;
 }
@@ -93,6 +92,12 @@ export function faceAt(compiled, pkg, hit) {
   const body = pkg?.bodies?.find((b) => b.id === ob.def.name), f = ob.def.faces[hit.face];
   if (!body || !f) return null;
   return { component: body.component, body: body.id, face: f.id, meta: f.meta, address: `${body.component}#${f.id}` };
+}
+
+export function buildLook(C, projectFiles, pkg, look) {
+  const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': 'export const program = __jigPackage;', 'scene.js': look };
+  for (const [name, source] of projectFiles) if (name !== LOOK_FILE && isLookFile(name)) files[name] = source;
+  return C.build(files, { scope: { __jigPackage: pkg } });
 }
 
 export class RenderHost {
@@ -201,9 +206,7 @@ export class RenderHost {
     }
   }
   async build(seq = ++this._seq, look = this.look()) {
-    const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': 'export const program = __jigPackage;', 'scene.js': look };
-    for (const [k, v] of this.host.files) if (k !== LOOK_FILE && isLookFile(k)) files[k] = v;
-    const r = await this.C.build(files, { scope: { __jigPackage: this.pkg } });
+    const r = await buildLook(this.C, this.host.files, this.pkg, look);
     if (seq !== this._seq) return;
     this.result = r; this._lookKey = this.lookKey(look);
     this.diags = [...(this.pkg.diagnostics ?? []).map((d) => ({ severity: d.level, code: d.kind, message: d.message, line: d.line })), ...(r.diags ?? [])];

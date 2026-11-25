@@ -275,6 +275,7 @@ function realize(st) {
   const comps = new Map(st.pkg.components.map((c) => [c.id, c]));
   const byComp = new Map();
   for (const b of st.pkg.bodies) {
+    if (b.hidden) continue;
     if (!byComp.has(b.component)) byComp.set(b.component, []);
     byComp.get(b.component).push(b);
   }
