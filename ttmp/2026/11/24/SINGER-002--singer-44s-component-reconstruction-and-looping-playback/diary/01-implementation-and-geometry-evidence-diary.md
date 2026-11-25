@@ -182,3 +182,9 @@ Review drawComponentNames in sheet.js and the studyPreview emission in study-pla
 ### Technical details
 
 SG-09 opts in with presentation.fadeComponentNames. Label opacity takes the same eased 0-to-1 spread value as the explosion translations. Exiting preview restores full opacity to enabled labels.
+
+## Step 7. Render the drafting sheet as an MP4 and PNG
+
+The request was “can we render a video / still frame from the jig cad stage?” I chose the SG-09 axonometric view and captured its drafting canvas at 1280 × 720. Script 14 scrubs the actual Stage, awaiting a repaint for each sample. The video contains 312 samples. Omitting the repeated endpoint gives a 13-second loop at 24 fps. The accompanying PNG is sample 84 during the full-spread hold.
+
+I inspected the still, decoded the movie with FFmpeg, and used ffprobe to verify H.264, dimensions, frame rate, duration and decoded frame count. Frame checksums differed at samples 0, 84 and 204. The script and both outputs are stored with this ticket.
