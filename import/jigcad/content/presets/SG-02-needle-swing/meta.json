@@ -1,1 +1,10 @@
-{"id":"SG-02","title":"Needle bar swing","group":"Singer 44S","order":2,"difficulty":"advanced","about":"Upper-head kinematic reconstruction with estimated dimensions.","view":"front","tries":"Edit phase and amplitude in Code and rebuild"}
+{
+  "id": "SG-02",
+  "title": "Needle bar swing",
+  "group": "Singer 44S",
+  "order": 2,
+  "difficulty": "advanced",
+  "about": "Upper-head kinematic reconstruction with estimated dimensions.",
+  "view": "front",
+  "tries": "Play the shaft cycle | Enable Loop and inspect the needle path"
+}

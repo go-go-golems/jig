@@ -1,0 +1,13 @@
+preset	features	bodies	view	file
+SG-01	35	12	front	SG-01-needle-drive.png
+SG-02	30	9	front	SG-02-needle-swing.png
+SG-03	76	29	axo	SG-03-upper-head.png
+SG-04	20	5	axo	SG-04-needle-hardware.png
+SG-04	20	5	front detail	sg-04-front-detail.png
+SG-04	20	5	axo detail	sg-04-axo-detail.png
+SG-05	16	4	axo	SG-05-swing-support.png
+SG-06	28	11	axo	SG-06-presser-foot.png
+SG-07	18	9	front	SG-07-take-up-lever.png
+SG-07	18	9	front detail	sg-07-front-detail.png
+SG-07	18	9	axo detail	sg-07-axo-detail.png
+SG-08	35	12	front	SG-08-zigzag-timing.png

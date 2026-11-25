@@ -2,6 +2,7 @@
 // placements archived before the Stage player was implemented.
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { register } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
@@ -12,7 +13,7 @@ const worker = await import(jig('src/engine/worker.js'))
 await worker.handle({ op: 'init' })
 const preset = 'content/presets/SG-03-upper-head/'
 const files = Object.fromEntries(['script.js', 'singer.parts.js'].map(f =>
-  [f, readFileSync(jig(preset + f), 'utf8')]))
+  [f, execFileSync('git', ['show', 'ba235fe:import/jigcad/' + preset + f], { encoding: 'utf8' })]))
 const { program } = await worker.handle({ op: 'compile', files, entry: 'script.js' })
 assert.ok(program?.ok, JSON.stringify(program?.diagnostics))
 const track = await worker.call('studyTrack', [{ name: 'Stitch cycle' }])

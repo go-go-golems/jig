@@ -1,6 +1,7 @@
 const parts = await importPartFile('singer.parts.js')
-// Shaft angle from centered bottom dead center, degrees.
-const phase = 0
-// Lateral gate amplitude, degrees. Zero selects a centered straight stitch.
-const amplitude = 2
-return parts.assemble('swing', phase, parts.swingAt(phase, amplitude))
+const law = parts.flowLaw(2)
+return parts.assemble('swing', 0, law.angle(0))
+  .study('Gate and slide', {
+    phase: 'Shaft', from: deg(0), to: deg(720), steps: 144,
+    at: phase => parts.jointValues('swing', phase, law.angle(phase)),
+  })

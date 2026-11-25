@@ -17,36 +17,6 @@ WhenToUse: ""
 
 # Singer 44S component reconstruction and looping playback
 
-## Overview
+Open the [upper-head component atlas](reference/01-upper-head-component-atlas-and-reconstruction-evidence.md) for the eight presets and their source-to-CAD comparisons. The [hardware reference](reference/02-needle-holder-and-swinging-guide-reconstruction.md) covers the selected needle system, clamp, guide and exact-solid checks.
 
-<!-- Provide a brief overview of the ticket, its goals, and current status -->
-
-## Key Links
-
-- **Related Files**: See frontmatter RelatedFiles field
-- **External Sources**: See frontmatter ExternalSources field
-
-## Status
-
-Current status: **active**
-
-## Topics
-
-- cad
-
-## Tasks
-
-See [tasks.md](./tasks.md) for the current task list.
-
-## Changelog
-
-See [changelog.md](./changelog.md) for recent changes and decisions.
-
-## Structure
-
-- design/ - Architecture and design documents
-- reference/ - Prompt packs, API contracts, context summaries
-- playbooks/ - Command sequences and test procedures
-- scripts/ - Temporary code and tooling
-- various/ - Working notes and research
-- archive/ - Deprecated or reference-only artifacts
+Use the [photo and frame index](sources/source-figures.tsv) and [workbench screenshot index](sources/workbench/index.tsv) when preparing the vault report. The [diary](diary/01-implementation-and-geometry-evidence-diary.md) records which placements changed during fitting and which dimensions still require measurement.

@@ -6,7 +6,8 @@ const path = require('node:path')
 const { chromium } = require(process.argv[3] || 'playwright')
 const url = process.argv[2]
 if (!url) throw Error('Supply the workbench URL')
-const sources = path.resolve(__dirname, '../sources')
+const sources = process.argv[4] || path.resolve(__dirname, '../sources')
+fs.mkdirSync(sources, { recursive: true })
 const oldTrace = path.resolve(__dirname,
   '../../SINGER-001--singer-44s-upper-stitch-head/sources/upper-head-cycle.tsv')
 
@@ -110,7 +111,17 @@ async function check(page) {
   assert.deepEqual(await pose('crank'), initial)
   console.log('F-06: pause, seek, replay, native overlay/picking and restore passed; worker calls during inspection:', await calls())
 
-  await page.evaluate(() => jigHost.loadPreset('SG-03'))
+  // The archived TSV belongs to the original upper-head reconstruction.
+  // Replay its matching source against the live Stage renderer.
+  const singerFiles = Object.fromEntries(['script.js', 'singer.parts.js'].map(file =>
+    [file, require('node:child_process').execFileSync('git', ['show',
+      'ba235fe:import/jigcad/content/presets/SG-03-upper-head/' + file],
+      { encoding: 'utf8' })]))
+  await page.evaluate(async files => {
+    await jigHost.loadPreset('SG-03')
+    for (const [file, source] of Object.entries(files)) jigHost.setFile(file, source)
+    await jigHost.compileNow()
+  }, singerFiles)
   await play.waitFor()
   await page.getByRole('button', {name: 'Front', exact:true}).click()
   const samples = fs.readFileSync(oldTrace, 'utf8').trim().split('\n').slice(1)

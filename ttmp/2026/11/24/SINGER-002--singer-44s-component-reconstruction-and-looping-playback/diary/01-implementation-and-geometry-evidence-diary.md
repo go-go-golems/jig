@@ -102,3 +102,9 @@ Run scripts/06-check-presser.mjs, 08-check-needle-hardware.mjs, 11-audit-head-fi
 ### Technical details
 
 The final all-pairs audit sampled 49 shaft positions at 15° intervals. No pair exceeded 0.001 mm³ of common volume after the bounding-box screen. This checks sampled solid geometry. Fabric, elastic response, axial play, tolerances and continuous collision detection require additional evidence.
+
+## Step 3. Capture the fitted assembly and publish the figure index
+
+The hardware milestone was 8aa7383. I added study playback to both isolated drive views, rebuilt the workbench, captured all eight presets and saved four additional detail views. The screenshot script checked the CLI feature and body counts against the loaded browser model. A capture of the Loop control was also refreshed on the assembled model.
+
+The historical Stage regression now reads its original source fixture at ba235fe when comparing to the earlier trajectory. I ran both its worker and Chromium checks using a temporary image destination; the historical figures remain reproducible. The new ticket has its own matching trajectory and capture scripts. The component atlas indexes the original and generated images separately for later vault writing.
