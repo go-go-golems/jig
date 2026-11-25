@@ -1,0 +1,23 @@
+{
+  "format": "jig-stage-job/1",
+  "first": 203,
+  "last": 205,
+  "frames": 3,
+  "fps": 24,
+  "width": 320,
+  "height": 240,
+  "spp": 16,
+  "native": [
+    {
+      "first": 203,
+      "last": 205,
+      "panel": 0,
+      "backend": "optix",
+      "ev": 7,
+      "spp": 16,
+      "renderMs": 44.1924
+    }
+  ],
+  "output": "movie.mp4",
+  "sha256": "1548e218c079c207f45bafa9c019f5aba72c6f82e1127947181ab49320e70773"
+}
