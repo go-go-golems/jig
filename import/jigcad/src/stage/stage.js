@@ -12,6 +12,8 @@ import { pickEdge } from './lines.js';
 import { handles, hitMark, drawSketchHover, pickOf } from './sketch.js';
 import { V, clamp } from './math.js';
 import { sketchToWorld } from './scene.js';
+import { captureCamera, savedView } from './saved-camera.js';
+import { CAMERAS_FILE, namedEntries } from '../render/shot-files.js';
 import { outputCamera } from './output-camera.js';
 import { studyAssembly } from './study-preview.js';
 
@@ -363,7 +365,7 @@ export function createStage(element, host = {}, options = {}) {
     if (z1 === z0 || !last) return;
     // keep the point under the pointer where it is
     const s0 = last.cam.s, s1 = s0 * z1 / z0, ax = (x - last.cam.W / 2), ay = (last.cam.Y0 - y);
-    setView({ zoom: z1, pan: [view.pan[0] + ax / s0 - ax / s1, view.pan[1] + ay / s0 - ay / s1] }, true);
+    setView({ zoom: z1, scale: view.scale ? s1 : null, pan: [view.pan[0] + ax / s0 - ax / s1, view.pan[1] + ay / s0 - ay / s1] }, true);
     clearTimeout(wheelT); wheelT = setTimeout(pushView, 150);
   }
   const onLeave = () => { if (!down && !drag && !pdrag) { hover = null; hoverHandle = null; poseHandle = null; setSheetHover(null); paintLayer(); } };
@@ -388,8 +390,9 @@ export function createStage(element, host = {}, options = {}) {
     const nxt = { name: v.name ?? cur.name, yaw: v.yaw ?? cur.yaw, pitch: v.pitch ?? cur.pitch, zoom: v.zoom ?? cur.zoom,
       sketch: v.sketch === undefined ? cur.sketch : v.sketch, shown: v.shown ? [...v.shown].sort() : cur.shown };
     const sameOverlays = !v.overlays || (v.overlays.size === on.size && [...v.overlays].every(k => on.has(k)));
-    if (JSON.stringify(cur) === JSON.stringify(nxt) && sameOverlays) return;
-    fromHost = true; try { setView({ ...nxt, shown: new Set(nxt.shown), pan: v.pan || view.pan, overlays: v.overlays }); } finally { fromHost = false; }
+    const clearFrame = (v.scale === null && view.scale !== null) || (v.target === null && view.target !== null);
+    if (JSON.stringify(cur) === JSON.stringify(nxt) && sameOverlays && !clearFrame) return;
+    fromHost = true; try { setView({ ...nxt, ...(v.scale === null && {scale:null}), ...(v.target === null && {target:null}), shown: new Set(nxt.shown), pan: v.pan || view.pan, overlays: v.overlays }); } finally { fromHost = false; }
   });
   offs.push(onTheme(invalidate, doc));
   const ro = new ResizeObserver(() => { size(); invalidate(); }); ro.observe(element);
@@ -403,13 +406,22 @@ export function createStage(element, host = {}, options = {}) {
     squareUp, redraw: () => { if (raf) cancelAnimationFrame(raf); paint(); },
     select: setSelection,
     // Freeze the sheet and its camera while the output preview is open.
+    captureCamera() {
+      api.redraw();
+      return captureCamera(last.cam);
+    },
+    recallCamera(cameras, name) {
+      setView(savedView(cameras,name,H), true);
+      api.redraw();
+      pushView();
+    },
     renderCamera(study) {
       const source = program, still = posedProgram(), stillFrame = preview, stillPose = posed?.pose;
       const baseView = { ...view }, cam = last.cam, baseHeight = H;
       const settings = { dpr: 1, overlays: new Set(on), selection, sketches: new Map(solved),
         sheet: options.sheet || host.preset?.id, colorsFrom: element };
       return outputCamera({ study, source, still, stillFrame, stillPose, baseView, cam, baseHeight,
-        element, settings, fitBox: last.scene.fitBox });
+        element, settings, readCameras: () => namedEntries(host.files, CAMERAS_FILE), fitBox: last.scene.fitBox });
     },
     toPNG: () => { if (raf) { cancelAnimationFrame(raf); paint(); } return canvas.toDataURL('image/png'); },
     destroy() {

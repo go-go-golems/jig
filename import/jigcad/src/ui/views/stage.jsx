@@ -6,6 +6,7 @@ import { loadStage } from '../modules.js';
 import { NAMED_VIEWS, OVERLAYS, squareView, isSketchPick } from '../../host/host.js';
 import { qty, num, vec, metric, DASH, bare } from '../format.js';
 import { SketchInspector, pickLabel } from './sketch-inspector.jsx';
+import { SavedCameras } from './saved-cameras.jsx';
 import { StageRender } from './stage-render.jsx';
 import { StudyPlayback } from './study-playback.jsx';
 
@@ -56,6 +57,7 @@ export function StageView({ host }) {
       <div class="stagewrap">
         <div class="toolbar">
           <Seg label="View" options={VIEW_OPTS} value={v.name} onChange={name => host.setView({ name, ...squareView(), zoom: v.zoom ?? 1, sketch: null })} />
+          {!fallback && good && v.name !== 'sketch' && <SavedCameras key={host.preset?.id} host={host} element={el} />}
           {related && host.findPreset(related.preset) && (
             <button class="btn sm" onClick={() => host.loadPreset(related.preset)}>{related.label}</button>
           )}
@@ -95,7 +97,7 @@ export function StageView({ host }) {
             if (!stage) return;
             const study = renderStudy.current;
             study?.pause();
-            setRender({ draw: stage.renderCamera(study), study, program: p,
+            setRender({ draw: stage.renderCamera(study), study, program: good,
               supportsBeauty: good.bodies?.length > 0 && v.name !== 'sketch' && good.kind !== 'print',
               name: host.preset?.slug || host.preset?.id || 'stage' });
           }}>Render…</button>
@@ -107,7 +109,7 @@ export function StageView({ host }) {
         {!fallback && !host.compiling && p?.ok && v.name !== 'sketch' && p.assembly?.studies && (
           <StudyPlayback renderStudy={renderStudy} host={host} program={p} />
         )}
-        {render && render.program === p && !host.compiling && <StageRender host={host} job={render} close={() => setRender(null)} />}
+        {render && render.program === good && !host.compiling && <StageRender host={host} job={render} close={() => setRender(null)} />}
         <div class="sheet">
           <div class="sheethost" ref={el} />
           {!good && p?.ok !== false && <p class="empty padded sheetnote">{host.compiling ? 'Compiling…' : `Nothing compiled yet. Press Run (${RUN_KEY}).`}</p>}
