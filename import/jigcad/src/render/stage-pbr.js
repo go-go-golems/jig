@@ -33,6 +33,18 @@ export function sheetView(camera, bodies, pose) {
     orthographic: { right: R(r), up: R(u), height: H * S / s } };
 }
 
+// A still or movie sent to the native renderer needs this same cut and the
+// same appearance metadata as the color layer drawn in the Stage dialog.
+export function stagePackage(pkg, bodies) {
+  const visible = new Map(bodies.map(b => [b.id, b]));
+  const adapted = pkg.bodies.map(original => {
+    const body = visible.get(original.id);
+    if (!body) return { ...original, hidden: true };
+    return body.sectionCapFace != null ? sectionBody(original, body) : original;
+  });
+  return { ...pkg, bodies: adapted };
+}
+
 export async function createStagePBR(host) {
   const initial = host.program?.ok !== false ? host.program : host.lastGood;
   const files = new Map(host.files);
@@ -53,14 +65,7 @@ export async function createStagePBR(host) {
       check(signal);
       const bodies = geometry.bodies;
       if (!previousBodies || previousBodies.length !== bodies.length || bodies.some((b, i) => previousBodies[i] !== b)) {
-        const visible = new Map(bodies.map(b => [b.id, b]));
-        // Keep addressable metadata in the look, including isolated-away parts.
-        const adapted = pkg.bodies.map(original => {
-          const body = visible.get(original.id);
-          if (!body) return { ...original, hidden: true };
-          return body.sectionCapFace != null ? sectionBody(original, body) : original;
-        });
-        const built = await buildLook(C, files, { ...pkg, bodies: adapted }, look);
+        const built = await buildLook(C, files, stagePackage(pkg, bodies), look);
         check(signal);
         if (!built.ok) throw Error(built.error?.message ?? 'Candela could not build this look');
         await vp.load(built.compiled);
