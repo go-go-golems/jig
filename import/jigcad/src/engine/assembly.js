@@ -1,6 +1,7 @@
 // Assemblies (README §4.10): components placed by transforms or joints between ports, grounding,
 // rigid/revolute/slider joints as placement constraints, print-in-place gap checks, BOM, mobility.
 import * as K from './kernel.js';
+import { normalizeShot, mapShotComponents } from '../render/shot.js';
 import { callerLine, finishMeta } from './part.js';
 import { stampLine } from './callsite.js';
 import { frameOf, matOf, orthoFrame } from './adapt.js';
@@ -74,6 +75,7 @@ class Assembly {
           throw Error(`study '${name}': phase bounds must be finite angles`);
       }
     }
+    if (o.shot !== undefined) o = { ...o, shot: normalizeShot(o.shot, name) };
     return this._w({ studies: [...(this.o.studies ?? []), { name, ...o }] });
   }
   report(name, fn, o = {}) { return this._w({ reports: [...(this.o.reports ?? []), { name, fn, unit: o.unit ?? '', digits: o.digits ?? 3 }] }); }
@@ -340,6 +342,12 @@ export function solveAssembly(asm, opts, compilePart) {
       const F = dynOn ? (forceCtx ??= forceSetup(S, comp, o, diagnostics, decisions)) : null, dyn = [];
       const res = runStudy(S, { name: st.name, drive: st.drive, phase: st.phase, at: st.at, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
         onRow: (k, row) => { const Ts = track.add(row.x); if (swept) poses[k] = Ts; if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } }, measures, o.events ?? []);
+      if (st.shot) {
+        const referenced = new Set(st.shot.flatMap(key => [...(key.isolate ?? []), ...(key.section?.components ?? [])]));
+        for (const id of referenced) if (!comp.has(id))
+          diagnostics.push({ level: 'error', kind: 'asm.shot', at: st.name, message: `shot references unknown component '${id}'` });
+        res.shot = st.shot;
+      }
       studies[st.name] = res;
       if (!res.error) posesOf[st.name] = track.done(res);
       if (dynOn) {
@@ -946,7 +954,9 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
         extra.joints.push({ id: `${id}/(rigid ${cid})`, kind: 'rigid', group: '{e}', dof: 0, a: `${root}:@rigid~${cid}`, b: `${gid}:@rigid`, opts: {}, synthetic: true, level: id });
       }
       subs.set(id, Object.assign(sn, { root, level: prefix, Ts, rootLocal: K.matMul(K.matInverse(Ts), comps.get(root)?.T0 ?? Ts) }));
-      for (const [k, v] of Object.entries(r.mech?.studies ?? {})) childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}` };
+      for (const [k, v] of Object.entries(r.mech?.studies ?? {}))
+        childOut.studies[`${id}/${k}`] = { ...v, name: `${id}/${k}`,
+          ...(v.shot && { shot: mapShotComponents(v.shot, component => id + '/' + component) }) };
       for (const [k, v] of Object.entries(r.mech?.poses ?? {})) childOut.poses[`${id}/${k}`] = { ...v, sub: sn };
       for (const rep of r.mech?.reports ?? []) childOut.reports.push({ ...rep, name: `${id}/${rep.name}` });
       for (const [k, v] of Object.entries(r.mech?.measures ?? {})) childOut.measures[`${id}/${k}`] = v;
@@ -969,9 +979,12 @@ function expandAssembly(asm, opts, compilePart, diagnostics, declared) {
     measures: (v, P, prefix) => { for (const m of v) extra.measures.push({ name: P(m.name), fn: mm => m.fn(prefixReader(mm, prefix)) }); },
     events: (v, P, prefix) => { for (const e of v) extra.events.push({ name: P(e.name), fn: row => e.fn(unprefixRow(row, prefix)) }); },
     studies: (v, P) => {
-      for (const st of v) extra.studies.push(st.phase ? { ...st, name: P(st.name), phase: P(st.phase),
-        at: x => Object.fromEntries(Object.entries(st.at(x)).map(([key, value]) => [P(key), value])) }
-        : { ...st, name: P(st.name), drive: P(st.drive) });
+      for (const st of v) {
+        const shared = { ...st, name: P(st.name), ...(st.shot && { shot: mapShotComponents(st.shot, P) }) };
+        extra.studies.push(st.phase ? { ...shared, phase: P(st.phase),
+          at: x => Object.fromEntries(Object.entries(st.at(x)).map(([key, value]) => [P(key), value])) }
+          : { ...shared, drive: P(st.drive) });
+      }
     },
     sweeps: (v, P) => { for (const sw of v) extra.sweeps.push({ ...sw, jointId: P(sw.jointId) }); },
     reports: (v, P, prefix) => { for (const rp of v) extra.reports.push({ ...rp, name: P(rp.name), fn: ctx => rp.fn(unprefixCtx(ctx, prefix)) }); },
