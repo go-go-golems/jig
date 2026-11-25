@@ -1,8 +1,16 @@
-// Walk the original row numbers so a dropped animation frame cannot skip an
-// unreachable interval. The track matrices are packed by reached row only.
-export function advanceStudy(indices, current, target) {
-  for (let next = current + 1; next <= target; next++) {
-    if (!indices.has(next)) return { row: next - 1, gap: next };
+// Row numbers follow authored order, even in a descending drive. Check each
+// crossed row so a slow display cannot jump over a gap or a joint limit.
+export function advanceStudy(indices, current, steps, last, loop) {
+  const count = last + 1;
+  const target = current + steps;
+  const row = loop ? target % count : Math.min(target, last);
+  // After visiting a full cycle all subsequent cycles have the same gaps.
+  const crossed = loop ? Math.min(steps, count) : row - current;
+  let previous = current;
+  for (let i = 1; i <= crossed; i++) {
+    const next = (current + i) % count;
+    if (!indices.has(next)) return { row: previous, gap: next };
+    previous = next;
   }
-  return { row: target, gap: null };
+  return { row, gap: null };
 }

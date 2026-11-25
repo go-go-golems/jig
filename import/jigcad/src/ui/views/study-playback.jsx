@@ -27,6 +27,8 @@ function TrackControls({ host, program, study }) {
   const [preview, setPreview] = useState(false);
   const [message, setMessage] = useState('');
   const clock = useRef(0), current = useRef(0);
+  // The live checkbox lets the user change repetition while the clock runs.
+  const loop = useRef(null);
   const last = study.rows.length - 1;
 
   function pause() {
@@ -94,20 +96,23 @@ function TrackControls({ host, program, study }) {
   }
   function play() {
     if (playing) { pause(); return; }
-    const start = current.current === last ? track.rows[0] : current.current;
+    const start = current.current === last && !loop.current.checked ? track.rows[0] : current.current;
     if (!show(start)) return;
     const began = performance.now();
+    let previousStep = 0;
     setPlaying(true);
     function tick(now) {
       if (host.program !== program || host.compiling) { pause(); return; }
       const elapsed = Math.max(0, now - began);
-      const target = Math.min(last, start + Math.floor(elapsed * last / PREVIEW_MS));
-      const next = advanceStudy(track.indices, current.current, target);
+      const step = Math.floor(elapsed * last / PREVIEW_MS);
+      const repeat = loop.current.checked;
+      const next = advanceStudy(track.indices, current.current, step - previousStep, last, repeat);
+      previousStep = step;
       if (next.row !== current.current) show(next.row);
       if (next.gap != null) {
         setMessage('Unreachable at ' + driveLabel(next.gap));
         pause();
-      } else if (target === last) pause();
+      } else if (!repeat && next.row === last) pause();
       else clock.current = requestAnimationFrame(tick);
     }
     clock.current = requestAnimationFrame(tick);
@@ -117,6 +122,7 @@ function TrackControls({ host, program, study }) {
       ? <button class="btn sm" onClick={() => show(current.current)}>Show pose</button>
       : <button class="btn sm" aria-label={playing ? 'Pause' : 'Play'}
         disabled={!track?.playable} onClick={play}>{playing ? 'Ⅱ Pause' : '▶ Play'}</button>}
+    {track?.playable && <label><input type="checkbox" ref={loop} /> Loop</label>}
     <input type="range" aria-label="Study sample" aria-valuetext={driveLabel(row)}
       min={0} max={last} step={1} value={row} disabled={!track?.rows.length}
       onInput={e => { const n = +e.currentTarget.value; pause(); if (!show(n)) e.currentTarget.value = current.current; }} />
