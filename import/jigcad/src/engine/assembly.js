@@ -1,7 +1,7 @@
 // Assemblies (README §4.10): components placed by transforms or joints between ports, grounding,
 // rigid/revolute/slider joints as placement constraints, print-in-place gap checks, BOM, mobility.
 import * as K from './kernel.js';
-import { normalizeShot, mapShotComponents } from '../render/shot.js';
+import { normalizeShot, mapShotComponents, shotComponents } from '../render/shot.js';
 import { callerLine, finishMeta } from './part.js';
 import { stampLine } from './callsite.js';
 import { frameOf, matOf, orthoFrame } from './adapt.js';
@@ -343,7 +343,7 @@ export function solveAssembly(asm, opts, compilePart) {
       const res = runStudy(S, { name: st.name, drive: st.drive, phase: st.phase, at: st.at, from: st.from != null ? rad(st.from) : 0, to: st.to != null ? rad(st.to) : full, steps,
         onRow: (k, row) => { const Ts = track.add(row.x); if (swept) poses[k] = Ts; if (dynOn) { const d = forceRow(S, F, st.drive, row, `${st.name} at ${+row.x.toFixed(3)}${jn.kind === 'slider' ? ' mm' : '°'}`); dyn[k] = d; Object.assign(row, d.readings); } } }, measures, o.events ?? []);
       if (st.shot) {
-        const referenced = new Set(st.shot.flatMap(key => [...(key.isolate ?? []), ...(key.section?.components ?? [])]));
+        const referenced = new Set(st.shot.flatMap(shotComponents));
         for (const id of referenced) if (!comp.has(id))
           diagnostics.push({ level: 'error', kind: 'asm.shot', at: st.name, message: `shot references unknown component '${id}'` });
         res.shot = st.shot;
