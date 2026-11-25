@@ -1,5 +1,6 @@
 // Snapshot of the drafting camera used by the export dialog. The geometry,
 // frame, and projection of each view are shared by the technical and PBR passes.
+import { savedView } from './saved-camera.js';
 import { draw } from './sheet.js';
 import { viewCam } from './camera.js';
 import { applyM, boxCorners, boxOk, emptyBox, growBox } from './math.js';
@@ -8,7 +9,7 @@ import { trailPoints } from './shot-marks.js';
 import { shotGeometry } from './section.js';
 
 export function outputCamera({ source, still, stillFrame, stillPose, baseView, cam, baseHeight,
-  element, settings, study, fitBox }) {
+  element, settings, study, fitBox, readCameras = () => ({}) }) {
   const bounds = fitBox.map(p => [...p]);
   if (study) {
     const bodies = source.bodies.filter(b => boxOk(b.bbox))
@@ -22,7 +23,7 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
     }
   }
   const auxiliaryCanvases = new WeakMap();
-  return (canvas, { width, height, fit, zoom, row, style, layout, fraction = 0 }, beautyRenderer) => {
+  return (canvas, { width, height, fit, zoom, row, style, layout, componentMask, fraction = 0 }, beautyRenderer) => {
     const frame = row == null ? stillFrame : study.frameAt(row);
     const model = row == null ? still : { ...source, assembly: studyAssembly(source.assembly, frame) };
     const camera = { ...baseView, sketchFit: fit ? null : baseView.sketchFit,
@@ -32,9 +33,10 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
     const geometry = style ? shotGeometry(model, style) : model;
     const pose = frame?.pose ?? stillPose;
     const shotView = layout ?? style?.view ?? 'stage';
-    const shotTrail = style?.trail && study && trailPoints(study, row ?? study.currentRow(), style.trail);
-    const paintView = (target, w, h, view, box, secondary = false) => {
-      const opts = { ...settings, width: w, height: h, fitBox: box, pose, style, shotTrail,
+    if (shotView?.camera) Object.assign(camera, savedView(readCameras(), shotView.camera, height, zoom));
+    const shotTrail = !componentMask && style?.trail && study && trailPoints(study, row ?? study.currentRow(), style.trail);
+    const paintView = (target, w, h, view, box, secondary = false, origin = [0, 0]) => {
+      const opts = { ...settings, width: w, height: h, fitBox: box, pose, style, shotTrail, componentMask,
         furniture: !secondary, componentNameOpacity: secondary ? 0 : frame?.componentNameOpacity };
       if (style?.isolate && typeof settings.selection?.body === 'number') {
         const id = model.bodies[settings.selection.body]?.id;
@@ -43,9 +45,9 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
       }
       if (secondary) opts.overlays = new Set();
       const drawSheet = beauty => draw(target, geometry, view, { ...opts, beauty });
-      if (!style?.surface) return drawSheet(null);
+      if (componentMask || !style?.surface) return drawSheet(null);
       const projection = viewCam(view, box, w, h);
-      return beautyRenderer({ camera: projection, pose, geometry, width: w, height: h }).then(drawSheet);
+      return beautyRenderer({ camera: projection, pose, geometry, width: w, height: h, origin }).then(drawSheet);
     };
     let auxiliary;
     if (shotView === 'front-side' || shotView?.inset) {
@@ -76,8 +78,9 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
         const ctx = canvas.getContext('2d');
         await paintView(auxiliary, left, height, sideView('front'), bounds, true);
         ctx.drawImage(auxiliary, 0, 0);
-        await paintView(auxiliary, right, height, sideView('side'), bounds, true);
+        await paintView(auxiliary, right, height, sideView('side'), bounds, true, [left, 0]);
         ctx.drawImage(auxiliary, left, 0);
+        if (componentMask) return;
         ctx.fillStyle = getComputedStyle(element).getPropertyValue('--hair');
         ctx.fillRect(left, 0, 1, height);
         caption(ctx, 'Front', 4, 4);
@@ -97,10 +100,11 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
       if (!boxOk(insetBounds)) return;
       const w = Math.max(1, Math.round(width * 0.36)), h = Math.max(1, Math.round(height * 0.38));
       const detail = { ...camera, target: null, scale: null, zoom: 1.3, pan: [0, 0] };
-      await paintView(auxiliary, w, h, detail, insetBounds, true);
+      await paintView(auxiliary, w, h, detail, insetBounds, true, [width - w - 6, 6]);
       const ctx = canvas.getContext('2d');
       const x = width - w - 6;
       ctx.drawImage(auxiliary, x, 6);
+      if (componentMask) return;
       ctx.strokeStyle = getComputedStyle(element).getPropertyValue('--ink');
       ctx.strokeRect(x + 0.5, 6.5, w - 1, h - 1);
       caption(ctx, shotView.inset, x + 1, 7);

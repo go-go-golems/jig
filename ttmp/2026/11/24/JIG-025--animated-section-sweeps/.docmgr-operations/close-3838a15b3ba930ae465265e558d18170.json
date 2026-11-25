@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "c608958f198b21e59d2c65f2390fd8f54d5f42cf714001ade4dfad1340bf3e77",
+  "request": {
+    "ticket": "JIG-025",
+    "status": "complete",
+    "intent": "",
+    "entry": "Validated timed offsets, capped geometry and Spark scene variants."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-3838a15b3ba930ae465265e558d18170",
+    "state": "committed",
+    "created_at": "2026-11-25T04:27:11.168674717Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "5e619ccbda51164762662879f66740069830352b9a02ab5f56e0699f1787481b",
+      "index.md": "51c7a2402bd10c6671c9d8a82798c13279f6a57efac9c7c50d86ed5b1279b9dc"
+    },
+    "after": {
+      "changelog.md": "800f59d60603fdeaa2f5d709c70f9ad3793f9d2f88011198145e331a549c3a85",
+      "index.md": "55c6b0bc1ae53fa435562507cebc0f65ec9deac21445c6f4a2c2f85e985c667e"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "5e619ccbda51164762662879f66740069830352b9a02ab5f56e0699f1787481b",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKVmVyaWZpZWQgYXJiaXRyYXJ5LXRpbWUgc2VjdGlvbiBzd2VlcHMgb24gYSBib3JlZCBzbGVldmUgYW5kIHRoZSBTRy0wOSBTdGFnZSBjYW1lcmEuIEFyY2hpdmVkIHRoZSBzdGFydCwgbWlkcG9pbnQsIGFuZCBlbmRwb2ludCBQTkdzLgoKIyMgMjAyNi0xMS0yNAoKVmFsaWRhdGVkIHRpbWVkIG9mZnNldHMsIGNhcHBlZCBnZW9tZXRyeSBhbmQgU3Bhcmsgc2NlbmUgdmFyaWFudHMuCg=="
+    },
+    {
+      "path": "index.md",
+      "before": "51c7a2402bd10c6671c9d8a82798c13279f6a57efac9c7c50d86ed5b1279b9dc",
+      "after": "LS0tClRpdGxlOiBBbmltYXRlZCBzZWN0aW9uIHN3ZWVwcwpUaWNrZXQ6IEpJRy0wMjUKU3RhdHVzOiBjb21wbGV0ZQpUb3BpY3M6CiAgICAtIGNhZApEb2NUeXBlOiBpbmRleApJbnRlbnQ6IGxvbmctdGVybQpPd25lcnM6IFtdClJlbGF0ZWRGaWxlczogW10KRXh0ZXJuYWxTb3VyY2VzOiBbXQpTdW1tYXJ5OiAiIgpMYXN0VXBkYXRlZDogMjAyNi0xMS0yNFQyMzoyNzoxMS4xNjg1NTcwMjYtMDU6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KIyBBbmltYXRlZCBzZWN0aW9uIHN3ZWVwcwoKQW5pbWF0ZSB0aGUgb2Zmc2V0IG9mIGEgc2VjdGlvbiBwbGFuZSB0aHJvdWdoIGEgY29tcG9uZW50IGluIGl0cyBsb2NhbCBjb29yZGluYXRlcy4KCltEZXNpZ25dKGRlc2lnbi1kb2MvMDEtbW92ZS1hLWNvbXBvbmVudC1sb2NhbC1zZWN0aW9uLXBsYW5lLXRocm91Z2gtYS1zaG90Lm1kKSDCtyBbSW1wbGVtZW50YXRpb24gZGlhcnldKGRpYXJ5LzAxLWFuaW1hdGVkLXNlY3Rpb24tc3dlZXBzLWltcGxlbWVudGF0aW9uLWRpYXJ5Lm1kKSDCtyBbVGFza3NdKHRhc2tzLm1kKSDCtyBbQ2hhbmdlbG9nXShjaGFuZ2Vsb2cubWQpCgpUaGUgc2l4IFN0YWdlIGRlc2lnbnMgYXJlIGJ1bmRsZWQgaW4gcmVNYXJrYWJsZSBDbG91ZCB1bmRlciAvYWkvMjAyNi8xMS8yNC9KaWctU3RhZ2UuCg=="
+    }
+  ]
+}

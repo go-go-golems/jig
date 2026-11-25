@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "607bf03e314edf7c4c6e53d1e5e6181623e025e8969b347a6aa5ba35e658c516",
+  "request": {
+    "ticket": "JIG-026",
+    "status": "complete",
+    "intent": "",
+    "entry": "Verified per-pixel occurrence IDs, PNG sequence, legend and work-area export."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-5e59d6e9dab75b18846c7077c0a2f13c",
+    "state": "committed",
+    "created_at": "2026-11-25T04:27:11.607287415Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "f38ab6a4c3998c3512fd532bd990b5c3825df69aa05ea70c48c0855cb68e4317",
+      "index.md": "492a56577c5836d15002b1de08ff21d7abed669d4367672e65f3a8e13f9b932f"
+    },
+    "after": {
+      "changelog.md": "72eb6eeff3d71fd04e6c2b4efac000864354d1102d519ec6c4db69f3260cb28c",
+      "index.md": "1fc587161c3844fe9669937e1bbc1b7e892d5090ca3475081feeac2324ae3962"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "f38ab6a4c3998c3512fd532bd990b5c3825df69aa05ea70c48c0855cb68e4317",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKQWRkZWQgY2F0ZWdvcmljYWwgUE5HIGFuZCB3b3JrLWFyZWEgc2VxdWVuY2UgWklQIGV4cG9ydCB3aXRoIGEgY29tcGxldGUgb2NjdXJyZW5jZSBsZWdlbmQsIHBsdXMgYSBjb21wcmVzc2VkIHByZXZpZXcuIFZlcmlmaWVkIG1hc2tzIGFnYWluc3QgdGhlIG9yZGluYXJ5IFN0YWdlIHJhc3Rlci4KCiMjIDIwMjYtMTEtMjQKClZlcmlmaWVkIHBlci1waXhlbCBvY2N1cnJlbmNlIElEcywgUE5HIHNlcXVlbmNlLCBsZWdlbmQgYW5kIHdvcmstYXJlYSBleHBvcnQuCg=="
+    },
+    {
+      "path": "index.md",
+      "before": "492a56577c5836d15002b1de08ff21d7abed669d4367672e65f3a8e13f9b932f",
+      "after": "LS0tClRpdGxlOiBDb21wb25lbnQgSUQgbWFzayBleHBvcnQKVGlja2V0OiBKSUctMDI2ClN0YXR1czogY29tcGxldGUKVG9waWNzOgogICAgLSBjYWQKRG9jVHlwZTogaW5kZXgKSW50ZW50OiBsb25nLXRlcm0KT3duZXJzOiBbXQpSZWxhdGVkRmlsZXM6IFtdCkV4dGVybmFsU291cmNlczogW10KU3VtbWFyeTogIiIKTGFzdFVwZGF0ZWQ6IDIwMjYtMTEtMjRUMjM6Mjc6MTEuNjA3MTMyMTA1LTA1OjAwCldoYXRGb3I6ICIiCldoZW5Ub1VzZTogIiIKLS0tCiMgQ29tcG9uZW50IElEIG1hc2sgZXhwb3J0CgpFeHBvcnQgbG9zc2xlc3Mgb2NjdXJyZW5jZSBtYXNrcyBhbmQgYSBtYXRjaGluZyBJRCBsZWdlbmQgZnJvbSB0aGUgU3RhZ2UgY2FtZXJhLgoKW0Rlc2lnbl0oZGVzaWduLWRvYy8wMS1wcm9kdWNlLXJlZ2lzdGVyZWQtb2NjdXJyZW5jZS1tYXNrcy1hbmQtYS1jb2xvci1sZWdlbmQubWQpIMK3IFtJbXBsZW1lbnRhdGlvbiBkaWFyeV0oZGlhcnkvMDEtY29tcG9uZW50LWlkLW1hc2stZXhwb3J0LWltcGxlbWVudGF0aW9uLWRpYXJ5Lm1kKSDCtyBbVGFza3NdKHRhc2tzLm1kKSDCtyBbQ2hhbmdlbG9nXShjaGFuZ2Vsb2cubWQpCgpUaGUgc2l4IFN0YWdlIGRlc2lnbnMgYXJlIGJ1bmRsZWQgaW4gcmVNYXJrYWJsZSBDbG91ZCB1bmRlciAvYWkvMjAyNi8xMS8yNC9KaWctU3RhZ2UuCg=="
+    }
+  ]
+}

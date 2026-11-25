@@ -102,7 +102,11 @@ export function StageView({ host }) {
               name: host.preset?.slug || host.preset?.id || 'stage' });
           }}>Render…</button>
           <span class="lbl">Zoom</span>
-          <input type="range" min="0.25" max="4" step="0.05" aria-label="Zoom" value={v.zoom ?? 1} style={pct(v.zoom ?? 1, 0.25, 4)} onInput={e => host.setView({ zoom: +e.currentTarget.value, scale: null })} />
+          <input type="range" min="0.25" max="4" step="0.05" aria-label="Zoom" value={v.zoom ?? 1} style={pct(v.zoom ?? 1, 0.25, 4)} onInput={e => {
+            const zoom = +e.currentTarget.value, stage = el.current?.jigStage;
+            if (stage?.setZoom) stage.setZoom(zoom);
+            else host.setView({ zoom, scale: null });
+          }} />
           <button class="btn sm" disabled={squared} title={`Back to the ${named?.title.toLowerCase() || 'axonometric'} view at zoom 1, centred on the part`}
             onClick={() => host.setView({ name: named ? v.name : 'axo', ...squareView() })}>Square up</button>
         </div>

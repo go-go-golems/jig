@@ -7,7 +7,9 @@ Topics:
 DocType: diary
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/src/ui/views/shot-timeline.jsx
+      Note: Visual timeline, key property editing and persistence
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-11-24T23:12:30.264489942-05:00
@@ -36,3 +38,9 @@ The Chromium script first failed to launch with “Executable doesn't exist” f
 ### Decisions and review instructions
 
 Source time remains the presentation clock and never edits the shaft drive. Numeric channels interpolate independently. Invalid edit attempts keep the last valid preview. Review src/render/shot-editor.js, src/ui/views/shot-timeline.jsx, and JIG-022/scripts/01-check-editor.cjs. The shared Stage dialog integration also includes work-area, studio and mask controls. The design bundle is in reMarkable Cloud under /ai/2026/11/24/Jig-Stage.
+
+## Step 3. Play the edited work area and restore authored keys
+
+The shared Render dialog advances its preview only after the current frame is ready, including the asynchronous surface pass. Scrubbing or starting an export stops playback. The integration test played frames 80 through 82, observed the endpoint, reopened the project, restored the authored timeline and found its original three-second cut. The initial playback assertion timed out because the test queried a zoom input by aria-label although it uses a wrapping label. Pointing the assertion at the study frame and Play button verified the endpoint.
+
+Review also identified an unreachable-row edge case in partial studies. Scrubbing to a missing row now holds the previous valid pose and reports the gap. Work areas wholly inside reachable samples can still export. Malformed project JSON keeps its original text while the operator can restore the script-authored keys for preview. Fix that JSON in Code before saving project edits.

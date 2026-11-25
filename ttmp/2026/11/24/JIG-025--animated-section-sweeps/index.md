@@ -1,7 +1,7 @@
 ---
 Title: Animated section sweeps
 Ticket: JIG-025
-Status: active
+Status: complete
 Topics:
     - cad
 DocType: index
@@ -10,43 +10,14 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-24T23:12:33.231233356-05:00
+LastUpdated: 2026-11-24T23:27:11.168557026-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
-
 # Animated section sweeps
 
-## Overview
+Animate the offset of a section plane through a component in its local coordinates.
 
-<!-- Provide a brief overview of the ticket, its goals, and current status -->
+[Design](design-doc/01-move-a-component-local-section-plane-through-a-shot.md) · [Implementation diary](diary/01-animated-section-sweeps-implementation-diary.md) · [Tasks](tasks.md) · [Changelog](changelog.md)
 
-## Key Links
-
-- **Related Files**: See frontmatter RelatedFiles field
-- **External Sources**: See frontmatter ExternalSources field
-
-## Status
-
-Current status: **active**
-
-## Topics
-
-- cad
-
-## Tasks
-
-See [tasks.md](./tasks.md) for the current task list.
-
-## Changelog
-
-See [changelog.md](./changelog.md) for recent changes and decisions.
-
-## Structure
-
-- design/ - Architecture and design documents
-- reference/ - Prompt packs, API contracts, context summaries
-- playbooks/ - Command sequences and test procedures
-- scripts/ - Temporary code and tooling
-- various/ - Working notes and research
-- archive/ - Deprecated or reference-only artifacts
+The six Stage designs are bundled in reMarkable Cloud under /ai/2026/11/24/Jig-Stage.

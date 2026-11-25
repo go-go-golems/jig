@@ -79,11 +79,14 @@ export function ShotTimeline({host, study, keys, components, row, seek, preview,
         change([...keys,{time,surface:1}],keys.length)}>Add key at playhead</button>
       <button class="btn sm" disabled={keys.length < 2} onClick={()=>change(keys.filter((k,i)=>i!==selected),0)}>Remove key</button>
       <button class="btn sm" disabled={!dirty} onClick={save}>Save timeline</button>
-      {(dirty || study.shot !== study.authoredShot || host.files.has(SHOTS_FILE)) && <button class="btn sm" onClick={()=>{
+      {(dirty || study.shotError || study.shot !== study.authoredShot || host.files.has(SHOTS_FILE)) && <button class="btn sm" onClick={()=>{
         try {
           writeEntry(host, SHOTS_FILE, study.name, undefined);
-          preview(study.authoredShot ?? []); setDirty(false); select(0); setError('');
-        } catch (e) {setError(e.message);}
+          setError('');
+        } catch (e) {
+          setError('Previewing authored keys. Repair shots.json in Code before saving. ' + e.message);
+        }
+        preview(study.authoredShot ?? []); setDirty(false); select(0);
       }}>Restore authored keys</button>}
       {error && <span role="alert">{error}</span>}
     </fieldset>

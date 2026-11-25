@@ -87,6 +87,7 @@ function TrackControls({ host, program, study, renderStudy }) {
 
   function frameAt(index) {
     const sample = track.indices.get(index);
+    if (sample === undefined) throw Error('Unreachable study sample: '+index);
     const frame = presentation && presentationSample(index);
     const pose = {};
     for (const [id, matrices] of Object.entries(track.T)) {

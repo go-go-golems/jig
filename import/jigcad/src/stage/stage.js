@@ -406,12 +406,21 @@ export function createStage(element, host = {}, options = {}) {
     squareUp, redraw: () => { if (raf) cancelAnimationFrame(raf); paint(); },
     select: setSelection,
     // Freeze the sheet and its camera while the output preview is open.
+    setZoom(zoom) {
+      const scale = view.scale ? view.scale * zoom / view.zoom : null;
+      setView({zoom,scale}, true);
+      api.redraw();
+      pushView();
+    },
     captureCamera() {
       api.redraw();
       return captureCamera(last.cam);
     },
     recallCamera(cameras, name) {
-      setView(savedView(cameras,name,H), true);
+      api.redraw();
+      const restored = savedView(cameras,name,H);
+      restored.zoom = clamp(restored.scale / last.cam.base, ZOOM_MIN, ZOOM_MAX);
+      setView(restored, true);
       api.redraw();
       pushView();
     },

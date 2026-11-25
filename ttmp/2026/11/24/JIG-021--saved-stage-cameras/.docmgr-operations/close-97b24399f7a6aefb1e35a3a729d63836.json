@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "c47d3d185432839c6d7f1a5aac3444a24cc00b1ea7df7de4aada1f1253b921d7",
+  "request": {
+    "ticket": "JIG-021",
+    "status": "complete",
+    "intent": "",
+    "entry": "Saved view, named cut and zoom continuity verified in Chromium."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-97b24399f7a6aefb1e35a3a729d63836",
+    "state": "committed",
+    "created_at": "2026-11-25T04:26:45.586993933Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "index.md": "43dd3d3a0a499fcc80740905beb4f7c1aba6e318d551b1a70ee16d21460e1675"
+    },
+    "after": {
+      "changelog.md": "e2b30afec0301eec9d5292482f711bd63de087ee3b5c7cd891a34dd6bd0743f5",
+      "index.md": "31902e9aec422e2750e18c1000696d93cd2879bcf7c53ce905ae8f6af10b5524"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKU2F2ZWQgdmlldywgbmFtZWQgY3V0IGFuZCB6b29tIGNvbnRpbnVpdHkgdmVyaWZpZWQgaW4gQ2hyb21pdW0uCg=="
+    },
+    {
+      "path": "index.md",
+      "before": "43dd3d3a0a499fcc80740905beb4f7c1aba6e318d551b1a70ee16d21460e1675",
+      "after": "LS0tClRpdGxlOiBTYXZlZCBTdGFnZSBjYW1lcmFzClRpY2tldDogSklHLTAyMQpTdGF0dXM6IGNvbXBsZXRlClRvcGljczoKICAgIC0gY2FkCkRvY1R5cGU6IGluZGV4CkludGVudDogbG9uZy10ZXJtCk93bmVyczogW10KUmVsYXRlZEZpbGVzOiBbXQpFeHRlcm5hbFNvdXJjZXM6IFtdClN1bW1hcnk6ICIiCkxhc3RVcGRhdGVkOiAyMDI2LTExLTI0VDIzOjI2OjQ1LjU4Njg3NTE2Mi0wNTowMApXaGF0Rm9yOiAiIgpXaGVuVG9Vc2U6ICIiCi0tLQojIFNhdmVkIFN0YWdlIGNhbWVyYXMKClN0b3JlIGEgbmFtZWQgb3J0aG9ncmFwaGljIHZpZXcgaW4gdGhlIHByZXNldCBhbmQgdXNlIGl0IG9uIHNjcmVlbiBvciBhcyBhIHNob3QgY3V0LgoKW0Rlc2lnbl0oZGVzaWduLWRvYy8wMS1jYXB0dXJlLWFuZC1yZWNhbGwtb3J0aG9ncmFwaGljLWZyYW1pbmcubWQpIMK3IFtJbXBsZW1lbnRhdGlvbiBkaWFyeV0oZGlhcnkvMDEtc2F2ZWQtc3RhZ2UtY2FtZXJhcy1pbXBsZW1lbnRhdGlvbi1kaWFyeS5tZCkgwrcgW1Rhc2tzXSh0YXNrcy5tZCkgwrcgW0NoYW5nZWxvZ10oY2hhbmdlbG9nLm1kKQoKVGhlIHNpeCBTdGFnZSBkZXNpZ25zIGFyZSBidW5kbGVkIGluIHJlTWFya2FibGUgQ2xvdWQgdW5kZXIgL2FpLzIwMjYvMTEvMjQvSmlnLVN0YWdlLgo="
+    }
+  ]
+}

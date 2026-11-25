@@ -7,7 +7,9 @@ Topics:
 DocType: diary
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/src/render/shot.js
+      Note: Section validation and interpolation by presentation time
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-11-24T23:12:33.932681224-05:00

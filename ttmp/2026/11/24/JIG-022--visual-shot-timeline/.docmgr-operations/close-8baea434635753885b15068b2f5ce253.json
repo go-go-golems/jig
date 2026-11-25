@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "24be9a069db178c9be7e82fc24a1a0d44f8493b5d1d0156ae4a439008bde74c0",
+  "request": {
+    "ticket": "JIG-022",
+    "status": "complete",
+    "intent": "",
+    "entry": "Key editing, dragging, reloading, work-area playback and restore verified."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-8baea434635753885b15068b2f5ce253",
+    "state": "committed",
+    "created_at": "2026-11-25T04:26:45.978046876Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "index.md": "683942a666931e5d4bd126cb30baed1f379db9f16ead4e9b0e4462b8bc372c20"
+    },
+    "after": {
+      "changelog.md": "8130beb663effeca00b1354a781865f8ca0e2ad7fe5fad8beebb06a8c99d8765",
+      "index.md": "cbb48e5201036743d1ad9c776a7433399dc40ee27310048d91f27d1841822725"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKS2V5IGVkaXRpbmcsIGRyYWdnaW5nLCByZWxvYWRpbmcsIHdvcmstYXJlYSBwbGF5YmFjayBhbmQgcmVzdG9yZSB2ZXJpZmllZC4K"
+    },
+    {
+      "path": "index.md",
+      "before": "683942a666931e5d4bd126cb30baed1f379db9f16ead4e9b0e4462b8bc372c20",
+      "after": "LS0tClRpdGxlOiBWaXN1YWwgc2hvdCB0aW1lbGluZQpUaWNrZXQ6IEpJRy0wMjIKU3RhdHVzOiBjb21wbGV0ZQpUb3BpY3M6CiAgICAtIGNhZApEb2NUeXBlOiBpbmRleApJbnRlbnQ6IGxvbmctdGVybQpPd25lcnM6IFtdClJlbGF0ZWRGaWxlczogW10KRXh0ZXJuYWxTb3VyY2VzOiBbXQpTdW1tYXJ5OiAiIgpMYXN0VXBkYXRlZDogMjAyNi0xMS0yNFQyMzoyNjo0NS45Nzc5MjUyMDctMDU6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KIyBWaXN1YWwgc2hvdCB0aW1lbGluZQoKRWRpdCBzdHVkeSBrZXlzLCBwcmV2aWV3IHRoZSByZXN1bHQsIGFuZCBzYXZlIGEgcHJvamVjdC1zcGVjaWZpYyB0aW1lbGluZS4KCltEZXNpZ25dKGRlc2lnbi1kb2MvMDEtZWRpdC1wcmVzZW50YXRpb24ta2V5cy1vbi10aGUtc3RhZ2UtdGltZWxpbmUubWQpIMK3IFtJbXBsZW1lbnRhdGlvbiBkaWFyeV0oZGlhcnkvMDEtdmlzdWFsLXNob3QtdGltZWxpbmUtaW1wbGVtZW50YXRpb24tZGlhcnkubWQpIMK3IFtUYXNrc10odGFza3MubWQpIMK3IFtDaGFuZ2Vsb2ddKGNoYW5nZWxvZy5tZCkKClRoZSBzaXggU3RhZ2UgZGVzaWducyBhcmUgYnVuZGxlZCBpbiByZU1hcmthYmxlIENsb3VkIHVuZGVyIC9haS8yMDI2LzExLzI0L0ppZy1TdGFnZS4K"
+    }
+  ]
+}

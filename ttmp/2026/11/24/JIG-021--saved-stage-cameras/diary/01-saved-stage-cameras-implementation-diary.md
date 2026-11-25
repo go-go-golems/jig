@@ -7,7 +7,9 @@ Topics:
 DocType: diary
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/src/stage/saved-camera.js
+      Note: Camera representation, capture and field-height conversion
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-11-24T23:12:28.706428958-05:00
@@ -36,3 +38,7 @@ The projection check in scripts/01-check-framing.mjs compared two world points a
 ### Review instructions and boundaries
 
 See src/stage/saved-camera.js and src/ui/views/saved-cameras.jsx. A missing camera name or a malformed record is a user-visible error. The menu is limited to resolved 3D views. Sketch camera bases use a separate projection. The 6-document design bundle was uploaded under /ai/2026/11/24/Jig-Stage; the cloud listing independently confirmed its presence.
+
+## Step 3. Preserve zoom continuity on recall
+
+Independent browser review exposed a scale discontinuity. A recalled 2.5× camera drew at the stored scale but the slider displayed 1.00×, and its next tick discarded the saved scale. Recall now derives the displayed zoom from the resolved scale divided by the current fit scale. The Stage slider and wheel both preserve proportional scale changes. The end-to-end check saved a panned 2.4× view, recalled its exact target and yaw, and verified that moving to 2.45× multiplied scale by 2.45/2.4. Code checkpoint 20bb599 introduced the capture path; the integration checkpoint adds this fix.

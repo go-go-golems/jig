@@ -1,4 +1,4 @@
 # Tasks
 
 ## TODO
-- [ ] Implement the design and verify through the Stage workflow <!-- t:dpb1 -->
+- [x] Implement the design and verify through the Stage workflow <!-- t:dpb1 -->

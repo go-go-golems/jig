@@ -7,7 +7,9 @@ Topics:
 DocType: diary
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/src/stage/component-mask.js
+      Note: Stable palette and visible-face mask rendering
 ExternalSources: []
 Summary: ""
 LastUpdated: 2026-11-24T23:12:35.296913339-05:00
