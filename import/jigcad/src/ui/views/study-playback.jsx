@@ -1,6 +1,6 @@
 // Read-only preview of an assembly study. The Stage owns the camera and meshes.
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { advanceStudy } from '../study-samples.js';
+import { advanceStudy, presentationSample } from '../study-samples.js';
 
 const PREVIEW_MS = 4000;
 
@@ -29,7 +29,10 @@ function TrackControls({ host, program, study }) {
   const clock = useRef(0), current = useRef(0);
   // The live checkbox lets the user change repetition while the clock runs.
   const loop = useRef(null);
-  const last = study.rows.length - 1;
+  const config = host.preset?.presentation;
+  const presentation = config?.study === study.name ? config : null;
+  const intro = presentation ? presentationSample(0).intro : 0;
+  const last = study.rows.length - 1 + intro;
 
   function pause() {
     cancelAnimationFrame(clock.current);
@@ -56,10 +59,15 @@ function TrackControls({ host, program, study }) {
     const valid = () => live && host.program === program && !host.compiling;
     host.call('studyTrack', { name: study.name }).then(result => {
       if (!valid()) return;
-      const indices = new Map(result.rows.map((r, i) => [r, i]));
-      const playable = result.rows.some((r, i, rows) => i > 0 && r === rows[i - 1] + 1);
-      setTrack({ ...result, indices, playable });
-      current.current = result.rows[0] ?? 0;
+      const indices = new Map();
+      if (result.rows[0] === 0) {
+        for (let r = 0; r < intro; r++) indices.set(r, 0);
+      }
+      result.rows.forEach((r, i) => indices.set(r + intro, i));
+      const rows = [...indices.keys()];
+      const playable = rows.some((r, i) => i > 0 && r === rows[i - 1] + 1);
+      setTrack({ ...result, rows, indices, playable });
+      current.current = rows[0] ?? 0;
       setRow(current.current);
       if (!indices.size) setMessage('No reachable samples');
     }).catch(error => { if (valid()) setMessage(error.message); });
@@ -79,11 +87,17 @@ function TrackControls({ host, program, study }) {
       setMessage('Unreachable at ' + driveLabel(index));
       return false;
     }
+    const frame = presentation && presentationSample(index);
     const pose = {};
     for (const [id, matrices] of Object.entries(track.T)) {
-      pose[id] = matrices.subarray(sample * 16, sample * 16 + 16);
+      const matrix = matrices.subarray(sample * 16, sample * 16 + 16);
+      const offset = presentation?.offsets[id];
+      if (frame?.spread && offset) {
+        pose[id] = matrix.slice();
+        for (let axis = 0; axis < 3; axis++) pose[id][12 + axis] += offset[axis] * frame.spread;
+      } else pose[id] = matrix;
     }
-    host.emit('studyPreview', { pose, row: study.rows[index], drive: study.drive });
+    host.emit('studyPreview', { pose, row: study.rows[frame ? frame.source : index], drive: study.drive, offsets: presentation?.offsets });
     current.current = index;
     setRow(index);
     setPreview(true);
@@ -91,7 +105,9 @@ function TrackControls({ host, program, study }) {
     return true;
   }
   function driveLabel(index) {
-    const value = study.rows[index]?.x;
+    const frame = presentation && presentationSample(index);
+    if (frame?.label) return frame.label + ' · ' + Math.round(frame.spread * 100) + '%';
+    const value = study.rows[frame ? frame.source : index]?.x;
     return value == null ? '' : +value.toFixed(3) + (study.unit === 'mm' ? ' mm' : '°');
   }
   function play() {
@@ -104,7 +120,7 @@ function TrackControls({ host, program, study }) {
     function tick(now) {
       if (host.program !== program || host.compiling) { pause(); return; }
       const elapsed = Math.max(0, now - began);
-      const step = Math.floor(elapsed * last / PREVIEW_MS);
+      const step = Math.floor(presentation ? elapsed * 24 / 1000 : elapsed * last / PREVIEW_MS);
       const repeat = loop.current.checked;
       const next = advanceStudy(track.indices, current.current, step - previousStep, last, repeat);
       previousStep = step;
@@ -122,7 +138,7 @@ function TrackControls({ host, program, study }) {
       ? <button class="btn sm" onClick={() => show(current.current)}>Show pose</button>
       : <button class="btn sm" aria-label={playing ? 'Pause' : 'Play'}
         disabled={!track?.playable} onClick={play}>{playing ? 'Ⅱ Pause' : '▶ Play'}</button>}
-    {track?.playable && <label><input type="checkbox" ref={loop} /> Loop</label>}
+    {track?.playable && <label><input type="checkbox" defaultChecked={!!presentation} ref={loop} /> Loop</label>}
     <input type="range" aria-label="Study sample" aria-valuetext={driveLabel(row)}
       min={0} max={last} step={1} value={row} disabled={!track?.rows.length}
       onInput={e => { const n = +e.currentTarget.value; pause(); if (!show(n)) e.currentTarget.value = current.current; }} />

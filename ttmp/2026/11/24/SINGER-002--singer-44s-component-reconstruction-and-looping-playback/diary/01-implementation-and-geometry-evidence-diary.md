@@ -108,3 +108,39 @@ The final all-pairs audit sampled 49 shaft positions at 15° intervals. No pair 
 The hardware milestone was 8aa7383. I added study playback to both isolated drive views, rebuilt the workbench, captured all eight presets and saved four additional detail views. The screenshot script checked the CLI feature and body counts against the loaded browser model. A capture of the Loop control was also refreshed on the assembled model.
 
 The historical Stage regression now reads its original source fixture at ba235fe when comparing to the earlier trajectory. I ran both its worker and Chromium checks using a temporary image destination; the historical figures remain reproducible. The new ticket has its own matching trajectory and capture scripts. The component atlas indexes the original and generated images separately for later vault writing.
+
+## Step 4. Present the upper head and presser assembly in a repeating sequence
+
+The requests were “can you make an exploded view of the entire mechanism?”, “in fact can you make a preset with an animation that explodes and then puts it back together and then does 2 cycles and loops?” and “including the foot and all that”. SG-09 uses the full combined head with the presser lifted by zero mm.
+
+### What I did
+
+I mounted the same 29 occurrences as SG-03 at the first sewing sample. I authored 28 display translations around the stationary casting and added a CAD Stage timeline that reuses the first solved pose during separation.
+
+### Why
+
+An exploded view intentionally separates mating surfaces. Keeping the offsets in the presentation lets the sewing solver and solid model retain the assembled geometry.
+
+### What worked
+
+The preset checker compiled 76 features and 29 bodies. Stage uses a common camera envelope for the assembled and spread parts.
+
+### What was tricky to build
+
+The playback slider indexes both display samples and solved samples. The introductory samples all read solver row zero. After the return, indices advance through the original drive track, including its unreachable-row handling.
+
+### What I learned
+
+The original shaft law spans 720 degrees because the needle alternates sides. The end of the second stroke closes the animation.
+
+### What warrants a second pair of eyes
+
+Inspect the arrangement of fasteners around the presser and take-up assemblies from the front and axonometric views. The offsets illustrate part identity and do not establish a disassembly sequence.
+
+### Code review instructions
+
+Open SG-09 in CAD Stage and scrub through the full-spread hold. Review study-samples.js, study-playback.jsx and the offsets in the preset metadata.
+
+### Technical details
+
+Playback spends three seconds opening, one second at full spread, three seconds closing and six seconds on the two strokes. Only translations change during the introductory samples.

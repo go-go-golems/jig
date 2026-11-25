@@ -103,7 +103,20 @@ export function createStage(element, host = {}, options = {}) {
   function setStudyPreview(frame) {
     if (frame && (!program?.assembly || view.name === 'sketch' || pdrag)) return;
     if (!frame && !preview) return;
-    if (frame && !preview) previewFit = last?.scene.fitBox;
+    if (frame && !preview) {
+      previewFit = last?.scene.fitBox;
+      if (frame.offsets && previewFit) {
+        previewFit = previewFit.map(corner => [...corner]);
+        for (const { body, box } of last.scene.instances) {
+          const offset = frame.offsets[body.part];
+          if (!offset) continue;
+          for (let axis = 0; axis < 3; axis++) {
+            previewFit[0][axis] = Math.min(previewFit[0][axis], box[0][axis] + offset[axis]);
+            previewFit[1][axis] = Math.max(previewFit[1][axis], box[1][axis] + offset[axis]);
+          }
+        }
+      }
+    }
     preview = frame;
     if (!preview) previewFit = null;
     hover = null;

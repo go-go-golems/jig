@@ -1,0 +1,26 @@
+{
+  "id": "SG-09",
+  "title": "Explode, assemble and stitch",
+  "group": "Singer 44S",
+  "order": 9,
+  "difficulty": "advanced",
+  "about": "The complete modeled upper head opens around the casting, closes and sews two zigzag strokes.",
+  "view": "front",
+  "overlays": "names",
+  "tries": "Press Play in CAD Stage. Pause at Full spread to inspect the foot and linkage.",
+  "presentation": {
+    "study": "Stitch cycle",
+    "offsets": {
+      "plate": [0,0,-31], "gate": [-40,0,0], "gatePin": [-61,-9,22],
+      "bar": [-72,-4,0], "driveBracket": [-108,-6,0],
+      "clamp": [-64,-3,-22], "clampScrew": [-40,-4,-26], "needle": [-73,0,-41],
+      "crank": [-58,-10,40], "shaftBearing": [-18,12,42], "rod": [-100,-8,30],
+      "lever": [6,-18,72], "eyeGuard": [33,-26,85], "rocker": [45,8,52],
+      "supporterShaft": [66,14,62], "frontClip": [88,-23,70], "rearClip": [106,25,59],
+      "presserGuide": [38,0,4], "presserBar": [68,4,0], "presserBracket": [92,0,-6],
+      "presserClampScrew": [109,-4,-5], "presserSpring": [84,0,16], "presserAdjuster": [58,0,37],
+      "presserLifter": [100,8,-24], "presserPivotScrew": [116,14,-30],
+      "presserShank": [56,0,-20], "presserShankScrew": [79,-4,-25], "presserFoot": [52,-4,-39]
+    }
+  }
+}
