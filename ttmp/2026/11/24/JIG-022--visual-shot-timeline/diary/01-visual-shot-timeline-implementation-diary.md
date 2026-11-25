@@ -44,3 +44,11 @@ Source time remains the presentation clock and never edits the shaft drive. Nume
 The shared Render dialog advances its preview only after the current frame is ready, including the asynchronous surface pass. Scrubbing or starting an export stops playback. The integration test played frames 80 through 82, observed the endpoint, reopened the project, restored the authored timeline and found its original three-second cut. The initial playback assertion timed out because the test queried a zoom input by aria-label although it uses a wrapping label. Pointing the assertion at the study frame and Play button verified the endpoint.
 
 Review also identified an unreachable-row edge case in partial studies. Scrubbing to a missing row now holds the previous valid pose and reports the gap. Work areas wholly inside reachable samples can still export. Malformed project JSON keeps its original text while the operator can restore the script-authored keys for preview. Fix that JSON in Code before saving project edits.
+
+### Final integration evidence
+
+The camera test and browser editor test both passed against the workbench on port 18965. `node import/jigcad/test/stage/unit.mjs` passed 21/21, the render shot suite passed, `go test ./...` passed, and `make test-candela` kept all 105 golden scene packs identical and passed its session checks. All six new ticket workspaces passed docmgr doctor. The browser screenshot is under sources/timeline-camera.png. The reMarkable CLI confirmed the six-design PDF and its cloud listing under /ai/2026/11/24/Jig-Stage.
+
+### What warrants a second pair of eyes
+
+Preview playback waits for the selected sample to finish rendering before advancing, so high-SPP previews can run slower than the 24 fps export clock. The movie and mask sequences sample at fixed output indices. Review the first and last frames of a work area when modifying the clock or deciding whether a cyclic endpoint should be included. The full scene and sliced-work-area tests use the same production mapping.
