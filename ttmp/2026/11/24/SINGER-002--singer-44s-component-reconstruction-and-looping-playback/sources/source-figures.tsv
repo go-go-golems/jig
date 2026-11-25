@@ -1,0 +1,34 @@
+figure	path_relative_to_sources	zip_member	photo_exif_datetime	video_frame_zero_based	elapsed_seconds	sheet_row	sheet_column
+P01	original-photos/Photo Nov 22 2026, 1 22 52 PM.jpg	Photo Nov 22 2026, 1 22 52 PM.jpg	2026:11:22 13:22:52	-	-	-	-
+P02	original-photos/Photo Nov 22 2026, 1 22 56 PM.jpg	Photo Nov 22 2026, 1 22 56 PM.jpg	2026:11:22 13:22:56	-	-	-	-
+P03	original-photos/Photo Nov 22 2026, 1 23 01 PM.jpg	Photo Nov 22 2026, 1 23 01 PM.jpg	2026:11:22 13:23:01	-	-	-	-
+P04	original-photos/Photo Nov 22 2026, 1 23 04 PM.jpg	Photo Nov 22 2026, 1 23 04 PM.jpg	2026:11:22 13:23:04	-	-	-	-
+P05	original-photos/Photo Nov 22 2026, 1 23 09 PM.jpg	Photo Nov 22 2026, 1 23 09 PM.jpg	2026:11:22 13:23:09	-	-	-	-
+P06	original-photos/Photo Nov 22 2026, 1 23 13 PM.jpg	Photo Nov 22 2026, 1 23 13 PM.jpg	2026:11:22 13:23:13	-	-	-	-
+P07	original-photos/Photo Nov 22 2026, 1 23 17 PM.jpg	Photo Nov 22 2026, 1 23 17 PM.jpg	2026:11:22 13:23:17	-	-	-	-
+P08	original-photos/Photo Nov 22 2026, 1 23 24 PM.jpg	Photo Nov 22 2026, 1 23 24 PM.jpg	2026:11:22 13:23:24	-	-	-	-
+P09	original-photos/Photo Nov 22 2026, 1 23 27 PM.jpg	Photo Nov 22 2026, 1 23 27 PM.jpg	2026:11:22 13:23:27	-	-	-	-
+P10	original-photos/Photo Nov 22 2026, 1 23 35 PM.jpg	Photo Nov 22 2026, 1 23 35 PM.jpg	2026:11:22 13:23:35	-	-	-	-
+P11	original-photos/Photo Nov 22 2026, 1 23 39 PM.jpg	Photo Nov 22 2026, 1 23 39 PM.jpg	2026:11:22 13:23:39	-	-	-	-
+P12	original-photos/Photo Nov 22 2026, 1 24 33 PM.jpg	Photo Nov 22 2026, 1 24 33 PM.jpg	2026:11:22 13:24:33	-	-	-	-
+P13	original-photos/Photo Nov 22 2026, 1 24 39 PM.jpg	Photo Nov 22 2026, 1 24 39 PM.jpg	2026:11:22 13:24:39	-	-	-	-
+V1.01	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	0	0.000	1	1
+V1.02	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	60	2.002	1	2
+V1.03	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	120	4.002	1	3
+V1.04	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	180	6.003	1	4
+V1.05	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	240	8.005	2	1
+V1.06	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	300	10.005	2	2
+V1.07	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	360	12.007	2	3
+V1.08	video-1-contact-sheet.jpg	Video Nov 22 2026, 1 24 45 PM.mov	-	369	12.307	2	4
+V2.01	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	0	0.000	1	1
+V2.02	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	120	4.002	1	2
+V2.03	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	240	8.005	1	3
+V2.04	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	360	12.007	1	4
+V2.05	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	480	16.008	2	1
+V2.06	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	600	20.012	2	2
+V2.07	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	720	24.013	2	3
+V2.08	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	840	28.015	2	4
+V2.09	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	960	32.018	3	1
+V2.10	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	1080	36.020	3	2
+V2.11	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	1200	40.022	3	3
+V2.12	video-2-contact-sheet.jpg	Video Nov 22 2026, 1 25 09 PM.mov	-	1221	40.722	3	4
