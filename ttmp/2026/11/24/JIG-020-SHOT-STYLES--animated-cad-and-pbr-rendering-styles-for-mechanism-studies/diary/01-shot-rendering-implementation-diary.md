@@ -77,3 +77,9 @@ Script 07 exports two geometry variants and 312 exact cameras and occurrence mat
 ### Preflight evidence
 
 The GB10 reported driver 580.178.04. It rendered frame zero at 1920 × 1080, 64 spp with explicit OptiX selection and metered EV 6.50414. A separate native probe on the section frame found its silhouette within one pixel of the matching CAD outline and confirmed the orange cap. The native batch ran in the sg09-optix-fullhd tmux session.
+
+### Render result and verification
+
+The Spark produced 287 native OptiX beauty frames and 25 fully drafted frames. The assembled H.264 file contains 312 frames over 13 seconds. Six decoded samples were compared with their source composites. Their mean absolute differences were approximately 1–2 levels on the 8-bit scale. The downloaded movie and the Spark copy both hashed to 8b46ab39c8b6be28a05644f21af5ac3293fc2366ff06aa9dfa1b5182ecdc0f46. The MP4 and JSON receipt are archived together under sources/.
+
+The first full Candela test reported stale shader snapshots. Independent x64 and ARM64 regeneration showed exactly two changed fields in each of 105 fixtures on each architecture, the shared shader hash and its line count. All per-frame buffer digests matched. I updated those two fields while retaining fixture order. The isolated Spark checkout passed its 105-fixture ARM64 replay.

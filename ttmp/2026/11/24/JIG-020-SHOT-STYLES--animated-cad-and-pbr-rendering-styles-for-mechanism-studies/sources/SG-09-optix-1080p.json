@@ -1,0 +1,90 @@
+{
+  "checkout": "3027bb9fc4366d7d71c0fa29440907985a1838a6",
+  "host": "bling",
+  "gpu": "NVIDIA GB10, 580.178.04",
+  "movie": "SG-09-optix-1080p.mp4",
+  "sha256": "8b46ab39c8b6be28a05644f21af5ac3293fc2366ff06aa9dfa1b5182ecdc0f46",
+  "bytes": 2209620,
+  "video": {
+    "codec_name": "h264",
+    "width": 1920,
+    "height": 1080,
+    "avg_frame_rate": "24/1",
+    "duration": "13.000000",
+    "nb_read_frames": "312"
+  },
+  "native_segments": [
+    {
+      "backend": "optix",
+      "variant": "full",
+      "first": 0,
+      "last": 71,
+      "frames": 72,
+      "spp": 64,
+      "ev": 6.50414,
+      "renderMs": 9848.96,
+      "denoise": "scene"
+    },
+    {
+      "backend": "optix",
+      "variant": "full",
+      "first": 97,
+      "last": 191,
+      "frames": 95,
+      "spp": 64,
+      "ev": 6.50414,
+      "renderMs": 12477.5,
+      "denoise": "scene"
+    },
+    {
+      "backend": "optix",
+      "variant": "section",
+      "first": 192,
+      "last": 239,
+      "frames": 48,
+      "spp": 64,
+      "ev": 6.50414,
+      "renderMs": 6591.45,
+      "denoise": "scene"
+    },
+    {
+      "backend": "optix",
+      "variant": "full",
+      "first": 240,
+      "last": 311,
+      "frames": 72,
+      "spp": 64,
+      "ev": 6.50414,
+      "renderMs": 9280.86,
+      "denoise": "scene"
+    }
+  ],
+  "native_frames": 287,
+  "cad_only_frames": 25,
+  "decoded_comparisons": [
+    {
+      "frame": 0,
+      "mean_absolute_rgb_error": 1.02
+    },
+    {
+      "frame": 36,
+      "mean_absolute_rgb_error": 2.008
+    },
+    {
+      "frame": 84,
+      "mean_absolute_rgb_error": 2.003
+    },
+    {
+      "frame": 204,
+      "mean_absolute_rgb_error": 1.007
+    },
+    {
+      "frame": 264,
+      "mean_absolute_rgb_error": 1.04
+    },
+    {
+      "frame": 311,
+      "mean_absolute_rgb_error": 1.032
+    }
+  ]
+}
