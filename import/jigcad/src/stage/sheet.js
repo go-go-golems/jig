@@ -9,6 +9,7 @@ import { sceneOf, sceneFacts, sketchToWorld, sameBody } from './scene.js';
 import { buffers, projectInstance, rasterInstance, paperImage, hatchImage, coverTriangles } from './raster.js';
 import { lineWork } from './lines.js';
 import { drawGrid, drawGroundLine, drawBed, dimensionTo, arrow, label, scaleBar, titleBlock, gridSteps } from './furniture.js';
+import { drawShotAccent, drawShotTrail } from './shot-marks.js';
 import { drawMechanism } from './mechanism-marks.js';
 import { drawSketch, sketchCam, sketchStatus } from './sketch.js';
 
@@ -62,6 +63,8 @@ export function shownSketches(program, view, overrides) {
 
 // draw(canvas, program, view, options) → the state the interactive stage keeps for picking (renderSheet returns
 // only { width, height, ms })
+const annotationBuffers = new WeakMap();
+
 export function draw(canvas, program, viewIn, o = {}) {
   const t0 = performance.now();
   const thumb = !!o.thumbnail;
@@ -78,7 +81,7 @@ export function draw(canvas, program, viewIn, o = {}) {
   if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
   const k = bw / W;
   const C = o.colors || readColors(o.colorsFrom || canvas, o.theme);
-  const ctx = canvas.getContext('2d');
+  let ctx = canvas.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   ctx.setTransform(k, 0, 0, k, 0, 0);
   ctx.fillStyle = C.stage; ctx.fillRect(0, 0, W, H);
@@ -122,12 +125,16 @@ export function draw(canvas, program, viewIn, o = {}) {
   const lw = state.lw = scene.instances.length ? lineWork(scene, cam, buf, k, { minEdgePx: LW.minEdgePx, minSilPx: LW.minSilPx }) : null;
   const tWork = performance.now();
   ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (lw) { ctx.globalAlpha = faint; ctx.strokeStyle = C.ink; ctx.lineWidth = LW.sil; ctx.stroke(lw.silOuter); ctx.globalAlpha = 1; }
+  const ink = faint * (o.style?.edges ?? 1);
+  if (lw && ink) { ctx.globalAlpha = ink; ctx.strokeStyle = C.ink; ctx.lineWidth = LW.sil; ctx.stroke(lw.silOuter); ctx.globalAlpha = 1; }
 
   // ---- the parts' paper, then tone on faces through masks
   let overhang = null;
   if (scene.instances.length) {
     const O = off(canvas, bw, bh), tones = [];
+    const caps = scene.instances.filter(i => i.body.sectionCapFace != null)
+      .map(i => ({ body: i.pi, face: i.body.sectionCapFace }));
+    if (caps.length) tones.push({ set: faceSet(scene, caps).set, col: rgba32('#d47845'), width: K.hatch * 1.4 });
     const sel = o.selection && o.selection.face != null ? faceSet(scene, [o.selection]) : null;
     if (sel && sel.any) tones.push({ set: sel.set, col: rgba32(C.red), width: K.hatch * 1.4 });
     const fea = program && program.fea;
@@ -154,16 +161,22 @@ export function draw(canvas, program, viewIn, o = {}) {
 
   // ---- hidden lines, B-rep edges at the ring stroke, inner silhouettes at half the silhouette stroke (the outline
   // the paper leaves), then the overhang's outline and the selection
-  if (lw) {
-    if (has('hidden')) { ctx.globalAlpha = 0.75 * faint; ctx.strokeStyle = C.muted; ctx.lineWidth = K.ring * 1.2; ctx.setLineDash(K.dashHidden); ctx.stroke(lw.hid); ctx.stroke(lw.silHid); ctx.setLineDash([]); }
-    ctx.globalAlpha = LW.ringAlpha * faint; ctx.strokeStyle = C.ink; ctx.lineWidth = LW.ring; ctx.stroke(lw.vis);
+  if (o.beauty && o.style.surface > 0) {
+    ctx.globalAlpha = o.style.surface;
+    ctx.drawImage(o.beauty, 0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+  if (o.style?.accent) drawShotAccent(ctx, state, o.style.accent);
+  if (lw && ink) {
+    if (has('hidden')) { ctx.globalAlpha = 0.75 * ink; ctx.strokeStyle = C.muted; ctx.lineWidth = K.ring * 1.2; ctx.setLineDash(K.dashHidden); ctx.stroke(lw.hid); ctx.stroke(lw.silHid); ctx.setLineDash([]); }
+    ctx.globalAlpha = LW.ringAlpha * ink; ctx.strokeStyle = C.ink; ctx.lineWidth = LW.ring; ctx.stroke(lw.vis);
     // tangent edges (where a fillet meets its neighbours) fainter still: they mark a change of surface, not a corner
-    ctx.globalAlpha = LW.tangentAlpha * faint; ctx.stroke(lw.tan);
+    ctx.globalAlpha = LW.tangentAlpha * ink; ctx.stroke(lw.tan);
     // silhouettes over a shallow step (engraving, lettering, a small pocket's rim): a little over an edge's weight
-    ctx.globalAlpha = LW.softAlpha * faint; ctx.lineWidth = LW.soft; ctx.stroke(lw.silSoft);
+    ctx.globalAlpha = LW.softAlpha * ink; ctx.lineWidth = LW.soft; ctx.stroke(lw.silSoft);
     // inner silhouettes, and the outer ones again, at the half the paper leaves visible: this also hides the pixel
     // steps of the paper's raster edge under the outline
-    ctx.globalAlpha = faint; ctx.lineWidth = LW.sil / 2; ctx.stroke(lw.sil); ctx.stroke(lw.silOuter);
+    ctx.globalAlpha = ink; ctx.lineWidth = LW.sil / 2; ctx.stroke(lw.sil); ctx.stroke(lw.silOuter);
     ctx.globalAlpha = 1;
     if (overhang) strokeFaces(ctx, state, overhang, C.warn, 1.2, true);
     if (o.selection && !o.selection.sketch) strokeSelection(ctx, C, state, o.selection);
@@ -172,7 +185,24 @@ export function draw(canvas, program, viewIn, o = {}) {
   const tLines = performance.now();
 
   // ---- overlays
+  const opacity = o.style?.annotations ?? 1;
+  // Annotation routines set their own alpha. Composite their completed layer
+  // once so labels, dimensions and sheet furniture fade together.
+  if (!opacity && !thumb) return state;
+  const base = ctx;
+  if (opacity < 1 && !thumb) {
+    let buffer = annotationBuffers.get(canvas);
+    if (!buffer) {
+      buffer = canvas.ownerDocument.createElement('canvas');
+      annotationBuffers.set(canvas, buffer);
+    }
+    buffer.width = bw;
+    buffer.height = bh;
+    ctx = buffer.getContext('2d');
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+  }
   if (!sketchView && !thumb) {
+    if (o.shotTrail) drawShotTrail(ctx, state, o.style.trail, o.shotTrail);
     if (has('componentNames') && program?.kind === 'assembly' && o.componentNameOpacity !== 0)
       drawComponentNames(ctx, C, state, o.componentNameOpacity ?? 1);
     if (has('normals')) drawNormals(ctx, C, state);
@@ -197,8 +227,14 @@ export function draw(canvas, program, viewIn, o = {}) {
   ctx.globalAlpha = 1;
   if (thumb) { state.ms = performance.now() - t0; return state; }
   if (sk) { const st = sketchStatus(sk); text(ctx, C, `SKETCH ${sk.id} · ${st.text}`, K.inset, K.inset + 6, { size: K.label, col: toneOf(C, st.tone) }); }
-  state.scaleBar = scaleBar(ctx, C, cam);
-  if (o.titleBlock !== false) state.title = titleBlock(ctx, C, cam, titleRows(program, scene, view, cam, sk), o.sheet || 'J-01');
+  if (o.furniture !== false) state.scaleBar = scaleBar(ctx, C, cam);
+  if (o.furniture !== false && o.titleBlock !== false) state.title = titleBlock(ctx, C, cam, titleRows(program, scene, view, cam, sk), o.sheet || 'J-01');
+  if (ctx !== base) {
+    base.save();
+    base.globalAlpha = opacity;
+    base.drawImage(ctx.canvas, 0, 0, W, H);
+    base.restore();
+  }
   state.ms = performance.now() - t0;
   state.timing = { raster: tRaster - t0, shadow: tShadow - tRaster, linework: tWork - tPaper0, paper: tPaper - tWork, stroke: tLines - tPaper, lines: tLines - tRaster, total: state.ms };
   return state;

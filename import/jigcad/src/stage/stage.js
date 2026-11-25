@@ -10,8 +10,9 @@ import { normView, nearestView, unprojectPlane, proj, VIEWS, ZOOM_MIN, ZOOM_MAX 
 import { onTheme, loadFonts, text, K } from './theme.js';
 import { pickEdge } from './lines.js';
 import { handles, hitMark, drawSketchHover, pickOf } from './sketch.js';
-import { V, clamp, applyM, boxCorners, boxOk, growBox } from './math.js';
+import { V, clamp } from './math.js';
 import { sketchToWorld } from './scene.js';
+import { outputCamera } from './output-camera.js';
 import { studyAssembly } from './study-preview.js';
 
 const ORBIT = 0.008, PITCH = 0.006, THRESHOLD = 4;
@@ -403,32 +404,12 @@ export function createStage(element, host = {}, options = {}) {
     select: setSelection,
     // Freeze the sheet and its camera while the output preview is open.
     renderCamera(study) {
-      const source = program, still = posedProgram(), stillFrame = preview;
+      const source = program, still = posedProgram(), stillFrame = preview, stillPose = posed?.pose;
       const baseView = { ...view }, cam = last.cam, baseHeight = H;
       const settings = { dpr: 1, overlays: new Set(on), selection, sketches: new Map(solved),
         sheet: options.sheet || host.preset?.id, colorsFrom: element };
-      const bounds = last.scene.fitBox.map(p => [...p]);
-      if (study) {
-        const bodies = source.bodies.filter(b => boxOk(b.bbox))
-          .map(b => ({ body: b, corners: boxCorners(b.bbox) }));
-        for (const row of study.rows) {
-          const { pose } = study.frameAt(row);
-          for (const { body, corners } of bodies) {
-            const matrix = pose[body.part] ?? body.transform;
-            for (const corner of corners) growBox(bounds, applyM(matrix, corner));
-          }
-        }
-      }
-      return (canvas, { width, height, fit, zoom, row }) => {
-        const frame = row == null ? stillFrame : study.frameAt(row);
-        const model = row == null ? still : { ...source, assembly: studyAssembly(source.assembly, frame) };
-        const camera = { ...baseView, sketchFit: fit ? null : baseView.sketchFit,
-          pan: cam.sketch && !fit ? baseView.pan : [0, 0],
-          scale: fit ? null : cam.s * height / baseHeight * zoom,
-          target: fit ? null : cam.T, zoom };
-        draw(canvas, model, camera, { ...settings, width, height, fitBox: bounds,
-          pose: frame?.pose, componentNameOpacity: frame?.componentNameOpacity });
-      };
+      return outputCamera({ study, source, still, stillFrame, stillPose, baseView, cam, baseHeight,
+        element, settings, fitBox: last.scene.fitBox });
     },
     toPNG: () => { if (raf) { cancelAnimationFrame(raf); paint(); } return canvas.toDataURL('image/png'); },
     destroy() {

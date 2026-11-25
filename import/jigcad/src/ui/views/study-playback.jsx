@@ -99,7 +99,7 @@ function TrackControls({ host, program, study, renderStudy }) {
   useLayoutEffect(() => {
     if (!track?.playable) return;
     renderStudy.current = {
-      name: study.name, frameAt, rows: track.rows, last,
+      name: study.name, shot: study.shot, frameAt, rows: track.rows, last,
       complete: track.rows.length === last + 1,
       seconds: presentation ? last / 24 : PREVIEW_MS / 1000,
       cyclic: !!presentation,

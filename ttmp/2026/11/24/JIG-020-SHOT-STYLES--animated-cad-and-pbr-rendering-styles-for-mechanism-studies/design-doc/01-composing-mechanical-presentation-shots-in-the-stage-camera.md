@@ -68,6 +68,55 @@ Treat a section as display geometry. Clip selected solids, reconstruct interior 
 4. Implement occurrence-local capped sections and isolation. Validate caps with holes and verify registration at small features in the Singer assembly.
 5. Capture workbench images and run an end-to-end export. Compare a reference CAD frame with default settings and exercise animation keys during scrubbing.
 
-## Further shot types
+## Authoring and running a shot
 
-The same frame data can support turntables by changing the camera, split screens and detail insets by rendering more than one camera at the same instant, and motion trails by sampling a named point. These are distinct camera and layout features. This ticket prioritizes the hybrid surface pass, style animation, isolation and fixed sections discussed for the Singer head.
+Open SG-09, switch to Code and find the study named Stitch cycle. Press Run after editing. In Stage, open Render, choose Preset animation under Style and scrub Study frame. CAD lines, PBR and PBR + CAD edges also work as manual still or movie styles. The combined style exposes surface blend and edge opacity directly. An authored shot can be modified without editing a rendering engine.
+
+The following legal keys illustrate the API. Insert the array as the shot property on the study alongside phase, steps and at. Time is elapsed presentation time in seconds, including the explode and reassembly introduction. A plain motion study uses its own playback duration. The compiler validates the channel names and occurrence IDs, and prefixes occurrence references when a child study is lifted into an assembly.
+
+```js
+shot: [
+  { time: 0, surface: 1, edges: 0, annotations: 0 },
+  { time: 3, surface: 0, edges: 1, annotations: 1 },
+  { time: 4, surface: 0, edges: 1, annotations: 1 },
+  { time: 7, surface: 1, edges: 0.45, annotations: 0 },
+  { time: 8, isolate: ['presserGuide', 'presserBar'],
+    section: { components: ['presserGuide'], normal: [0,-1,0], offset: 0 } },
+  { time: 10, isolate: null, section: null, view: { inset: 'presserFoot' } },
+  { time: 13, view: 'stage', edges: 0 }
+]
+```
+
+| Channel | Meaning |
+| --- | --- |
+| surface | PBR fraction from 0 to 1 over the CAD paper pass. |
+| edges | Opacity of the Stage edge strokes, including silhouettes. |
+| annotations | Opacity of the annotation layer including sheet furniture, enabled labels and motion trails. Stage visibility switches and the presentation's label fade still apply. |
+| isolate | Exact occurrence IDs to keep, or null to restore the assembly. |
+| section | One half-space applied to the named components. Each component keeps local points satisfying dot(unit normal, point) ≤ offset, in mm. Use null to clear. |
+| accent | Components, a six-digit hex color and opacity for a visibility-tested color overlay. |
+| trail | Component, local XYZ point in mm, history length in seconds and a six-digit hex color. Gaps in the study break the trail. |
+| view | stage, turntable, front-side or an object with an inset occurrence ID. |
+
+Numeric opacity channels interpolate linearly between their own keys and hold after their last key. Selections and camera compositions take effect at the keyed time. A turntable makes one revolution over the complete study. Front and side panels sample the same mechanical state. A detail inset fits its camera to the chosen moving occurrence. The Composition control can override the authored camera arrangement for an individual export.
+
+SG-09 uses a closed 13-second shot. The first three seconds transition to drafting as the parts separate. The separated view holds through second four. Reassembly restores the shaded surfaces by second seven. At second eight the presser guide is sectioned and surrounding parts disappear. At second ten the complete head returns, with a teal drive train and an orange needle trajectory. The final surface and visibility settings match the starting shot. The fixed section and explosion paths are presentation geometry.
+
+## Source map
+
+| File | Responsibility |
+| --- | --- |
+| import/jigcad/content/presets/SG-09-exploded-head/script.js | Real editable study and shot example. |
+| import/jigcad/src/render/shot.js | Schema, component remapping and evaluator. |
+| import/jigcad/src/ui/views/study-playback.jsx | Maps a timeline row to the solved and exploded occurrence transforms. |
+| import/jigcad/src/stage/output-camera.js | Captures the view, fits the complete study, evaluates the frame and draws the selected cameras. |
+| import/jigcad/src/render/stage-pbr.js | Builds the look from the CAD package and obtains the Candela color image. |
+| import/jigcad/src/stage/section.js and shot-marks.js | Clips solids, generates caps, tints visible face pixels, and traces component-local points. |
+| import/jigcad/src/stage/sheet.js | Composes paper, beauty, edges and annotations. |
+| import/jigcad/src/ui/views/stage-render.jsx | Owns the asynchronous preview, PNG and movie controls, cancellation and GPU resource lifetime. |
+
+## Verification and limits
+
+The two-depth registration check projects separate objects through the Stage and Candela camera models. The section audit sweeps four planes across the 29 Singer bodies and separately measures the retained volume and cap area on a bored sleeve. The browser acceptance test changes styles, scrubs the shot, checks PNG equality against the camera preview, exports the actual study and decodes its 312 H.264 frames. The verification scripts and captured images are stored under scripts and sources in this ticket.
+
+The PBR pass uses a GPU backend. This run exercised WebGL2 and a deliberate backend failure. The regular CAD renderer remains available on a machine without GPU rendering. The section offset is fixed within a keyed interval. The current interface supports a single plane per selected component group.

@@ -96,6 +96,7 @@ export function StageView({ host }) {
             const study = renderStudy.current;
             study?.pause();
             setRender({ draw: stage.renderCamera(study), study, program: p,
+              supportsBeauty: good.bodies?.length > 0 && v.name !== 'sketch' && good.kind !== 'print',
               name: host.preset?.slug || host.preset?.id || 'stage' });
           }}>Render…</button>
           <span class="lbl">Zoom</span>
