@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "9114ffa1eabadde579c480d67f72d9d02fd82669254839bb99c2921076d961e8",
+  "request": {
+    "ticket": "JIG-024",
+    "status": "complete",
+    "intent": "",
+    "entry": "Verified portable studio switching, reload, cross-preset reuse and matching OptiX background pixel with fixed EV."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-72c293590fcdac66512293b03f712b2b",
+    "state": "committed",
+    "created_at": "2026-11-25T04:31:04.734160288Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "index.md": "4e509f3d5a479245f1e1f967699762d05635a77f46c9c812ba92b3a11541e864"
+    },
+    "after": {
+      "changelog.md": "3d8214308a19126777692aae100ae6afff89876ffc094ac57fd655a0106909f8",
+      "index.md": "65be9322428bb32b2f271acb5c16857ac9e759d6bcd8707c2fc2594242fac4d2"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKVmVyaWZpZWQgcG9ydGFibGUgc3R1ZGlvIHN3aXRjaGluZywgcmVsb2FkLCBjcm9zcy1wcmVzZXQgcmV1c2UgYW5kIG1hdGNoaW5nIE9wdGlYIGJhY2tncm91bmQgcGl4ZWwgd2l0aCBmaXhlZCBFVi4K"
+    },
+    {
+      "path": "index.md",
+      "before": "4e509f3d5a479245f1e1f967699762d05635a77f46c9c812ba92b3a11541e864",
+      "after": "LS0tClRpdGxlOiBSZXVzYWJsZSByZW5kZXIgc3R1ZGlvcwpUaWNrZXQ6IEpJRy0wMjQKU3RhdHVzOiBjb21wbGV0ZQpUb3BpY3M6CiAgICAtIGNhZApEb2NUeXBlOiBpbmRleApJbnRlbnQ6IGxvbmctdGVybQpPd25lcnM6IFtdClJlbGF0ZWRGaWxlczogW10KRXh0ZXJuYWxTb3VyY2VzOiBbXQpTdW1tYXJ5OiAiIgpMYXN0VXBkYXRlZDogMjAyNi0xMS0yNFQyMzozMTowNC43MzQwODk0MTQtMDU6MDAKV2hhdEZvcjogIiIKV2hlblRvVXNlOiAiIgotLS0KIyBSZXVzYWJsZSByZW5kZXIgc3R1ZGlvcwoKUmV1c2UgbmFtZWQgQ2FuZGVsYSBzY2VuZSBsb29rcyBhbmQgZXhwb3N1cmUgaW4gdGhlIGJyb3dzZXIgb3IgaW4gYSBuYXRpdmUgam9iLgoKW0Rlc2lnbl0oZGVzaWduLWRvYy8wMS1zdG9yZS1hbmQtc3dpdGNoLW5hbWVkLXNjZW5lLWxvb2tzLm1kKSDCtyBbSW1wbGVtZW50YXRpb24gZGlhcnldKGRpYXJ5LzAxLXJldXNhYmxlLXJlbmRlci1zdHVkaW9zLWltcGxlbWVudGF0aW9uLWRpYXJ5Lm1kKSDCtyBbVGFza3NdKHRhc2tzLm1kKSDCtyBbQ2hhbmdlbG9nXShjaGFuZ2Vsb2cubWQpCgpUaGUgc2l4IFN0YWdlIGRlc2lnbnMgYXJlIGJ1bmRsZWQgaW4gcmVNYXJrYWJsZSBDbG91ZCB1bmRlciAvYWkvMjAyNi8xMS8yNC9KaWctU3RhZ2UuCg=="
+    }
+  ]
+}
