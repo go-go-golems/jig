@@ -1,0 +1,10 @@
+{
+  "id": "SG-10",
+  "title": "Rotary hook passing the rising needle",
+  "group": "Singer 44S",
+  "order": 10,
+  "difficulty": "advanced",
+  "about": "A slow service-timing study of the rotary holder passing the needle scarf above the Class 15 bobbin.",
+  "tries": "In Render, select Preset animation. Halfway through the four-second shot the hook point passes behind the right-rising needle.",
+  "view": "axo"
+}

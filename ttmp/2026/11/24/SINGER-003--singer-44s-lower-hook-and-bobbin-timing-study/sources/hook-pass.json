@@ -1,0 +1,46 @@
+{
+  "preset": "SG-10-hook-pass",
+  "study": "Hook pass",
+  "row": 60,
+  "lastRow": 120,
+  "shaftDeg": 40.021861596466174,
+  "timeSeconds": 2,
+  "barRiseMm": 3.499999999992932,
+  "rearScarfGapMm": 0.07499999999609039,
+  "pointAboveEyeTopMm": 1.9983132640091181,
+  "hookPointWorldMm": [
+    2.689853088224852,
+    0.2849999999960904,
+    -3.853091812949227
+  ],
+  "scarfSurfaceWorldMm": [
+    2.689853088203683,
+    0.21,
+    -3.85309181295629
+  ],
+  "eyeTopWorldMm": [
+    2.771975551107877,
+    0,
+    -5.851405076958345
+  ],
+  "holderPointLocalMm": [
+    0,
+    15,
+    0.1469081870507729
+  ],
+  "needleScarfLocalMm": [
+    0,
+    0.21,
+    -10
+  ],
+  "commonVolumeSampleCount": 121,
+  "uniqueCandidateTests": 485,
+  "maxCommonVolumeMm3": 0,
+  "largestOverlap": null,
+  "provenance": {
+    "shaftDeg": "Computed from representative upper-head linkage and selected gate angle.",
+    "barRiseMm": "Specified by 3-11 and reconstructed along right-hand bar axis.",
+    "rearScarfGapMm": "Chosen midpoint of the separate 3-12 range; verified against the needle solid.",
+    "pointAboveEyeTopMm": "Estimated scarf-midpoint target, calculated from the reconstructed geometry."
+  }
+}

@@ -131,10 +131,13 @@ function clampScrew() {
       mm(2), { id: 'rimSlot' })
     .port('axis', planar(origin))
 }
+const needleDatums = {tip: -17, eyeTop: -12, buttToEye: 33.9,
+  scarfBack: 0.21, scarfMid: -10}
 function needle() {
   // Representative Schmetz 130/705 H NM90. The manufacturer's O1 dimension
   // goes to the upper edge of the eye. Needle tip position is the SG datum.
-  const tip = -17, eyeTop = -12, butt = eyeTop + 33.9
+  const {tip, eyeTop, buttToEye, scarfBack, scarfMid} = needleDatums
+  const butt = eyeTop + buttToEye
   const blank = j.sketch('needleBlank', { on: j.plane.XZ })
     .polyline('section', [[0, tip], [0.08, tip + 0.16],
       [0.45, tip + 3.4], [0.45, -0.6], [1.02, 4], [1.02, butt - 0.24],
@@ -148,9 +151,12 @@ function needle() {
     .cut(face(j.region.slot([0, -12.4], [0, -0.4], 0.18), 0.32),
       mm(0.8), { id: 'longFrontGroove' })
     .cut(face(j.region.slot([0, -11.7], [0, -8.5], 0.8), -0.55),
-      mm(0.34), { id: 'rearScarf' })
+      mm(0.55 - scarfBack), { id: 'rearScarf' })
     .port('shank', planar(origin)).port('tip', planar([0, tip]))
     .port('threadEye', planar([0, eyeTop - 0.65]))
+    .port('slideAxis', vertical())
+    .port('scarfMid', j.frame({origin: j.pt(0, scarfBack, scarfMid)}))
+    .port('eyeTop', planar([0, eyeTop])).port('butt', planar([0, butt]))
 }
 function addNeedleHardware(head) {
   return head.add('clampScrew', clampScrew())
@@ -346,5 +352,6 @@ function flowLaw(amplitude, clearance = 5) {
 }
 // Convenience for the isolated drive and static swing presets.
 const swingAt = (phase, amplitude) => flowLaw(amplitude).angle(phase)
-return { takeUpStudy, takeUpAngles, needleHardwareStudy, swingSupportStudy,
+return { needle, plate, needleDatums, takeUpStudy, takeUpAngles,
+  needleHardwareStudy, swingSupportStudy,
   assemble, pose, flowLaw, swingAt, jointValues }
