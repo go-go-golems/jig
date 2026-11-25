@@ -59,3 +59,9 @@ Scripts 01 through 06 cover the workbench export, registration, section geometry
 ### What warrants a second pair of eyes
 
 Review the camera in a WebGPU-capable interactive browser. Headless tests on this machine verified the WebGL2 backend. At low sample counts reflective steel can look noisy. The sample-count control applies to each output frame.
+
+## Step 4. Finish integration and close the ticket
+
+Commit de41a90 connected the render controls, both drawing passes and camera compositions. An isolation review found that joint marks and numeric face selections could refer to parts hidden by a shot. The final adjustment filters the joint/port annotations and resolves a selected source body by its stable ID in the isolated body list. Script 03 now checks the remaining annotation references as well as the clipped geometry.
+
+The full Go test suite initially encountered the sandbox error “listen tcp 127.0.0.1:0: socket: operation not permitted”. It passed with local HTTP listeners available. The Stage unit suite passed 21/21, make web succeeded and docmgr doctor passed for this ticket.

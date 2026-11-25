@@ -1,7 +1,7 @@
 ---
 Title: Animated CAD and PBR rendering styles for mechanism studies
 Ticket: JIG-020-SHOT-STYLES
-Status: active
+Status: complete
 Topics:
     - cad
     - rendering
@@ -11,7 +11,7 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-24T20:07:40.353474662-05:00
+LastUpdated: 2026-11-24T20:19:40.387327875-05:00
 WhatFor: ""
 WhenToUse: ""
 ---

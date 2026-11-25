@@ -55,6 +55,9 @@ const section = {components:['presserGuide'],normal:[0,-1,0],offset:0}
 const shot = {isolate:['presserGuide','presserBar'],section}
 const result = shotGeometry(head,shot)
 assert.deepEqual(result.bodies.map(b=>b.part).sort(),shot.isolate.slice().sort())
+assert.ok(head.assembly.joints.length > result.assembly.joints.length)
+assert.ok(result.assembly.ports.every(p => shot.isolate.includes(p.ref.split(':')[0])))
+assert.ok(Object.keys(result.assembly.origins).every(id => shot.isolate.includes(id)))
 const guide = result.bodies.find(b=>b.part==='presserGuide')
 assert.ok(guide.faces.at(-1).area>1)
 assert.equal(result.bodies.find(b=>b.part==='presserBar'),head.bodies.find(b=>b.part==='presserBar'))

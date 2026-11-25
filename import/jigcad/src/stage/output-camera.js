@@ -36,6 +36,11 @@ export function outputCamera({ source, still, stillFrame, stillPose, baseView, c
     const paintView = (target, w, h, view, box, secondary = false) => {
       const opts = { ...settings, width: w, height: h, fitBox: box, pose, style, shotTrail,
         furniture: !secondary, componentNameOpacity: secondary ? 0 : frame?.componentNameOpacity };
+      if (style?.isolate && typeof settings.selection?.body === 'number') {
+        const id = model.bodies[settings.selection.body]?.id;
+        const index = geometry.bodies.findIndex(b => b.id === id);
+        opts.selection = index < 0 ? null : { ...settings.selection, body: index };
+      }
       if (secondary) opts.overlays = new Set();
       const drawSheet = beauty => draw(target, geometry, view, { ...opts, beauty });
       if (!style?.surface) return drawSheet(null);

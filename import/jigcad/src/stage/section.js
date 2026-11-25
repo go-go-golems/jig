@@ -19,7 +19,18 @@ export function shotGeometry(program, { isolate, section } = {}) {
       .filter(Boolean);
     cache.set(program.bodies, { key, bodies });
   }
-  return { ...program, bodies };
+  if (!isolate || !program.assembly) return { ...program, bodies };
+  const visible = new Set(bodies.map(b => b.part));
+  const belongs = ref => visible.has(ref?.split(':')[0]);
+  const assembly = program.assembly;
+  return { ...program, bodies, assembly: { ...assembly,
+    ports: assembly.ports.filter(port => belongs(port.ref)),
+    joints: assembly.joints.filter(joint => belongs(joint.portA) && belongs(joint.portB)),
+    origins: Object.fromEntries(Object.entries(assembly.origins).filter(([id]) => visible.has(id))),
+    // Study measures can refer to any body. Only the shot's explicitly
+    // selected trail can be attributed to a visible component here.
+    studies: {},
+  } };
 }
 
 const triple = (array, index) => [array[index], array[index + 1], array[index + 2]];
