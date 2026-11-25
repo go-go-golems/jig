@@ -188,3 +188,31 @@ SG-09 opts in with presentation.fadeComponentNames. Label opacity takes the same
 The request was “can we render a video / still frame from the jig cad stage?” I chose the SG-09 axonometric view and captured its drafting canvas at 1280 × 720. Script 14 scrubs the actual Stage, awaiting a repaint for each sample. The video contains 312 samples. Omitting the repeated endpoint gives a 13-second loop at 24 fps. The accompanying PNG is sample 84 during the full-spread hold.
 
 I inspected the still, decoded the movie with FFmpeg, and used ffprobe to verify H.264, dimensions, frame rate, duration and decoded frame count. Frame checksums differed at samples 0, 84 and 204. The script and both outputs are stored with this ticket.
+
+## Step 8. Give CAD Stage its own render camera and export controls
+
+The requests were “can we ad a render menu to the cad stage like we did for render?” and “also, how can we chose the render dimensions to make sure we have the object properly framed, or have standard formats / like can we see a preview of the render camera ? like in blender or so?”
+
+### What I did and why
+
+Stage opens a modal camera preview. Presets cover HD, Full HD, portrait and square. Custom sizes cover 32 to 4096 pixels per dimension. The preview canvas has the actual output dimensions and CSS scales its display. PNG saves that canvas. The movie writer calls the same draw function with the same settings for each output frame. The existing Candela video writer and workbench download path handle encoding and saving.
+
+### What was tricky to build
+
+A camera fitted separately at each shaft angle would change scale during the animation. The export computes one bounding box from the body corners transformed through every reachable study pose, including presentation offsets. The Stage camera option instead keeps the viewport's center, direction and vertical framing. Preview scrubbing uses the playback component's sample mapping without emitting changes into the live Stage.
+
+### What worked
+
+Script 15 exercised the local toolbar in Chromium. It checked the 1080 × 1920 portrait buffer, custom sizing, a frameless-to-UI PNG byte comparison against the canvas, and the underlying paused Stage row after closing. ffprobe decoded a 640 × 360 H.264 movie of 312 frames. The 21 Stage unit checks passed. The browser screenshot is sources/workbench/SG-09-render-camera.png.
+
+### What didn't work
+
+The first run of scripts/15-check-stage-render.cjs reported “locator.selectOption: Timeout 30000ms exceeded” on an exact Format label lookup. The selects now have explicit accessible names. The rerun completed successfully.
+
+### What warrants a second pair of eyes
+
+Video support depends on the browser's WebCodecs encoders at the requested dimensions. The export chooses MP4 where H.264 is available and otherwise requests WebM. The browser verification here covered H.264. Bounding boxes intentionally permit extra margin on long diagonal parts.
+
+### Code review instructions
+
+Start at stage-render.jsx and renderCamera in stage.js, then follow frameAt in study-playback.jsx. Run make web and the ticket's scripts/15-check-stage-render.cjs against the local server.

@@ -6,6 +6,7 @@ import { loadStage } from '../modules.js';
 import { NAMED_VIEWS, OVERLAYS, squareView, isSketchPick } from '../../host/host.js';
 import { qty, num, vec, metric, DASH, bare } from '../format.js';
 import { SketchInspector, pickLabel } from './sketch-inspector.jsx';
+import { StageRender } from './stage-render.jsx';
 import { StudyPlayback } from './study-playback.jsx';
 
 /** A persistent name that wraps only after "/" and "[". */
@@ -21,7 +22,8 @@ const VIEW_OPTS = [
 
 export function StageView({ host }) {
   useHost(host, ['view', 'selection', 'program', 'compiling', 'preset']);
-  const el = useRef(null);
+  const el = useRef(null), renderStudy = useRef(null);
+  const [render, setRender] = useState(null);
   const [fallback, setFallback] = useState(false);
   const [overlays, setOverlays] = useState(OVERLAYS);
   useEffect(() => {
@@ -88,14 +90,23 @@ export function StageView({ host }) {
               </button>
             ))}
           </Menu>
+          <button class="btn sm" disabled={!good || fallback || host.compiling} onClick={() => {
+            const stage = el.current?.jigStage;
+            if (!stage) return;
+            const study = renderStudy.current;
+            study?.pause();
+            setRender({ draw: stage.renderCamera(study), study, program: p,
+              name: host.preset?.slug || host.preset?.id || 'stage' });
+          }}>Render…</button>
           <span class="lbl">Zoom</span>
           <input type="range" min="0.25" max="4" step="0.05" aria-label="Zoom" value={v.zoom ?? 1} style={pct(v.zoom ?? 1, 0.25, 4)} onInput={e => host.setView({ zoom: +e.currentTarget.value, scale: null })} />
           <button class="btn sm" disabled={squared} title={`Back to the ${named?.title.toLowerCase() || 'axonometric'} view at zoom 1, centred on the part`}
             onClick={() => host.setView({ name: named ? v.name : 'axo', ...squareView() })}>Square up</button>
         </div>
         {!fallback && !host.compiling && p?.ok && v.name !== 'sketch' && p.assembly?.studies && (
-          <StudyPlayback host={host} program={p} />
+          <StudyPlayback renderStudy={renderStudy} host={host} program={p} />
         )}
+        {render && render.program === p && !host.compiling && <StageRender host={host} job={render} close={() => setRender(null)} />}
         <div class="sheet">
           <div class="sheethost" ref={el} />
           {!good && p?.ok !== false && <p class="empty padded sheetnote">{host.compiling ? 'Compiling…' : `Nothing compiled yet. Press Run (${RUN_KEY}).`}</p>}

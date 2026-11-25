@@ -4,7 +4,7 @@ import { advanceStudy, presentationSample } from '../study-samples.js';
 
 const PREVIEW_MS = 4000;
 
-export function StudyPlayback({ host, program }) {
+export function StudyPlayback({ host, program, renderStudy }) {
   const studies = program.assembly.studies;
   const names = Object.keys(studies).filter(name => studies[name].rows?.length);
   const [selected, select] = useState(null);
@@ -16,11 +16,11 @@ export function StudyPlayback({ host, program }) {
         {names.map(n => <option key={n} value={n}>{n}</option>)}
       </select>
       : <span class="lbl">Study · {name}</span>}
-    <TrackControls key={name} host={host} program={program} study={studies[name]} />
+    <TrackControls renderStudy={renderStudy} key={name} host={host} program={program} study={studies[name]} />
   </div>;
 }
 
-function TrackControls({ host, program, study }) {
+function TrackControls({ host, program, study, renderStudy }) {
   const [track, setTrack] = useState(null);
   const [row, setRow] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -81,12 +81,8 @@ function TrackControls({ host, program, study }) {
     };
   }, [host, program, study]);
 
-  function show(index) {
+  function frameAt(index) {
     const sample = track.indices.get(index);
-    if (sample == null) {
-      setMessage('Unreachable at ' + driveLabel(index));
-      return false;
-    }
     const frame = presentation && presentationSample(index);
     const pose = {};
     for (const [id, matrices] of Object.entries(track.T)) {
@@ -97,8 +93,29 @@ function TrackControls({ host, program, study }) {
         for (let axis = 0; axis < 3; axis++) pose[id][12 + axis] += offset[axis] * frame.spread;
       } else pose[id] = matrix;
     }
-    host.emit('studyPreview', { pose, row: study.rows[frame ? frame.source : index], drive: study.drive,
-      componentNameOpacity: presentation?.fadeComponentNames ? frame.spread : undefined, offsets: presentation?.offsets });
+    return { pose, row: study.rows[frame ? frame.source : index], drive: study.drive,
+      componentNameOpacity: presentation?.fadeComponentNames ? frame.spread : undefined, offsets: presentation?.offsets };
+  }
+  useLayoutEffect(() => {
+    if (!track?.playable) return;
+    renderStudy.current = {
+      name: study.name, frameAt, rows: track.rows, last,
+      complete: track.rows.length === last + 1,
+      seconds: presentation ? last / 24 : PREVIEW_MS / 1000,
+      cyclic: !!presentation,
+      currentRow: () => current.current,
+      pause,
+    };
+    return () => { renderStudy.current = null; };
+  }, [track, program, study]);
+
+  function show(index) {
+    const sample = track.indices.get(index);
+    if (sample == null) {
+      setMessage('Unreachable at ' + driveLabel(index));
+      return false;
+    }
+    host.emit('studyPreview', frameAt(index));
     current.current = index;
     setRow(index);
     setPreview(true);
