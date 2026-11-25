@@ -13,6 +13,7 @@ const checked = execFileSync(process.execPath,
   ['import/jigcad/tools/preset-check.mjs', 'SG-', '--quiet'], {encoding: 'utf8'})
 const presets = Array.from(checked.matchAll(/^ok\s+(SG-\d\d-\S+) · .*? · (\d+) features · (\d+) bodies/gm),
   ([,slug,features,bodies]) => ({slug, features: +features, bodies: +bodies, id: slug.slice(0,5)}))
+  .filter(item => item.id <= 'SG-08') // Original reconstruction figure set.
 assert.deepEqual(presets.map(p => p.id),
   ['SG-01','SG-02','SG-03','SG-04','SG-05','SG-06','SG-07','SG-08'])
 const evidence = [['preset','features','bodies','view','file']]

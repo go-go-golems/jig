@@ -144,3 +144,9 @@ Open SG-09 in CAD Stage and scrub through the full-spread hold. Review study-sam
 ### Technical details
 
 Playback spends three seconds opening, one second at full spread, three seconds closing and six seconds on the two strokes. Only translations change during the introductory samples.
+
+## Step 5. Verify playback in the running workbench and archive the views
+
+The implementation checkpoint was 66dab82. I ran the ticket's scripts/13-check-exploded-head.cjs against the server on port 18965. Chromium confirmed that Loop started enabled and that playback advanced from the last sewing sample into the opening segment.
+
+The script compared all 16 placement matrix entries for each of the 29 occurrences against the prescribed offsets at full spread, and against the home pose after reassembly and at 720 degrees (tolerance 0.00001). It also checked that the presser foot stayed seated while the needle moved. I enlarged the default view after inspecting the first screenshot and reran the browser check. The four SG-09 PNGs in sources/workbench show front and axonometric spread, reassembly and sewing. These are workbench captures of reconstructed parts. The original photographs remain in the ticket's source archive.
