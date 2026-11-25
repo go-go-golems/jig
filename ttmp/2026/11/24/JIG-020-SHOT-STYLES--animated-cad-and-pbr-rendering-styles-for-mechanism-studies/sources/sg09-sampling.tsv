@@ -1,0 +1,6 @@
+measurement	frames	left	top	right_exclusive	bottom_exclusive	mean_abs_64_1024	mean_abs_1024_2048
+Assembled head · crank and spring	0	840	445	1008	597	4.29673	0.89356
+Presser cutaway · bar and guide caps	204	866	585	1034	737	1.03090	0.18345
+Sewing · rising needle, shank and foot	264	844	636	1012	788	2.91313	0.60340
+same-frame RGB difference	252-275	803	363	1063	857	1.88952	0.43155
+change in RGB difference between adjacent frames	252-275	803	363	1063	857	1.53342	0.63047

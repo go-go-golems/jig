@@ -105,3 +105,27 @@ The job must complete all four OptiX segments, composite all 312 frames and pass
 At c91de4e the verifier accepted all four segments at 1,024 SPP with fixed EV 6.50414. The segments took 147.349, 196.397, 102.459 and 147.792 seconds of native render time, totaling 593.997 seconds. The job started at 20:39:13.151 Eastern and finished verification at 20:49:40.554 Eastern on November 24. End-to-end elapsed time with pre-exported inputs was 627.403 seconds. The native phase including output took 604.8 seconds, compositing took 20.1 seconds and encoding with verification took 2.5 seconds.
 
 The H.264 export contains 312 frames at 24 fps. The six decoded-frame comparisons each reported a mean absolute channel difference between 1.008 and 2.011 on the 8-bit scale. Local and remote SHA-256 both equal fc4541c0d8c81ae3b9514c9fb32cf5f8fa31bd5aaf0d6bd73cfa539f74328397. Script 10 and the accompanying JSON receipt provide the reproduction and verification record.
+
+## Step 7. Verify the 2,048-SPP export and compare the moving image
+
+The Spark finished the three-level sampling experiment with the original camera, 29 occurrence tracks, original reference plates and fixed EV 6.50414. A 24-frame loop exposes the change in moving metal and needle highlights at the movie's playback speed. The numerical comparisons use matched native display PNGs, before adding the CAD plates or compressing the final movie.
+
+### Prompt context
+
+The request was “start a 2048 render btw”. After playback, the user answered “goahead” to the proposed benchmark closeout and three-way vault comparison. The agreed closeout included the movie, receipt, measured timing and moving highlights.
+
+### Actions and technical evidence
+
+- Compared SHA-256 on the Spark and locally. Both return 9cf15f11695b38e0b57b5b7787a16582145e7fc82cb09818b2583cde2e607d84. Local ffprobe decoded 312 H.264 frames at 1920 × 1080, 24 fps and 13 seconds.
+- The four OptiX segments report 294.793, 390.040, 195.853 and 282.753 seconds, or 1,163.439 seconds combined. The Spark native log was created at 20:53:00.159 Eastern. The verification log finished at 21:12:56.971, for 1,196.812 seconds elapsed. This includes 19.980 seconds of compositing and 2.502 seconds of encoding and verification, using previously exported plates and poses.
+- Script 12 reads all three job directories in sample-count order. It writes a five-column PNG, a lossless WebP at an average of 24 fps and a TSV with the crop boundaries and exact measurements. Native data lives on bling.local under ~/data/pbr-spark/renders/SG-09-optix-1080p-{7f59b22,1024spp,2048spp}. Pass these paths in that order followed by an output directory.
+
+### Decisions, observations and limitations
+
+The spatial region for the sewing loop is fixed to cover the full moving head for an entire second. Averaging over the same rectangle makes the two successive sample-count changes comparable. The background and stationary components contribute to this average. In frames 252–275 the mean absolute RGB channel difference was 1.88952 for 64→1,024 and 0.43155 for 1,024→2,048. The mean absolute change in the signed pairwise difference between consecutive frames was 1.53342 and 0.63047 respectively. The latter metric detects changes in the residual over time, including residuals carried along by moving objects.
+
+The crank and spring crop shows the largest reduction among the three selected stills. The display processing and the sample sets are shared between runs, so these differences do not establish radiometric accuracy against an independent reference. The 2,048-SPP job took 1.96 times the native render time of the 1,024-SPP job.
+
+### Validation and review
+
+I decoded all 24 frames of the comparison WebP and checked that every one of its 72 crops exactly equals the corresponding original native crop. Its frame durations total 1,000 ms. Independently, the Spark movie verifier compared six H.264 frames to their source composites and recorded mean absolute channel differences from 1.007 to 2.007. Inspect the eightfold-gain columns of the PNG for spatial differences and the lossless loop for temporal differences. No validation failures were observed.
