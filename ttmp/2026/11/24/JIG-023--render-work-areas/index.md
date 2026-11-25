@@ -1,7 +1,7 @@
 ---
 Title: Render work areas
 Ticket: JIG-023
-Status: active
+Status: complete
 Topics:
     - cad
 DocType: index
@@ -10,43 +10,14 @@ Owners: []
 RelatedFiles: []
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-24T23:12:30.99117942-05:00
+LastUpdated: 2026-11-24T23:27:59.276515377-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
-
 # Render work areas
 
-## Overview
+Choose inclusive production-frame bounds for video, mask sequences and portable Spark jobs.
 
-<!-- Provide a brief overview of the ticket, its goals, and current status -->
+[Design](design-doc/01-render-a-selected-interval-on-the-original-study-clock.md) · [Implementation diary](diary/01-render-work-areas-implementation-diary.md) · [Tasks](tasks.md) · [Changelog](changelog.md)
 
-## Key Links
-
-- **Related Files**: See frontmatter RelatedFiles field
-- **External Sources**: See frontmatter ExternalSources field
-
-## Status
-
-Current status: **active**
-
-## Topics
-
-- cad
-
-## Tasks
-
-See [tasks.md](./tasks.md) for the current task list.
-
-## Changelog
-
-See [changelog.md](./changelog.md) for recent changes and decisions.
-
-## Structure
-
-- design/ - Architecture and design documents
-- reference/ - Prompt packs, API contracts, context summaries
-- playbooks/ - Command sequences and test procedures
-- scripts/ - Temporary code and tooling
-- various/ - Working notes and research
-- archive/ - Deprecated or reference-only artifacts
+The six Stage designs are bundled in reMarkable Cloud under /ai/2026/11/24/Jig-Stage.
