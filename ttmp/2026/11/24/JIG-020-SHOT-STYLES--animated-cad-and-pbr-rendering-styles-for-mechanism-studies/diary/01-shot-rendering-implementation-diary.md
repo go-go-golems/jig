@@ -65,3 +65,15 @@ Review the camera in a WebGPU-capable interactive browser. Headless tests on thi
 Commit de41a90 connected the render controls, both drawing passes and camera compositions. An isolation review found that joint marks and numeric face selections could refer to parts hidden by a shot. The final adjustment filters the joint/port annotations and resolves a selected source body by its stable ID in the isolated body list. Script 03 now checks the remaining annotation references as well as the clipped geometry.
 
 The full Go test suite initially encountered the sandbox error “listen tcp 127.0.0.1:0: socket: operation not permitted”. It passed with local HTTP listeners available. The Stage unit suite passed 21/21, make web succeeded and docmgr doctor passed for this ticket.
+
+## Step 5. Publish the workbench and run the same shot on the Spark
+
+The user asked “ok, can you push this and check it out on bling.local which is my DGX spark, and render a high res version with optix over there?” I selected Full HD, 24 fps and 64 samples per pixel. I pushed main at 7f59b22. The Spark already had a jig-018-rt checkout, so I created a separate detached worktree under ~/data/pbr-spark/jig-sg09-7f59b22.
+
+### What changed and why
+
+Script 07 exports two geometry variants and 312 exact cameras and occurrence matrices from the shot. Every sample also has CAD reference plates that encode how the annotations and drafted lines composite over a beauty image. The native render CLI reads the scene and frame track, traces with OptiX, and reuses the first segment's metered exposure for later segments. Running the 64-sample pass on frames with a positive surface contribution avoids shading the 25 fully CAD frames. Scripts 08 through 10 composite, encode, decode and check the movie.
+
+### Preflight evidence
+
+The GB10 reported driver 580.178.04. It rendered frame zero at 1920 × 1080, 64 spp with explicit OptiX selection and metered EV 6.50414. A separate native probe on the section frame found its silhouette within one pixel of the matching CAD outline and confirmed the orange cap. The native batch ran in the sg09-optix-fullhd tmux session.
