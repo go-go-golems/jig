@@ -335,17 +335,25 @@ static int cmdRender(int argc, char** argv) {
   const bool parityOnly = wPfm && !wPng && !wExr && !wMp4;
   if (wMp4) { w -= w % 2; h -= h % 2; }   // 4:2:0 video wants even dimensions
   // time: a still at --time, or a sequence from --start to --end at --fps (end inclusive, as the workbench's jobs)
-  const bool sequence = hasFlag(argc, argv, "--sequence") || !args(argc, argv, "--end").empty() || !args(argc, argv, "--frames").empty();
+  const std::string trackFile = arg(argc, argv, "--frame-track", "");
+  const int trackStart = std::stoi(arg(argc, argv, "--start-frame", "0"));
+  if (trackStart < 0 || (trackFile.empty() && trackStart != 0))
+    throw std::runtime_error("--start-frame needs --frame-track and a nonnegative index");
+  const bool sequence = !trackFile.empty() || hasFlag(argc, argv, "--sequence") || !args(argc, argv, "--end").empty() || !args(argc, argv, "--frames").empty();
   const double fps = std::stod(arg(argc, argv, "--fps", "24"));
   // a still without --time: the preset's start time (resolved by the engine); `start` is then reported as -1
   const bool timeGiven = sequence || !args(argc, argv, "--time").empty();
   const double start = std::stod(arg(argc, argv, sequence ? "--start" : "--time", timeGiven ? "0" : "-1"));
   const double end = std::stod(arg(argc, argv, "--end", std::to_string(start + 1).c_str()));
-  const int frames = sequence ? (args(argc, argv, "--frames").empty() ? std::max(1, (int)std::lround((end - start) * fps) + 1) : std::stoi(arg(argc, argv, "--frames", "1"))) : 1;
+  int frames = sequence ? (args(argc, argv, "--frames").empty() ? std::max(1, (int)std::lround((end - start) * fps) + 1) : std::stoi(arg(argc, argv, "--frames", "1"))) : 1;
   if (wMp4 && !sequence) { fprintf(stderr, "--format mp4 needs a sequence (--end or --frames)\n"); return 1; }
   const int seed = std::stoi(arg(argc, argv, "--seed", parityOnly ? "0" : "1"));
   const bool fixedSeed = hasFlag(argc, argv, "--fixed-seed");
-  const int firstFrame = std::stoi(arg(argc, argv, "--first-frame", "1"));
+  const int firstFrame = std::stoi(arg(argc, argv, "--first-frame", trackFile.empty() ? "1" : std::to_string(trackStart).c_str()));
+  const std::string sceneDirectory = arg(argc, argv, "--scene-files", "");
+  const std::string evValue = arg(argc, argv, "--ev", "");
+  const double fixedEV = evValue.empty() ? 0 : std::stod(evValue);
+  if (!std::isfinite(fixedEV)) throw std::runtime_error("--ev needs a finite exposure");
   const char* home = getenv("HOME");
   const fs::path outDir = arg(argc, argv, "--out", parityOnly ? "build/parity" : (std::string(home ? home : ".") + "/data/pbr-spark/renders/" + id).c_str());
   fs::create_directories(outDir);
@@ -358,11 +366,21 @@ static int cmdRender(int argc, char** argv) {
   rt.onConsole = [&](const std::string& level, const std::string& text) { if (level == "warn" || level == "error") fprintf(stderr, "[js %s] %s\n", level.c_str(), text.substr(0, 300).c_str()); };
   rt.runScript(readFile(bundle), bundle);
   size_t nFiles = 0, nBytes = 0;
-  auto contentObj = readContent(rt, content, &nFiles, &nBytes);
+  auto contentObj = readContent(rt, sceneDirectory.empty() ? content : sceneDirectory, &nFiles, &nBytes);
+  v8::Local<v8::Array> track;
+  if (!trackFile.empty()) {
+    auto parsed = rt.fromJSON(readFile(trackFile));
+    if (!parsed->IsArray()) throw std::runtime_error("--frame-track must be a JSON array");
+    track = parsed.As<v8::Array>();
+    if (!hasFlag(argc, argv, "--frames")) frames = static_cast<int>(track->Length()) - trackStart;
+    if (frames <= 0 || static_cast<uint64_t>(trackStart) + frames > track->Length())
+      throw std::runtime_error("--frame-track selected frame range is outside the file");
+  }
   const auto t0 = std::chrono::steady_clock::now();
   auto opts = rt.fromJSON("{\"width\":" + std::to_string(w) + ",\"height\":" + std::to_string(h) + (timeGiven ? ",\"time\":" + std::to_string(start) : std::string()) + ",\"seed\":" + std::to_string(seed) +
-                          ",\"target\":\"" + requested + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + serOption(argc, argv) + ",\"params\":" + paramsJSON(argc, argv) + "}");
-  auto hr = rt.call("Candela", "openRenderPreset", {contentObj, rt.str(id), opts});
+                          (evValue.empty() ? "" : ",\"exposureEV\":" + std::to_string(fixedEV)) + ",\"target\":\"" + requested + "\"" + (noMotion ? ",\"motionBlur\":false" : "") + serOption(argc, argv) + ",\"params\":" + paramsJSON(argc, argv) + "}");
+  auto hr = sceneDirectory.empty() ? rt.call("Candela", "openRenderPreset", {contentObj, rt.str(id), opts})
+                                   : rt.call("Candela", "openRender", {contentObj, opts});
   if (!rt.get(hr, "ok")->IsTrue()) { fprintf(stderr, "%s: %s\n", id.c_str(), rt.toStdString(rt.get(hr, "error")).c_str()); return 2; }
   auto H = hr.As<v8::Object>();
   // the engine resolves 'auto': OptiX for meshes or many objects, plain CUDA otherwise (src/engine/headless.ts)
@@ -424,14 +442,19 @@ static int cmdRender(int argc, char** argv) {
   if (wMp4) video = std::make_unique<crt::VideoWriter>(outDir / (stem + ".mp4"), w, h, fps, arg(argc, argv, "--codec", "h264"), arg(argc, argv, "--quality", "high"));
 
   int launches = 0;
-  double jsMs = 0, renderMs = 0, outMs = 0, asMs = 0, ev = 0;
+  double jsMs = 0, renderMs = 0, outMs = 0, asMs = 0, ev = 0, firstTime = 0;
   std::vector<double> frameMs;
   const auto tJob = std::chrono::steady_clock::now();
   for (int f = 0; f < frames; f++) {
     v8::HandleScope fs_(rt.isolate());
     const double t = sequence ? start + f / fps : num(H, "time");
     const auto ta = std::chrono::steady_clock::now();
-    if (f > 0) rt.callMethod(H, "seek", {v8::Number::New(rt.isolate(), t), v8::Number::New(rt.isolate(), 1.0 / fps), v8::Number::New(rt.isolate(), seed + (fixedSeed ? 0 : f))});
+    if (!track.IsEmpty()) {
+      auto sample = track->Get(rt.context(), trackStart + f).ToLocalChecked();
+      rt.callMethod(H, "setSample", {sample, v8::Number::New(rt.isolate(), f ? 1.0 / fps : 0),
+                    v8::Number::New(rt.isolate(), seed + (fixedSeed ? 0 : trackStart + f))});
+    } else if (f > 0) rt.callMethod(H, "seek", {v8::Number::New(rt.isolate(), t), v8::Number::New(rt.isolate(), 1.0 / fps), v8::Number::New(rt.isolate(), seed + (fixedSeed ? 0 : f))});
+    if (f == 0) firstTime = num(H, "time");
     sync();
     if (RO) asMs += RO->frameBuildMs();
     while (num(H, "spp") < sppTarget) {
@@ -447,8 +470,9 @@ static int cmdRender(int argc, char** argv) {
     renderMs += std::chrono::duration<double, std::milli>(tb - ta).count();
     const std::string fstem = sequence ? stem + "." + pad4(f + firstFrame) : stem;
     std::vector<float> acc;
-    if (wPfm || wExr || (f == 0 && (display || wExr))) acc = R->readAccum();
-    if (f == 0 && (display || wExr)) ev = rt.callMethod(H, "meter", {rt.floats(acc.data(), acc.size())}).As<v8::Number>()->Value();
+    if (wPfm || wExr || (f == 0 && display && evValue.empty())) acc = R->readAccum();
+    if (f == 0 && (display || wExr)) ev = evValue.empty()
+      ? rt.callMethod(H, "meter", {rt.floats(acc.data(), acc.size())}).As<v8::Number>()->Value() : fixedEV;
     if (wPfm) {
       crt::writePFM(outDir / (fstem + ".pfm"), w, h, acc);
       if (aov) crt::writePFM(outDir / (fstem + ".albedo.pfm"), w, h, R->readAlbedo());
@@ -474,7 +498,7 @@ static int cmdRender(int argc, char** argv) {
     const auto tc = std::chrono::steady_clock::now();
     outMs += std::chrono::duration<double, std::milli>(tc - tb).count();
     frameMs.push_back(std::chrono::duration<double, std::milli>(tc - ta).count());
-    if (sequence) printf("  frame %d/%d  t=%.4f  %.0f ms\n", f + 1, frames, t, frameMs.back()), fflush(stdout);
+    if (sequence) printf("  frame %d/%d  t=%.4f  %.0f ms\n", f + 1, frames, num(H, "time"), frameMs.back()), fflush(stdout);
   }
   if (video) video->finish();
   const double jobMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - tJob).count();
@@ -483,7 +507,7 @@ static int cmdRender(int argc, char** argv) {
   std::ostringstream fm;
   for (size_t i = 0; i < frameMs.size(); i++) fm << (i ? "," : "") << frameMs[i];
   std::ofstream(outDir / (stem + ".json")) << "{\"id\":\"" << id << "\",\"backend\":\"" << backend << "\",\"formats\":" << jsonString(formats) << ",\"asBuildMs\":" << (optix ? RO->buildMs() : 0.0)
-      << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"motion\":" << (optix && RO->motion() ? "true" : "false") << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << (sequence ? start : num(H, "time"))
+      << ",\"pipelineMs\":" << (optix ? RO->pipelineMs() : 0.0) << ",\"motion\":" << (optix && RO->motion() ? "true" : "false") << ",\"width\":" << w << ",\"height\":" << h << ",\"time\":" << firstTime
       << ",\"frames\":" << frames << ",\"fps\":" << fps << ",\"spp\":" << spp << ",\"launches\":" << launches << ",\"buildMs\":" << buildMs << ",\"compileMs\":" << (hit ? 0 : comp.ms) << ",\"cached\":" << (hit ? "true" : "false")
       << ",\"renderMs\":" << renderMs << ",\"outputMs\":" << outMs << ",\"jobMs\":" << jobMs << ",\"jsMs\":" << jsMs << ",\"ev\":" << ev << ",\"denoise\":" << jsonString(denoise) << ",\"denoiseMs\":" << denoiseMs << ",\"registers\":" << regs << ",\"localBytes\":" << local
       << ",\"sppPerSec\":" << spp * double(w) * h * frames / (renderMs / 1000) << ",\"frameMs\":[" << fm.str() << "]}\n";
@@ -505,6 +529,7 @@ int main(int argc, char** argv) {
                     "       candela-rt cuda-sweep [--backend cuda|optix] [--ids a,b] [--jobs n] [--json out] [--kernels dir] [--cache dir]\n"
                     "       candela-rt render <id> [--backend auto|cuda|optix] [--size WxH] [--spp n] [--time t] [--param id=value]… [--seed n]\n"
                     "                 [--format pfm,png,exr,mp4] [--sequence --start s --end s | --frames n] [--fps 24] [--fixed-seed]\n"
+                    "                 [--scene-files dir] [--frame-track frames.json --start-frame 0 --frames n] [--ev fixedExposure]\n"
                     "                 [--codec h264|hevc|av1] [--quality draft|standard|high|max] [--denoise scene|ai|off] [--ser auto|on|off] [--spheres builtin|custom] [--name stem] [--out dir] [--aov] [--no-motion-blur]\n"
                     "       candela-rt serve [--port 8790] [--bind 0.0.0.0] [--denoise ai|scene|off] [--ser auto|on|off] [--spheres builtin|custom] [--token t] [--max-spp 2048] [--max-width 1920]\n");
     return 1;

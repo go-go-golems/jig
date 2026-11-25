@@ -17,6 +17,8 @@ export interface HeadlessOptions {
   width: number; height: number; time?: number;
   /** the frame seed (U row 24 .x, and the pack's seed); a render job uses seed + frame index */
   seed?: number;
+  /** Hold auto exposure across independently rendered chunks of one shot. */
+  exposureEV?: number;
   target?: CudaTargetChoice | null;
   /** false: render without motion blur (parity checks) */
   motionBlur?: boolean;
@@ -68,6 +70,8 @@ export interface HeadlessRender {
   /** a camera override from the workbench's navigation ({ at, target, … } as Viewport.setView), or null */
   view: any;
   setView(view: any): void;
+  /** Apply an exported presentation sample. Poses are absolute Candela matrices (metres). */
+  setSample(sample: { time: number; view: any; poses: Record<string, number[]> }, dt: number, seed: number): void;
   resize(width: number, height: number): void;
   /** set a param: 'repack' (dynamic: the buffers change, version++), 'rebuild' (static: open the scene again with
    *  paramValues()), or 'unknown' */
@@ -144,7 +148,7 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
       h.O = nonEmpty(fr ? fr.O : P.O); h.LI = nonEmpty(P.LI); h.BV = nonEmpty(P.BV); h.SD = SD;
       h.version++;
     },
-    get ev() { return cam && cam.ev != null && cam.mode !== 'auto' ? cam.ev : meteredEV; },
+    get ev() { if (o.exposureEV !== undefined) return o.exposureEV; return cam && cam.ev != null && cam.mode !== 'auto' ? cam.ev : meteredEV; },
     meter(accum: Float32Array) {
       const m = meterExposure(accum, h.width, h.height);
       if (m) meteredEV = m.ev;
@@ -163,6 +167,16 @@ export async function openRender(files: Record<string, string>, o: HeadlessOptio
     irHash: digestString(s.compiled.shared),
     view: null,
     setView(view) { h.view = view || null; h.spp = 0; },
+    setSample(sample, dt, seed) {
+      if (!sample || !Number.isFinite(sample.time) || !sample.view || !sample.poses)
+        throw Error('frame-track sample needs time, view and poses');
+      for (const [id, matrix] of Object.entries(sample.poses))
+        if (!Array.isArray(matrix) || matrix.length !== 16 || !matrix.every(Number.isFinite))
+          throw Error('frame-track pose for ' + id + ' must be a finite 4x4 placement');
+      s.setPoses(sample.poses);
+      h.setView(sample.view);
+      h.seek(sample.time, dt, seed);
+    },
     resize(width, height) { h.width = width; h.height = height; h.spp = 0; },
     setParam(id, value) {
       const def = s.params.defs.get(id);
