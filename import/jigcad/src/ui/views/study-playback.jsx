@@ -1,5 +1,7 @@
 // Read-only preview of an assembly study. The Stage owns the camera and meshes.
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { projectShot } from '../../render/shot-editor.js';
+import { useHost } from '../common.jsx';
 import { advanceStudy, presentationSample } from '../study-samples.js';
 
 const PREVIEW_MS = 4000;
@@ -21,6 +23,8 @@ export function StudyPlayback({ host, program, renderStudy }) {
 }
 
 function TrackControls({ host, program, study, renderStudy }) {
+  useHost(host, ['files']);
+  const projectKeys = host.files.get('shots.json'), cameras = host.files.get('cameras.json');
   const [track, setTrack] = useState(null);
   const [row, setRow] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -98,16 +102,20 @@ function TrackControls({ host, program, study, renderStudy }) {
   }
   useLayoutEffect(() => {
     if (!track?.playable) return;
+    const seconds = presentation ? last / 24 : PREVIEW_MS / 1000;
+    let shot, shotError;
+    try { shot = projectShot({...study,seconds},host.files,program.assembly.components); }
+    catch (e) { shotError = e.message; }
     renderStudy.current = {
-      name: study.name, shot: study.shot, frameAt, rows: track.rows, last,
+      name: study.name, shot, authoredShot: study.shot, shotError, frameAt, rows: track.rows, last,
       complete: track.rows.length === last + 1,
-      seconds: presentation ? last / 24 : PREVIEW_MS / 1000,
+      seconds,
       cyclic: !!presentation,
       currentRow: () => current.current,
       pause,
     };
     return () => { renderStudy.current = null; };
-  }, [track, program, study]);
+  }, [track, program, study, projectKeys, cameras]);
 
   function show(index) {
     const sample = track.indices.get(index);

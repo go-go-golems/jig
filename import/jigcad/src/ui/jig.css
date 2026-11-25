@@ -262,3 +262,14 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .stage-render footer { margin-top:12px; }
 .render-camera-preview { background:var(--fill-2); display:grid; place-items:center; padding:8px; margin-bottom:8px; }
 .render-camera-preview canvas { max-width:100%; max-height:52vh; width:auto; height:auto; }
+
+.shot-timeline { margin:8px 0; }
+.shot-timeline summary { cursor:pointer; }
+.shot-ruler { position:relative; flex:0 0 96%; height:39px; margin:4px 2%; background:var(--bg); border-bottom:1px solid var(--hair); touch-action:none; }
+.shot-key { position:absolute; top:7px; width:12px; height:12px; padding:0; transform:translateX(-50%) rotate(45deg); background:var(--panel); border:2px solid var(--ink); cursor:ew-resize; }
+.shot-key.on { background:var(--ink); }
+.shot-playhead { position:absolute; height:100%; border-left:1px solid var(--ink); }
+.shot-timeline input[type=number] { width:5em; }
+
+.shot-tick { position:absolute; bottom:0; transform:translateX(-50%); color:var(--muted); font-size:10px; white-space:nowrap; }
+.shot-properties textarea { display:block; width:min(36em,75vw); font:12px monospace; color:var(--ink); background:var(--bg); }
