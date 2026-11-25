@@ -8,6 +8,16 @@ async function main() {
     const page = await browser.newPage({viewport: {width:1540, height:1020}})
     const errors = []
     page.on('pageerror', e => errors.push(e.message))
+    await page.addInitScript(() => {
+      const proto = CanvasRenderingContext2D.prototype
+      const original = proto.fillText
+      proto.fillText = function (label, ...args) {
+        if (label === 'Presser Foot' && this.canvas.getAttribute('aria-label') === 'drafting sheet')
+          window.footLabelDraws.push(this.globalAlpha)
+        return original.call(this, label, ...args)
+      }
+      window.footLabelDraws = []
+    })
     await page.goto(process.argv[2] + '/?preset=SG-09-exploded-head')
     await page.getByRole('button', {name:/Layout/}).click()
     await page.getByRole('button', {name:/Everything in one tile/}).click()
@@ -28,7 +38,22 @@ async function main() {
     const offsets = await page.evaluate(() => jigHost.preset.presentation.offsets)
     assert.deepEqual(Object.keys(home).sort(), [...Object.keys(offsets),'head'].sort())
     assert.equal(Object.keys(home).filter(id => id.startsWith('presser')).length,11)
+    const labelDraws = () => page.evaluate(() => window.footLabelDraws.splice(0))
+    await labelDraws()
+    await pose(36)
+    assert.ok((await labelDraws()).some(alpha => Math.abs(alpha - 0.5) < 0.001))
     const spread = await pose(84)
+    assert.ok((await labelDraws()).includes(1))
+    const show = page.getByRole('button', {name:/^Show /})
+    await show.click()
+    const names = page.getByRole('button', {name:/Component names/})
+    await names.click()
+    await labelDraws()
+    await pose(83)
+    assert.deepEqual(await labelDraws(), [])
+    await names.click()
+    await show.click()
+    await pose(84)
     await capture('full-spread')
     await page.getByRole('button', {name:'Axo',exact:true}).click()
     await pose(85)
@@ -38,7 +63,9 @@ async function main() {
     for (const id of Object.keys(home)) {
       for (let k=0; k<16; k++) near(spread[id][k],home[id][k]+(offsets[id]?.[k-12] || 0))
     }
+    await labelDraws()
     const assembled = await pose(168)
+    assert.deepEqual(await labelDraws(), [])
     await capture('assembled')
     const operating = await pose(204)
     await capture('sewing')

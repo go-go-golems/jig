@@ -44,6 +44,7 @@ export function createStage(element, host = {}, options = {}) {
     if (!W || !H) size();
     const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
     last = draw(canvas, posedProgram(), view, { width: W, height: H, dpr, overlays: on, selection, sketches: solved, sheet: options.sheet || (host.preset && host.preset.id) || 'J-01', colorsFrom: element, dragging: drag && drag.ref,
+      componentNameOpacity: preview?.componentNameOpacity,
       pose: preview?.pose ?? posed?.pose, fitBox: previewFit ?? (heldFit && heldFit.name === (program && program.name) && view.name !== 'sketch' ? heldFit.box : null) });
     // a sketch keeps the fit it was first drawn with, so solves and drags do not move the camera
     if (last.sketchView && !view.sketchFit && last.cam.fit) view = normView({ ...view, sketchFit: last.cam.fit });

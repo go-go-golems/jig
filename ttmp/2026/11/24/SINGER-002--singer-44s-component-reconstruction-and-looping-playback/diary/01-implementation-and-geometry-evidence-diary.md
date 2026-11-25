@@ -150,3 +150,35 @@ Playback spends three seconds opening, one second at full spread, three seconds 
 The implementation checkpoint was 66dab82. I ran the ticket's scripts/13-check-exploded-head.cjs against the server on port 18965. Chromium confirmed that Loop started enabled and that playback advanced from the last sewing sample into the opening segment.
 
 The script compared all 16 placement matrix entries for each of the 29 occurrences against the prescribed offsets at full spread, and against the home pose after reassembly and at 720 degrees (tolerance 0.00001). It also checked that the presser foot stayed seated while the needle moved. I enlarged the default view after inspecting the first screenshot and reran the browser check. The four SG-09 PNGs in sources/workbench show front and axonometric spread, reassembly and sewing. These are workbench captures of reconstructed parts. The original photographs remain in the ticket's source archive.
+
+## Step 6. Label each moving occurrence on the CAD sheet
+
+“could we add showing component names, and could we animate that option too? or does the framework make animation show options complicated?” The Stage now has a Component names switch for assemblies. SG-09 starts with it enabled.
+
+### What I did and why
+
+The renderer groups posed body bounds by occurrence and projects one anchor for each component. Two ordered columns keep adjacent names apart and leader lines associate them with the parts. The display uses the occurrence ID, expanded into words, so the front and rear clips keep separate labels.
+
+### What worked
+
+The Stage unit suite passed 21/21. The ticket's script 13 ran in Chromium against port 18965, toggled the overlay through Show and checked actual canvas text calls for Presser Foot at half spread, full spread, after hiding names, and after reassembly. The same run checked all 29 poses and the loop wrap. I inspected the resulting front-view screenshot and saved the axonometric view as well.
+
+### What was tricky to build
+
+The Show switch records a user preference, while opacity belongs to a particular animation sample. Drawing uses both, so scrubbing backwards restores the appropriate opacity and disabling the switch suppresses labels even at full spread.
+
+### What I learned
+
+The Stage already receives the transformed bodies for every playback sample. Labels can use that same scene without recomputing the mechanical study.
+
+### What warrants a second pair of eyes
+
+Very dense assemblies or a short viewport leave less space between labels. The columns are laid out anew as the camera or occurrence positions change.
+
+### Code review instructions
+
+Review drawComponentNames in sheet.js and the studyPreview emission in study-playback.jsx. Run node import/jigcad/test/stage/unit.mjs and the ticket's scripts/13-check-exploded-head.cjs.
+
+### Technical details
+
+SG-09 opts in with presentation.fadeComponentNames. Label opacity takes the same eased 0-to-1 spread value as the explosion translations. Exiting preview restores full opacity to enabled labels.

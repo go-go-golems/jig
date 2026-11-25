@@ -36,6 +36,7 @@ export const OVERLAYS = [
   { key: 'shadows', label: 'Shadows', about: 'hatched sun shadows on the floor', on: true },
   { key: 'grid', label: 'Grid', about: 'the floor grid', on: true },
   { key: 'names', label: 'Names', about: 'face and edge names under the pointer', on: true },
+  { key: 'componentNames', label: 'Component names', about: 'label assembly components on the sheet', on: false },
   { key: 'dims', label: 'Dims', about: 'overall dimensions of the bounding box', on: true },
   { key: 'hidden', label: 'Hidden', about: 'hidden edges, dashed', on: false },
   { key: 'overhang', label: 'Overhang', about: 'faces that print over air, hatched', on: false },

@@ -4,7 +4,7 @@
 // ring stroke; silhouettes at the silhouette stroke; overlays; the sketch; the sheet furniture.
 import { V, boxOk, boxCorners, boxSize, emptyBox, growBox, fmtNum, fmtVolume, applyM, applyDir } from './math.js';
 import { VIEWS, SUN, normView, viewCam, proj, makeCam } from './camera.js';
-import { readColors, K, hatchPattern, rgba32, text, toneOf } from './theme.js';
+import { readColors, K, hatchPattern, rgba32, text, textWidth, toneOf } from './theme.js';
 import { sceneOf, sceneFacts, sketchToWorld, sameBody } from './scene.js';
 import { buffers, projectInstance, rasterInstance, paperImage, hatchImage, coverTriangles } from './raster.js';
 import { lineWork } from './lines.js';
@@ -17,6 +17,7 @@ export const OVERLAYS = [
   { key: 'shadows', label: 'Shadows', about: 'hatched sun shadows on the floor', on: true },
   { key: 'grid', label: 'Grid', about: 'the floor grid', on: true },
   { key: 'names', label: 'Names', about: 'face and edge names under the pointer', on: true },
+  { key: 'componentNames', label: 'Component names', about: 'label assembly components on the sheet', on: false },
   { key: 'dims', label: 'Dims', about: 'overall dimensions of the bounding box', on: true },
   { key: 'hidden', label: 'Hidden', about: 'hidden edges, dashed', on: false },
   { key: 'overhang', label: 'Overhang', about: 'faces that print over air, hatched', on: false },
@@ -172,6 +173,8 @@ export function draw(canvas, program, viewIn, o = {}) {
 
   // ---- overlays
   if (!sketchView && !thumb) {
+    if (has('componentNames') && program?.kind === 'assembly' && o.componentNameOpacity !== 0)
+      drawComponentNames(ctx, C, state, o.componentNameOpacity ?? 1);
     if (has('normals')) drawNormals(ctx, C, state);
     if (has('dims') && scene.instances.length) drawBoxDims(ctx, C, state);
     if (has('joints') && program?.kind === 'assembly') drawMechanism(ctx, C, state, program);
@@ -419,4 +422,54 @@ function titleRows(program, scene, view, cam, sk) {
   }
   rows.push(['VIEW', vname + zoom]);
   return rows;
+}
+
+// One leader per occurrence. A multi-body component contributes one combined
+// world-space box, so its callout follows every pose, including a Stage drag.
+function drawComponentNames(ctx, C, { cam, scene, width, height }, opacity) {
+  const boxes = new Map();
+  for (const { body, box } of scene.instances) {
+    if (!body.part) continue;
+    const bounds = boxes.get(body.part) ?? emptyBox();
+    growBox(bounds, box[0]);
+    growBox(bounds, box[1]);
+    boxes.set(body.part, bounds);
+  }
+  const visible = [];
+  for (const [id, box] of boxes) {
+    const [x, y] = proj(cam, box[0].map((v, i) => (v + box[1][i]) / 2));
+    if (x >= 0 && x <= width && y >= 0 && y <= height) {
+      const words = id.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
+      visible.push({ x, y, name: words[0].toUpperCase() + words.slice(1) });
+    }
+  }
+  visible.sort((a, b) => a.x - b.x);
+  const middle = Math.ceil(visible.length / 2);
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.lineWidth = 0.75;
+  for (const [side, column] of [visible.slice(0, middle), visible.slice(middle)].entries()) {
+    if (!column.length) continue;
+    const right = side === 1;
+    const size = K.labelSm;
+    const longest = Math.max(...column.map(p => textWidth(ctx, p.name, size)));
+    const columnX = right ? Math.min(width - longest - 8, column.at(-1).x + 24)
+      : Math.max(longest + 8, column[0].x - 24);
+    column.sort((a, b) => a.y - b.y);
+    const gap = Math.min(size + 6, Math.max(0, height - 60) / Math.max(1, column.length - 1));
+    let previous = 4 - gap;
+    column.forEach(({ x, y, name }, i) => {
+      const bottom = height - 52 - gap * (column.length - 1 - i);
+      const lineY = Math.min(bottom, Math.max(previous + gap, y, size));
+      previous = lineY;
+      ctx.strokeStyle = C.muted;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(columnX, lineY);
+      ctx.stroke();
+      text(ctx, C, name, columnX + (right ? 4 : -4), lineY,
+        { size, align: right ? 'left' : 'right', bg: C.stage });
+    });
+  }
+  ctx.restore();
 }

@@ -97,7 +97,8 @@ function TrackControls({ host, program, study }) {
         for (let axis = 0; axis < 3; axis++) pose[id][12 + axis] += offset[axis] * frame.spread;
       } else pose[id] = matrix;
     }
-    host.emit('studyPreview', { pose, row: study.rows[frame ? frame.source : index], drive: study.drive, offsets: presentation?.offsets });
+    host.emit('studyPreview', { pose, row: study.rows[frame ? frame.source : index], drive: study.drive,
+      componentNameOpacity: presentation?.fadeComponentNames ? frame.spread : undefined, offsets: presentation?.offsets });
     current.current = index;
     setRow(index);
     setPreview(true);

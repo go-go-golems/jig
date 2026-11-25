@@ -5,3 +5,5 @@ Press **Play** in CAD Stage. The casting stays fixed as the needle drive opens t
 The parts return to their solved positions before the shaft makes two revolutions. The needle changes sides and returns to its starting position. The presser foot stays down on both strokes. Loop starts enabled and can be switched off during playback.
 
 All 29 occurrences use the SG-03 and SG-06 part definitions. The spread distances are illustration offsets in millimetres. They do not specify service removal paths. The hook, bobbin and feed mechanism lie outside this upper-head model.
+
+**Show → Component names** toggles the callouts. During this presentation their opacity follows the spread, including when you scrub backwards. Exit preview to see the labeled assembled head.
