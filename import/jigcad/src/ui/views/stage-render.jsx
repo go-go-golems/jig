@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { onTheme } from '../../stage/theme.js';
 import { loadCandela } from '../../render/host.js';
 import { saveOrCopy } from '../save.js';
 
@@ -22,7 +23,10 @@ export function StageRender({ host, job, close }) {
     return () => active.current?.abort();
   }, []);
   useLayoutEffect(() => {
-    if (valid) job.draw(sheet.current, settings);
+    if (!valid) return;
+    const redraw = () => job.draw(sheet.current, settings);
+    redraw();
+    return onTheme(redraw, sheet.current.ownerDocument);
   }, [width, height, fit, zoom, row, job]);
   function choose(name) {
     setFormat(name);

@@ -216,3 +216,9 @@ Video support depends on the browser's WebCodecs encoders at the requested dimen
 ### Code review instructions
 
 Start at stage-render.jsx and renderCamera in stage.js, then follow frameAt in study-playback.jsx. Run make web and the ticket's scripts/15-check-stage-render.cjs against the local server.
+
+## Step 9. Correct the render dialog contrast in dark mode
+
+The user reported “the modal doesn't seem to respeect light/dark mode?” The dialog referenced an undefined paper token and fell back to white while its labels inherited dark-mode ink. I switched the dialog, controls and preview surround to the workbench palette and set the native control color scheme. The camera canvas now redraws on theme changes while the dialog is open.
+
+Script 15 switched between dark and light with the dialog open, asserted foreground and background colors on the dialog, width input and format selector, sampled the canvas background, and captured both appearances. The PNG comparison and 312-frame video check also passed.

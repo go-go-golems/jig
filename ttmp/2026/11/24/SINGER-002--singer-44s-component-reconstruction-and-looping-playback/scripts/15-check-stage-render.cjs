@@ -21,7 +21,26 @@ async function run() {
     assert.deepEqual(await canvas.evaluate(c => [c.width,c.height]),[1080,1920])
     await panel.getByLabel('Format',{exact:true}).selectOption('HD landscape')
     await panel.getByLabel('Zoom').fill('1.7')
-    await page.screenshot({path:path.join(__dirname,'../sources/workbench/SG-09-render-camera.png')})
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme => {
+        while (document.documentElement.dataset.theme !== theme) jigHost.cycleTheme()
+      },theme)
+      const bg = theme === 'dark' ? 'rgb(26, 26, 26)' : 'rgb(255, 255, 255)'
+      const ink = theme === 'dark' ? 'rgb(242, 242, 242)' : 'rgb(26, 26, 26)'
+      for (const element of [panel,panel.getByLabel('Width'),panel.getByLabel('Format',{exact:true})]) {
+        const colors = await element.evaluate(el => {
+          const css = getComputedStyle(el)
+          return [css.backgroundColor,css.color,css.colorScheme]
+        })
+        assert.deepEqual(colors,[bg,ink,theme])
+      }
+      await page.waitForFunction(dark => {
+        const ctx = document.querySelector('.render-camera-preview canvas').getContext('2d')
+        return (ctx.getImageData(2,2,1,1).data[0] < 128) === dark
+      },theme === 'dark')
+      const suffix = theme === 'dark' ? '-dark' : ''
+      await page.screenshot({path:path.join(__dirname,'../sources/workbench/SG-09-render-camera'+suffix+'.png')})
+    }
     await panel.getByLabel('Width').fill('640')
     await panel.getByLabel('Height').fill('360')
     await panel.getByLabel('Framing').selectOption('stage')
