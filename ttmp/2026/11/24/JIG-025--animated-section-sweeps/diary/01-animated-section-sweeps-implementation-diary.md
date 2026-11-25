@@ -38,3 +38,7 @@ I ran the shot suite and the ticket's scripts/01-check-swept-sleeve.mjs. The sle
 ### Review instructions
 
 Use section = { components, normal, offset, endOffset, endTime } in a timed shot key. Try a decreasing offset, scrub backwards through a replacement key and clear section with null. The ticket sleeve check asserts that the source body retains its original faces.
+
+### Stage acceptance
+
+Commit 08fa26c contains the sweep evaluator and bored-sleeve check. The integrated browser test authored a −6 to +6 mm offset over 8.0–9.5 seconds on the SG-09 presser guide, exercised the preset timeline and saved the actual draft outputs at rows 192, 210 and 228. The three archived PNGs show the cap progress under the fixed export camera. The script is shared with JIG-026 and lives in that ticket's scripts directory.

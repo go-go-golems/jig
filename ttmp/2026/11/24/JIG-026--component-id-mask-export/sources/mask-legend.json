@@ -1,0 +1,121 @@
+{
+  "background": "#000000",
+  "components": [
+    {
+      "id": "bar",
+      "color": "#9e3779"
+    },
+    {
+      "id": "clamp",
+      "color": "#3c6ef2"
+    },
+    {
+      "id": "clampScrew",
+      "color": "#daa66b"
+    },
+    {
+      "id": "crank",
+      "color": "#78dde4"
+    },
+    {
+      "id": "driveBracket",
+      "color": "#17155d"
+    },
+    {
+      "id": "eyeGuard",
+      "color": "#b54cd6"
+    },
+    {
+      "id": "frontClip",
+      "color": "#53844f"
+    },
+    {
+      "id": "gate",
+      "color": "#f1bbc8"
+    },
+    {
+      "id": "gatePin",
+      "color": "#8ff341"
+    },
+    {
+      "id": "head",
+      "color": "#2e2aba"
+    },
+    {
+      "id": "lever",
+      "color": "#cc6233"
+    },
+    {
+      "id": "needle",
+      "color": "#6a99ac"
+    },
+    {
+      "id": "plate",
+      "color": "#08d125"
+    },
+    {
+      "id": "presserAdjuster",
+      "color": "#a7089e"
+    },
+    {
+      "id": "presserBar",
+      "color": "#454017"
+    },
+    {
+      "id": "presserBracket",
+      "color": "#e37790"
+    },
+    {
+      "id": "presserClampScrew",
+      "color": "#81af09"
+    },
+    {
+      "id": "presserFoot",
+      "color": "#1fe682"
+    },
+    {
+      "id": "presserGuide",
+      "color": "#be1dfb"
+    },
+    {
+      "id": "presserLifter",
+      "color": "#5c5574"
+    },
+    {
+      "id": "presserPivotScrew",
+      "color": "#fa8ced"
+    },
+    {
+      "id": "presserShank",
+      "color": "#98c466"
+    },
+    {
+      "id": "presserShankScrew",
+      "color": "#36fbdf"
+    },
+    {
+      "id": "presserSpring",
+      "color": "#d53358"
+    },
+    {
+      "id": "rearClip",
+      "color": "#736ad1"
+    },
+    {
+      "id": "rocker",
+      "color": "#11a24a"
+    },
+    {
+      "id": "rod",
+      "color": "#afd9c3"
+    },
+    {
+      "id": "shaftBearing",
+      "color": "#4e113c"
+    },
+    {
+      "id": "supporterShaft",
+      "color": "#ec48b5"
+    }
+  ]
+}

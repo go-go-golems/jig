@@ -7,6 +7,7 @@ import { VIEWS, SUN, normView, viewCam, proj, makeCam } from './camera.js';
 import { readColors, K, hatchPattern, rgba32, text, textWidth, toneOf } from './theme.js';
 import { sceneOf, sceneFacts, sketchToWorld, sameBody } from './scene.js';
 import { buffers, projectInstance, rasterInstance, paperImage, hatchImage, coverTriangles } from './raster.js';
+import { paintComponentMask } from './component-mask.js';
 import { lineWork } from './lines.js';
 import { drawGrid, drawGroundLine, drawBed, dimensionTo, arrow, label, scaleBar, titleBlock, gridSteps } from './furniture.js';
 import { drawShotAccent, drawShotTrail } from './shot-marks.js';
@@ -114,6 +115,11 @@ export function draw(canvas, program, viewIn, o = {}) {
   const buf = state.buf = buffers(canvas, bw, bh);
   for (const inst of scene.instances) rasterInstance(buf, inst, projectInstance(inst, cam, k));
   const tRaster = performance.now();
+  if (o.componentMask) {
+    paintComponentMask(ctx, scene, buf, o.componentMask);
+    state.ms = performance.now() - t0;
+    return state;
+  }
 
   // ---- shadows: the mesh pushed along the sun to the floor, one path, filled once with the hatch
   if (!sketchView && cam.planar && has('shadows') && scene.instances.length) drawShadows(ctx, C, scene, cam, canvas, k);
