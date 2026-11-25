@@ -260,6 +260,11 @@ input[type=range]:disabled { opacity: 0.4; cursor: default; }
 .stage-render label { display:inline-flex; align-items:center; gap:5px; }
 .stage-render input[type=number] { width:6em; }
 .stage-render footer { margin-top:12px; }
+.stage-render .render-studios[open], .studio-fields .studio-builder, .studio-fields .studio-source { width:100%; }
+.studio-fields { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:8px 0; }
+.studio-fields .studio-source { display:grid; gap:4px; }
+.studio-fields textarea { box-sizing:border-box; width:100%; min-height:6em; resize:vertical; font-family:var(--mono); background:var(--bg); color:var(--ink); border:1px solid var(--hair); }
+.studio-builder[open] label, .studio-builder[open] button { margin:5px 8px 0 0; }
 .render-camera-preview { background:var(--fill-2); display:grid; place-items:center; padding:8px; margin-bottom:8px; }
 .render-camera-preview canvas { max-width:100%; max-height:52vh; width:auto; height:auto; }
 

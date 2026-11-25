@@ -47,28 +47,31 @@ export function stagePackage(pkg, bodies) {
 
 export async function createStagePBR(host) {
   const initial = host.program?.ok !== false ? host.program : host.lastGood;
-  const files = new Map(host.files);
-  const look = files.get(LOOK_FILE) ?? defaultLook({ ground: false });
+  const projectFiles = new Map(host.files);
   const [C, exported] = await Promise.all([loadCandela(), host.export('candela', { quality: 'preview' })]);
   const pkg = JSON.parse(exported.data);
   const vp = new C.Viewport(document.createElement('canvas'));
   vp.motionOverride = null;
   vp.lockEV = true;
-  let disposed = false, previousBodies = null, metered = false;
+  let disposed = false, previousBodies = null, previousStudio, metered = false;
   try { await vp.init(); } catch (err) { vp.backend?.dispose(); throw err; }
   const check = signal => {
     signal?.throwIfAborted();
     if (disposed) throw new DOMException('Render closed', 'AbortError');
   };
   return {
-    async render({ camera, geometry = initial, pose, width, height, spp = 4, signal, time = 0 }) {
+    async render({ camera, geometry = initial, pose, width, height, spp = 4, signal, time = 0, studio = null }) {
       check(signal);
       const bodies = geometry.bodies;
-      if (!previousBodies || previousBodies.length !== bodies.length || bodies.some((b, i) => previousBodies[i] !== b)) {
+      if (studio !== previousStudio || !previousBodies || previousBodies.length !== bodies.length || bodies.some((b, i) => previousBodies[i] !== b)) {
+        const files = studio ? Object.entries(studio.modules) : projectFiles;
+        const look = studio?.source ?? projectFiles.get(LOOK_FILE) ?? defaultLook({ ground: false });
         const built = await buildLook(C, files, stagePackage(pkg, bodies), look);
         check(signal);
         if (!built.ok) throw Error(built.error?.message ?? 'Candela could not build this look');
         await vp.load(built.compiled);
+        if (studio !== previousStudio) metered = false;
+        previousStudio = studio;
         previousBodies = bodies;
       }
       check(signal);
@@ -86,7 +89,10 @@ export async function createStagePBR(host) {
         if (!vp.frame({ force: true, display: false })) throw Error('The PBR rendering device was lost');
         await vp.backend.idle();
       }
-      if (!metered && vp.cam.mode === 'auto') {
+      if (studio?.ev != null) {
+        vp.cam.mode = 'fixed';
+        vp.cam.ev = studio.ev;
+      } else if (!metered && vp.cam.mode === 'auto') {
         await vp.meter();
         metered = true;
       }

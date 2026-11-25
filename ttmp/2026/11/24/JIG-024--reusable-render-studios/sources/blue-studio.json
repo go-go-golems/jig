@@ -1,0 +1,9 @@
+{
+  "format": "jig-render-studio/1",
+  "name": "Blue inspection",
+  "studio": {
+    "source": "import { scene, light, camera, material } from 'candela';\nimport { jigScene } from 'jig-candela';\nimport { program } from 'jig-program';\nconst asm = jigScene(program, { autoFinish: true })\n  .material(\"*\", material.pbr().baseColor(\"#305ac9\").roughness(0.45));\nconst v = asm.view('axo');\nexport default scene().add(asm)\n  .add(light.sun().elevation(45).azimuth(135).illuminance(700))\n  .add(light.env.gradient({ top: \"#cbe4ff\", bottom: \"#243344\", intensity: 700 }))\n  .camera(camera.pinhole().at(v.at).lookAt(v.target));\n",
+    "ev": 9,
+    "modules": {}
+  }
+}
