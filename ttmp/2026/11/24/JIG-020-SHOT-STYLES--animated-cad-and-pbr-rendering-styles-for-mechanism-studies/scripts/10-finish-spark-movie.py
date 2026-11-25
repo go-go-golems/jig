@@ -18,6 +18,7 @@ def main():
     p.add_argument('job', type=Path)
     p.add_argument('--checkout', type=Path, required=True)
     p.add_argument('--name', default='SG-09-optix-1080p')
+    p.add_argument('--spp', type=int, default=64, help='Expected samples per pixel in every native segment')
     args = p.parse_args()
     job = args.job.resolve()
     frames = json.loads((job / 'frames.json').read_text())
@@ -25,7 +26,7 @@ def main():
     receipts = [json.loads(f.read_text()) for f in sorted((job/'stats').glob('*.json'))]
     covered = set()
     for r in receipts:
-        assert (r['backend'], r['width'], r['height'], r['spp']) == ('optix',1920,1080,64)
+        assert (r['backend'], r['width'], r['height'], r['spp']) == ('optix',1920,1080,args.spp)
         covered.update(range(r['first'],r['last']+1))
     assert shaded == covered
     assert len(frames) == 312

@@ -83,3 +83,19 @@ The GB10 reported driver 580.178.04. It rendered frame zero at 1920 × 1080, 64 
 The Spark produced 287 native OptiX beauty frames and 25 fully drafted frames. The assembled H.264 file contains 312 frames over 13 seconds. Six decoded samples were compared with their source composites. Their mean absolute differences were approximately 1–2 levels on the 8-bit scale. The downloaded movie and the Spark copy both hashed to 8b46ab39c8b6be28a05644f21af5ac3293fc2366ff06aa9dfa1b5182ecdc0f46. The MP4 and JSON receipt are archived together under sources/.
 
 The first full Candela test reported stale shader snapshots. Independent x64 and ARM64 regeneration showed exactly two changed fields in each of 105 fixtures on each architecture, the shared shader hash and its line count. All per-frame buffer digests matched. I updated those two fields while retaining fixture order. The isolated Spark checkout passed its 105-fixture ARM64 replay.
+
+## Step 6. Repeat the Spark render at 1,024 samples per pixel
+
+The user requested “ok, do 1024” after reviewing the 64-SPP result. I interpreted this as a second export of the complete 13-second movie at the same resolution, frame rate and exposure. Keeping both versions makes a direct visual and timing comparison possible.
+
+### What changed and why
+
+The new job directory on bling.local is ~/data/pbr-spark/renders/SG-09-optix-1080p-1024spp. It links to the previous job's plates, geometry variants and frame track. Beauty frames, composite frames, receipts and logs are private to the new job. I launched script 09 in the sg09-1024 tmux session with --spp 1024 --ev 6.50414. The encoder previously asserted a fixed 64-SPP receipt. Script 10 now takes the expected SPP as an argument and verifies it for each native segment.
+
+### First evidence and review instructions
+
+The native log reported approximately two seconds for each of the first frames. Script 11 reads the original frame-zero beauty PNGs, crops the same 260 by 455 pixel rectangle from both, and plots the absolute display-RGB difference with eightfold gain. I ran it against the downloaded native images. Their mean absolute channel difference was 2.20 out of 255 across the crop, including its background. This measures change after display processing. It does not measure error against a converged reference. Inspect the spring and plate highlights in the report figure.
+
+### Remaining verification
+
+The job must complete all four OptiX segments, composite all 312 frames and pass the encoder's decoded-frame checks. Record the timing from the four receipts and the Spark wall-clock logs, then check that the downloaded movie matches the receipt hash.
