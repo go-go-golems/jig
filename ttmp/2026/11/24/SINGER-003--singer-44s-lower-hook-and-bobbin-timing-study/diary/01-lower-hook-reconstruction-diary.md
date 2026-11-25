@@ -40,3 +40,19 @@ The shared needle now declares its scarf and eye landmarks alongside the solid c
 Script 02 compiles SG-10 through the real worker, obtains the occurrence transforms and finds the named points on their original solids. At the event the point coincides with the scarf witness in X and Z. OpenCascade gives a 0.075 mm point-to-needle distance, matching the chosen midpoint of the separate §3-12 procedure. The eye's upper edge is 1.9983 mm below the point in world Z. At the preceding and following samples the point lies on opposite sides of the needle.
 
 An initial all-pairs audit found 0.0000974 mm³ of common volume between needle and holder at the event even though the apex-to-scarf clearance passed. Moving the inner edge of the beak root outward removed the overlap at that sample. Analytic arcs replaced polygon walls, eliminating axial drafting seams around the cup. The motion remains a short service inspection with an unloaded bobbin and an inferred rotating holder profile.
+
+## Step 3. Qualify the solid sweep and publish the cutaway
+
+Commit 12f8097 contains the reusable lower assembly, 121-pose verification and solved-frame receipt. Checking all 121 samples produced 485 unique bounding-box candidate pairs. The maximum reported OpenCascade common volume was zero. SG-03 still compiled with 29 bodies and SG-10 compiled with 19 features, five bodies and zero residual degrees of freedom. Clearances between samples and specimen dimensions remain open measurement questions.
+
+### What changed and how to reproduce it
+
+The authored cutaway moves the local section plane from +25 mm to zero over 1.2 seconds, then holds it steady at the hook pass. Script 03 runs against the built workbench, selects the authored render and captures the four-second 960 × 600 sequence. The labeled PNG uses the output camera passed to the real color renderer and projects the verified model-space hook point into that image. The projected center falls at approximately (547, 323) pixels. The caption identifies model shaft angle, specified rise and selected midpoint clearance.
+
+The Stage video contains 96 frames. Its noncyclic endpoint sampling brackets the numerical inspection row between adjacent frames. Script 03 inserts a 48-frame hold of the actual row-60 render between those two samples. This produces a six-second, 144-frame H.264 movie at 24 fps with the event visible for two full seconds.
+
+### Validation and tools
+
+The first browser call reported a missing Chromium headless shell revision 1255. The capture script accepts an explicit executable argument. I reran it with the installed revision 1254, Playwright, and the local workbench on port 18965. The decoded test in script 04 compared frames 48, 71 and 95 against the labeled PNG, yielding mean absolute channel differences of 0.538, 0.535 and 0.535 out of 255. The first and final frames differ from the held frame by 19.711 and 18.658 respectively. The movie's SHA-256 is a1365e999be784bb34ad055b008347acc5c8c8f5037fab149e9e953c69d495b3.
+
+Review the section as the plate withdraws, then follow the leader to the hook point during the hold. Inspect scripts 02–04 and the receipt when repeating the work. The manual reference images identify which checks use a fitted bobbin case and which require removing it. Model assumptions and their effect on interpretation are recorded in SG-10's preset notes.

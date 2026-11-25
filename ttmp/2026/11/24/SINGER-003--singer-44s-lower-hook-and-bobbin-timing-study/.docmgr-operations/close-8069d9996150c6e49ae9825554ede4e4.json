@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "digest": "18704972e2402634a6a71f2ab27b992b03f48d0766109c9c9f7abcf578733f8a",
+  "request": {
+    "ticket": "SINGER-003",
+    "status": "complete",
+    "intent": "",
+    "entry": "Verified the solved hook pass across 121 CAD poses and published the labeled six-second cutaway, numeric receipt and repeatable capture scripts."
+  },
+  "receipt": {
+    "sequence": 1,
+    "operation_id": "close-8069d9996150c6e49ae9825554ede4e4",
+    "state": "committed",
+    "created_at": "2026-11-25T04:25:25.558803168Z",
+    "changed_paths": [
+      "changelog.md",
+      "index.md"
+    ],
+    "before": {
+      "changelog.md": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "index.md": "3832b17906493909d214bf7ea0c3f002bdf502cd7c5a0a60f943531804d491ae"
+    },
+    "after": {
+      "changelog.md": "1da4e513bd46882d5d985937ad54b25e6f72389008bee76bd6b035d3ed4015da",
+      "index.md": "798dca66fbe012636426c39c94095d9d71e1908193e718d735477a45d9c3e7f2"
+    }
+  },
+  "changes": [
+    {
+      "path": "changelog.md",
+      "before": "005a59f1c61892d642c4592fca0ad9ddf9b90cae2488874de61cce46ace43a47",
+      "after": "IyBDaGFuZ2Vsb2cKCiMjIDIwMjYtMTEtMjQKCi0gSW5pdGlhbCB3b3Jrc3BhY2UgY3JlYXRlZAoKIyMgMjAyNi0xMS0yNAoKVmVyaWZpZWQgdGhlIHNvbHZlZCBob29rIHBhc3MgYWNyb3NzIDEyMSBDQUQgcG9zZXMgYW5kIHB1Ymxpc2hlZCB0aGUgbGFiZWxlZCBzaXgtc2Vjb25kIGN1dGF3YXksIG51bWVyaWMgcmVjZWlwdCBhbmQgcmVwZWF0YWJsZSBjYXB0dXJlIHNjcmlwdHMuCg=="
+    },
+    {
+      "path": "index.md",
+      "before": "3832b17906493909d214bf7ea0c3f002bdf502cd7c5a0a60f943531804d491ae",
+      "after": "LS0tClRpdGxlOiBTaW5nZXIgNDRTIGxvd2VyIGhvb2sgYW5kIGJvYmJpbiB0aW1pbmcgc3R1ZHkKVGlja2V0OiBTSU5HRVItMDAzClN0YXR1czogY29tcGxldGUKVG9waWNzOgogICAgLSBjYWQKRG9jVHlwZTogaW5kZXgKSW50ZW50OiBsb25nLXRlcm0KT3duZXJzOiBbXQpSZWxhdGVkRmlsZXM6CiAgICAtIFBhdGg6IHJlcG86Ly9pbXBvcnQvamlnY2FkL2NvbnRlbnQvcHJlc2V0cy9TRy0wMy11cHBlci1oZWFkL3Npbmdlci5wYXJ0cy5qcwogICAgICBOb3RlOiBTaGFyZWQgdXBwZXItaGVhZCBnZW9tZXRyeSBhbmQgbW90aW9uIGxhdwogICAgLSBQYXRoOiByZXBvOi8vaW1wb3J0L2ppZ2NhZC9jb250ZW50L3ByZXNldHMvU0ctMTAtaG9vay1wYXNzL2hvb2sucGFydHMuanMKICAgICAgTm90ZTogTG93ZXIgYXNzZW1ibHkgYW5kIHBoYXNlIHJlZ2lzdHJhdGlvbgpFeHRlcm5hbFNvdXJjZXM6IFtdClN1bW1hcnk6ICIiCkxhc3RVcGRhdGVkOiAyMDI2LTExLTI0VDIzOjI1OjI1LjU1ODcwNDEzNy0wNTowMApXaGF0Rm9yOiAiIgpXaGVuVG9Vc2U6ICIiCi0tLQoKIyBTaW5nZXIgNDRTIGxvd2VyIGhvb2sgYW5kIGJvYmJpbiB0aW1pbmcgc3R1ZHkKCiMjIE92ZXJ2aWV3CgpTRy0xMCBmb2xsb3dzIHRoZSByaWdodC1oYW5kIHJpc2luZyBuZWVkbGUgYWNyb3NzIHRoZSBob29rIHBvaW50LiBBIDEyMS1wb3NlIENBRCBzdHVkeSBjb21iaW5lcyB0aGUgc2hhcmVkIFNpbmdlciBuZWVkbGUgYW5kIHBsYXRlIHdpdGggdGhlIHJvdGF0aW5nIGhvbGRlciwgc3RhdGlvbmFyeSBib2JiaW4gY2FzZSBhbmQgQ2xhc3MgMTUgYm9iYmluLiBUaGUgY3V0YXdheSBleHBvc2VzIHRoZWlyIHJlbGF0aW9uc2hpcCBhdCB0aGUgc2VydmljZSByaXNlLgoKIyMgS2V5IExpbmtzCgotIFtXYXRjaCB0aGUgc2l4LXNlY29uZCBpbnNwZWN0aW9uXShzb3VyY2VzL3NnMTAtaG9vay1wYXNzLm1wNCkgb3IgW2luc3BlY3QgdGhlIGxhYmVsZWQgZXZlbnQgZnJhbWVdKHNvdXJjZXMvc2cxMC1ob29rLXBhc3MucG5nKS4KLSBbU29sdmVkIGV2ZW50IHJlY2VpcHRdKHNvdXJjZXMvaG9vay1wYXNzLmpzb24pIGFuZCBbZ2VvbWV0cnkgdmVyaWZpY2F0aW9uIHNjcmlwdF0oc2NyaXB0cy8wMi12ZXJpZnktaG9vay5tanMpLgotIFtGYWN0b3J5IGV2aWRlbmNlXShyZWZlcmVuY2UvMDEtaG9vay1hc3NlbWJseS1pZGVudGlmaWNhdGlvbi1hbmQtc2VydmljZS10aW1pbmcubWQpIGFuZCBbaW1wbGVtZW50YXRpb24gZGlhcnldKGRpYXJ5LzAxLWxvd2VyLWhvb2stcmVjb25zdHJ1Y3Rpb24tZGlhcnkubWQpLgoKIyMgUmVwcm9kdWN0aW9uCgpSdW4gc2NyaXB0IDAyIGZyb20gdGhlIEppZyByZXBvc2l0b3J5IHJvb3QuIEJ1aWxkIHRoZSB3b3JrYmVuY2ggd2l0aCBgbWFrZSB3ZWJgLCBzZWxlY3QgU0ctMTAsIGFuZCB1c2UgKipSZW5kZXLigKYg4oaSIFByZXNldCBhbmltYXRpb24qKi4gU2NyaXB0IDAzIHN0YWdlcyB0aGUgY2FtZXJhLCBjYXB0dXJlcyB0aGUgZXhhY3QgY2VudGVyIHNhbXBsZSBhbmQgaW5zZXJ0cyBhIHR3by1zZWNvbmQgaW5zcGVjdGlvbiBob2xkIGluIHRoZSBleHBvcnRlZCAyNCBmcHMgbW92aWUuIFtCcm93c2VyIGNhcHR1cmUgc2NyaXB0XShzY3JpcHRzLzAzLWNhcHR1cmUtaG9vay1wYXNzLmNqcykKCltUYXNrc10odGFza3MubWQpIMK3IFtDaGFuZ2Vsb2ddKGNoYW5nZWxvZy5tZCkK"
+    }
+  ]
+}

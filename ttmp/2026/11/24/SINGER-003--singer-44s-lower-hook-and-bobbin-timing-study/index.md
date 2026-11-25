@@ -1,16 +1,20 @@
 ---
 Title: Singer 44S lower hook and bobbin timing study
 Ticket: SINGER-003
-Status: active
+Status: complete
 Topics:
     - cad
 DocType: index
 Intent: long-term
 Owners: []
-RelatedFiles: []
+RelatedFiles:
+    - Path: repo://import/jigcad/content/presets/SG-03-upper-head/singer.parts.js
+      Note: Shared upper-head geometry and motion law
+    - Path: repo://import/jigcad/content/presets/SG-10-hook-pass/hook.parts.js
+      Note: Lower assembly and phase registration
 ExternalSources: []
 Summary: ""
-LastUpdated: 2026-11-24T23:09:13.916648332-05:00
+LastUpdated: 2026-11-24T23:25:25.558704137-05:00
 WhatFor: ""
 WhenToUse: ""
 ---
@@ -19,36 +23,16 @@ WhenToUse: ""
 
 ## Overview
 
-<!-- Provide a brief overview of the ticket, its goals, and current status -->
+SG-10 follows the right-hand rising needle across the hook point. A 121-pose CAD study combines the shared Singer needle and plate with the rotating holder, stationary bobbin case and Class 15 bobbin. The cutaway exposes their relationship at the service rise.
 
 ## Key Links
 
-- **Related Files**: See frontmatter RelatedFiles field
-- **External Sources**: See frontmatter ExternalSources field
+- [Watch the six-second inspection](sources/sg10-hook-pass.mp4) or [inspect the labeled event frame](sources/sg10-hook-pass.png).
+- [Solved event receipt](sources/hook-pass.json) and [geometry verification script](scripts/02-verify-hook.mjs).
+- [Factory evidence](reference/01-hook-assembly-identification-and-service-timing.md) and [implementation diary](diary/01-lower-hook-reconstruction-diary.md).
 
-## Status
+## Reproduction
 
-Current status: **active**
+Run script 02 from the Jig repository root. Build the workbench with `make web`, select SG-10, and use **Render… → Preset animation**. Script 03 stages the camera, captures the exact center sample and inserts a two-second inspection hold in the exported 24 fps movie. [Browser capture script](scripts/03-capture-hook-pass.cjs)
 
-## Topics
-
-- cad
-
-## Tasks
-
-See [tasks.md](./tasks.md) for the current task list.
-
-## Changelog
-
-See [changelog.md](./changelog.md) for recent changes and decisions.
-
-## Structure
-
-- design/ - Architecture and design documents
-- reference/ - Prompt packs, API contracts, context summaries
-- playbooks/ - Command sequences and test procedures
-- scripts/ - Temporary code and tooling
-- various/ - Working notes and research
-- archive/ - Deprecated or reference-only artifacts
-
-The lower-hook study follows the rising needle through the hook pass. The [factory evidence](reference/01-hook-assembly-identification-and-service-timing.md) establishes the adjustment conditions. The [diary](diary/01-lower-hook-reconstruction-diary.md) records what was implemented and how it was checked.
+[Tasks](tasks.md) · [Changelog](changelog.md)
