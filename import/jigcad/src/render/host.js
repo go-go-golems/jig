@@ -94,10 +94,14 @@ export function faceAt(compiled, pkg, hit) {
   return { component: body.component, body: body.id, face: f.id, meta: f.meta, address: `${body.component}#${f.id}` };
 }
 
-export function buildLook(C, projectFiles, pkg, look) {
-  const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': 'export const program = __jigPackage;', 'scene.js': look };
+export function sceneFiles(projectFiles, look, programSource) {
+  const files = { 'jig-candela.js': LIB['jig-candela.js'], 'jig-program.js': programSource, 'scene.js': look };
   for (const [name, source] of projectFiles) if (name !== LOOK_FILE && isLookFile(name)) files[name] = source;
-  return C.build(files, { scope: { __jigPackage: pkg } });
+  return files;
+}
+
+export function buildLook(C, projectFiles, pkg, look) {
+  return C.build(sceneFiles(projectFiles, look, 'export const program = __jigPackage;'), { scope: { __jigPackage: pkg } });
 }
 
 export class RenderHost {

@@ -1,0 +1,32 @@
+{
+  "format": "jig-stage-job/1",
+  "first": 203,
+  "last": 203,
+  "frames": 1,
+  "fps": 24,
+  "width": 320,
+  "height": 240,
+  "spp": 1,
+  "native": [
+    {
+      "first": 203,
+      "last": 203,
+      "panel": 0,
+      "backend": "optix",
+      "ev": 7,
+      "spp": 1,
+      "renderMs": 19.7916
+    },
+    {
+      "first": 203,
+      "last": 203,
+      "panel": 1,
+      "backend": "optix",
+      "ev": 7,
+      "spp": 1,
+      "renderMs": 20.7171
+    }
+  ],
+  "output": "frame.png",
+  "sha256": "123d353f572f5c965204a5b1b6c8ecc2d54a2a2ce1ec497172ae055b8a603663"
+}

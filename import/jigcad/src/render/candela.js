@@ -6,6 +6,6 @@
 export * from '../../../candela/src/engine/core.ts';
 export { API, paramStore, formatDiag, compile } from '../../../candela/src/engine/candela.ts';
 export { Viewport } from '../../../candela/src/engine/viewport.ts';
-export { RenderQueue, runRender, passesToEXR, writeEXR, readEXR } from '../../../candela/src/engine/output.ts';
+export { RenderQueue, runRender, zipStore, passesToEXR, writeEXR, readEXR } from '../../../candela/src/engine/output.ts';
 export { videoSupport, VideoWriter } from '../../../candela/src/engine/video.ts';
 export { rayMesh } from '../../../candela/src/engine/mesh.ts';   // picking against CAD meshes (render/host.js)
