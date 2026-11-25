@@ -9,17 +9,24 @@ function components(ids, path) {
   return [...new Set(ids)];
 }
 
-function section(spec, path) {
+function section(spec, path, startTime) {
   if (spec === null) return null;
-  if (!spec || typeof spec !== 'object' || Object.keys(spec).some(k => !['components', 'normal', 'offset'].includes(k)))
-    throw Error(path + ' must be null or {components, normal, offset}');
+  if (!spec || typeof spec !== 'object' || Object.keys(spec).some(k => !['components', 'normal', 'offset', 'endOffset', 'endTime'].includes(k)))
+    throw Error(path + ' must be null or {components, normal, offset, endOffset?, endTime?}');
   const { normal, offset } = spec;
   if (!Array.isArray(normal) || normal.length !== 3 || !normal.every(Number.isFinite))
     throw Error(path + '.normal must be a finite three-vector');
   const length = Math.hypot(...normal);
   if (!length || !Number.isFinite(length) || !Number.isFinite(offset))
     throw Error(path + ' needs a nonzero normal and a finite offset in mm');
-  return { components: components(spec.components, path + '.components'), normal: normal.map(n => n / length), offset };
+  const plane = { components: components(spec.components, path + '.components'), normal: normal.map(n => n / length), offset };
+  if ('endTime' in spec || 'endOffset' in spec) {
+    if (!Number.isFinite(spec.endOffset) || !Number.isFinite(spec.endTime) || spec.endTime <= startTime)
+      throw Error(path + ' sweep requires finite endOffset and endTime later than its key');
+    plane.endTime = spec.endTime;
+    plane.endOffset = spec.endOffset;
+  }
+  return plane;
 }
 
 function color(value, path) {
@@ -51,9 +58,11 @@ function trail(value, path) {
 
 function view(value, path) {
   if (['stage', 'turntable', 'front-side'].includes(value)) return value;
+  if (value && typeof value.camera === 'string' && value.camera.trim() && Object.keys(value).length === 1)
+    return { camera: value.camera };
   if (value && typeof value.inset === 'string' && value.inset.trim() && Object.keys(value).length === 1)
     return { inset: value.inset };
-  throw Error(path + ' must be stage, turntable, front-side or {inset: component}');
+  throw Error(path + ' must be stage, turntable, front-side or {inset: component} or {camera: name}');
 }
 
 export function shotComponents(key) {
@@ -79,7 +88,7 @@ export function normalizeShot(keys, studyName) {
         if (!Number.isFinite(value) || value < 0 || value > 1) throw Error(at + '.' + name + ' must be in [0, 1]');
         key[name] = value;
       } else if (name === 'isolate') key.isolate = value === null ? null : components(value, at + '.isolate');
-      else if (name === 'section') key.section = section(value, at + '.section');
+      else if (name === 'section') key.section = section(value, at + '.section', raw.time);
       else if (name === 'accent') key.accent = accent(value, at + '.accent');
       else if (name === 'trail') key.trail = trail(value, at + '.trail');
       else if (name === 'view') key.view = view(value, at + '.view');
@@ -123,7 +132,14 @@ export function shotAt(keys, seconds) {
   for (const key of keys) {
     if (key.time > t) break;
     if ('isolate' in key) out.isolate = key.isolate;
-    if ('section' in key) out.section = key.section;
+    if ('section' in key) {
+      const plane = key.section;
+      if (plane?.endTime != null) {
+        const { components, normal, offset, endOffset, endTime } = plane;
+        const fraction = Math.min(1, (t - key.time) / (endTime - key.time));
+        out.section = { components, normal, offset: fraction === 1 ? endOffset : offset + fraction * (endOffset - offset) };
+      } else out.section = plane;
+    }
     for (const name of ['accent', 'trail', 'view']) {
       if (!(name in key)) continue;
       if (key[name] == null) delete out[name];

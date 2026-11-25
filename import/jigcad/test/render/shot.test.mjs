@@ -96,3 +96,18 @@ test('selected-color mask tints only visible pixels of the selected occurrence',
   drawShotAccent(ctx, {scene, buf, k: 1}, {components:['needle'], color:'#223344', opacity:0.5});
   assert.deepEqual(spans, [[2,0,2,1]]);
 });
+
+test('local section sweep samples a tilted plane by time and survives remapping and backwards seeks', () => {
+  const plane = { components: ['sleeve'], normal: [0, 0, 3], offset: 5, endOffset: -3, endTime: 4 };
+  const keys = normalizeShot([{time: 2, section: plane}, {time: 3, edges: 0}, {time: 6, section: null}], 'cut');
+  const nested = mapShotComponents(keys, id => 'child/' + id);
+  for (const [t, offset] of [[5, -3], [2, 5], [3, 1], [4, -3]]) {
+    assert.deepEqual(shotAt(nested, t).section, { components: ['child/sleeve'], normal: [0, 0, 1], offset });
+  }
+  assert.equal(shotAt(keys, 1).section, null);
+  assert.equal(shotAt(keys, 6).section, null);
+  const earlyClear = normalizeShot([{time: 2, section: plane}, {time: 3, section: null}], 'cut');
+  assert.equal(shotAt(earlyClear, 3).section, null);
+  for (const changes of [{endTime: 2}, {endOffset: undefined}, {endTime: undefined}, {endOffset: NaN}])
+    assert.throws(() => normalizeShot([{time: 2, section: {...plane, ...changes}}], 'cut'), /sweep/);
+});

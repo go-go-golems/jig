@@ -82,7 +82,15 @@ async function run() {
       for (let row=0;row<312;row++) {
         const data = await page.evaluate(async({row,known})=>{
           const n = nativeShot, o = n.options(row)
-          const variant = o.style.section ? 'section' : 'full'
+          // Sweeps can produce a different clipped mesh at every sample.
+          n.variants ??= new Map()
+          const signature = JSON.stringify([o.style.isolate, o.style.section])
+          if (!n.variants.has(signature)) {
+            const name = !o.style.isolate && !o.style.section ? 'full'
+              : o.style.section && !known.includes('section') ? 'section' : 'geometry-' + row
+            n.variants.set(signature, name)
+          }
+          const variant = n.variants.get(signature)
           const surface = o.style.surface, time = row/24
           // Stop at the beauty callback. Positive surface requests camera and
           // geometry even on the CAD-only rows, without a GPU/drawing pass.
